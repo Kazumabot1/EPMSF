@@ -1,3 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #e0f2fe; /* Light blue */
+  --primary-dark: #0ea5e9;
+  --secondary: #fef2f2; /* Slight red */
+  --secondary-dark: #ef4444;
+  --text: #1f2937;
+  --background: #f9fafb;
+}
+
+* {
+  font-family: 'Times New Roman', serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text);
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
