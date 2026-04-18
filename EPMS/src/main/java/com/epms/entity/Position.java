@@ -20,10 +20,9 @@ public class Position {
     @Column(name = "position_title")
     private String positionTitle;
 
-    @Column(name = "position_level")
-    private Integer positionLevel;
-
-    private String description;
+    @ManyToOne
+    @JoinColumn(name = "level_id", nullable = false)
+    private PositionLevel level;
 
     private Boolean status = true;
 

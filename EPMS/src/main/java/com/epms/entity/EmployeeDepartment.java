@@ -26,11 +26,11 @@ public class EmployeeDepartment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", referencedColumnName = "id")
     private Department department;
-private String currentdepartment;
-private String parentdepartment;
-private String assignBy;
-private Date startdate;
-private Date enddate;
+    private String currentdepartment;
+    private String parentdepartment;
+    private String assignBy;
+    private Date startdate;
+    private Date enddate;
 
 
     // Extra fields (optional)
