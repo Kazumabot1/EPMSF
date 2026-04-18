@@ -28,11 +28,8 @@ public class Team {
     private Department department;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_id")
+    @JoinColumn(name = "created_by_id", nullable = false)
     private User createdByUser;
-
-    @Column(name = "created_by", length = 100, nullable = false)
-    private String createdBy;
 
     @Temporal(TemporalType.DATE)
     @Column(name = "created_date", nullable = false)

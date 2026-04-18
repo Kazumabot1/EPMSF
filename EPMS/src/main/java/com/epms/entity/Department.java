@@ -33,7 +33,7 @@ public class Department {
 
     private String createdBy;
 
-    // One department has many employees
-    @ManyToMany(mappedBy = "department", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Employee> employees;
+    // One department can have many EmployeeDepartment records (history tracking)
+    @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<EmployeeDepartment> employeeDepartments;
 }

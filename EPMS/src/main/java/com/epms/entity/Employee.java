@@ -37,12 +37,7 @@ public class Employee {
     private String fatherName;
     private String fatherNrc;
 
-    // Foreign key to Department (Many employees belong to one department)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id", referencedColumnName = "id")
-    private Department department;
-
-    // An employee can have many EmployeeDepartment records (if using join table with extra fields)
+    // Many-to-Many with Department is managed through EmployeeDepartment (supports history tracking)
     @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<EmployeeDepartment> employeeDepartments;
 }
