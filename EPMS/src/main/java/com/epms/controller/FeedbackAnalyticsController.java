@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,44 +29,37 @@ public class FeedbackAnalyticsController {
 
     @GetMapping("/{requestId}/summary")
     public ResponseEntity<GenericApiResponse<FeedbackSummaryResponse>> getFeedbackSummary(@PathVariable Long requestId) {
-        log.info("Extracting analytics summary for Request ID: {}", requestId);
+        log.info("Fetching feedback summary for Request ID: {}", requestId);
 
         FeedbackSummaryProjection projection = feedbackRequestService.getFeedbackSummary(requestId);
-        FeedbackSummaryResponse responseDto = new FeedbackSummaryResponse();
         
-        if (projection != null) {
-            responseDto.setRequestId(projection.getRequestId());
-            responseDto.setAverageScore(projection.getAvgScore());
-            responseDto.setTotalResponses(projection.getTotalResponses());
+        if (projection == null) {
+            // Safe fallback if aggregation returns null
+            return ResponseEntity.ok(GenericApiResponse.success("No summary data found", new FeedbackSummaryResponse(requestId, 0.0, 0L)));
         }
 
-        GenericApiResponse<FeedbackSummaryResponse> response = GenericApiResponse.<FeedbackSummaryResponse>builder()
-                .success(true)
-                .message("Feedback summary retrieved successfully")
-                .data(responseDto)
-                .timestamp(LocalDateTime.now())
+        FeedbackSummaryResponse response = FeedbackSummaryResponse.builder()
+                .requestId(projection.getRequestId())
+                .averageScore(projection.getAvgScore() != null ? projection.getAvgScore() : 0.0)
+                .totalResponses(projection.getTotalResponses() != null ? projection.getTotalResponses() : 0L)
                 .build();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(GenericApiResponse.success("Summary retrieved successfully", response));
     }
 
     @GetMapping("/{requestId}/pending")
     public ResponseEntity<GenericApiResponse<List<PendingEvaluatorResponse>>> getPendingEvaluators(@PathVariable Long requestId) {
-        log.info("Extracting pending evaluators for Request ID: {}", requestId);
+        log.info("Fetching pending evaluators for Request ID: {}", requestId);
 
         List<PendingEvaluatorProjection> projections = feedbackEvaluationService.getPendingEvaluators(requestId);
-        
-        List<PendingEvaluatorResponse> responseDtos = projections.stream()
-                .map(p -> new PendingEvaluatorResponse(p.getEvaluatorId(), p.getRequestId()))
+
+        List<PendingEvaluatorResponse> responseList = projections.stream()
+                .map(p -> PendingEvaluatorResponse.builder()
+                        .evaluatorEmployeeId(p.getEvaluatorId())
+                        .requestId(p.getRequestId())
+                        .build())
                 .collect(Collectors.toList());
 
-        GenericApiResponse<List<PendingEvaluatorResponse>> response = GenericApiResponse.<List<PendingEvaluatorResponse>>builder()
-                .success(true)
-                .message("Pending evaluators retrieved successfully")
-                .data(responseDtos)
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(GenericApiResponse.success("Pending evaluators retrieved successfully", responseList));
     }
 }

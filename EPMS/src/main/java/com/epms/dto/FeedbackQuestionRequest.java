@@ -6,7 +6,8 @@ import lombok.Data;
 
 @Data
 public class FeedbackQuestionRequest {
-    @NotBlank(message = "Question text cannot be blank")
+
+    @NotBlank(message = "Question text is required")
     private String questionText;
 
     @NotNull(message = "Question order is required")
@@ -18,6 +19,6 @@ public class FeedbackQuestionRequest {
     @NotNull(message = "Weight is required")
     private Double weight;
 
-    @NotNull(message = "Is required flag is required")
+    @NotNull(message = "isRequired flag must be provided")
     private Boolean isRequired;
 }

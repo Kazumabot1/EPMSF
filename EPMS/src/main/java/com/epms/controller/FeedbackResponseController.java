@@ -1,7 +1,9 @@
 package com.epms.controller;
 
+import com.epms.dto.FeedbackResponseItemRequest;
 import com.epms.dto.FeedbackResponseSubmitRequest;
 import com.epms.dto.GenericApiResponse;
+import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackResponseItem;
 import com.epms.service.FeedbackResponseService;
@@ -10,11 +12,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -25,38 +29,37 @@ public class FeedbackResponseController {
     private final FeedbackResponseService feedbackResponseService;
 
     @PostMapping
-    public ResponseEntity<GenericApiResponse<Long>> submitResponse(@Valid @RequestBody FeedbackResponseSubmitRequest request) {
-        log.info("Receiving response payload for Assignment ID: {}", request.getEvaluatorAssignmentId());
+    public ResponseEntity<GenericApiResponse<Long>> submitFeedbackResponse(@Valid @RequestBody FeedbackResponseSubmitRequest request) {
+        log.info("Received request to submit feedback response for assignment ID: {}", request.getEvaluatorAssignmentId());
 
-        Long submittingEmployeeId = 1L; // Fetched from Spring Security
+        Long submittingEmployeeId = 1L; // Context injected via Spring Security Principal later
 
-        List<FeedbackResponseItem> mappedItems = request.getResponses().stream().map(itemDTO -> {
+        List<FeedbackResponseItem> items = new ArrayList<>();
+        double totalScore = 0.0;
+        
+        for (FeedbackResponseItemRequest itemReq : request.getResponses()) {
             FeedbackResponseItem item = new FeedbackResponseItem();
-            com.epms.entity.FeedbackQuestion question = new com.epms.entity.FeedbackQuestion();
-            question.setId(itemDTO.getQuestionId());
+            FeedbackQuestion question = new FeedbackQuestion();
+            question.setId(itemReq.getQuestionId());
             item.setQuestion(question);
-            item.setRatingValue(itemDTO.getRatingValue());
-            item.setComment(itemDTO.getComment());
-            return item;
-        }).collect(Collectors.toList());
+            item.setRatingValue(itemReq.getRatingValue());
+            item.setComment(itemReq.getComment());
+            items.add(item);
+            
+            totalScore += itemReq.getRatingValue();
+        }
 
-        Double avgLocal = mappedItems.stream().mapToDouble(FeedbackResponseItem::getRatingValue).average().orElse(0.0);
+        Double overallScore = items.isEmpty() ? 0.0 : totalScore / items.size();
 
-        FeedbackResponse response = feedbackResponseService.submitResponse(
+        FeedbackResponse savedResponse = feedbackResponseService.submitResponse(
                 request.getEvaluatorAssignmentId(),
                 submittingEmployeeId,
-                avgLocal,
+                overallScore,
                 request.getComments(),
-                mappedItems
+                items
         );
 
-        GenericApiResponse<Long> apiResponse = GenericApiResponse.<Long>builder()
-                .success(true)
-                .message("Feedback has been submitted successfully.")
-                .data(response.getId())
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(GenericApiResponse.success("Feedback submitted successfully", savedResponse.getId()));
     }
 }

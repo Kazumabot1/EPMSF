@@ -1,6 +1,7 @@
 package com.epms.controller;
 
 import com.epms.dto.FeedbackRequestCreateDTO;
+import com.epms.dto.FeedbackRequestListResponse;
 import com.epms.dto.GenericApiResponse;
 import com.epms.entity.FeedbackRequest;
 import com.epms.service.FeedbackRequestService;
@@ -14,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -26,42 +26,46 @@ public class FeedbackRequestController {
     private final FeedbackRequestService feedbackRequestService;
 
     @PostMapping
-    public ResponseEntity<GenericApiResponse<Long>> createRequest(@Valid @RequestBody FeedbackRequestCreateDTO requestDTO) {
-        log.info("Received payload to create feedback request for target employee: {}", requestDTO.getTargetEmployeeId());
-        
+    public ResponseEntity<GenericApiResponse<Long>> createFeedbackRequest(@Valid @RequestBody FeedbackRequestCreateDTO requestDTO) {
+        log.info("Received request to create feedback request for target employee ID: {}", requestDTO.getTargetEmployeeId());
+
+        Long requesterUserId = 1L; // Context injected later
+
         FeedbackRequest createdRequest = feedbackRequestService.createFeedbackRequest(
                 requestDTO.getFormId(),
                 requestDTO.getTargetEmployeeId(),
-                1L, // Requested By User ID mock from security context
+                requesterUserId,
                 requestDTO.getCycleId(),
                 requestDTO.getDueAt(),
-                true // mocked anonymous inheritance
+                true // isAnonymous defaults based on business rules or form
         );
 
-        GenericApiResponse<Long> response = GenericApiResponse.<Long>builder()
-                .success(true)
-                .message("Feedback Request dispatched successfully")
-                .data(createdRequest.getId())
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(GenericApiResponse.success("Feedback request and evaluators created successfully", createdRequest.getId()));
     }
 
     @GetMapping("/{employeeId}")
-    public ResponseEntity<GenericApiResponse<Page<Long>>> getRequestsForEmployee(@PathVariable Long employeeId, Pageable pageable) {
-        log.info("Fetching requests for employee ID: {}", employeeId);
+    public ResponseEntity<GenericApiResponse<Page<FeedbackRequestListResponse>>> getRequestsForEmployee(
+            @PathVariable Long employeeId, Pageable pageable) {
+        log.info("Fetching feedback requests for employee ID: {}", employeeId);
         
         List<FeedbackRequest> requests = feedbackRequestService.getRequestsForEmployee(employeeId);
-        Page<Long> pagedIds = new PageImpl<>(requests.stream().map(FeedbackRequest::getId).toList(), pageable, requests.size());
         
-        GenericApiResponse<Page<Long>> response = GenericApiResponse.<Page<Long>>builder()
-                .success(true)
-                .message("Fetched employee requests successfully")
-                .data(pagedIds)
-                .timestamp(LocalDateTime.now())
-                .build();
+        List<FeedbackRequestListResponse> dtoList = requests.stream()
+                .map(req -> FeedbackRequestListResponse.builder()
+                        .id(req.getId())
+                        .formId(req.getForm().getId())
+                        .cycleId(req.getCycleId())
+                        .targetEmployeeId(req.getTargetEmployeeId())
+                        .dueAt(req.getDueAt())
+                        .status(req.getStatus().name())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
 
-        return ResponseEntity.ok(response);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), dtoList.size());
+        Page<FeedbackRequestListResponse> page = new PageImpl<>(dtoList.subList(start, Math.max(start, end)), pageable, dtoList.size());
+
+        return ResponseEntity.ok(GenericApiResponse.success("Feedback requests fetched successfully", page));
     }
 }

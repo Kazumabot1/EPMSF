@@ -1,6 +1,8 @@
 package com.epms.controller;
 
 import com.epms.dto.FeedbackFormCreateRequest;
+import com.epms.dto.FeedbackQuestionRequest;
+import com.epms.dto.FeedbackSectionRequest;
 import com.epms.dto.GenericApiResponse;
 import com.epms.entity.FeedbackForm;
 import com.epms.entity.FeedbackQuestion;
@@ -14,8 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -26,44 +28,40 @@ public class FeedbackFormController {
     private final FeedbackFormService feedbackFormService;
 
     @PostMapping
-    public ResponseEntity<GenericApiResponse<Long>> createForm(@Valid @RequestBody FeedbackFormCreateRequest request) {
-        log.info("Received request to create Feedback Form: {}", request.getFormName());
-        
-        // Manual mapping from DTO to Entity
+    public ResponseEntity<GenericApiResponse<Long>> createFeedbackForm(@Valid @RequestBody FeedbackFormCreateRequest request) {
+        log.info("Received request to create feedback form: {}", request.getFormName());
+
         FeedbackForm form = new FeedbackForm();
         form.setFormName(request.getFormName());
         form.setAnonymousAllowed(request.getAnonymousAllowed());
         form.setStatus(FeedbackFormStatus.DRAFT);
-        // Security Context fallback
-        form.setCreatedByUserId(1L); 
+        // User context to be injected via Principal/SecurityContext later
+        form.setCreatedByUserId(1L);
 
-        form.setSections(request.getSections().stream().map(sectionRequest -> {
+        List<FeedbackSection> sections = new ArrayList<>();
+        for (FeedbackSectionRequest sectionReq : request.getSections()) {
             FeedbackSection section = new FeedbackSection();
-            section.setTitle(sectionRequest.getTitle());
-            section.setOrderNo(sectionRequest.getOrderNo());
-            
-            section.setQuestions(sectionRequest.getQuestions().stream().map(qRequest -> {
+            section.setTitle(sectionReq.getTitle());
+            section.setOrderNo(sectionReq.getOrderNo());
+
+            List<FeedbackQuestion> questions = new ArrayList<>();
+            for (FeedbackQuestionRequest qReq : sectionReq.getQuestions()) {
                 FeedbackQuestion question = new FeedbackQuestion();
-                question.setQuestionText(qRequest.getQuestionText());
-                question.setQuestionOrder(qRequest.getQuestionOrder());
-                question.setRatingScaleId(qRequest.getRatingScaleId());
-                question.setWeight(qRequest.getWeight());
-                question.setIsRequired(qRequest.getIsRequired());
-                return question;
-            }).collect(Collectors.toList()));
-            
-            return section;
-        }).collect(Collectors.toList()));
+                question.setQuestionText(qReq.getQuestionText());
+                question.setQuestionOrder(qReq.getQuestionOrder());
+                question.setRatingScaleId(qReq.getRatingScaleId());
+                question.setWeight(qReq.getWeight());
+                question.setIsRequired(qReq.getIsRequired());
+                questions.add(question);
+            }
+            section.setQuestions(questions);
+            sections.add(section);
+        }
+        form.setSections(sections);
 
-        FeedbackForm savedForm = feedbackFormService.createForm(form);
+        FeedbackForm createdForm = feedbackFormService.createForm(form);
 
-        GenericApiResponse<Long> response = GenericApiResponse.<Long>builder()
-                .success(true)
-                .message("Feedback Form created successfully")
-                .data(savedForm.getId())
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(GenericApiResponse.success("Feedback form created successfully", createdForm.getId()));
     }
 }
