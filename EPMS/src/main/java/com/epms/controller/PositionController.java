@@ -26,30 +26,30 @@ public class PositionController {
     private final PositionService positionService;
 
     @PostMapping
-    public ResponseEntity<PositionResponseDto> create(@Valid @RequestBody PositionRequestDto requestDto) {
+    public ResponseEntity<PositionResponseDto> createPosition(@Valid @RequestBody PositionRequestDto requestDto) {
         PositionResponseDto responseDto = positionService.create(requestDto);
         return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
     }
 
     @GetMapping
-    public ResponseEntity<List<PositionResponseDto>> getAll() {
+    public ResponseEntity<List<PositionResponseDto>> getAllPosition() {
         return ResponseEntity.ok(positionService.getAll());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PositionResponseDto> getById(@PathVariable Integer id) {
+        public ResponseEntity<PositionResponseDto> getPositionById(@PathVariable Integer id) {
         return ResponseEntity.ok(positionService.getById(id));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PositionResponseDto> update(
+    public ResponseEntity<PositionResponseDto> updatePosition(
             @PathVariable Integer id,
             @Valid @RequestBody PositionRequestDto requestDto) {
         return ResponseEntity.ok(positionService.update(id, requestDto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+    public ResponseEntity<Void> deletePosition(@PathVariable Integer id) {
         positionService.delete(id);
         return ResponseEntity.noContent().build();
     }
