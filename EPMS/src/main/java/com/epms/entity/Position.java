@@ -36,8 +36,8 @@ public class Position {
     private Set<KpiPosition> kpiPositions = new HashSet<>();
 
     // Helper method to get all KPIs for this position
-    public Set<KpiForm> getKpis() {
-        Set<KpiForm> kpiForms = new HashSet<>();
+    public Set<Kpi> getKpis() {
+        Set<Kpi> kpiForms = new HashSet<>();
         for (KpiPosition kp : kpiPositions) {
             kpiForms.add(kp.getKpiForm());
         }

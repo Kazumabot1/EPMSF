@@ -18,7 +18,7 @@ public class KpiPosition {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "kpi_id", nullable = false)
-    private KpiForm kpiForm;
+    private Kpi kpiForm;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id", nullable = false)

@@ -12,7 +12,7 @@ import java.util.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class KpiForm {
+public class Kpi {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
