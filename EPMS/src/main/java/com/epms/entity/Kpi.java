@@ -20,7 +20,11 @@ public class Kpi {
 
     private String title;
     private Double target;
-    private String unit;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kpi_unit_id")
+    private KpiUnit kpiUnit;
+
     private Integer weight;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -19,6 +19,9 @@ public class Position {
 
     @Column(name = "position_title")
     private String positionTitle;
+    
+    @Column(name = "description")
+    private String description;
 
     @ManyToOne
     @JoinColumn(name = "level_id", nullable = false)
