@@ -1,0 +1,28 @@
+import { useState } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import Sidebar from './Sidebar';
+import Header from './Header';
+
+const HRLayout = () => {
+  const [collapsed, setCollapsed] = useState(false);
+  const email = localStorage.getItem('epmsUserEmail');
+
+  if (!email) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <div className="hr-shell">
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
+      <Header collapsed={collapsed} />
+
+      <main className={`hr-content ${collapsed ? 'collapsed' : ''}`}>
+        <div className="hr-content-inner">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default HRLayout;

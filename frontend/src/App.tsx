@@ -1,24 +1,37 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import Home from './components/Home';
 import Login from './components/Login';
 import Register from './components/Register';
+import Permissions from './components/Permissions';
+import UserRoles from './components/UserRoles';
+import RolePermissions from './components/RolePermissions';
+import PipUpdates from './components/PipUpdates';
+import NotificationTemplates from './components/NotificationTemplates';
+import OneOnOneMeetings from './components/OneOnOneMeetings';
+import OneOnOneActionItems from './components/OneOnOneActionItems';
+import HRLayout from './components/layout/HRLayout';
+import './components/layout/hr-layout.css';
 
 function App() {
   return (
     <Router>
-      <div>
-        <nav style={{ padding: 10 }}>
-          <Link to="/">Home</Link> |{' '}
-          <Link to="/login">Login</Link> |{' '}
-          <Link to="/register">Register</Link>
-        </nav>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        <Routes>
+        <Route element={<HRLayout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Routes>
-      </div>
+          <Route path="/permissions" element={<Permissions />} />
+          <Route path="/user-roles" element={<UserRoles />} />
+          <Route path="/role-permissions" element={<RolePermissions />} />
+          <Route path="/pip-updates" element={<PipUpdates />} />
+          <Route path="/notifications" element={<NotificationTemplates />} />
+          <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
+          <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Router>
   );
 }
