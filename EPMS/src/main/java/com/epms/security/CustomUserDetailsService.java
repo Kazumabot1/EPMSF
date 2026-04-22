@@ -29,6 +29,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final RoleRepository roleRepository;
     private final RolePermissionRepository rolePermissionRepository;
     private final PermissionRepository permissionRepository;
+    private final DashboardResolver dashboardResolver;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
@@ -37,8 +38,8 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
         List<Integer> roleIds = userRoles.stream().map(UserRole::getRoleId).distinct().toList();
-        List<Role> roles = roleIds.isEmpty() ? List.of() : roleRepository.findAllById(roleIds);
 
+        List<Role> roles = roleIds.isEmpty() ? List.of() : roleRepository.findAllById(roleIds);
         List<RolePermission> rolePermissions = roleIds.isEmpty() ? List.of() : rolePermissionRepository.findByRoleIdIn(roleIds);
         List<Integer> permissionIds = rolePermissions.stream().map(RolePermission::getPermissionId).distinct().toList();
         List<Permission> permissions = permissionIds.isEmpty() ? List.of() : permissionRepository.findAllById(permissionIds);
@@ -49,6 +50,10 @@ public class CustomUserDetailsService implements UserDetailsService {
         Set<String> permissionNames = new LinkedHashSet<>();
         permissions.forEach(permission -> permissionNames.add(permission.getName()));
 
-        return new UserPrincipal(user, roleNames.stream().toList(), permissionNames.stream().toList());
+        List<String> roleList = roleNames.stream().toList();
+        List<String> permissionList = permissionNames.stream().toList();
+        String dashboard = dashboardResolver.resolveDashboard(roleList, user.getPosition());
+
+        return new UserPrincipal(user, roleList, permissionList, dashboard);
     }
 }

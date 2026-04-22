@@ -1,4 +1,3 @@
-
 package com.epms.security;
 
 import com.epms.entity.User;
@@ -18,39 +17,56 @@ public class UserPrincipal implements UserDetails {
     private final String email;
     private final String password;
     private final boolean active;
+
     private final Integer managerId;
     private final Integer departmentId;
+
+    private final String fullName;
+    private final String employeeCode;
+    private final String position;
+    private final String dashboard;
+
     private final List<String> roles;
     private final List<String> permissions;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public UserPrincipal(User user, List<String> roles, List<String> permissions) {
+    public UserPrincipal(User user, List<String> roles, List<String> permissions, String dashboard) {
         this.id = user.getId();
         this.email = user.getEmail();
         this.password = user.getPassword();
         this.active = Boolean.TRUE.equals(user.getActive());
         this.managerId = user.getManagerId();
         this.departmentId = user.getDepartmentId();
+        this.fullName = user.getFullName();
+        this.employeeCode = user.getEmployeeCode();
+        this.position = user.getPosition();
         this.roles = roles;
         this.permissions = permissions;
+        this.dashboard = dashboard;
         this.authorities = buildAuthorities(roles, permissions);
     }
 
     private Collection<? extends GrantedAuthority> buildAuthorities(List<String> roles, List<String> permissions) {
         List<SimpleGrantedAuthority> granted = new ArrayList<>();
-        roles.forEach(role -> granted.add(new SimpleGrantedAuthority(role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase())));
-        permissions.forEach(permission -> granted.add(new SimpleGrantedAuthority(permission.toUpperCase())));
+
+        roles.forEach(role -> {
+            String normalized = role.toUpperCase();
+            if (!normalized.startsWith("ROLE_")) {
+                normalized = "ROLE_" + normalized;
+            }
+            granted.add(new SimpleGrantedAuthority(normalized));
+        });
+
+        permissions.forEach(permission ->
+                granted.add(new SimpleGrantedAuthority(permission.toUpperCase()))
+        );
+
         return granted;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;
-    }
-
-    @Override
-    public String getPassword() {
-        return password;
     }
 
     @Override
