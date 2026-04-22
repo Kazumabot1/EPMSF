@@ -1,4 +1,3 @@
-
 package com.epms.service.auth;
 
 import com.epms.dto.auth.AuthResponse;
@@ -46,7 +45,12 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request) {
         try {
-            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
         } catch (BadCredentialsException ex) {
             throw new BadCredentialsException("Invalid email or password");
         }
@@ -54,7 +58,9 @@ public class AuthService {
         User user = userRepository.findByEmailAndActiveTrue(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        UserPrincipal principal = (UserPrincipal) customUserDetailsService.loadUserByUsername(request.getEmail());
+        UserPrincipal principal =
+                (UserPrincipal) customUserDetailsService.loadUserByUsername(request.getEmail());
+
         refreshTokenRepository.deleteByUserId(user.getId());
         RefreshToken refreshToken = createRefreshToken(user.getId());
 
@@ -67,8 +73,10 @@ public class AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .employeeCode(user.getEmployeeCode())
+                .position(user.getPosition())
                 .roles(principal.getRoles())
                 .permissions(principal.getPermissions())
+                .dashboard(principal.getDashboard())
                 .build();
     }
 
@@ -86,7 +94,8 @@ public class AuthService {
                 .filter(u -> Boolean.TRUE.equals(u.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found for refresh token"));
 
-        UserPrincipal principal = (UserPrincipal) customUserDetailsService.loadUserByUsername(user.getEmail());
+        UserPrincipal principal =
+                (UserPrincipal) customUserDetailsService.loadUserByUsername(user.getEmail());
 
         return AuthResponse.builder()
                 .accessToken(jwtService.generateAccessToken(principal))
@@ -97,8 +106,10 @@ public class AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .employeeCode(user.getEmployeeCode())
+                .position(user.getPosition())
                 .roles(principal.getRoles())
                 .permissions(principal.getPermissions())
+                .dashboard(principal.getDashboard())
                 .build();
     }
 
@@ -125,6 +136,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         user.setUpdatedAt(new Date());
         userRepository.save(user);
+
         refreshTokenRepository.deleteByUserId(userId);
     }
 
@@ -136,4 +148,3 @@ public class AuthService {
         return refreshTokenRepository.save(refreshToken);
     }
 }
-
