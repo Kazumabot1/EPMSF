@@ -45,6 +45,17 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    to: '/hr/performance-kpi',
+    label: 'Performance KPI',
+    icon: 'bi-clipboard-data',
+    children: [
+      { to: '/hr/performance-kpi/unit', label: 'KPI Unit', icon: 'bi-rulers' },
+      { to: '/hr/performance-kpi/category', label: 'KPI Category', icon: 'bi-tags' },
+      { to: '/hr/performance-kpi/item', label: 'KPI Item', icon: 'bi-list-check' },
+      { to: '/hr/performance-kpi/form', label: 'KPI Form', icon: 'bi-table' },
+    ],
+  },
+  {
     to: '/one-on-one-meetings',
     label: 'Appraisals',
     icon: 'bi-clipboard-check',
@@ -65,6 +76,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     '/user-roles': false,
     '/permissions': false,
     '/hr/position': false,
+    '/hr/performance-kpi': false,
     '/one-on-one-meetings': false,
   });
 

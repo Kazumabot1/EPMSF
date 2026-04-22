@@ -13,6 +13,10 @@ import HRLayout from './components/layout/HRLayout';
 import PositionLevelCreate from './pages/position-level/Create';
 import PositionCreate from './pages/position/Create';
 import PositionTable from './pages/position/Table';
+import KpiUnitPage from './pages/hr/performance-kpi/unit/KpiUnitPage';
+import KpiCategoryPage from './pages/hr/performance-kpi/category/KpiCategoryPage';
+import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
+import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
 import './components/layout/hr-layout.css';
 
 function App() {
@@ -34,6 +38,10 @@ function App() {
           <Route path="/hr/position/create" element={<PositionCreate />} />
           <Route path="/hr/position-level/create" element={<PositionLevelCreate />} />
           <Route path="/hr/position/table" element={<PositionTable />} />
+          <Route path="/hr/performance-kpi/unit" element={<KpiUnitPage />} />
+          <Route path="/hr/performance-kpi/category" element={<KpiCategoryPage />} />
+          <Route path="/hr/performance-kpi/item" element={<KpiItemPage />} />
+          <Route path="/hr/performance-kpi/form" element={<KpiFormPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
