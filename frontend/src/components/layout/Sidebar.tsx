@@ -35,6 +35,16 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    to: '/hr/position',
+    label: 'Position',
+    icon: 'bi-briefcase',
+    children: [
+      { to: '/hr/position/create', label: 'Position Create', icon: 'bi-plus-circle' },
+      { to: '/hr/position-level/create', label: 'Position Level Create', icon: 'bi-layers' },
+      { to: '/hr/position/table', label: 'Position Table', icon: 'bi-table' },
+    ],
+  },
+  {
     to: '/one-on-one-meetings',
     label: 'Appraisals',
     icon: 'bi-clipboard-check',
@@ -54,6 +64,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
     '/user-roles': false,
     '/permissions': false,
+    '/hr/position': false,
     '/one-on-one-meetings': false,
   });
 
