@@ -22,4 +22,7 @@ public interface KpiRepository extends JpaRepository<Kpi, Integer> {
 
     @EntityGraph(attributePaths = {"kpiUnit", "kpiCategory", "kpiItem"})
     Optional<Kpi> findWithRelationsById(Integer id);
+
+    long countByCreatedByUser_Id(Integer userId);
+    long count();
 }

@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
@@ -41,12 +42,14 @@ public class AuthController {
     private long refreshTokenExpirationMs;
 
     @PostMapping("/login")
+    @Transactional
     public ResponseEntity<GenericApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        UserPrincipal principal = (UserPrincipal) customUserDetailsService.loadUserByUsername(request.getEmail());
+        UserPrincipal principal =
+                (UserPrincipal) customUserDetailsService.loadUserByUsername(request.getEmail());
 
         User user = userRepository.findByEmailAndActiveTrue(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));

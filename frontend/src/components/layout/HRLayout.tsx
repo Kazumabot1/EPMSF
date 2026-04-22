@@ -1,28 +1,20 @@
-import { useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import Header from './Header';
+import { authStorage } from '../../services/authStorage';
 
 const HRLayout = () => {
-  const [collapsed, setCollapsed] = useState(false);
-  const email = localStorage.getItem('epmsUserEmail');
+  const user = authStorage.getUser();
 
-  if (!email) {
+  if (!user || !authStorage.isLoggedIn()) {
     return <Navigate to="/login" replace />;
   }
 
-  return (
-    <div className="hr-shell">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
-      <Header collapsed={collapsed} />
+  const allowedDashboards = ['HR_DASHBOARD', 'ADMIN_DASHBOARD'];
 
-      <main className={`hr-content ${collapsed ? 'collapsed' : ''}`}>
-        <div className="hr-content-inner">
-          <Outlet />
-        </div>
-      </main>
-    </div>
-  );
+  if (!allowedDashboards.includes(user.dashboard)) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export default HRLayout;

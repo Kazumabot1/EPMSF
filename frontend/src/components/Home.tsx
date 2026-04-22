@@ -8,19 +8,13 @@ function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const email = localStorage.getItem('epmsUserEmail');
-
-    if (!email) {
-      navigate('/login');
-      return;
-    }
-
-    api.get('/api/dashboard/summary', {
-      params: { email },
-    })
-      .then(res => setData(res.data))
-      .catch(() => setError('Failed to load dashboard'));
-  }, []);
+    api.get('/api/dashboard/summary')
+      .then((res) => setData(res.data))
+      .catch(() => {
+        setError('Failed to load dashboard');
+        navigate('/login');
+      });
+  }, [navigate]);
 
   return (
     <div className="hr-dashboard">
@@ -40,17 +34,17 @@ function Home() {
                 <p>Total Employees</p>
                 <span className="hr-stat-icon blue"><i className="bi bi-people" /></span>
               </div>
-              <h3>{data.stats.directReports + 8}</h3>
-              <small>{data.stats.directReports} active</small>
+              <h3>{data.stats.directReports}</h3>
+              <small>Visible to HR</small>
             </article>
 
             <article className="hr-stat-card">
               <div className="hr-stat-card-head">
-                <p>Pending Appraisals</p>
+                <p>KPIs Created</p>
                 <span className="hr-stat-icon amber"><i className="bi bi-clipboard-check" /></span>
               </div>
-              <h3>{Math.max(1, data.stats.kpisCreated - 1)}</h3>
-              <small>Require action</small>
+              <h3>{data.stats.kpisCreated}</h3>
+              <small>Configured by you</small>
             </article>
 
             <article className="hr-stat-card">
@@ -58,61 +52,53 @@ function Home() {
                 <p>Active PIPs</p>
                 <span className="hr-stat-icon red"><i className="bi bi-exclamation-triangle" /></span>
               </div>
-              <h3>1</h3>
-              <small>Being monitored</small>
+              <h3>{data.stats.activePipsManaged}</h3>
+              <small>Currently tracked</small>
             </article>
 
             <article className="hr-stat-card">
               <div className="hr-stat-card-head">
-                <p>Pending Feedback</p>
-                <span className="hr-stat-icon sky"><i className="bi bi-bullseye" /></span>
+                <p>Unread Notifications</p>
+                <span className="hr-stat-icon sky"><i className="bi bi-bell" /></span>
               </div>
               <h3>{data.stats.unreadNotifications}</h3>
-              <small>Awaiting responses</small>
+              <small>Need attention</small>
             </article>
           </section>
 
           <section className="hr-panel-grid">
             <article className="hr-panel-card">
-              <h4><i className="bi bi-calendar-event" /> Upcoming Deadlines</h4>
+              <h4><i className="bi bi-person-badge" /> Logged in as</h4>
               <div className="hr-list-item">
-                <strong>Annual Review 2024</strong>
-                <span className="active">Active</span>
+                <strong>{data.user.fullName}</strong>
+                <span className="active">{data.user.position}</span>
               </div>
               <div className="hr-list-item">
-                <strong>Mid-Year Review 2024</strong>
-                <span className="review">In Review</span>
-              </div>
-              <div className="hr-list-item">
-                <strong>KPI Finalization</strong>
-                <span className="pending">Pending</span>
+                <strong>{data.user.email}</strong>
+                <span className="review">{data.user.employeeCode ?? 'No code'}</span>
               </div>
             </article>
 
             <article className="hr-panel-card">
-              <h4><i className="bi bi-bullseye" /> KPI Status Overview</h4>
-              <div className="hr-progress-row">
-                <span>Active</span>
-                <div><em style={{ width: '88%' }} /></div>
-                <small>7 KPIs (88%)</small>
-              </div>
-              <div className="hr-progress-row">
-                <span>Completed</span>
-                <div><em style={{ width: '13%' }} /></div>
-                <small>1 KPI (13%)</small>
-              </div>
-              <div className="hr-progress-row">
-                <span>Draft</span>
-                <div><em style={{ width: '0%' }} /></div>
-                <small>0 KPIs (0%)</small>
-              </div>
+              <h4><i className="bi bi-bullseye" /> Recent KPIs</h4>
+              {data.recentKpis?.length ? data.recentKpis.map((item: any) => (
+                <div className="hr-list-item" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <span className="pending">Weight {item.weight}</span>
+                </div>
+              )) : <p className="hr-loading">No KPI records yet.</p>}
             </article>
 
             <article className="hr-panel-card">
-              <h4><i className="bi bi-check2-circle" /> Pending Tasks</h4>
-              <button type="button" className="hr-task-btn">Review 3 appraisal submissions</button>
-              <button type="button" className="hr-task-btn">Configure Q3 appraisal cycle</button>
-              <button type="button" className="hr-task-btn">Assign KPIs to new hires</button>
+              <h4><i className="bi bi-bell" /> Recent Notifications</h4>
+              {data.recentNotifications?.length ? data.recentNotifications.map((item: any) => (
+                <div className="hr-list-item" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <span className={item.read ? 'review' : 'pending'}>
+                    {item.read ? 'Read' : 'Unread'}
+                  </span>
+                </div>
+              )) : <p className="hr-loading">No notifications yet.</p>}
             </article>
           </section>
         </>
