@@ -14,7 +14,7 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: 'bi-grid-1x2' },
+  { to: '/dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
   {
     to: '/user-roles',
     label: 'Employee Management',
@@ -143,7 +143,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             <NavLink
               key={item.label}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/dashboard'}
               className={({ isActive }) => `hr-nav-item ${isActive ? 'active' : ''}`}
               title={collapsed ? item.label : undefined}
             >

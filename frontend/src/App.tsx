@@ -27,7 +27,8 @@ function App() {
         <Route path="/register" element={<Register />} />
 
         <Route element={<HRLayout />}>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Home />} />
           <Route path="/permissions" element={<Permissions />} />
           <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/role-permissions" element={<RolePermissions />} />
@@ -44,7 +45,7 @@ function App() {
           <Route path="/hr/performance-kpi/form" element={<KpiFormPage />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
   );
