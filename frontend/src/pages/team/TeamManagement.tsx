@@ -2,17 +2,17 @@
 // (Component to display and manage teams)
 
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { fetchTeams, type TeamResponse } from '../../services/teamService';
 import TeamEditModal from './TeamEditModal'; // KHN added part
+import TeamCreate from './TeamCreate';
 import './team-ui.css';
 
 const TeamManagement = () => {
-    const navigate = useNavigate();
     const [teams, setTeams] = useState<TeamResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedTeam, setSelectedTeam] = useState<TeamResponse | null>(null); // KHN added part
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
     const loadTeams = async () => {
         try {
@@ -53,7 +53,7 @@ const TeamManagement = () => {
                     <div className="team-table-toolbar">
                         <button 
                             className="team-btn primary"
-                            onClick={() => navigate('/hr/team/create')}
+                            onClick={() => setShowCreateModal(true)}
                         >
                             <i className="bi bi-plus-lg" />
                             Create New Team
@@ -132,6 +132,29 @@ const TeamManagement = () => {
                     onClose={() => setSelectedTeam(null)} 
                     onUpdate={handleModalUpdate}
                 />
+            )}
+
+            {showCreateModal && (
+                <div className="team-modal-overlay">
+                    <div className="team-modal-content">
+                        <div className="team-modal-header">
+                            <h2>Create Team</h2>
+                            <button className="team-btn ghost" onClick={() => setShowCreateModal(false)}>
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+                        <div className="team-modal-body">
+                            <TeamCreate
+                                embedded
+                                onCancel={() => setShowCreateModal(false)}
+                                onCreated={() => {
+                                    setShowCreateModal(false);
+                                    loadTeams();
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

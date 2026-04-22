@@ -17,6 +17,9 @@ import KpiUnitPage from './pages/hr/performance-kpi/unit/KpiUnitPage';
 import KpiCategoryPage from './pages/hr/performance-kpi/category/KpiCategoryPage';
 import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
 import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
+import TeamManagement from './pages/team/TeamManagement';
+import TeamCreate from './pages/team/TeamCreate';
+import DepartmentManagement from './pages/department/DepartmentManagement';
 import './components/layout/hr-layout.css';
 
 function App() {
@@ -30,6 +33,9 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Home />} />
           <Route path="/permissions" element={<Permissions />} />
+          <Route path="/hr/team" element={<TeamManagement />} />
+          <Route path="/hr/team/create" element={<TeamCreate />} />
+          <Route path="/hr/department" element={<DepartmentManagement />} />
           <Route path="/user-roles" element={<UserRoles />} />
           <Route path="/role-permissions" element={<RolePermissions />} />
           <Route path="/pip-updates" element={<PipUpdates />} />

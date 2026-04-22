@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 type SidebarProps = {
   collapsed: boolean;
@@ -16,12 +16,13 @@ type NavItem = {
 const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'bi-grid-1x2' },
   {
-    to: '/user-roles',
+    to: '/hr/team',
     label: 'Employee Management',
     icon: 'bi-people',
     children: [
+      { to: '/hr/team', label: 'Teams', icon: 'bi-diagram-3' },
       { to: '/user-roles', label: 'Employees', icon: 'bi-person' },
-      { to: '/role-permissions', label: 'Departments', icon: 'bi-building' },
+      { to: '/hr/department', label: 'Department', icon: 'bi-building' },
       { to: '/permissions', label: 'Job Positions', icon: 'bi-briefcase' },
     ],
   },
@@ -72,8 +73,9 @@ const navItems: NavItem[] = [
 
 const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
-    '/user-roles': false,
+    '/hr/team': false,
     '/permissions': false,
     '/hr/position': false,
     '/hr/performance-kpi': false,
@@ -83,6 +85,16 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const toggleMenu = (key: string) => {
     setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  useEffect(() => {
+    const activeParent = navItems.find((item) =>
+      item.children?.some((child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)),
+    );
+
+    if (activeParent) {
+      setOpenMenus((prev) => ({ ...prev, [activeParent.to]: true }));
+    }
+  }, [location.pathname]);
 
   return (
     <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -106,7 +118,9 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       <nav className="hr-sidebar-nav">
         {navItems.map((item) => {
           const hasChildren = !!item.children?.length;
-          const childActive = item.children?.some((child) => location.pathname === child.to);
+          const childActive = item.children?.some(
+            (child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`),
+          );
 
           if (hasChildren && !collapsed) {
             return (
@@ -114,7 +128,12 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 <button
                   type="button"
                   className={`hr-nav-item hr-nav-button ${childActive ? 'active' : ''}`}
-                  onClick={() => toggleMenu(item.to)}
+                  onClick={() => {
+                    toggleMenu(item.to);
+                    if (item.to === '/hr/team') {
+                      navigate('/hr/team');
+                    }
+                  }}
                 >
                   <i className={`bi ${item.icon}`} />
                   <span className="hr-nav-label">{item.label}</span>
