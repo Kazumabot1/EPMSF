@@ -21,6 +21,8 @@ import TeamManagement from './pages/team/TeamManagement';
 import TeamCreate from './pages/team/TeamCreate';
 import DepartmentManagement from './pages/department/DepartmentManagement';
 import './components/layout/hr-layout.css';
+import EmployeeManagement from "./pages/employee/EmployeeManagement";
+import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 
 function App() {
   return (
@@ -28,9 +30,10 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
+<Route path="/employees" element={<EmployeeManagement />} />
         <Route element={<HRLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/hr/employee" element={<EmployeeDashboard />} />
           <Route path="/dashboard" element={<Home />} />
           <Route path="/permissions" element={<Permissions />} />
           <Route path="/hr/team" element={<TeamManagement />} />

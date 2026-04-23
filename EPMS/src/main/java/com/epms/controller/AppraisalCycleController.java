@@ -47,5 +47,18 @@ public class AppraisalCycleController {
         appraisalCycleService.deleteAppraisalCycle(id);
         return ResponseEntity.noContent().build();
     }
-}
 
+    @PostMapping("/{id}/lock")
+    public ResponseEntity<AppraisalCycleResponseDto> lockAppraisalCycle(@PathVariable Integer id) {
+        AppraisalCycleResponseDto cycle = appraisalCycleService.getAppraisalCycleById(id);
+        AppraisalCycleRequestDto requestDto = new AppraisalCycleRequestDto();
+        requestDto.setName(cycle.getName());
+        requestDto.setType(cycle.getType());
+        requestDto.setStartDate(cycle.getStartDate());
+        requestDto.setEndDate(cycle.getEndDate());
+        requestDto.setStatus("LOCKED");
+        requestDto.setDynamicType(cycle.getDynamicType());
+        requestDto.setDynamicOffsetMonths(cycle.getDynamicOffsetMonths());
+        return ResponseEntity.ok(appraisalCycleService.updateAppraisalCycle(id, requestDto));
+    }
+}

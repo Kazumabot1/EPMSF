@@ -24,4 +24,7 @@ public class AppraisalCycle {
     private String status; // DRAFT, ACTIVE, COMPLETED, LOCKED
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt = new Date();
+
+    private String dynamicType; // FIXED, JOIN_DATE_BASED
+    private Integer dynamicOffsetMonths; // For join-date-based cycles
 }

@@ -47,5 +47,41 @@ public class AppraisalController {
         appraisalService.deleteAppraisal(id);
         return ResponseEntity.noContent().build();
     }
-}
 
+    @PostMapping("/{id}/save-draft")
+    public ResponseEntity<AppraisalResponseDto> saveDraft(@PathVariable Integer id) {
+        // Logic to save as draft
+        AppraisalResponseDto appraisal = appraisalService.getAppraisalById(id);
+        // Assuming we update status to DRAFT
+        AppraisalRequestDto requestDto = new AppraisalRequestDto();
+        requestDto.setEmployeeId(appraisal.getEmployeeId());
+        requestDto.setCycleId(appraisal.getCycleId());
+        requestDto.setFormId(appraisal.getFormId());
+        requestDto.setAppraisalStatus("DRAFT");
+        return ResponseEntity.ok(appraisalService.updateAppraisal(id, requestDto));
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<AppraisalResponseDto> submitAppraisal(@PathVariable Integer id) {
+        // Logic to submit
+        AppraisalResponseDto appraisal = appraisalService.getAppraisalById(id);
+        AppraisalRequestDto requestDto = new AppraisalRequestDto();
+        requestDto.setEmployeeId(appraisal.getEmployeeId());
+        requestDto.setCycleId(appraisal.getCycleId());
+        requestDto.setFormId(appraisal.getFormId());
+        requestDto.setAppraisalStatus("SUBMITTED");
+        return ResponseEntity.ok(appraisalService.updateAppraisal(id, requestDto));
+    }
+
+    @PostMapping("/{id}/lock")
+    public ResponseEntity<AppraisalResponseDto> lockAppraisal(@PathVariable Integer id) {
+        // Logic to lock
+        AppraisalResponseDto appraisal = appraisalService.getAppraisalById(id);
+        AppraisalRequestDto requestDto = new AppraisalRequestDto();
+        requestDto.setEmployeeId(appraisal.getEmployeeId());
+        requestDto.setCycleId(appraisal.getCycleId());
+        requestDto.setFormId(appraisal.getFormId());
+        requestDto.setAppraisalStatus("LOCKED");
+        return ResponseEntity.ok(appraisalService.updateAppraisal(id, requestDto));
+    }
+}
