@@ -23,6 +23,8 @@ public interface FeedbackEvaluatorAssignmentRepository extends JpaRepository<Fee
 
     List<FeedbackEvaluatorAssignment> findByEvaluatorEmployeeIdAndStatus(Long evaluatorEmployeeId, AssignmentStatus status);
 
+    List<FeedbackEvaluatorAssignment> findByFeedbackRequestIdAndStatusIn(Long feedbackRequestId, List<AssignmentStatus> statuses);
+
     Page<FeedbackEvaluatorAssignment> findByEvaluatorEmployeeIdAndStatus(Long evaluatorEmployeeId, AssignmentStatus status, Pageable pageable);
 
     boolean existsByFeedbackRequestIdAndEvaluatorEmployeeId(Long feedbackRequestId, Long evaluatorEmployeeId);
@@ -44,4 +46,8 @@ public interface FeedbackEvaluatorAssignmentRepository extends JpaRepository<Fee
            "WHERE a.feedbackRequest.id = :requestId " +
            "AND a.status NOT IN (com.epms.entity.enums.AssignmentStatus.SUBMITTED, com.epms.entity.enums.AssignmentStatus.DECLINED)")
     List<PendingEvaluatorProjection> findPendingEvaluatorsByRequestId(@Param("requestId") Long requestId);
+
+    long countByFeedbackRequestId(Long feedbackRequestId);
+
+    long countByFeedbackRequestIdAndStatus(Long feedbackRequestId, AssignmentStatus status);
 }

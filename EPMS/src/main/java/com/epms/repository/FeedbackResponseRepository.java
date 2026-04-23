@@ -18,6 +18,17 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
 
     boolean existsByEvaluatorAssignmentId(Long evaluatorAssignmentId);
 
+    @Query("SELECT COUNT(r) > 0 FROM FeedbackResponse r " +
+           "JOIN r.evaluatorAssignment a " +
+           "JOIN a.feedbackRequest req " +
+           "WHERE a.evaluatorEmployeeId = :evaluatorEmployeeId " +
+           "AND req.targetEmployeeId = :targetEmployeeId " +
+           "AND req.cycleId = :cycleId " +
+           "AND r.finalStatus = com.epms.entity.enums.ResponseStatus.SUBMITTED")
+    boolean existsSubmittedByEvaluatorAndTargetAndCycle(@Param("evaluatorEmployeeId") Long evaluatorEmployeeId,
+                                                        @Param("targetEmployeeId") Long targetEmployeeId,
+                                                        @Param("cycleId") Long cycleId);
+
     /**
      * Get submitted responses only (e.g. for general viewing or aggregation).
      */
@@ -31,6 +42,20 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
            "JOIN r.evaluatorAssignment a " +
            "WHERE a.feedbackRequest.id = :requestId AND r.finalStatus = :status")
     List<FeedbackResponse> findResponsesByRequestIdAndStatus(@Param("requestId") Long requestId, @Param("status") ResponseStatus status);
+
+    @Query("SELECT r FROM FeedbackResponse r " +
+           "JOIN r.evaluatorAssignment a " +
+           "JOIN a.feedbackRequest req " +
+           "WHERE req.targetEmployeeId = :targetEmployeeId " +
+           "AND r.finalStatus = :status")
+    List<FeedbackResponse> findByTargetEmployeeIdAndStatus(@Param("targetEmployeeId") Long targetEmployeeId,
+                                                           @Param("status") ResponseStatus status);
+
+    @Query("SELECT r FROM FeedbackResponse r " +
+           "JOIN r.evaluatorAssignment a " +
+           "JOIN a.feedbackRequest req " +
+           "WHERE req.cycleId = :cycleId AND r.finalStatus = :status")
+    List<FeedbackResponse> findByCycleIdAndStatus(@Param("cycleId") Long cycleId, @Param("status") ResponseStatus status);
 
     /**
      * Example modifying query to update final status of a response.

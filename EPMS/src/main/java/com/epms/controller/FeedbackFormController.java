@@ -4,6 +4,8 @@ import com.epms.dto.FeedbackFormCreateRequest;
 import com.epms.dto.FeedbackQuestionRequest;
 import com.epms.dto.FeedbackSectionRequest;
 import com.epms.dto.GenericApiResponse;
+import com.epms.exception.UnauthorizedActionException;
+import com.epms.security.SecurityUtils;
 import com.epms.entity.FeedbackForm;
 import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackSection;
@@ -30,13 +32,55 @@ public class FeedbackFormController {
     @PostMapping
     public ResponseEntity<GenericApiResponse<Long>> createFeedbackForm(@Valid @RequestBody FeedbackFormCreateRequest request) {
         log.info("Received request to create feedback form: {}", request.getFormName());
+        ensureHrOrAdmin();
 
+        FeedbackForm form = mapRequestToForm(request);
+        form.setStatus(FeedbackFormStatus.DRAFT);
+        form.setCreatedByUserId(SecurityUtils.currentUserId().longValue());
+
+        FeedbackForm createdForm = feedbackFormService.createForm(form);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(GenericApiResponse.success("Feedback form created successfully", createdForm.getId()));
+    }
+
+    @PutMapping("/{formId}")
+    public ResponseEntity<GenericApiResponse<Long>> updateFeedbackForm(
+            @PathVariable Long formId,
+            @Valid @RequestBody FeedbackFormCreateRequest request) {
+        ensureHrOrAdmin();
+        FeedbackForm form = mapRequestToForm(request);
+        form.setCreatedByUserId(SecurityUtils.currentUserId().longValue());
+        FeedbackForm updated = feedbackFormService.updateFormStructure(formId, form);
+        return ResponseEntity.ok(GenericApiResponse.success("Feedback form updated successfully", updated.getId()));
+    }
+
+    @PostMapping("/{formId}/versions")
+    public ResponseEntity<GenericApiResponse<Long>> createFeedbackFormVersion(
+            @PathVariable Long formId,
+            @Valid @RequestBody FeedbackFormCreateRequest request) {
+        ensureHrOrAdmin();
+        FeedbackForm form = mapRequestToForm(request);
+        form.setStatus(FeedbackFormStatus.DRAFT);
+        form.setCreatedByUserId(SecurityUtils.currentUserId().longValue());
+        FeedbackForm version = feedbackFormService.createNewVersion(formId, form);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(GenericApiResponse.success("Feedback form version created successfully", version.getId()));
+    }
+
+    @GetMapping("/{formId}/versions")
+    public ResponseEntity<GenericApiResponse<List<Long>>> getFeedbackFormVersions(@PathVariable Long formId) {
+        ensureHrOrAdmin();
+        List<Long> versions = feedbackFormService.getFormVersions(formId).stream()
+                .map(FeedbackForm::getId)
+                .toList();
+        return ResponseEntity.ok(GenericApiResponse.success("Feedback form versions retrieved successfully", versions));
+    }
+
+    private FeedbackForm mapRequestToForm(FeedbackFormCreateRequest request) {
         FeedbackForm form = new FeedbackForm();
         form.setFormName(request.getFormName());
         form.setAnonymousAllowed(request.getAnonymousAllowed());
-        form.setStatus(FeedbackFormStatus.DRAFT);
-        // User context to be injected via Principal/SecurityContext later
-        form.setCreatedByUserId(1L);
 
         List<FeedbackSection> sections = new ArrayList<>();
         for (FeedbackSectionRequest sectionReq : request.getSections()) {
@@ -58,10 +102,16 @@ public class FeedbackFormController {
             sections.add(section);
         }
         form.setSections(sections);
+        return form;
+    }
 
-        FeedbackForm createdForm = feedbackFormService.createForm(form);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(GenericApiResponse.success("Feedback form created successfully", createdForm.getId()));
+    private void ensureHrOrAdmin() {
+        List<String> roles = SecurityUtils.currentUser().getRoles();
+        boolean authorized = roles != null && roles.stream()
+                .map(String::toUpperCase)
+                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+        if (!authorized) {
+            throw new UnauthorizedActionException("Only HR/Admin can manage feedback forms.");
+        }
     }
 }

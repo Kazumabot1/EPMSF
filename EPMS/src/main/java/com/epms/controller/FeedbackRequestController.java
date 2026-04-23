@@ -1,9 +1,12 @@
 package com.epms.controller;
 
+import com.epms.dto.FeedbackDeadlineUpdateRequest;
 import com.epms.dto.FeedbackRequestCreateDTO;
 import com.epms.dto.FeedbackRequestListResponse;
 import com.epms.dto.GenericApiResponse;
 import com.epms.entity.FeedbackRequest;
+import com.epms.exception.UnauthorizedActionException;
+import com.epms.security.SecurityUtils;
 import com.epms.service.FeedbackRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,8 +31,9 @@ public class FeedbackRequestController {
     @PostMapping
     public ResponseEntity<GenericApiResponse<Long>> createFeedbackRequest(@Valid @RequestBody FeedbackRequestCreateDTO requestDTO) {
         log.info("Received request to create feedback request for target employee ID: {}", requestDTO.getTargetEmployeeId());
+        ensureHrOrAdmin();
 
-        Long requesterUserId = 1L; // Context injected later
+        Long requesterUserId = SecurityUtils.currentUserId().longValue();
 
         FeedbackRequest createdRequest = feedbackRequestService.createFeedbackRequest(
                 requestDTO.getFormId(),
@@ -42,6 +46,22 @@ public class FeedbackRequestController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GenericApiResponse.success("Feedback request and evaluators created successfully", createdRequest.getId()));
+    }
+
+    @PatchMapping("/{requestId}/deadline")
+    public ResponseEntity<GenericApiResponse<Long>> updateFeedbackDeadline(
+            @PathVariable Long requestId,
+            @Valid @RequestBody FeedbackDeadlineUpdateRequest request) {
+        ensureHrOrAdmin();
+        FeedbackRequest updated = feedbackRequestService.updateDeadline(requestId, request.getDueAt());
+        return ResponseEntity.ok(GenericApiResponse.success("Feedback deadline updated successfully", updated.getId()));
+    }
+
+    @PostMapping("/{requestId}/reminders")
+    public ResponseEntity<GenericApiResponse<Integer>> sendFeedbackReminders(@PathVariable Long requestId) {
+        ensureHrOrAdmin();
+        int sent = feedbackRequestService.sendReminderNotifications(requestId);
+        return ResponseEntity.ok(GenericApiResponse.success("Feedback reminders sent successfully", sent));
     }
 
     @GetMapping("/{employeeId}")
@@ -67,5 +87,15 @@ public class FeedbackRequestController {
         Page<FeedbackRequestListResponse> page = new PageImpl<>(dtoList.subList(start, Math.max(start, end)), pageable, dtoList.size());
 
         return ResponseEntity.ok(GenericApiResponse.success("Feedback requests fetched successfully", page));
+    }
+
+    private void ensureHrOrAdmin() {
+        List<String> roles = SecurityUtils.currentUser().getRoles();
+        boolean authorized = roles != null && roles.stream()
+                .map(String::toUpperCase)
+                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+        if (!authorized) {
+            throw new UnauthorizedActionException("Only HR/Admin can perform this action.");
+        }
     }
 }

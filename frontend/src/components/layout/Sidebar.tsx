@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
       { to: '/one-on-one-action-items', label: 'Action Items', icon: 'bi-list-check' },
     ],
   },
-  { to: '/notifications', label: '360 Feedback', icon: 'bi-chat-dots' },
+  { to: '/hr/feedback/overview', label: '360 Feedback', icon: 'bi-chat-dots' },
   { to: '/pip-updates', label: 'PIP Management', icon: 'bi-exclamation-triangle' },
   { to: '/one-on-one-meetings', label: 'Reports', icon: 'bi-file-earmark-bar-graph' },
   { to: '/notifications', label: 'Notifications', icon: 'bi-bell' },

@@ -27,6 +27,12 @@ public class FeedbackForm {
     @Column(name = "anonymous_allowed", nullable = false)
     private Boolean anonymousAllowed;
 
+    @Column(name = "root_form_id")
+    private Long rootFormId;
+
+    @Column(name = "version_number", nullable = false)
+    private Integer versionNumber;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private FeedbackFormStatus status;
@@ -50,6 +56,9 @@ public class FeedbackForm {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        if (this.versionNumber == null) {
+            this.versionNumber = 1;
+        }
     }
 
     @PreUpdate

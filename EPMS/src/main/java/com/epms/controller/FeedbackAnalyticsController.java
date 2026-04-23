@@ -1,8 +1,12 @@
 package com.epms.controller;
 
+import com.epms.dto.ConsolidatedFeedbackReportResponse;
+import com.epms.dto.FeedbackCompletionDashboardResponse;
 import com.epms.dto.FeedbackSummaryResponse;
 import com.epms.dto.GenericApiResponse;
 import com.epms.dto.PendingEvaluatorResponse;
+import com.epms.exception.UnauthorizedActionException;
+import com.epms.security.SecurityUtils;
 import com.epms.repository.projection.FeedbackSummaryProjection;
 import com.epms.repository.projection.PendingEvaluatorProjection;
 import com.epms.service.FeedbackEvaluationService;
@@ -61,5 +65,31 @@ public class FeedbackAnalyticsController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(GenericApiResponse.success("Pending evaluators retrieved successfully", responseList));
+    }
+
+    @GetMapping("/cycle/{cycleId}/completion")
+    public ResponseEntity<GenericApiResponse<FeedbackCompletionDashboardResponse>> getCycleCompletionDashboard(
+            @PathVariable Long cycleId) {
+        ensureHrOrAdmin();
+        FeedbackCompletionDashboardResponse response = feedbackRequestService.getCompletionDashboard(cycleId);
+        return ResponseEntity.ok(GenericApiResponse.success("Completion dashboard retrieved successfully", response));
+    }
+
+    @GetMapping("/cycle/{cycleId}/consolidated")
+    public ResponseEntity<GenericApiResponse<ConsolidatedFeedbackReportResponse>> getConsolidatedFeedbackReport(
+            @PathVariable Long cycleId) {
+        ensureHrOrAdmin();
+        ConsolidatedFeedbackReportResponse response = feedbackRequestService.getConsolidatedReport(cycleId);
+        return ResponseEntity.ok(GenericApiResponse.success("Consolidated report retrieved successfully", response));
+    }
+
+    private void ensureHrOrAdmin() {
+        List<String> roles = SecurityUtils.currentUser().getRoles();
+        boolean authorized = roles != null && roles.stream()
+                .map(String::toUpperCase)
+                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+        if (!authorized) {
+            throw new UnauthorizedActionException("Only HR/Admin can access feedback analytics dashboards.");
+        }
     }
 }
