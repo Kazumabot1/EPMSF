@@ -19,5 +19,7 @@ public class AppraisalCycleResponseDto {
     private Boolean isActive;
     private String status;
     private Date createdAt;
-}
 
+    private String dynamicType;
+    private Integer dynamicOffsetMonths;
+}

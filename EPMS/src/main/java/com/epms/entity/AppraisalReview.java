@@ -31,6 +31,8 @@ public class AppraisalReview {
 
     private Double totalScore;
 
+    private String comments; // Added for manager review comments
+
     @OneToMany(mappedBy = "review")
     private List<AppraisalAnswer> answers;
 }

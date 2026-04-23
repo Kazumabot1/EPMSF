@@ -15,5 +15,6 @@ public class AppraisalReviewResponseDto {
     private String reviewType;
     private String reviewStatus;
     private Double totalScore;
-}
 
+    private String comments;
+}

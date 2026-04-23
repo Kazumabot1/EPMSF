@@ -21,5 +21,7 @@ public class AppraisalCycleRequestDto {
     private Date startDate;
     private Date endDate;
     private String status; // DRAFT, ACTIVE, COMPLETED, LOCKED
-}
 
+    private String dynamicType; // FIXED, JOIN_DATE_BASED
+    private Integer dynamicOffsetMonths;
+}

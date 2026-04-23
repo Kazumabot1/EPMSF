@@ -21,5 +21,6 @@ public class AppraisalReviewRequestDto {
 
     private String reviewStatus; // pending, submitted
     private Double totalScore;
-}
 
+    private String comments;
+}

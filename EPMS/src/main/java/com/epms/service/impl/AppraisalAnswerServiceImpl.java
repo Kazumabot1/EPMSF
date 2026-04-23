@@ -4,11 +4,11 @@ import com.epms.dto.AppraisalAnswerRequestDto;
 import com.epms.dto.AppraisalAnswerResponseDto;
 import com.epms.entity.AppraisalAnswer;
 import com.epms.entity.AppraisalReview;
-import com.epms.entity.FormQuestion;
+import com.epms.entity.AppraisalQuestion;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.AppraisalAnswerRepository;
 import com.epms.repository.AppraisalReviewRepository;
-import com.epms.repository.FormQuestionRepository;
+import com.epms.repository.AppraisalQuestionRepository;
 import com.epms.service.AppraisalAnswerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,15 +21,15 @@ public class AppraisalAnswerServiceImpl implements AppraisalAnswerService {
 
     private final AppraisalAnswerRepository appraisalAnswerRepository;
     private final AppraisalReviewRepository appraisalReviewRepository;
-    private final FormQuestionRepository formQuestionRepository;
+    private final AppraisalQuestionRepository appraisalQuestionRepository;
 
     @Override
     public AppraisalAnswerResponseDto createAppraisalAnswer(AppraisalAnswerRequestDto requestDto) {
         AppraisalReview review = appraisalReviewRepository.findById(requestDto.getReviewId())
                 .orElseThrow(() -> new ResourceNotFoundException("Appraisal Review not found with id: " + requestDto.getReviewId()));
 
-        FormQuestion question = formQuestionRepository.findById(requestDto.getQuestionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Form Question not found with id: " + requestDto.getQuestionId()));
+        AppraisalQuestion question = appraisalQuestionRepository.findById(requestDto.getQuestionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appraisal Question not found with id: " + requestDto.getQuestionId()));
 
         AppraisalAnswer appraisalAnswer = new AppraisalAnswer();
         appraisalAnswer.setReview(review);
@@ -63,8 +63,8 @@ public class AppraisalAnswerServiceImpl implements AppraisalAnswerService {
         AppraisalReview review = appraisalReviewRepository.findById(requestDto.getReviewId())
                 .orElseThrow(() -> new ResourceNotFoundException("Appraisal Review not found with id: " + requestDto.getReviewId()));
 
-        FormQuestion question = formQuestionRepository.findById(requestDto.getQuestionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Form Question not found with id: " + requestDto.getQuestionId()));
+        AppraisalQuestion question = appraisalQuestionRepository.findById(requestDto.getQuestionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appraisal Question not found with id: " + requestDto.getQuestionId()));
 
         existingAnswer.setReview(review);
         existingAnswer.setQuestion(question);
@@ -91,7 +91,7 @@ public class AppraisalAnswerServiceImpl implements AppraisalAnswerService {
         AppraisalAnswerResponseDto dto = new AppraisalAnswerResponseDto();
         dto.setId(appraisalAnswer.getId());
         dto.setReviewId(appraisalAnswer.getReview().getId());
-        dto.setQuestionId(appraisalAnswer.getQuestion().getQuestionId());
+        dto.setQuestionId(appraisalAnswer.getQuestion().getId());
         dto.setAnswerText(appraisalAnswer.getAnswerText());
         dto.setRatingValue(appraisalAnswer.getRatingValue());
         dto.setYesNoValue(appraisalAnswer.getYesNoValue());
@@ -99,4 +99,3 @@ public class AppraisalAnswerServiceImpl implements AppraisalAnswerService {
         return dto;
     }
 }
-

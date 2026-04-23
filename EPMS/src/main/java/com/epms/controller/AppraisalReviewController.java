@@ -47,5 +47,17 @@ public class AppraisalReviewController {
         appraisalReviewService.deleteAppraisalReview(id);
         return ResponseEntity.noContent().build();
     }
-}
 
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<AppraisalReviewResponseDto> submitAppraisalReview(@PathVariable Integer id) {
+        AppraisalReviewResponseDto review = appraisalReviewService.getAppraisalReviewById(id);
+        AppraisalReviewRequestDto requestDto = new AppraisalReviewRequestDto();
+        requestDto.setAppraisalId(review.getAppraisalId());
+        requestDto.setReviewerEmployeeId(review.getReviewerEmployeeId());
+        requestDto.setReviewType(review.getReviewType());
+        requestDto.setReviewStatus("SUBMITTED");
+        requestDto.setTotalScore(review.getTotalScore());
+        requestDto.setComments(review.getComments());
+        return ResponseEntity.ok(appraisalReviewService.updateAppraisalReview(id, requestDto));
+    }
+}

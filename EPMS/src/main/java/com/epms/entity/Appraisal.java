@@ -25,6 +25,10 @@ public class Appraisal {
     @JoinColumn(name = "cycle_id")
     private AppraisalCycle cycle;
 
+    @ManyToOne
+    @JoinColumn(name = "form_id")
+    private AppraisalForm form;
+
     private String appraisalStatus;
     private Double overallScore;
     private String performanceCategory;
