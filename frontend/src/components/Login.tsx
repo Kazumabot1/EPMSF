@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { authStorage } from '../services/authStorage';
 import type { ApiEnvelope, AuthResponse } from '../types/auth';
 import './login.css';
@@ -14,20 +14,18 @@ function Login() {
 
   const resolveRoute = (dashboard?: string) => {
     switch (dashboard) {
-      case 'HR_DASHBOARD':
-        return '/';
-      case 'ADMIN_DASHBOARD':
-        return '/';
-      case 'MANAGER_DASHBOARD':
-        return '/';
-      case 'DEPARTMENT_HEAD_DASHBOARD':
-        return '/';
-      case 'EXECUTIVE_DASHBOARD':
-        return '/';
       case 'EMPLOYEE_DASHBOARD':
-        return '/';
+        return '/employee/dashboard';
+      case 'MANAGER_DASHBOARD':
+        return '/manager/dashboard';
+      case 'DEPARTMENT_HEAD_DASHBOARD':
+        return '/department-head/dashboard';
+      case 'EXECUTIVE_DASHBOARD':
+        return '/executive/dashboard';
+      case 'ADMIN_DASHBOARD':
+      case 'HR_DASHBOARD':
       default:
-        return '/';
+        return '/dashboard';
     }
   };
 
@@ -37,13 +35,10 @@ function Login() {
     setIsSubmitting(true);
 
     try {
-      const res = await axios.post<ApiEnvelope<AuthResponse>>(
-        'http://localhost:8081/api/auth/login',
-        {
-          email,
-          password,
-        }
-      );
+      const res = await api.post<ApiEnvelope<AuthResponse>>('/auth/login', {
+        email: email.trim(),
+        password,
+      });
 
       const payload = res.data.data;
       authStorage.setSession(payload);
@@ -51,8 +46,8 @@ function Login() {
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        'Login failed'
+          err?.response?.data?.error ||
+          'Login failed. Please check your email/password and make sure the backend is running.'
       );
     } finally {
       setIsSubmitting(false);

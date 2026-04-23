@@ -1,14 +1,32 @@
-import type { AuthResponse } from '../types/auth';
-
 const ACCESS_TOKEN_KEY = 'epmsAccessToken';
 const REFRESH_TOKEN_KEY = 'epmsRefreshToken';
 const USER_KEY = 'epmsUser';
 
+type SessionPayload = {
+  accessToken: string;
+  refreshToken: string;
+  dashboard: string;
+  fullName: string;
+  email: string;
+  position?: string;
+  employeeCode?: string;
+};
+
 export const authStorage = {
-  setSession(payload: AuthResponse) {
+  setSession(payload: SessionPayload) {
     localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, payload.refreshToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(payload));
+
+    localStorage.setItem(
+      USER_KEY,
+      JSON.stringify({
+        dashboard: payload.dashboard,
+        fullName: payload.fullName,
+        email: payload.email,
+        position: payload.position ?? '',
+        employeeCode: payload.employeeCode ?? '',
+      })
+    );
   },
 
   clearSession() {
@@ -17,11 +35,11 @@ export const authStorage = {
     localStorage.removeItem(USER_KEY);
   },
 
-  getAccessToken(): string | null {
+  getAccessToken() {
     return localStorage.getItem(ACCESS_TOKEN_KEY);
   },
 
-  getRefreshToken(): string | null {
+  getRefreshToken() {
     return localStorage.getItem(REFRESH_TOKEN_KEY);
   },
 
@@ -36,7 +54,7 @@ export const authStorage = {
     }
   },
 
-  isLoggedIn(): boolean {
+  isLoggedIn() {
     return !!localStorage.getItem(ACCESS_TOKEN_KEY);
-  }
+  },
 };

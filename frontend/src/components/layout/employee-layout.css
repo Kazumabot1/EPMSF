@@ -1,0 +1,65 @@
+.employee-layout {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.employee-layout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 32px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.employee-layout-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #2563eb;
+  background: #dbeafe;
+}
+
+.employee-layout-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  color: #0f172a;
+}
+
+.employee-layout-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.employee-layout-logout {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #ef4444;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.employee-layout-main {
+  padding: 24px 32px;
+}
+
+@media (max-width: 768px) {
+  .employee-layout-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .employee-layout-main {
+    padding: 20px;
+  }
+}

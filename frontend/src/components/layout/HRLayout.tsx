@@ -3,18 +3,13 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import './hr-layout.css';
 
 const HRLayout = () => {
   const user = authStorage.getUser();
   const [collapsed, setCollapsed] = useState(false);
 
-  if (!user || !authStorage.isLoggedIn()) {
-    return <Navigate to="/login" replace />;
-  }
-
-  const allowedDashboards = ['HR_DASHBOARD', 'ADMIN_DASHBOARD'];
-
-  if (!allowedDashboards.includes(user.dashboard)) {
+  if (!user || !authStorage.getAccessToken()) {
     return <Navigate to="/login" replace />;
   }
 
