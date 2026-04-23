@@ -21,7 +21,7 @@ const navItems: NavItem[] = [
     icon: 'bi-people',
     children: [
       { to: '/hr/team', label: 'Teams', icon: 'bi-diagram-3' },
-      { to: '/user-roles', label: 'Employees', icon: 'bi-person' },
+      { to: '/hr/employee', label: 'Employees', icon: 'bi-person' },
       { to: '/hr/department', label: 'Department', icon: 'bi-building' },
       { to: '/permissions', label: 'Job Positions', icon: 'bi-briefcase' },
     ],
