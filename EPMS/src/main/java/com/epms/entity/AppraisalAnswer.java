@@ -23,7 +23,7 @@ public class AppraisalAnswer {
 
     @ManyToOne
     @JoinColumn(name = "question_id")
-    private FormQuestion question;
+    private AppraisalQuestion question;
 
     private String answerText;
     private Double ratingValue;

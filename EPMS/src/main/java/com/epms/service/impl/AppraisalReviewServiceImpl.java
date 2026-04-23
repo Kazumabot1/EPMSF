@@ -37,6 +37,7 @@ public class AppraisalReviewServiceImpl implements AppraisalReviewService {
         review.setReviewType(requestDto.getReviewType());
         review.setReviewStatus(requestDto.getReviewStatus() != null ? requestDto.getReviewStatus() : "pending");
         review.setTotalScore(requestDto.getTotalScore());
+        review.setComments(requestDto.getComments());
 
         AppraisalReview savedReview = appraisalReviewRepository.save(review);
         return mapToResponseDto(savedReview);
@@ -73,6 +74,7 @@ public class AppraisalReviewServiceImpl implements AppraisalReviewService {
             existingReview.setReviewStatus(requestDto.getReviewStatus());
         }
         existingReview.setTotalScore(requestDto.getTotalScore());
+        existingReview.setComments(requestDto.getComments());
 
         AppraisalReview updatedReview = appraisalReviewRepository.save(existingReview);
         return mapToResponseDto(updatedReview);
@@ -97,7 +99,7 @@ public class AppraisalReviewServiceImpl implements AppraisalReviewService {
         dto.setReviewType(review.getReviewType());
         dto.setReviewStatus(review.getReviewStatus());
         dto.setTotalScore(review.getTotalScore());
+        dto.setComments(review.getComments());
         return dto;
     }
 }
-

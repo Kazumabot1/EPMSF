@@ -26,6 +26,8 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         cycle.setStartDate(requestDto.getStartDate());
         cycle.setEndDate(requestDto.getEndDate());
         cycle.setStatus(requestDto.getStatus() != null ? requestDto.getStatus() : "DRAFT");
+        cycle.setDynamicType(requestDto.getDynamicType());
+        cycle.setDynamicOffsetMonths(requestDto.getDynamicOffsetMonths());
         cycle.setCreatedAt(new Date());
 
         AppraisalCycle savedCycle = appraisalCycleRepository.save(cycle);
@@ -57,6 +59,8 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         if (requestDto.getStatus() != null) {
             existingCycle.setStatus(requestDto.getStatus());
         }
+        existingCycle.setDynamicType(requestDto.getDynamicType());
+        existingCycle.setDynamicOffsetMonths(requestDto.getDynamicOffsetMonths());
 
         AppraisalCycle updatedCycle = appraisalCycleRepository.save(existingCycle);
         return mapToResponseDto(updatedCycle);
@@ -83,7 +87,8 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         dto.setIsActive(cycle.getIsActive());
         dto.setStatus(cycle.getStatus());
         dto.setCreatedAt(cycle.getCreatedAt());
+        dto.setDynamicType(cycle.getDynamicType());
+        dto.setDynamicOffsetMonths(cycle.getDynamicOffsetMonths());
         return dto;
     }
 }
-
