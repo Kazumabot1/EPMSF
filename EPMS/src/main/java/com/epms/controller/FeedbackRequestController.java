@@ -37,11 +37,12 @@ public class FeedbackRequestController {
 
         FeedbackRequest createdRequest = feedbackRequestService.createFeedbackRequest(
                 requestDTO.getFormId(),
+                requestDTO.getCampaignId(),
                 requestDTO.getTargetEmployeeId(),
                 requesterUserId,
-                requestDTO.getCycleId(),
                 requestDTO.getDueAt(),
-                true // isAnonymous defaults based on business rules or form
+                Boolean.TRUE.equals(requestDTO.getAnonymousEnabled()),
+                requestDTO.getEvaluatorTypes()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -75,7 +76,8 @@ public class FeedbackRequestController {
                 .map(req -> FeedbackRequestListResponse.builder()
                         .id(req.getId())
                         .formId(req.getForm().getId())
-                        .cycleId(req.getCycleId())
+                        .campaignId(req.getCampaign().getId())
+                        .campaignName(req.getCampaign().getName())
                         .targetEmployeeId(req.getTargetEmployeeId())
                         .dueAt(req.getDueAt())
                         .status(req.getStatus().name())

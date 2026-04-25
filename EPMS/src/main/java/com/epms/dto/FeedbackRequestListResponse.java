@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 public class FeedbackRequestListResponse {
     private Long id;
     private Long formId;
-    private Long cycleId;
+    private Long campaignId;
+    private String campaignName;
     private Long targetEmployeeId;
     private LocalDateTime dueAt;
     private String status;

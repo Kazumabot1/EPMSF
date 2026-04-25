@@ -20,9 +20,9 @@ public interface FeedbackRequestRepository extends JpaRepository<FeedbackRequest
 
     Page<FeedbackRequest> findByTargetEmployeeId(Long targetEmployeeId, Pageable pageable);
 
-    List<FeedbackRequest> findByCycleId(Long cycleId);
+    List<FeedbackRequest> findByCampaignId(Long campaignId);
 
-    Page<FeedbackRequest> findByCycleId(Long cycleId, Pageable pageable);
+    Page<FeedbackRequest> findByCampaignId(Long campaignId, Pageable pageable);
 
     List<FeedbackRequest> findByStatus(FeedbackRequestStatus status);
 
@@ -30,7 +30,7 @@ public interface FeedbackRequestRepository extends JpaRepository<FeedbackRequest
 
     List<FeedbackRequest> findByDueAtBefore(LocalDateTime dueAt);
 
-    List<FeedbackRequest> findByTargetEmployeeIdAndCycleId(Long targetEmployeeId, Long cycleId);
+    List<FeedbackRequest> findByTargetEmployeeIdAndCampaignId(Long targetEmployeeId, Long campaignId);
 
     /**
      * Calculate average score per feedback request.

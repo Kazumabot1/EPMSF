@@ -4,13 +4,15 @@ import com.epms.dto.ConsolidatedFeedbackItemResponse;
 import com.epms.dto.ConsolidatedFeedbackReportResponse;
 import com.epms.dto.FeedbackCompletionDashboardResponse;
 import com.epms.dto.FeedbackCompletionItemResponse;
+import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackForm;
 import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.Notification;
 import com.epms.entity.FeedbackRequest;
-import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
+import com.epms.entity.enums.EvaluatorSourceType;
+import com.epms.entity.enums.FeedbackCampaignStatus;
 import com.epms.entity.enums.FeedbackRequestStatus;
 import com.epms.entity.enums.ResponseStatus;
 import com.epms.exception.BusinessValidationException;
@@ -18,6 +20,7 @@ import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.NotificationRepository;
+import com.epms.repository.FeedbackCampaignRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.UserRepository;
 import com.epms.repository.projection.FeedbackSummaryProjection;
@@ -31,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -43,6 +47,7 @@ import java.util.stream.Collectors;
 public class FeedbackRequestServiceImpl implements FeedbackRequestService {
 
     private final FeedbackRequestRepository feedbackRequestRepository;
+    private final FeedbackCampaignRepository feedbackCampaignRepository;
     private final FeedbackFormService feedbackFormService;
     private final FeedbackEvaluationService feedbackEvaluationService;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
@@ -53,20 +58,43 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
 
     @Override
     @Transactional
-    public FeedbackRequest createFeedbackRequest(Long formId, Long targetEmployeeId, Long requestedByUserId, Long cycleId, LocalDateTime dueAt, boolean isAnonymousEnabled) {
+    public FeedbackRequest createFeedbackRequest(Long formId, Long campaignId, Long targetEmployeeId, Long requestedByUserId,
+                                                 LocalDateTime dueAt, boolean isAnonymousEnabled,
+                                                 List<EvaluatorSourceType> evaluatorTypes) {
         log.info("Creating Feedback Request for Target Employee: {}", targetEmployeeId);
 
         if (dueAt != null && dueAt.isBefore(LocalDateTime.now())) {
             throw new BusinessValidationException("Deadline due date must be in the future.");
         }
 
+        if (evaluatorTypes == null || evaluatorTypes.isEmpty()) {
+            throw new BusinessValidationException("At least one evaluator type is required.");
+        }
+
         FeedbackForm form = feedbackFormService.getFormById(formId);
+        FeedbackCampaign campaign = feedbackCampaignRepository.findById(campaignId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback campaign not found."));
+
+        if (campaign.getStatus() == FeedbackCampaignStatus.CANCELLED || campaign.getStatus() == FeedbackCampaignStatus.CLOSED) {
+            throw new BusinessValidationException("Cannot create requests for a closed or cancelled feedback campaign.");
+        }
+
+        LocalDateTime campaignDeadline = campaign.getEndDate().atTime(LocalTime.MAX);
+        if (LocalDateTime.now().isAfter(campaignDeadline)) {
+            throw new BusinessValidationException("Cannot create requests after the campaign end date.");
+        }
+        if (dueAt != null && dueAt.isAfter(campaignDeadline)) {
+            throw new BusinessValidationException("Request due date cannot be later than the campaign end date.");
+        }
+        if (Boolean.TRUE.equals(isAnonymousEnabled) && !Boolean.TRUE.equals(form.getAnonymousAllowed())) {
+            throw new BusinessValidationException("Selected feedback form does not allow anonymous feedback.");
+        }
 
         FeedbackRequest request = new FeedbackRequest();
         request.setForm(form);
+        request.setCampaign(campaign);
         request.setTargetEmployeeId(targetEmployeeId);
         request.setRequestedByUserId(requestedByUserId);
-        request.setCycleId(cycleId);
         request.setDueAt(dueAt);
         request.setIsAnonymousEnabled(isAnonymousEnabled);
         request.setStatus(FeedbackRequestStatus.IN_PROGRESS);
@@ -76,15 +104,15 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
         log.info("Feedback Request ID {} saved. Triggering auto-selection.", savedRequest.getId());
         
         // Execute auto assignment within the same boundary for atomic integrity
-        feedbackEvaluationService.autoAssignEvaluators(savedRequest.getId(), targetEmployeeId, isAnonymousEnabled);
-        createRequestNotifications(savedRequest.getId(), savedRequest.getDueAt());
+        feedbackEvaluationService.autoAssignEvaluators(savedRequest.getId(), targetEmployeeId, isAnonymousEnabled, evaluatorTypes);
+        createRequestNotifications(savedRequest.getId(), resolveEffectiveDeadline(savedRequest));
         auditLogService.log(
                 requestedByUserId.intValue(),
                 "CREATE_REQUEST",
                 "FEEDBACK_REQUEST",
                 savedRequest.getId().intValue(),
                 null,
-                "cycle=" + cycleId + ",target=" + targetEmployeeId + ",dueAt=" + dueAt,
+                "campaign=" + campaignId + ",target=" + targetEmployeeId + ",dueAt=" + dueAt + ",types=" + evaluatorTypes,
                 "Feedback request created"
         );
 
@@ -112,6 +140,10 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
 
         FeedbackRequest request = feedbackRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Feedback request not found."));
+        LocalDateTime campaignDeadline = request.getCampaign().getEndDate().atTime(LocalTime.MAX);
+        if (dueAt.isAfter(campaignDeadline)) {
+            throw new BusinessValidationException("Deadline cannot be later than the campaign end date.");
+        }
         String oldDueAt = String.valueOf(request.getDueAt());
         request.setDueAt(dueAt);
         FeedbackRequest updated = feedbackRequestRepository.save(request);
@@ -132,7 +164,8 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
     public int sendReminderNotifications(Long requestId) {
         FeedbackRequest request = feedbackRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Feedback request not found."));
-        if (request.getDueAt() != null && LocalDateTime.now().isAfter(request.getDueAt())) {
+        LocalDateTime effectiveDeadline = resolveEffectiveDeadline(request);
+        if (effectiveDeadline != null && LocalDateTime.now().isAfter(effectiveDeadline)) {
             throw new BusinessValidationException("Cannot send reminders after deadline.");
         }
 
@@ -147,7 +180,7 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
                 notification.setType("FEEDBACK");
                 notification.setTitle("Feedback Reminder");
                 notification.setMessage("Reminder: please submit feedback for employee #" +
-                        request.getTargetEmployeeId() + " before " + request.getDueAt());
+                        request.getTargetEmployeeId() + " before " + effectiveDeadline);
                 reminders.add(notification);
             });
         }
@@ -187,8 +220,10 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public FeedbackCompletionDashboardResponse getCompletionDashboard(Long cycleId) {
-        List<FeedbackRequest> requests = feedbackRequestRepository.findByCycleId(cycleId);
+    public FeedbackCompletionDashboardResponse getCompletionDashboard(Long campaignId) {
+        FeedbackCampaign campaign = feedbackCampaignRepository.findById(campaignId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback campaign not found."));
+        List<FeedbackRequest> requests = feedbackRequestRepository.findByCampaignId(campaignId);
 
         List<FeedbackCompletionItemResponse> items = requests.stream()
                 .map(request -> {
@@ -214,7 +249,8 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
         double completionPercent = totalAssignments == 0 ? 0.0 : (submittedAssignments * 100.0) / totalAssignments;
 
         return FeedbackCompletionDashboardResponse.builder()
-                .cycleId(cycleId)
+                .campaignId(campaignId)
+                .campaignName(campaign.getName())
                 .totalRequests((long) requests.size())
                 .totalAssignments(totalAssignments)
                 .submittedAssignments(submittedAssignments)
@@ -226,8 +262,10 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public ConsolidatedFeedbackReportResponse getConsolidatedReport(Long cycleId) {
-        List<FeedbackResponse> responses = responseRepository.findByCycleIdAndStatus(cycleId, ResponseStatus.SUBMITTED);
+    public ConsolidatedFeedbackReportResponse getConsolidatedReport(Long campaignId) {
+        FeedbackCampaign campaign = feedbackCampaignRepository.findById(campaignId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback campaign not found."));
+        List<FeedbackResponse> responses = responseRepository.findByCampaignIdAndStatus(campaignId, ResponseStatus.SUBMITTED);
 
         Map<Long, List<FeedbackResponse>> byTarget = responses.stream()
                 .collect(Collectors.groupingBy(r -> r.getEvaluatorAssignment().getFeedbackRequest().getTargetEmployeeId()));
@@ -263,7 +301,7 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
                 .sorted(Comparator.comparing(ConsolidatedFeedbackItemResponse::getTargetEmployeeId))
                 .toList();
 
-        double cycleAverageScore = responses.stream()
+        double campaignAverageScore = responses.stream()
                 .map(FeedbackResponse::getOverallScore)
                 .filter(java.util.Objects::nonNull)
                 .mapToDouble(Double::doubleValue)
@@ -271,10 +309,24 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
                 .orElse(0.0);
 
         return ConsolidatedFeedbackReportResponse.builder()
-                .cycleId(cycleId)
-                .cycleAverageScore(cycleAverageScore)
+                .campaignId(campaignId)
+                .campaignName(campaign.getName())
+                .campaignAverageScore(campaignAverageScore)
                 .totalResponses((long) responses.size())
                 .items(items)
                 .build();
+    }
+
+    private LocalDateTime resolveEffectiveDeadline(FeedbackRequest request) {
+        LocalDateTime campaignDeadline = request.getCampaign().getEndDate() != null
+                ? request.getCampaign().getEndDate().atTime(LocalTime.MAX)
+                : null;
+        if (request.getDueAt() == null) {
+            return campaignDeadline;
+        }
+        if (campaignDeadline == null) {
+            return request.getDueAt();
+        }
+        return request.getDueAt().isBefore(campaignDeadline) ? request.getDueAt() : campaignDeadline;
     }
 }

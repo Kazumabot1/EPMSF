@@ -24,14 +24,14 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/feedback/requests")
+@RequestMapping("/api/v1/feedback")
 @RequiredArgsConstructor
 public class FeedbackAnalyticsController {
 
     private final FeedbackRequestService feedbackRequestService;
     private final FeedbackEvaluationService feedbackEvaluationService;
 
-    @GetMapping("/{requestId}/summary")
+    @GetMapping("/requests/{requestId}/summary")
     public ResponseEntity<GenericApiResponse<FeedbackSummaryResponse>> getFeedbackSummary(@PathVariable Long requestId) {
         log.info("Fetching feedback summary for Request ID: {}", requestId);
 
@@ -51,7 +51,7 @@ public class FeedbackAnalyticsController {
         return ResponseEntity.ok(GenericApiResponse.success("Summary retrieved successfully", response));
     }
 
-    @GetMapping("/{requestId}/pending")
+    @GetMapping("/requests/{requestId}/pending")
     public ResponseEntity<GenericApiResponse<List<PendingEvaluatorResponse>>> getPendingEvaluators(@PathVariable Long requestId) {
         log.info("Fetching pending evaluators for Request ID: {}", requestId);
 
@@ -67,19 +67,19 @@ public class FeedbackAnalyticsController {
         return ResponseEntity.ok(GenericApiResponse.success("Pending evaluators retrieved successfully", responseList));
     }
 
-    @GetMapping("/cycle/{cycleId}/completion")
-    public ResponseEntity<GenericApiResponse<FeedbackCompletionDashboardResponse>> getCycleCompletionDashboard(
-            @PathVariable Long cycleId) {
+    @GetMapping("/campaigns/{campaignId}/completion")
+    public ResponseEntity<GenericApiResponse<FeedbackCompletionDashboardResponse>> getCampaignCompletionDashboard(
+            @PathVariable Long campaignId) {
         ensureHrOrAdmin();
-        FeedbackCompletionDashboardResponse response = feedbackRequestService.getCompletionDashboard(cycleId);
+        FeedbackCompletionDashboardResponse response = feedbackRequestService.getCompletionDashboard(campaignId);
         return ResponseEntity.ok(GenericApiResponse.success("Completion dashboard retrieved successfully", response));
     }
 
-    @GetMapping("/cycle/{cycleId}/consolidated")
+    @GetMapping("/campaigns/{campaignId}/consolidated")
     public ResponseEntity<GenericApiResponse<ConsolidatedFeedbackReportResponse>> getConsolidatedFeedbackReport(
-            @PathVariable Long cycleId) {
+            @PathVariable Long campaignId) {
         ensureHrOrAdmin();
-        ConsolidatedFeedbackReportResponse response = feedbackRequestService.getConsolidatedReport(cycleId);
+        ConsolidatedFeedbackReportResponse response = feedbackRequestService.getConsolidatedReport(campaignId);
         return ResponseEntity.ok(GenericApiResponse.success("Consolidated report retrieved successfully", response));
     }
 

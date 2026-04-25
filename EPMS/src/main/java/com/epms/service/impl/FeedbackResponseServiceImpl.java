@@ -14,6 +14,7 @@ import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackQuestionRepository;
 import com.epms.repository.FeedbackResponseRepository;
+import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackResponseService;
 import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -34,6 +37,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private final FeedbackResponseRepository responseRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackQuestionRepository questionRepository;
+    private final UserRepository userRepository;
     private final AuditLogService auditLogService;
 
     @Override
@@ -46,7 +50,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             throw new UnauthorizedActionException("You are not authorized to edit this feedback.");
         }
 
-        LocalDateTime dueAt = assignment.getFeedbackRequest().getDueAt();
+        LocalDateTime dueAt = resolveEffectiveDeadline(assignment);
         if (dueAt != null && LocalDateTime.now().isAfter(dueAt)) {
             throw new BusinessValidationException("Feedback editing deadline has passed.");
         }
@@ -104,7 +108,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         }
 
         // Validate: Cannot submit after deadline
-        LocalDateTime dueAt = assignment.getFeedbackRequest().getDueAt();
+        LocalDateTime dueAt = resolveEffectiveDeadline(assignment);
         if (dueAt != null && LocalDateTime.now().isAfter(dueAt)) {
             throw new BusinessValidationException("Feedback submission deadline has passed.");
         }
@@ -112,14 +116,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         // Validate: Submission payload must include rating items
         if (items == null || items.isEmpty()) {
             throw new BusinessValidationException("At least one response item is required.");
-        }
-
-        // Validate: One submission per evaluator/target/cycle
-        if (responseRepository.existsSubmittedByEvaluatorAndTargetAndCycle(
-                submittingEmployeeId,
-                assignment.getFeedbackRequest().getTargetEmployeeId(),
-                assignment.getFeedbackRequest().getCycleId())) {
-            throw new BusinessValidationException("You have already submitted feedback for this employee in this cycle.");
         }
 
         Double overallScore = calculateOverallScore(items);
@@ -168,14 +164,15 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         boolean isPrivileged = hasPrivilegedRole(requesterRoles);
         boolean isSubmitter = assignment.getEvaluatorEmployeeId().equals(requestingEmployeeId);
         boolean isTargetEmployee = assignment.getFeedbackRequest().getTargetEmployeeId().equals(requestingEmployeeId);
-        boolean visibilityReached = hasVisibilityReached(assignment.getFeedbackRequest().getId(), assignment.getFeedbackRequest().getDueAt());
+        boolean isManager = isManagerOfTarget(assignment.getFeedbackRequest().getTargetEmployeeId(), requestingEmployeeId);
+        boolean visibilityReached = hasVisibilityReached(assignment.getFeedbackRequest());
 
-        if (!isSubmitter && !isTargetEmployee && !isPrivileged) {
+        if (!isSubmitter && !isTargetEmployee && !isManager && !isPrivileged) {
             throw new UnauthorizedActionException("You are not authorized to view this feedback response.");
         }
 
-        if (isTargetEmployee && !visibilityReached) {
-            throw new BusinessValidationException("Feedback is visible only after deadline or cycle completion.");
+        if ((isTargetEmployee || isManager) && !visibilityReached) {
+            throw new BusinessValidationException("Feedback is visible only after deadline or campaign completion.");
         }
 
         // Hide identity for non-privileged viewers when anonymity is enabled.
@@ -198,15 +195,17 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     @Transactional(readOnly = true)
     public List<FeedbackSubmissionStatusResponse> getSubmissionStatuses(Long evaluatorEmployeeId) {
         return assignmentRepository.findByEvaluatorEmployeeId(evaluatorEmployeeId).stream()
-                .sorted(Comparator.comparing((FeedbackEvaluatorAssignment a) -> a.getFeedbackRequest().getDueAt(),
+                .sorted(Comparator.comparing(this::resolveEffectiveDeadline,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(assignment -> FeedbackSubmissionStatusResponse.builder()
                         .evaluatorAssignmentId(assignment.getId())
                         .requestId(assignment.getFeedbackRequest().getId())
-                        .cycleId(assignment.getFeedbackRequest().getCycleId())
+                        .campaignId(assignment.getFeedbackRequest().getCampaign().getId())
+                        .campaignName(assignment.getFeedbackRequest().getCampaign().getName())
                         .targetEmployeeId(assignment.getFeedbackRequest().getTargetEmployeeId())
+                        .evaluatorType(assignment.getSourceType().name())
                         .status(assignment.getStatus().name())
-                        .dueAt(assignment.getFeedbackRequest().getDueAt())
+                        .dueAt(resolveEffectiveDeadline(assignment))
                         .build())
                 .toList();
     }
@@ -216,8 +215,9 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     public List<FeedbackReceivedItemResponse> getReceivedFeedback(Long targetEmployeeId, Long requestingEmployeeId, List<String> requesterRoles) {
         boolean privileged = hasPrivilegedRole(requesterRoles);
         boolean isTargetEmployee = targetEmployeeId.equals(requestingEmployeeId);
+        boolean isManager = isManagerOfTarget(targetEmployeeId, requestingEmployeeId);
 
-        if (!privileged && !isTargetEmployee) {
+        if (!privileged && !isTargetEmployee && !isManager) {
             throw new UnauthorizedActionException("You are not authorized to view feedback for this employee.");
         }
 
@@ -225,14 +225,15 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
         return submittedResponses.stream()
                 .filter(response -> privileged || hasVisibilityReached(
-                        response.getEvaluatorAssignment().getFeedbackRequest().getId(),
-                        response.getEvaluatorAssignment().getFeedbackRequest().getDueAt()))
+                        response.getEvaluatorAssignment().getFeedbackRequest()))
                 .map(response -> {
                     FeedbackEvaluatorAssignment assignment = response.getEvaluatorAssignment();
                     boolean hideIdentity = Boolean.TRUE.equals(assignment.getIsAnonymous()) && !privileged;
                     return FeedbackReceivedItemResponse.builder()
                             .responseId(response.getId())
                             .requestId(assignment.getFeedbackRequest().getId())
+                            .campaignId(assignment.getFeedbackRequest().getCampaign().getId())
+                            .campaignName(assignment.getFeedbackRequest().getCampaign().getName())
                             .targetEmployeeId(assignment.getFeedbackRequest().getTargetEmployeeId())
                             .overallScore(response.getOverallScore())
                             .comments(response.getComments())
@@ -245,7 +246,9 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
                 .toList();
     }
 
-    private boolean hasVisibilityReached(Long requestId, LocalDateTime dueAt) {
+    private boolean hasVisibilityReached(com.epms.entity.FeedbackRequest request) {
+        Long requestId = request.getId();
+        LocalDateTime dueAt = resolveEffectiveDeadline(request);
         if (dueAt != null && LocalDateTime.now().isAfter(dueAt)) {
             return true;
         }
@@ -261,6 +264,29 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         return roles.stream()
                 .map(String::toUpperCase)
                 .anyMatch(role -> role.equals("ADMIN") || role.equals("HR") || role.equals("ROLE_ADMIN") || role.equals("ROLE_HR"));
+    }
+
+    private boolean isManagerOfTarget(Long targetEmployeeId, Long requestingEmployeeId) {
+        return userRepository.findById(targetEmployeeId.intValue())
+                .map(user -> Objects.equals(user.getManagerId(), requestingEmployeeId.intValue()))
+                .orElse(false);
+    }
+
+    private LocalDateTime resolveEffectiveDeadline(FeedbackEvaluatorAssignment assignment) {
+        return resolveEffectiveDeadline(assignment.getFeedbackRequest());
+    }
+
+    private LocalDateTime resolveEffectiveDeadline(com.epms.entity.FeedbackRequest request) {
+        LocalDateTime campaignDeadline = request.getCampaign().getEndDate() != null
+                ? request.getCampaign().getEndDate().atTime(LocalTime.MAX)
+                : null;
+        if (request.getDueAt() == null) {
+            return campaignDeadline;
+        }
+        if (campaignDeadline == null) {
+            return request.getDueAt();
+        }
+        return request.getDueAt().isBefore(campaignDeadline) ? request.getDueAt() : campaignDeadline;
     }
 
     private Double calculateOverallScore(List<FeedbackResponseItem> items) {

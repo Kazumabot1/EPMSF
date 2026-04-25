@@ -65,7 +65,19 @@ const navItems: NavItem[] = [
       { to: '/one-on-one-action-items', label: 'Action Items', icon: 'bi-list-check' },
     ],
   },
-  { to: '/hr/feedback/overview', label: '360 Feedback', icon: 'bi-chat-dots' },
+  {
+    to: '/hr/feedback',
+    label: '360 Feedback',
+    icon: 'bi-chat-dots',
+    children: [
+      { to: '/hr/feedback/campaigns', label: 'Campaigns', icon: 'bi-megaphone' },
+      { to: '/hr/feedback/forms', label: 'Forms', icon: 'bi-ui-checks-grid' },
+      { to: '/hr/feedback/requests', label: 'Requests', icon: 'bi-person-lines-fill' },
+      { to: '/hr/feedback/responses', label: 'Responses', icon: 'bi-chat-square-text' },
+      { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi-bar-chart-line' },
+      { to: '/hr/feedback/audit', label: 'Audit', icon: 'bi-clock-history' },
+    ],
+  },
   { to: '/pip-updates', label: 'PIP Management', icon: 'bi-exclamation-triangle' },
   { to: '/one-on-one-meetings', label: 'Reports', icon: 'bi-file-earmark-bar-graph' },
   { to: '/notifications', label: 'Notifications', icon: 'bi-bell' },
@@ -80,6 +92,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
     '/hr/position': false,
     '/hr/performance-kpi': false,
     '/one-on-one-meetings': false,
+    '/hr/feedback': false,
   });
 
   const toggleMenu = (key: string) => {
@@ -132,6 +145,9 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                     toggleMenu(item.to);
                     if (item.to === '/hr/team') {
                       navigate('/hr/team');
+                    }
+                    if (item.to === '/hr/feedback') {
+                      navigate('/hr/feedback/campaigns');
                     }
                   }}
                 >

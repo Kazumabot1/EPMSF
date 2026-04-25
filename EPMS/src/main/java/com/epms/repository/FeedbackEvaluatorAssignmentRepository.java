@@ -30,12 +30,12 @@ public interface FeedbackEvaluatorAssignmentRepository extends JpaRepository<Fee
     boolean existsByFeedbackRequestIdAndEvaluatorEmployeeId(Long feedbackRequestId, Long evaluatorEmployeeId);
 
     /**
-     * Get all evaluator assignments for a target employee in a specific cycle.
+     * Get all evaluator assignments for a target employee in a specific campaign.
      */
     @Query("SELECT a FROM FeedbackEvaluatorAssignment a " +
            "JOIN a.feedbackRequest r " +
-           "WHERE r.targetEmployeeId = :targetEmployeeId AND r.cycleId = :cycleId")
-    List<FeedbackEvaluatorAssignment> findAssignmentsByTargetAndCycle(@Param("targetEmployeeId") Long targetEmployeeId, @Param("cycleId") Long cycleId);
+           "WHERE r.targetEmployeeId = :targetEmployeeId AND r.campaign.id = :campaignId")
+    List<FeedbackEvaluatorAssignment> findAssignmentsByTargetAndCampaign(@Param("targetEmployeeId") Long targetEmployeeId, @Param("campaignId") Long campaignId);
 
     /**
      * Get pending evaluators (not submitted or declined yet) for a given feedback request.

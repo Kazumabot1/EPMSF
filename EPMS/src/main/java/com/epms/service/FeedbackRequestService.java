@@ -9,11 +9,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface FeedbackRequestService {
-    FeedbackRequest createFeedbackRequest(Long formId, Long targetEmployeeId, Long requestedByUserId, Long cycleId, java.time.LocalDateTime dueAt, boolean isAnonymousEnabled);
+    FeedbackRequest createFeedbackRequest(Long formId, Long campaignId, Long targetEmployeeId, Long requestedByUserId,
+                                          java.time.LocalDateTime dueAt, boolean isAnonymousEnabled,
+                                          java.util.List<com.epms.entity.enums.EvaluatorSourceType> evaluatorTypes);
     FeedbackSummaryProjection getFeedbackSummary(Long requestId);
     List<FeedbackRequest> getRequestsForEmployee(Long employeeId);
     FeedbackRequest updateDeadline(Long requestId, LocalDateTime dueAt);
     int sendReminderNotifications(Long requestId);
-    FeedbackCompletionDashboardResponse getCompletionDashboard(Long cycleId);
-    ConsolidatedFeedbackReportResponse getConsolidatedReport(Long cycleId);
+    FeedbackCompletionDashboardResponse getCompletionDashboard(Long campaignId);
+    ConsolidatedFeedbackReportResponse getConsolidatedReport(Long campaignId);
 }

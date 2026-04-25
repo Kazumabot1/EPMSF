@@ -20,6 +20,7 @@ import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
 import TeamManagement from './pages/team/TeamManagement';
 import TeamCreate from './pages/team/TeamCreate';
 import DepartmentManagement from './pages/department/DepartmentManagement';
+import FeedbackLayoutPage from './pages/feedback/FeedbackLayoutPage';
 import './components/layout/hr-layout.css';
 import EmployeeManagement from "./pages/employee/EmployeeManagement";
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
@@ -52,6 +53,7 @@ function App() {
           <Route path="/hr/performance-kpi/category" element={<KpiCategoryPage />} />
           <Route path="/hr/performance-kpi/item" element={<KpiItemPage />} />
           <Route path="/hr/performance-kpi/form" element={<KpiFormPage />} />
+          <Route path="/hr/feedback/*" element={<FeedbackLayoutPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

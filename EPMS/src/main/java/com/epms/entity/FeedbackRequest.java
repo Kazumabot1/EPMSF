@@ -25,8 +25,9 @@ public class FeedbackRequest {
     @JoinColumn(name = "form_id", nullable = false)
     private FeedbackForm form;
 
-    @Column(name = "cycle_id", nullable = false)
-    private Long cycleId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "campaign_id", nullable = false)
+    private FeedbackCampaign campaign;
 
     @Column(name = "target_employee_id", nullable = false)
     private Long targetEmployeeId;

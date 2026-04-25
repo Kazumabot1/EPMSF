@@ -14,5 +14,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     long countByDepartmentId(Integer departmentId);
     long countByActiveTrue();
 
+    List<User> findByManagerIdAndActiveTrue(Integer managerId);
     List<User> findByDepartmentIdAndActiveTrue(Integer departmentId);
 }

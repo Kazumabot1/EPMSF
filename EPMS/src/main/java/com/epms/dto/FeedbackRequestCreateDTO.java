@@ -1,10 +1,13 @@
 package com.epms.dto;
 
+import com.epms.entity.enums.EvaluatorSourceType;
 import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class FeedbackRequestCreateDTO {
@@ -12,17 +15,17 @@ public class FeedbackRequestCreateDTO {
     @NotNull(message = "Form ID is required")
     private Long formId;
 
-    @NotNull(message = "Cycle ID is required")
-    private Long cycleId;
+    @NotNull(message = "Campaign ID is required")
+    private Long campaignId;
 
     @NotNull(message = "Target Employee ID is required")
     private Long targetEmployeeId;
 
-    @NotNull(message = "Due date is required")
     @Future(message = "Due date must be in the future")
     private LocalDateTime dueAt;
 
-    private Boolean includeManager = true;
-    private Boolean includePeers = true;
-    private Boolean includeSubordinates = true;
+    @NotEmpty(message = "At least one evaluator type is required")
+    private List<EvaluatorSourceType> evaluatorTypes;
+
+    private Boolean anonymousEnabled = true;
 }

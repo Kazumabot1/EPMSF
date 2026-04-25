@@ -18,17 +18,6 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
 
     boolean existsByEvaluatorAssignmentId(Long evaluatorAssignmentId);
 
-    @Query("SELECT COUNT(r) > 0 FROM FeedbackResponse r " +
-           "JOIN r.evaluatorAssignment a " +
-           "JOIN a.feedbackRequest req " +
-           "WHERE a.evaluatorEmployeeId = :evaluatorEmployeeId " +
-           "AND req.targetEmployeeId = :targetEmployeeId " +
-           "AND req.cycleId = :cycleId " +
-           "AND r.finalStatus = com.epms.entity.enums.ResponseStatus.SUBMITTED")
-    boolean existsSubmittedByEvaluatorAndTargetAndCycle(@Param("evaluatorEmployeeId") Long evaluatorEmployeeId,
-                                                        @Param("targetEmployeeId") Long targetEmployeeId,
-                                                        @Param("cycleId") Long cycleId);
-
     /**
      * Get submitted responses only (e.g. for general viewing or aggregation).
      */
@@ -46,7 +35,7 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
     @Query("SELECT r FROM FeedbackResponse r " +
            "JOIN r.evaluatorAssignment a " +
            "JOIN a.feedbackRequest req " +
-           "WHERE req.targetEmployeeId = :targetEmployeeId " +
+            "WHERE req.targetEmployeeId = :targetEmployeeId " +
            "AND r.finalStatus = :status")
     List<FeedbackResponse> findByTargetEmployeeIdAndStatus(@Param("targetEmployeeId") Long targetEmployeeId,
                                                            @Param("status") ResponseStatus status);
@@ -54,8 +43,16 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
     @Query("SELECT r FROM FeedbackResponse r " +
            "JOIN r.evaluatorAssignment a " +
            "JOIN a.feedbackRequest req " +
-           "WHERE req.cycleId = :cycleId AND r.finalStatus = :status")
-    List<FeedbackResponse> findByCycleIdAndStatus(@Param("cycleId") Long cycleId, @Param("status") ResponseStatus status);
+           "WHERE req.campaign.id = :campaignId AND r.finalStatus = :status")
+    List<FeedbackResponse> findByCampaignIdAndStatus(@Param("campaignId") Long campaignId, @Param("status") ResponseStatus status);
+
+    @Query("SELECT r FROM FeedbackResponse r " +
+           "JOIN r.evaluatorAssignment a " +
+           "JOIN a.feedbackRequest req " +
+           "WHERE req.targetEmployeeId IN :targetEmployeeIds " +
+           "AND r.finalStatus = :status")
+    List<FeedbackResponse> findByTargetEmployeeIdsAndStatus(@Param("targetEmployeeIds") List<Long> targetEmployeeIds,
+                                                            @Param("status") ResponseStatus status);
 
     /**
      * Example modifying query to update final status of a response.
