@@ -32,15 +32,10 @@ const HrEmployeeAccountImport = () => {
       setLoading(true);
       setResult(null);
 
-     const response = await api.post<ImportResult>(
-       '/hr/employee-accounts/import',
-       formData,
-       {
-         headers: {
-           'Content-Type': 'multipart/form-data',
-         },
-       }
-     );
+      const response = await api.post<ImportResult>(
+        '/hr/employee-accounts/import',
+        formData
+      );
 
       setResult(response.data);
       alert('Import completed');
@@ -66,15 +61,23 @@ const HrEmployeeAccountImport = () => {
         onChange={(e) => {
           const selectedFile = e.target.files?.[0] ?? null;
           setFile(selectedFile);
+          setResult(null);
         }}
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          marginTop: '16px',
+        }}
+      >
         <button type="button" onClick={chooseFile}>
           Choose Excel / CSV File
         </button>
 
-        <span style={{ minWidth: '180px' }}>
+        <span style={{ minWidth: '220px' }}>
           {file ? file.name : 'No file selected'}
         </span>
 
@@ -82,6 +85,7 @@ const HrEmployeeAccountImport = () => {
           {loading ? 'Importing...' : 'Import'}
         </button>
       </div>
+
       {result && (
         <div style={{ marginTop: 20 }}>
           <h3>Import Result</h3>
