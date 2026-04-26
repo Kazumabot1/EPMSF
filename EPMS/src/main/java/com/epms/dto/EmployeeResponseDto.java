@@ -15,6 +15,7 @@ public class EmployeeResponseDto {
     private String lastName;
     private String fullName;
     private String phoneNumber;
+    private String email;
     private String staffNrc;
     private String gender;
     private String race;
@@ -39,4 +40,20 @@ public class EmployeeResponseDto {
     private Date departmentStartDate;
     private Date departmentEndDate;
     private Integer departmentHistoryCount;
+
+    private Integer userId;
+    private Boolean loginAccountCreated;
+    private Boolean mustChangePassword;
+    /**
+     * When create/update requested login provisioning: outcome message for the UI (success or failure).
+     */
+    private String accountProvisioningMessage;
+    /**
+     * True when the requested provisioning step completed successfully; false when it failed; null if not requested.
+     */
+    private Boolean accountProvisioningSuccess;
+    /**
+     * Sanitized SMTP error when email send failed (no secrets). Null if not applicable.
+     */
+    private String accountProvisioningSmtpError;
 }

@@ -2,11 +2,13 @@ package com.epms.service;
 
 import com.epms.dto.HrEmployeeAccountCreateRequest;
 import com.epms.dto.HrImportResult;
+import com.epms.dto.HrImportRowResult;
+import com.epms.dto.AccountProvisionResult;
 import com.epms.entity.*;
+import com.epms.exception.BadRequestException;
 import com.epms.repository.*;
 import jakarta.transaction.Transactional;
 import org.apache.poi.ss.usermodel.*;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,7 +23,8 @@ public class HrEmployeeAccountService {
     private final PositionRepository positionRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final EmployeeRepository employeeRepository;
+    private final UserAccountProvisioningService userAccountProvisioningService;
 
     public HrEmployeeAccountService(
             UserRepository userRepository,
@@ -29,36 +32,37 @@ public class HrEmployeeAccountService {
             PositionRepository positionRepository,
             RoleRepository roleRepository,
             UserRoleRepository userRoleRepository,
-            PasswordEncoder passwordEncoder
+            EmployeeRepository employeeRepository,
+            UserAccountProvisioningService userAccountProvisioningService
     ) {
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
         this.positionRepository = positionRepository;
         this.roleRepository = roleRepository;
         this.userRoleRepository = userRoleRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.employeeRepository = employeeRepository;
+        this.userAccountProvisioningService = userAccountProvisioningService;
     }
 
     @Transactional
-    public User createOrUpdateEmployeeAccount(HrEmployeeAccountCreateRequest request) {
+    public AccountProvisionResult createOrUpdateEmployeeAccount(HrEmployeeAccountCreateRequest request) {
         String email = cleanEmail(request.getEmail());
         String employeeCode = clean(request.getEmployeeCode());
 
         if (email == null) {
-            throw new RuntimeException("Email is required");
+            throw new BadRequestException("Email is required");
         }
 
-        User user = userRepository.findByEmail(email).orElse(new User());
-
-        boolean isNew = user.getId() == null;
-        if (isNew) {
-            user.setCreatedAt(new Date());
-            user.setActive(true);
-            user.setPassword(passwordEncoder.encode(
-                    clean(request.getPassword()) != null ? request.getPassword() : "ChangeMe123!"
-            ));
+        Employee employee = findOrCreateEmployeeForAccount(request);
+        AccountProvisionResult provision = userAccountProvisioningService.provisionFromEmployee(
+                employee,
+                clean(request.getRoleName()) != null ? request.getRoleName() : "EMPLOYEE",
+                Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+        );
+        if (!provision.isSuccess() || provision.getUserId() == null) {
+            return provision;
         }
-
+        User user = userRepository.findById(provision.getUserId()).orElseThrow();
         user.setEmail(email);
         user.setEmployeeCode(employeeCode);
         user.setFullName(clean(request.getFullName()));
@@ -76,18 +80,15 @@ public class HrEmployeeAccountService {
 
         user = userRepository.save(user);
 
-        Role role = getOrCreateRole(
-                clean(request.getRoleName()) != null ? request.getRoleName() : "EMPLOYEE"
-        );
-
-        if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), role.getId())) {
-            UserRole userRole = new UserRole();
-            userRole.setUserId(user.getId());
-            userRole.setRoleId(role.getId());
-            userRoleRepository.save(userRole);
-        }
-
-        return user;
+        return AccountProvisionResult.builder()
+                .userId(user.getId())
+                .success(provision.isSuccess())
+                .accountCreated(provision.isAccountCreated())
+                .accountLinked(provision.isAccountLinked())
+                .temporaryPasswordEmailSent(provision.isTemporaryPasswordEmailSent())
+                .message(provision.getMessage())
+                .smtpErrorDetail(provision.getSmtpErrorDetail())
+                .build();
     }
 
     @Transactional
@@ -113,10 +114,21 @@ public class HrEmployeeAccountService {
             String staffName = value(row, "StaffName", "FullName", "fullName");
             String department = value(row, "Department", "departmentName");
             String position = value(row, "Position", "positionName");
+            String firstName = value(row, "FirstName", "firstName");
+            String lastName = value(row, "LastName", "lastName");
+            HrImportRowResult rowResult = HrImportRowResult.builder()
+                    .rowNumber(rowNumber)
+                    .email(cleanEmail(email))
+                    .build();
 
             if (clean(email) == null) {
                 result.setSkipped(result.getSkipped() + 1);
                 result.getWarnings().add("Row " + rowNumber + ": skipped because email is empty");
+                rowResult.setEmployeeAction("skipped");
+                rowResult.setAccountAction("skipped");
+                rowResult.setEmailAction("skipped");
+                rowResult.getValidationErrors().add("Email is required");
+                result.getRows().add(rowResult);
                 continue;
             }
 
@@ -129,18 +141,33 @@ public class HrEmployeeAccountService {
             request.setDepartmentName(department);
             request.setPositionName(position);
             request.setRoleName("EMPLOYEE");
-            request.setPassword("ChangeMe123!");
+            request.setFirstName(firstName);
+            request.setLastName(lastName);
+            request.setSendTemporaryPasswordEmail(true);
 
-            createOrUpdateEmployeeAccount(request);
+            AccountProvisionResult provision = createOrUpdateEmployeeAccount(request);
 
             if (existed) {
                 result.setUpdated(result.getUpdated() + 1);
+                rowResult.setAccountAction("linked");
             } else {
                 result.setCreated(result.getCreated() + 1);
+                rowResult.setAccountAction("created");
             }
+            rowResult.setEmployeeAction("created_or_updated");
+            rowResult.setEmailAction(provision.isTemporaryPasswordEmailSent() ? "sent" : "failed");
+            if (!provision.isSuccess() && provision.getMessage() != null) {
+                rowResult.getValidationErrors().add(provision.getMessage());
+            }
+            result.getRows().add(rowResult);
         }
 
         return result;
+    }
+
+    @Transactional
+    public AccountProvisionResult resendTemporaryPassword(Integer userId) {
+        return userAccountProvisioningService.resendTemporaryPassword(userId);
     }
 
     private Department getOrCreateDepartment(String name) {
@@ -182,6 +209,35 @@ public class HrEmployeeAccountService {
                     role.setDescription("Auto-created by HR employee import");
                     return roleRepository.save(role);
                 });
+    }
+
+    private Employee findOrCreateEmployeeForAccount(HrEmployeeAccountCreateRequest request) {
+        String email = cleanEmail(request.getEmail());
+        return employeeRepository.findByEmail(email).orElseGet(() -> {
+            Employee employee = new Employee();
+            employee.setEmail(email);
+            employee.setFirstName(clean(request.getFirstName()) != null ? clean(request.getFirstName()) : deriveFirstName(request.getFullName()));
+            employee.setLastName(clean(request.getLastName()) != null ? clean(request.getLastName()) : deriveLastName(request.getFullName()));
+            employee.setStaffNrc(clean(request.getEmployeeCode()));
+            Position position = findPosition(request.getPositionName());
+            employee.setPosition(position);
+            employee.setActive(true);
+            return employeeRepository.save(employee);
+        });
+    }
+
+    private String deriveFirstName(String fullName) {
+        String value = clean(fullName);
+        if (value == null) return "Employee";
+        String[] parts = value.split("\\s+");
+        return parts.length > 0 ? parts[0] : "Employee";
+    }
+
+    private String deriveLastName(String fullName) {
+        String value = clean(fullName);
+        if (value == null) return "User";
+        String[] parts = value.split("\\s+");
+        return parts.length > 1 ? parts[parts.length - 1] : "User";
     }
 
     private List<Map<String, String>> readCsv(MultipartFile file) throws Exception {

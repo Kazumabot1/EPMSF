@@ -1,7 +1,9 @@
 package com.epms.service.impl;
 
+import com.epms.dto.AccountProvisionResult;
 import com.epms.dto.EmployeeRequestDto;
 import com.epms.dto.EmployeeResponseDto;
+import com.epms.entity.User;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
 import com.epms.entity.EmployeeDepartment;
@@ -12,7 +14,9 @@ import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.PositionRepository;
+import com.epms.repository.UserRepository;
 import com.epms.service.EmployeeService;
+import com.epms.service.UserAccountProvisioningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final PositionRepository positionRepository;
     private final DepartmentRepository departmentRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
+    private final UserAccountProvisioningService userAccountProvisioningService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,6 +61,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     @Transactional
     public EmployeeResponseDto createEmployee(EmployeeRequestDto request) {
+        validateLoginAccountRequest(request);
         Employee employee = new Employee();
         copyRequestToEntity(request, employee);
         if (employee.getActive() == null) {
@@ -62,18 +69,39 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         Employee saved = employeeRepository.save(employee);
         syncDepartmentAssignment(request.getDepartmentId(), saved);
-        return getEmployeeById(saved.getId());
+        AccountProvisionResult provision = null;
+        if (Boolean.TRUE.equals(request.getCreateLoginAccount())) {
+            provision = userAccountProvisioningService.provisionFromEmployee(
+                    saved,
+                    "EMPLOYEE",
+                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+            );
+        }
+        EmployeeResponseDto dto = getEmployeeById(saved.getId());
+        mergeAccountProvisioning(dto, provision);
+        return dto;
     }
 
     @Override
     @Transactional
     public EmployeeResponseDto updateEmployee(Integer id, EmployeeRequestDto request) {
+        validateLoginAccountRequest(request);
         Employee employee = employeeRepository.findWithDepartmentsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
         copyRequestToEntity(request, employee);
         employeeRepository.save(employee);
         syncDepartmentAssignment(request.getDepartmentId(), employee);
-        return getEmployeeById(id);
+        AccountProvisionResult provision = null;
+        if (Boolean.TRUE.equals(request.getCreateLoginAccount())) {
+            provision = userAccountProvisioningService.provisionFromEmployee(
+                    employee,
+                    "EMPLOYEE",
+                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+            );
+        }
+        EmployeeResponseDto dto = getEmployeeById(id);
+        mergeAccountProvisioning(dto, provision);
+        return dto;
     }
 
     @Override
@@ -89,10 +117,30 @@ public class EmployeeServiceImpl implements EmployeeService {
         return getEmployeeById(id);
     }
 
+    private void validateLoginAccountRequest(EmployeeRequestDto request) {
+        if (!Boolean.TRUE.equals(request.getCreateLoginAccount())) {
+            return;
+        }
+        if (!userAccountProvisioningService.isValidWorkEmail(request.getEmail())) {
+            throw new BusinessValidationException(
+                    "A valid work email is required when create login account is enabled.");
+        }
+    }
+
+    private void mergeAccountProvisioning(EmployeeResponseDto dto, AccountProvisionResult provision) {
+        if (provision == null) {
+            return;
+        }
+        dto.setAccountProvisioningMessage(provision.getMessage());
+        dto.setAccountProvisioningSuccess(provision.isSuccess());
+        dto.setAccountProvisioningSmtpError(provision.getSmtpErrorDetail());
+    }
+
     private void copyRequestToEntity(EmployeeRequestDto request, Employee employee) {
         employee.setFirstName(trimToNull(request.getFirstName()));
         employee.setLastName(trimToNull(request.getLastName()));
         employee.setPhoneNumber(trimToNull(request.getPhoneNumber()));
+        employee.setEmail(trimToNull(request.getEmail()));
         employee.setStaffNrc(trimToNull(request.getStaffNrc()));
         employee.setGender(trimToNull(request.getGender()));
         employee.setRace(trimToNull(request.getRace()));
@@ -235,12 +283,14 @@ public class EmployeeServiceImpl implements EmployeeService {
             }
         }
 
+        User linkedUser = userRepository.findByEmployeeId(emp.getId()).orElse(null);
         return new EmployeeResponseDto(
                 emp.getId(),
                 emp.getFirstName(),
                 emp.getLastName(),
                 fullName,
                 emp.getPhoneNumber(),
+                emp.getEmail(),
                 emp.getStaffNrc(),
                 emp.getGender(),
                 emp.getRace(),
@@ -263,7 +313,13 @@ public class EmployeeServiceImpl implements EmployeeService {
                 assignedBy,
                 departmentStartDate,
                 departmentEndDate,
-                history.size()
+                history.size(),
+                linkedUser != null ? linkedUser.getId() : null,
+                linkedUser != null,
+                linkedUser != null ? linkedUser.getMustChangePassword() : null,
+                null,
+                null,
+                null
         );
     }
 }

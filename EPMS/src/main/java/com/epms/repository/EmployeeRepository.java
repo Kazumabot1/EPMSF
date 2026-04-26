@@ -21,4 +21,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     @EntityGraph(attributePaths = {"employeeDepartments", "employeeDepartments.department", "position", "position.level"})
     @Query("SELECT e FROM Employee e WHERE e.id = :id")
     Optional<Employee> findWithDepartmentsById(@Param("id") Integer id);
+
+    Optional<Employee> findByEmail(String email);
 }

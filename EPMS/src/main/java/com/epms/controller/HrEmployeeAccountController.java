@@ -2,7 +2,7 @@ package com.epms.controller;
 
 import com.epms.dto.HrEmployeeAccountCreateRequest;
 import com.epms.dto.HrImportResult;
-import com.epms.entity.User;
+import com.epms.dto.AccountProvisionResult;
 import com.epms.service.HrEmployeeAccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +20,7 @@ public class HrEmployeeAccountController {
     }
 
     @PostMapping
-    public ResponseEntity<User> createEmployeeAccount(
+    public ResponseEntity<AccountProvisionResult> createEmployeeAccount(
             @RequestBody HrEmployeeAccountCreateRequest request
     ) {
         return ResponseEntity.ok(
@@ -35,5 +35,10 @@ public class HrEmployeeAccountController {
         return ResponseEntity.ok(
                 hrEmployeeAccountService.importEmployeeAccounts(file)
         );
+    }
+
+    @PostMapping("/{id}/resend-temporary-password")
+    public ResponseEntity<AccountProvisionResult> resendTemporaryPassword(@PathVariable Integer id) {
+        return ResponseEntity.ok(hrEmployeeAccountService.resendTemporaryPassword(id));
     }
 }

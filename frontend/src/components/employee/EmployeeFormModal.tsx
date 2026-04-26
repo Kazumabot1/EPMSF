@@ -91,11 +91,52 @@ const EmployeeFormModal = ({ open, mode, employee, onClose, onSaved }: Props) =>
     const payload = formValuesToPayload(values);
     try {
       if (mode === 'create') {
-        await createEmployee(payload);
-        toast.success('Employee created');
+        const res = await createEmployee(payload);
+        if (res.accountProvisioningMessage) {
+          const smtp = res.accountProvisioningSmtpError?.trim();
+          const detail = `${res.accountProvisioningMessage}${smtp && !res.accountProvisioningMessage.includes(smtp) ? ` ${smtp}` : ''}`;
+          if (res.accountProvisioningSuccess === false) {
+            // DB save succeeded; only email failed — not a "hard" error, use warning
+            toast(
+              <div className="text-left text-sm text-slate-800">
+                <p className="mb-1 font-semibold text-amber-900">Employee created — email not sent</p>
+                <p>{detail}</p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Set <code className="rounded bg-slate-100 px-1">SMTP_HOST</code>, <code className="rounded bg-slate-100 px-1">SMTP_USER</code>, <code className="rounded bg-slate-100 px-1">SMTP_PASS</code> (Gmail
+                  app password) in <code className="rounded bg-slate-100 px-1">.env</code>, restart the API, then use{' '}
+                  <code className="rounded bg-slate-100 px-1">POST /api/mail/test</code> to verify.
+                </p>
+              </div>,
+              { icon: '⚠️', duration: 12_000, id: 'provision-mail' }
+            );
+          } else {
+            toast.success(`Employee created. ${detail}`);
+          }
+        } else {
+          toast.success('Employee created');
+        }
       } else if (employee) {
-        await updateEmployee(employee.id, payload);
-        toast.success('Employee updated');
+        const res = await updateEmployee(employee.id, payload);
+        if (res.accountProvisioningMessage) {
+          const smtp = res.accountProvisioningSmtpError?.trim();
+          const detail = `${res.accountProvisioningMessage}${smtp && !res.accountProvisioningMessage.includes(smtp) ? ` ${smtp}` : ''}`;
+          if (res.accountProvisioningSuccess === false) {
+            toast(
+              <div className="text-left text-sm text-slate-800">
+                <p className="mb-1 font-semibold text-amber-900">Employee updated — email not sent</p>
+                <p>{detail}</p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Check SMTP in <code className="rounded bg-slate-100 px-1">.env</code> and restart the backend.
+                </p>
+              </div>,
+              { icon: '⚠️', duration: 12_000, id: 'provision-mail-update' }
+            );
+          } else {
+            toast.success(`Employee updated. ${detail}`);
+          }
+        } else {
+          toast.success('Employee updated');
+        }
       }
       onSaved();
       onClose();
@@ -203,6 +244,11 @@ const EmployeeFormModal = ({ open, mode, employee, onClose, onSaved }: Props) =>
                   <input className="epms-emp-input-field" type="tel" {...register('phoneNumber')} />
                 </label>
                 <label className="epms-emp-field block">
+                  <span className="epms-emp-field__label">Work email</span>
+                  <input className="epms-emp-input-field" type="email" {...register('email')} />
+                  {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
+                </label>
+                <label className="epms-emp-field block">
                   <span className="epms-emp-field__label">Staff NRC</span>
                   <input className="epms-emp-input-field" {...register('staffNrc')} />
                 </label>
@@ -218,6 +264,16 @@ const EmployeeFormModal = ({ open, mode, employee, onClose, onSaved }: Props) =>
                 <label className="epms-emp-field block">
                   <span className="epms-emp-field__label">Date of birth</span>
                   <input className="epms-emp-input-field" type="date" {...register('dateOfBirth')} />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-col gap-2">
+                <label className="text-sm text-slate-700">
+                  <input type="checkbox" className="mr-2" {...register('createLoginAccount')} />
+                  Create login account automatically when email is provided
+                </label>
+                <label className="text-sm text-slate-700">
+                  <input type="checkbox" className="mr-2" {...register('sendTemporaryPasswordEmail')} />
+                  Send temporary password onboarding email
                 </label>
               </div>
             </div>

@@ -13,8 +13,10 @@ public class HrImportResult {
     private int updated;
     private int skipped;
     private List<String> warnings;
+    private List<HrImportRowResult> rows;
 
     public HrImportResult() {
         this.warnings = new ArrayList<>();
+        this.rows = new ArrayList<>();
     }
 }

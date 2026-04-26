@@ -26,6 +26,18 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    private Integer employeeId;
+
+    private Boolean mustChangePassword = false;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date passwordChangedAt;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date lastTemporaryPasswordSentAt;
+
+    private String accountStatus;
+
     private String fullName;
 
     private String employeeCode;

@@ -7,6 +7,14 @@ type ImportResult = {
   updated: number;
   skipped: number;
   warnings: string[];
+  rows: {
+    rowNumber: number;
+    email: string;
+    employeeAction: string;
+    accountAction: string;
+    emailAction: string;
+    validationErrors: string[];
+  }[];
 };
 
 const HrEmployeeAccountImport = () => {
@@ -99,6 +107,21 @@ const HrEmployeeAccountImport = () => {
               <ul>
                 {result.warnings.map((warning, index) => (
                   <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {result.rows?.length > 0 && (
+            <>
+              <h4>Row Details</h4>
+              <ul>
+                {result.rows.map((row) => (
+                  <li key={row.rowNumber}>
+                    Row {row.rowNumber}: employee={row.employeeAction}, account={row.accountAction},
+                    email={row.emailAction}
+                    {row.validationErrors?.length ? `, errors=${row.validationErrors.join('; ')}` : ''}
+                  </li>
                 ))}
               </ul>
             </>

@@ -4,6 +4,7 @@ export const employeeFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   phoneNumber: z.string().optional(),
+  email: z.string().email('Enter a valid email').or(z.literal('')),
   staffNrc: z.string().optional(),
   gender: z.string().optional(),
   race: z.string().optional(),
@@ -18,6 +19,8 @@ export const employeeFormSchema = z.object({
   fatherNrc: z.string().optional(),
   positionId: z.string().optional(),
   departmentId: z.string().optional(),
+  createLoginAccount: z.boolean().optional(),
+  sendTemporaryPasswordEmail: z.boolean().optional(),
 });
 
 export type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
@@ -26,6 +29,7 @@ export const defaultEmployeeFormValues: EmployeeFormValues = {
   firstName: '',
   lastName: '',
   phoneNumber: '',
+  email: '',
   staffNrc: '',
   gender: '',
   race: '',
@@ -40,6 +44,8 @@ export const defaultEmployeeFormValues: EmployeeFormValues = {
   fatherNrc: '',
   positionId: '',
   departmentId: '',
+  createLoginAccount: true,
+  sendTemporaryPasswordEmail: true,
 };
 
 export function formValuesToPayload(values: EmployeeFormValues) {
@@ -47,6 +53,7 @@ export function formValuesToPayload(values: EmployeeFormValues) {
     firstName: values.firstName,
     lastName: values.lastName,
     phoneNumber: values.phoneNumber,
+    email: values.email,
     staffNrc: values.staffNrc,
     gender: values.gender,
     race: values.race,
@@ -73,5 +80,7 @@ export function formValuesToPayload(values: EmployeeFormValues) {
       const n = Number.parseInt(values.departmentId, 10);
       return Number.isFinite(n) ? n : null;
     })(),
+    createLoginAccount: values.createLoginAccount ?? true,
+    sendTemporaryPasswordEmail: values.sendTemporaryPasswordEmail ?? true,
   };
 }

@@ -21,6 +21,8 @@ public class Employee {
     private String firstName;
     private String lastName;
     private String phoneNumber;
+    private String email;
+    private String password;
     private String staffNrc;
     private String gender;
     private String race;

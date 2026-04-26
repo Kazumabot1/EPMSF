@@ -35,6 +35,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomUserDetailsService customUserDetailsService;
+    private final AuthRateLimitService authRateLimitService;
 
     @Value("${app.jwt.refresh-token-expiration-ms:604800000}")
     private long refreshTokenExpirationMs;
@@ -44,6 +45,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        String key = request.getEmail() == null ? "anonymous" : request.getEmail().trim().toLowerCase();
+        authRateLimitService.check(key);
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
@@ -51,7 +54,9 @@ public class AuthService {
                             request.getPassword()
                     )
             );
+            authRateLimitService.success(key);
         } catch (BadCredentialsException ex) {
+            authRateLimitService.fail(key);
             throw new BadCredentialsException("Invalid email or password");
         }
 
@@ -100,6 +105,12 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        if (Boolean.TRUE.equals(user.getMustChangePassword())) {
+            if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
+                throw new BadRequestException("Current temporary password is required");
+            }
+        }
+
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new BadRequestException("Current password is incorrect");
         }
@@ -109,6 +120,9 @@ public class AuthService {
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        user.setPasswordChangedAt(new Date());
+        user.setAccountStatus("ACTIVE");
         user.setUpdatedAt(new Date());
 
         userRepository.save(user);
@@ -140,6 +154,7 @@ public class AuthService {
                 .roles(principal.getRoles())
                 .permissions(principal.getPermissions())
                 .dashboard(principal.getDashboard())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 }

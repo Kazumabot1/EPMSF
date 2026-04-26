@@ -1,6 +1,7 @@
 package com.epms.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -20,6 +21,9 @@ public class EmployeeRequestDto {
     private String lastName;
 
     private String phoneNumber;
+    /** Optional unless {@link #createLoginAccount} is true. */
+    @Email(message = "Email must be valid")
+    private String email;
     private String staffNrc;
     private String gender;
     private String race;
@@ -43,4 +47,7 @@ public class EmployeeRequestDto {
      * Optional. When set, creates/updates the open department assignment. When null, closes the open one.
      */
     private Integer departmentId;
+
+    private Boolean createLoginAccount;
+    private Boolean sendTemporaryPasswordEmail;
 }

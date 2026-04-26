@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import api from "../../services/api";
 import "./employee-ui.css";
 
-const defaultPassword = "ChangeMe123!";
-
 const roleOptions = [
   { value: "EMPLOYEE", label: "Employee" },
   { value: "HR", label: "HR" },
@@ -19,11 +17,12 @@ const CreateEmployeeAccount = () => {
     departmentName: "",
     positionName: "",
     roleName: "EMPLOYEE",
-    password: defaultPassword,
+    sendTemporaryPasswordEmail: true,
   });
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const emailRegex = /^[A-Za-z0-9+._-]+@[A-Za-z0-9._-]+\.[A-Za-z]{2,}$/;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setMessage(null);
@@ -36,12 +35,35 @@ const CreateEmployeeAccount = () => {
       setMessage({ type: "error", text: "Email is required to create the account." });
       return;
     }
+    if (!emailRegex.test(form.email.trim())) {
+      setMessage({ type: "error", text: "Please provide a valid email address." });
+      return;
+    }
 
     setMessage(null);
     try {
       setLoading(true);
-      await api.post("/hr/employee-accounts", { ...form, email: form.email.trim().toLowerCase() });
-      setMessage({ type: "success", text: "Employee account was created. The user can sign in with the email and password you set." });
+      const response = await api.post("/users", { ...form, email: form.email.trim().toLowerCase() });
+      const data = response?.data?.data as
+        | {
+            success?: boolean;
+            message?: string;
+            temporaryPasswordEmailSent?: boolean;
+            smtpErrorDetail?: string | null;
+          }
+        | undefined;
+      const statusOk = data?.success !== false;
+      const detail = data?.message || "Employee account processed.";
+      const smtp = data?.smtpErrorDetail?.trim();
+      const emailStatus = form.sendTemporaryPasswordEmail
+        ? data?.temporaryPasswordEmailSent
+          ? " Email sent successfully."
+          : ` Email could not be sent.${smtp ? ` ${smtp}` : " Check SMTP configuration."}`
+        : "";
+      setMessage({ type: statusOk ? "success" : "error", text: `${detail}${emailStatus}`.trim() });
+      if (!statusOk) {
+        return;
+      }
       setForm({
         employeeCode: "",
         fullName: "",
@@ -49,7 +71,7 @@ const CreateEmployeeAccount = () => {
         departmentName: "",
         positionName: "",
         roleName: "EMPLOYEE",
-        password: defaultPassword,
+        sendTemporaryPasswordEmail: true,
       });
     } catch (error: unknown) {
       console.error(error);
@@ -167,19 +189,18 @@ const CreateEmployeeAccount = () => {
                   </select>
                 </div>
 
-                <div className="employee-form-field">
-                  <label htmlFor="password">Initial password</label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="text"
-                    className="employee-form-input"
-                    value={form.password}
-                    onChange={handleInputChange}
-                    placeholder={defaultPassword}
-                    autoComplete="new-password"
-                  />
-                  <p className="employee-form-hint">User should change this after first sign-in.</p>
+                <div className="employee-form-field employee-form-field-span-2">
+                  <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      name="sendTemporaryPasswordEmail"
+                      type="checkbox"
+                      checked={form.sendTemporaryPasswordEmail}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, sendTemporaryPasswordEmail: e.target.checked }))
+                      }
+                    />
+                    Send temporary password email and force first-login password change
+                  </label>
                 </div>
               </div>
             </div>

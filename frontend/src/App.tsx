@@ -30,6 +30,7 @@ import KpiCategoryPage from './pages/hr/performance-kpi/category/KpiCategoryPage
 import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
 import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
 import ProfilePage from './pages/hr/ProfilePage';
+import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
         <Route path="/register" element={<Register />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route path="/change-password" element={<ForceChangePasswordPage />} />
           <Route element={<EmployeeLayout />}>
             <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
           </Route>

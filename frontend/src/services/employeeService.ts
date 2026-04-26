@@ -14,6 +14,7 @@ export interface EmployeeResponse {
   lastName: string;
   fullName: string;
   phoneNumber: string | null;
+  email?: string | null;
   staffNrc: string | null;
   gender: string | null;
   race: string | null;
@@ -37,12 +38,19 @@ export interface EmployeeResponse {
   positionTitle?: string | null;
   positionLevelCode?: string | null;
   currentDepartmentId?: number | null;
+  userId?: number | null;
+  loginAccountCreated?: boolean | null;
+  mustChangePassword?: boolean | null;
+  accountProvisioningMessage?: string | null;
+  accountProvisioningSuccess?: boolean | null;
+  accountProvisioningSmtpError?: string | null;
 }
 
 export interface EmployeeRequestPayload {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  email?: string;
   staffNrc?: string;
   gender?: string;
   race?: string;
@@ -59,6 +67,8 @@ export interface EmployeeRequestPayload {
   positionId?: number | null;
   /** Set to `null` to clear current department assignment. */
   departmentId?: number | null;
+  createLoginAccount?: boolean;
+  sendTemporaryPasswordEmail?: boolean;
 }
 
 const unwrap = <T>(response: { data: GenericApiResponse<T> }): T => response.data.data;
@@ -121,6 +131,7 @@ function buildJsonBody(payload: EmployeeRequestPayload): Record<string, unknown>
   };
   const optional = [
     'phoneNumber',
+  'email',
     'staffNrc',
     'gender',
     'race',
@@ -146,6 +157,12 @@ function buildJsonBody(payload: EmployeeRequestPayload): Record<string, unknown>
   }
   out.positionId = payload.positionId ?? null;
   out.departmentId = payload.departmentId ?? null;
+  if (payload.createLoginAccount !== undefined) {
+    out.createLoginAccount = payload.createLoginAccount;
+  }
+  if (payload.sendTemporaryPasswordEmail !== undefined) {
+    out.sendTemporaryPasswordEmail = payload.sendTemporaryPasswordEmail;
+  }
   return out;
 }
 
@@ -153,6 +170,7 @@ export const responseToFormDefaults = (e: EmployeeResponse) => ({
   firstName: e.firstName ?? '',
   lastName: e.lastName ?? '',
   phoneNumber: e.phoneNumber ?? '',
+  email: e.email ?? '',
   staffNrc: e.staffNrc ?? '',
   gender: e.gender ?? '',
   race: e.race ?? '',
@@ -170,6 +188,8 @@ export const responseToFormDefaults = (e: EmployeeResponse) => ({
     e.currentDepartmentId != null && e.currentDepartmentId !== undefined
       ? String(e.currentDepartmentId)
       : '',
+  createLoginAccount: true,
+  sendTemporaryPasswordEmail: true,
 });
 
 export const formatDateForInput = (iso: string | null | undefined): string => {

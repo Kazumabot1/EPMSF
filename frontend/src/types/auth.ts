@@ -11,6 +11,7 @@ export interface AuthResponse {
   roles: string[];
   permissions: string[];
   dashboard: string;
+  mustChangePassword: boolean;
 }
 
 export interface CurrentUserResponse {
@@ -22,6 +23,7 @@ export interface CurrentUserResponse {
   roles: string[];
   permissions: string[];
   dashboard: string;
+  mustChangePassword: boolean;
 }
 
 export interface ApiEnvelope<T> {
