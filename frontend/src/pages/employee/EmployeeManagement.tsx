@@ -38,7 +38,7 @@ const EmployeeManagement = () => {
 
   return (
     <div className="employee-container">
-      <h2>Employee Management</h2>
+      <h2>Employee list</h2>
 
       <div className="filters">
         <input

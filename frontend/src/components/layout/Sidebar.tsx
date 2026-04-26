@@ -11,6 +11,8 @@ type NavItem = {
   to: string;
   label: string;
   icon: string;
+  /** When set on a child link, only exact path matches (avoids e.g. /hr/employee matching /hr/employee/create). */
+  end?: boolean;
   children?: NavItem[];
 };
 
@@ -46,18 +48,24 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             label: 'Team Management',
             icon: 'bi bi-people',
             children: [
-              { to: '/hr/team', label: 'Teams', icon: 'bi bi-people' },
+              { to: '/hr/team', label: 'Teams', icon: 'bi bi-people', end: true },
               { to: '/hr/team/create', label: 'Create Team', icon: 'bi bi-plus-circle' },
             ],
           },
 
           {
-            to: '/hr/employee',
+            to: '/hr/organization',
             label: 'Organization',
             icon: 'bi bi-building',
             children: [
               { to: '/hr/department', label: 'Departments', icon: 'bi bi-building' },
-              { to: '/hr/employee', label: 'Employees', icon: 'bi bi-person' },
+              { to: '/hr/employee', label: 'Employee list', icon: 'bi bi-people', end: true },
+              {
+                to: '/hr/employee/workforce',
+                label: 'Workforce overview',
+                icon: 'bi bi-person-badge',
+                end: true,
+              },
               { to: '/hr/employee/create', label: 'Create Employee', icon: 'bi bi-person-plus' },
               { to: '/hr/employee/import', label: 'Import Employees', icon: 'bi bi-upload' },
             ],
@@ -212,6 +220,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                     <NavLink
                       key={child.to}
                       to={child.to}
+                      end={child.end}
                       className={({ isActive }) =>
                         `hr-submenu-link ${isActive ? 'active' : ''}`
                       }
