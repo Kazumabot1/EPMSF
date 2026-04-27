@@ -14,8 +14,15 @@ import java.util.Date;
 public class AppraisalResult {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-    private Integer employeeId;
-    private Integer cycleId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cycle_id", nullable = false)
+    private AppraisalCycle cycle;
+
     private Double selfScore;
     private Double managerScore;
     private Double finalScore;

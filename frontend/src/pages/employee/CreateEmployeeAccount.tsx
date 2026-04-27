@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { fetchDepartments } from "../../services/departmentService";
+import type { Department } from "../../services/departmentService";
+import { positionService } from "../../services/positionService";
+import type { PositionResponse } from "../../types/position";
 import "./employee-ui.css";
 
 const roleOptions = [
@@ -22,6 +26,8 @@ const CreateEmployeeAccount = () => {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [positions, setPositions] = useState<PositionResponse[]>([]);
   const emailRegex = /^[A-Za-z0-9+._-]+@[A-Za-z0-9._-]+\.[A-Za-z]{2,}$/;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -43,43 +49,8 @@ const CreateEmployeeAccount = () => {
     setMessage(null);
     try {
       setLoading(true);
-      const response = await api.post("/users", { ...form, email: form.email.trim().toLowerCase() });
-      const data = response?.data?.data as
-        | {
-            success?: boolean;
-            message?: string;
-            accountCreated?: boolean;
-            temporaryPasswordEmailSent?: boolean;
-            smtpErrorDetail?: string | null;
-          }
-        | undefined;
-      const statusOk = data?.success !== false;
-      const smtp = data?.smtpErrorDetail?.trim();
-      const accountCreated = data?.accountCreated === true;
-      const emailRequested = form.sendTemporaryPasswordEmail;
-      const emailFailed = emailRequested && !data?.temporaryPasswordEmailSent;
-
-      let text: string;
-      if (accountCreated && emailRequested && emailFailed) {
-        text =
-          "Account was created, but email delivery failed. Please check SMTP credentials or resend later.";
-        if (smtp) {
-          text += ` ${smtp}`;
-        }
-      } else {
-        const detail = data?.message || "Employee account processed.";
-        const emailStatus = emailRequested
-          ? data?.temporaryPasswordEmailSent
-            ? " Email sent successfully."
-            : ` Email could not be sent.${smtp ? ` ${smtp}` : " Check SMTP configuration."}`
-          : "";
-        text = `${detail}${emailStatus}`.trim();
-      }
-
-      setMessage({ type: statusOk ? "success" : "error", text });
-      if (!statusOk) {
-        return;
-      }
+      await api.post("/hr/employee-accounts", { ...form, email: form.email.trim().toLowerCase() });
+      setMessage({ type: "success", text: "Employee account was created. The user can sign in with the email and password you set." });
       setForm({
         employeeCode: "",
         fullName: "",
@@ -103,6 +74,29 @@ const CreateEmployeeAccount = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const deptData = await fetchDepartments();
+        setDepartments(deptData);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    const loadPositions = async () => {
+      try {
+        const posData = await positionService.getPositions();
+        setPositions(posData);
+      } catch (error) {
+        console.error("Error fetching positions:", error);
+      }
+    };
+
+    loadDepartments();
+    loadPositions();
+  }, []);
 
   return (
     <div className="employee-page employee-form-create">
@@ -233,26 +227,38 @@ const CreateEmployeeAccount = () => {
               <div className="employee-form-grid">
                 <div className="employee-form-field">
                   <label htmlFor="departmentName">Department</label>
-                  <input
+                  <select
                     id="departmentName"
                     name="departmentName"
-                    className="employee-form-input"
+                    className="employee-form-select"
                     value={form.departmentName}
                     onChange={handleInputChange}
-                    placeholder="e.g. Engineering"
-                  />
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.departmentName}>
+                        {dept.departmentName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="employee-form-field">
                   <label htmlFor="positionName">Position</label>
-                  <input
+                  <select
                     id="positionName"
                     name="positionName"
-                    className="employee-form-input"
+                    className="employee-form-select"
                     value={form.positionName}
                     onChange={handleInputChange}
-                    placeholder="e.g. Software Engineer"
-                  />
+                  >
+                    <option value="">Select Position</option>
+                    {positions.map((pos) => (
+                      <option key={pos.id} value={pos.positionTitle}>
+                        {pos.positionTitle}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
