@@ -8,6 +8,8 @@ type KpiDynamicRowsTableProps = {
   items: KpiItem[];
   categories: KpiCategory[];
   units: KpiUnit[];
+  /** When true, rows are display-only; add/remove/change handlers are not used. */
+  readOnly?: boolean;
   onAddRow: () => void;
   onRemoveRow: (rowId: string) => void;
   onRowChange: (rowId: string, changes: Partial<KpiFormRowDraft>) => void;
@@ -20,14 +22,30 @@ const calculateWeightedScore = (score: number | null, weight: number | null): nu
   return Number(((score * weight) / 100).toFixed(2));
 };
 
-const KpiDynamicRowsTable = ({ rows, items, categories, units, onAddRow, onRemoveRow, onRowChange }: KpiDynamicRowsTableProps) => (
+const labelFor = (
+  id: number | null,
+  list: { id: number; name: string }[],
+  fallback: string,
+) => (id != null ? list.find((e) => e.id === id)?.name ?? fallback : fallback);
+
+const KpiDynamicRowsTable = ({
+  rows,
+  items,
+  categories,
+  units,
+  readOnly = false,
+  onAddRow,
+  onRemoveRow,
+  onRowChange,
+}: KpiDynamicRowsTableProps) => (
   <div>
     <div className="kpi-rows-head">
       <h3>KPI Rows</h3>
-      <button type="button" onClick={onAddRow} className="kpi-add-row">
-        <i className="bi bi-plus-circle" />{' '}
-        Add Row
-      </button>
+      {!readOnly && (
+        <button type="button" onClick={onAddRow} className="kpi-add-row">
+          <i className="bi bi-plus-circle" /> Add Row
+        </button>
+      )}
     </div>
     <div className="kpi-grid-table-wrap">
       <table className="kpi-grid-table">
@@ -41,12 +59,26 @@ const KpiDynamicRowsTable = ({ rows, items, categories, units, onAddRow, onRemov
             <th>Weight (%)</th>
             <th>Score (%)</th>
             <th>Weighted Score</th>
-            <th>Action</th>
+            {!readOnly && <th>Action</th>}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const weightedScore = calculateWeightedScore(row.score, row.weight);
+            if (readOnly) {
+              return (
+                <tr key={row.rowId}>
+                  <td>{labelFor(row.kpiItemId, items, '—')}</td>
+                  <td>{labelFor(row.kpiCategoryId, categories, '—')}</td>
+                  <td>{row.target ?? '—'}</td>
+                  <td>{labelFor(row.kpiUnitId, units, '—')}</td>
+                  <td>{row.actual ?? '—'}</td>
+                  <td>{row.weight ?? '—'}</td>
+                  <td>{row.score ?? '—'}</td>
+                  <td className="kpi-weighted">{weightedScore.toFixed(2)}</td>
+                </tr>
+              );
+            }
             return (
               <tr key={row.rowId}>
                 <td>

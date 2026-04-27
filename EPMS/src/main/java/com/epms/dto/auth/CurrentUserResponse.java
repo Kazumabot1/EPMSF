@@ -17,4 +17,5 @@ public class CurrentUserResponse {
     private List<String> roles;
     private List<String> permissions;
     private String dashboard;
+    private Boolean mustChangePassword;
 }

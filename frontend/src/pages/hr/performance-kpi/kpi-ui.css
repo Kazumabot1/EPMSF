@@ -225,6 +225,22 @@
   color: #334155;
 }
 
+.kpi-readonly-label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.kpi-readonly-value {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #0f172a;
+  padding: 9px 11px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
 .kpi-required {
   color: #dc2626;
 }

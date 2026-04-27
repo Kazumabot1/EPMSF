@@ -12,6 +12,7 @@ interface User {
   roles: string[];
   permissions: string[];
   dashboard: string;
+  mustChangePassword: boolean;
 }
 
 interface AuthContextType {
@@ -61,6 +62,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       roles: payload.roles ?? [],
       permissions: payload.permissions ?? [],
       dashboard: payload.dashboard,
+      mustChangePassword: payload.mustChangePassword ?? false,
     });
   }, []);
 

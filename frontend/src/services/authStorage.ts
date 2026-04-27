@@ -20,6 +20,7 @@ export const authStorage = {
         roles: payload.roles ?? [],
         permissions: payload.permissions ?? [],
         dashboard: payload.dashboard,
+        mustChangePassword: payload.mustChangePassword ?? false,
       })
     );
   },

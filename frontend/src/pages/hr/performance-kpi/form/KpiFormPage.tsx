@@ -76,6 +76,14 @@ const KpiFormPage = () => {
   const [saving, setSaving] = useState(false);
   const [positionFilter, setPositionFilter] = useState('');
 
+  const [viewState, setViewState] = useState<{
+    formName: string;
+    positionName: string;
+    createdBy: string;
+    createdAt: string;
+    rows: KpiFormRowDraft[];
+  } | null>(null);
+
   const saveBundles = (nextBundles: KpiFormBundle[]) => {
     setBundles(nextBundles);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBundles));
@@ -162,12 +170,8 @@ const KpiFormPage = () => {
     setShowModal(true);
   };
 
-  const openEdit = (bundleId: string) => {
-    const bundle = bundles.find((entry) => entry.bundleId === bundleId);
-    if (!bundle) {
-      return;
-    }
-    const mappedRows = bundle.kpiIds.map((kpiId) => {
+  const mapBundleToRows = (bundle: KpiFormBundle): KpiFormRowDraft[] => {
+    return bundle.kpiIds.map((kpiId) => {
       const kpi = kpis.find((entry) => entry.id === kpiId);
       return {
         rowId: crypto.randomUUID(),
@@ -180,6 +184,39 @@ const KpiFormPage = () => {
         score: bundle.rowScores[kpiId]?.score ?? null,
       } satisfies KpiFormRowDraft;
     });
+  };
+
+  const openView = (bundleId: string) => {
+    const bundle = bundles.find((entry) => entry.bundleId === bundleId);
+    if (!bundle) {
+      return;
+    }
+    setViewState({
+      formName: bundle.formName,
+      positionName: bundle.positionName,
+      createdBy: bundle.createdBy,
+      createdAt: bundle.createdAt,
+      rows: mapBundleToRows(bundle),
+    });
+  };
+
+  const closeView = () => {
+    setViewState(null);
+  };
+
+  const viewTotalScore = useMemo(() => {
+    if (!viewState) {
+      return 0;
+    }
+    return viewState.rows.reduce((sum, row) => sum + calculateWeightedScore(row.score, row.weight), 0);
+  }, [viewState]);
+
+  const openEdit = (bundleId: string) => {
+    const bundle = bundles.find((entry) => entry.bundleId === bundleId);
+    if (!bundle) {
+      return;
+    }
+    const mappedRows = mapBundleToRows(bundle);
     setEditingBundleId(bundleId);
     setFormName(bundle.formName);
     setPositionId(String(bundle.positionId));
@@ -408,8 +445,19 @@ const KpiFormPage = () => {
                         <div className="kpi-row-actions">
                           <button
                             type="button"
+                            onClick={() => openView(item.bundleId)}
+                            className="kpi-icon-btn"
+                            title="View"
+                            aria-label="View KPI form"
+                          >
+                            <i className="bi bi-eye" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => openEdit(item.bundleId)}
                             className="kpi-icon-btn"
+                            title="Edit"
+                            aria-label="Edit KPI form"
                           >
                             <i className="bi bi-pencil-square" />
                           </button>
@@ -417,6 +465,8 @@ const KpiFormPage = () => {
                             type="button"
                             onClick={() => void handleDeleteBundle(item.bundleId)}
                             className="kpi-icon-btn danger"
+                            title="Delete"
+                            aria-label="Delete KPI form"
                           >
                             <i className="bi bi-trash" />
                           </button>
@@ -512,6 +562,64 @@ const KpiFormPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {viewState && (
+        <div className="kpi-modal-backdrop overflow-y-auto">
+          <div className="kpi-modal mx-auto w-full max-w-6xl">
+            <h2 className="kpi-modal-title">View KPI Form</h2>
+            <div className="kpi-form">
+              <div className="kpi-form-grid">
+                <div className="kpi-field">
+                  <span className="kpi-readonly-label">KPI Form Name</span>
+                  <p className="kpi-readonly-value">{viewState.formName}</p>
+                </div>
+                <div className="kpi-field">
+                  <span className="kpi-readonly-label">Position</span>
+                  <p className="kpi-readonly-value">{viewState.positionName}</p>
+                </div>
+                <div className="kpi-field">
+                  <span className="kpi-readonly-label">Created By</span>
+                  <p className="kpi-readonly-value">{viewState.createdBy}</p>
+                </div>
+                <div className="kpi-field">
+                  <span className="kpi-readonly-label">Created At</span>
+                  <p className="kpi-readonly-value">
+                    {viewState.createdAt
+                      ? new Date(viewState.createdAt).toLocaleString(undefined, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+
+              {viewState.rows.length === 0 ? (
+                <p className="kpi-state info">No KPI rows in this form.</p>
+              ) : (
+                <KpiDynamicRowsTable
+                  readOnly
+                  rows={viewState.rows}
+                  items={items}
+                  categories={categories}
+                  units={units}
+                  onAddRow={() => {}}
+                  onRemoveRow={() => {}}
+                  onRowChange={() => {}}
+                />
+              )}
+
+              <div className="kpi-total-score">Total Score: {viewTotalScore.toFixed(2)}</div>
+
+              <div className="kpi-form-actions">
+                <button type="button" onClick={closeView} className="kpi-btn-primary">
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

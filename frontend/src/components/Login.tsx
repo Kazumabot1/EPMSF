@@ -50,7 +50,7 @@ function Login() {
       }
 
       login(payload);
-      navigate(resolveRoute(payload.dashboard), { replace: true });
+      navigate(payload.mustChangePassword ? '/change-password' : resolveRoute(payload.dashboard), { replace: true });
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||

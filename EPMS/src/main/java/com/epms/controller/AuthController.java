@@ -60,6 +60,7 @@ public class AuthController {
                 .roles(principal.getRoles())
                 .permissions(principal.getPermissions())
                 .dashboard(principal.getDashboard())
+                .mustChangePassword(principal.isMustChangePassword())
                 .build();
 
         return ResponseEntity.ok(GenericApiResponse.success("Current user fetched successfully", response));

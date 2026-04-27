@@ -1,11 +1,8 @@
-import axios from "axios";
-import { authStorage } from "./authStorage";
+import axios from 'axios';
+import { authStorage } from './authStorage';
 
 const api = axios.create({
-  baseURL: "/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL: '/api',
 });
 
 api.interceptors.request.use((config) => {

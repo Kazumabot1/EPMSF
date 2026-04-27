@@ -38,6 +38,9 @@ public class Position {
     @OneToMany(mappedBy = "position", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<KpiPosition> kpiPositions = new HashSet<>();
 
+    @OneToMany(mappedBy = "position", fetch = FetchType.LAZY)
+    private List<Employee> employees = new ArrayList<>();
+
     // Helper method to get all KPIs for this position
     public Set<Kpi> getKpis() {
         Set<Kpi> kpiForms = new HashSet<>();
