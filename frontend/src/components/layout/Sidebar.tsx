@@ -66,7 +66,6 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 icon: 'bi bi-person-badge',
                 end: true,
               },
-              { to: '/hr/employee/create', label: 'Create Employee', icon: 'bi bi-person-plus' },
               { to: '/hr/employee/import', label: 'Import Employees', icon: 'bi bi-upload' },
             ],
           },

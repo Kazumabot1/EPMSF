@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import EmployeeFormModal from '../../components/employee/EmployeeFormModal';
 import EmployeeViewModal from '../../components/employee/EmployeeViewModal';
 import EmployeeDeactivateDialog from '../../components/employee/EmployeeDeactivateDialog';
+import CreateEmployeeAccountModal from './CreateEmployeeAccountModal';
 import '../../components/employee/employee-crud.css';
 import {
   fetchEmployees,
@@ -39,6 +40,8 @@ const EmployeeManagement = () => {
 
   const [viewOpen, setViewOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [accountOpen, setAccountOpen] = useState(searchParams.get('createAccount') === '1');
 
   const loadEmployees = useCallback(async () => {
     try {
@@ -62,6 +65,12 @@ const EmployeeManagement = () => {
   useEffect(() => {
     setPage(1);
   }, [search, genderFilter, statusFilter]);
+
+  useEffect(() => {
+    if (searchParams.get('createAccount') === '1') {
+      setAccountOpen(true);
+    }
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     let list = employees.filter((emp) => {
@@ -118,6 +127,16 @@ const EmployeeManagement = () => {
     setDeactivateOpen(true);
   };
 
+  const openAccountModal = () => {
+    setSearchParams({ createAccount: '1' });
+    setAccountOpen(true);
+  };
+
+  const closeAccountModal = () => {
+    setAccountOpen(false);
+    setSearchParams({});
+  };
+
   const initials = (emp: EmployeeResponse) => {
     const parts = [emp.firstName, emp.lastName].filter(Boolean);
     if (parts.length === 0) {
@@ -156,10 +175,10 @@ const EmployeeManagement = () => {
               <i className="bi bi-upload" aria-hidden />
               Import (Excel / CSV)
             </Link>
-            <Link to="/hr/employee/create" className="epms-emp-btn epms-emp-btn--ghost no-underline">
+            <button type="button" className="epms-emp-btn epms-emp-btn--ghost" onClick={openAccountModal}>
               <i className="bi bi-key" aria-hidden />
               Create login account
-            </Link>
+            </button>
           </div>
         </header>
 
@@ -507,6 +526,12 @@ const EmployeeManagement = () => {
         employee={selected}
         onClose={() => setDeactivateOpen(false)}
         onDeactivated={() => void loadEmployees()}
+      />
+
+      <CreateEmployeeAccountModal
+        open={accountOpen}
+        onClose={closeAccountModal}
+        onCreated={() => void loadEmployees()}
       />
     </div>
   );

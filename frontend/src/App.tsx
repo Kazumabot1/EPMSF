@@ -11,7 +11,6 @@ import NotificationTemplates from './components/NotificationTemplates';
 import OneOnOneMeetings from './components/OneOnOneMeetings';
 import OneOnOneActionItems from './components/OneOnOneActionItems';
 import ProtectedRoute from './routes/ProtectedRoute';
-import CreateEmployeeAccount from './pages/employee/CreateEmployeeAccount';
 import AppLayout from './layouts/AppLayout';
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 import EmployeeMyDashboard from './pages/employee/EmployeeMyDashboard';
@@ -31,6 +30,7 @@ import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
 import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
+import CreateEmployeeAccountModal from "./pages/employee/CreateEmployeeAccountModal";
 
 function App() {
   return (
@@ -119,7 +119,6 @@ function App() {
 
               <Route path="/hr/employee" element={<EmployeeManagement />} />
               <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
-              <Route path="/hr/employee/create" element={<CreateEmployeeAccount />} />
               <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
               <Route path="/hr/team" element={<TeamManagement />} />
               <Route path="/hr/team/create" element={<TeamCreate />} />
