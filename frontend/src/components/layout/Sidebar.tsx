@@ -59,7 +59,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             icon: 'bi bi-building',
             children: [
               { to: '/hr/department', label: 'Departments', icon: 'bi bi-building' },
-              { to: '/hr/employee', label: 'Employee list', icon: 'bi bi-people', end: true },
+              { to: '/hr/employee', label: 'Employee', icon: 'bi bi-people', end: true },
               {
                 to: '/hr/employee/workforce',
                 label: 'Workforce overview',
