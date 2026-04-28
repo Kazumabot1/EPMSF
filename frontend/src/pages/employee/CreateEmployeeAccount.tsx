@@ -1,286 +1,305 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import api from "../../services/api";
-import "./employee-ui.css";
+import { useEffect, useState } from 'react';
+import api from '../../services/api';
+import { fetchDepartments, type Department } from '../../services/departmentService';
+import { positionService } from '../../services/positionService';
+import type { PositionResponse } from '../../types/position';
 
-const roleOptions = [
-  { value: "EMPLOYEE", label: "Employee" },
-  { value: "HR", label: "HR" },
-  { value: "MANAGER", label: "Manager" },
-];
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onCreated?: () => void;
+};
 
-const CreateEmployeeAccount = () => {
-  const [form, setForm] = useState({
-    employeeCode: "",
-    fullName: "",
-    email: "",
-    departmentName: "",
-    positionName: "",
-    roleName: "EMPLOYEE",
-    sendTemporaryPasswordEmail: true,
-  });
+const emptyForm = {
+  employeeCode: '',
+  fullName: '',
+  email: '',
+  roleName: 'EMPLOYEE',
+  departmentId: '',
+  positionId: '',
+  sendTemporaryPasswordEmail: true,
+};
 
+const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
+  const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const emailRegex = /^[A-Za-z0-9+._-]+@[A-Za-z0-9._-]+\.[A-Za-z]{2,}$/;
+  const [message, setMessage] = useState('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setMessage(null);
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const [positions, setPositions] = useState<PositionResponse[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [orgPickersLoading, setOrgPickersLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm(emptyForm);
+      setMessage('');
+      setLoading(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    setOrgPickersLoading(true);
+
+    Promise.all([positionService.getPositions(), fetchDepartments()])
+      .then(([posList, deptList]) => {
+        if (!cancelled) {
+          setPositions(posList.filter((p) => p.status !== false));
+          setDepartments(deptList);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPositions([]);
+          setDepartments([]);
+          setMessage('Could not load departments or positions.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setOrgPickersLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target;
+
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm((prev) => ({ ...prev, [name]: checked }));
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email.trim()) {
-      setMessage({ type: "error", text: "Email is required to create the account." });
-      return;
-    }
-    if (!emailRegex.test(form.email.trim())) {
-      setMessage({ type: "error", text: "Please provide a valid email address." });
-      return;
-    }
 
-    setMessage(null);
     try {
       setLoading(true);
-      const response = await api.post("/users", { ...form, email: form.email.trim().toLowerCase() });
-      const data = response?.data?.data as
-        | {
-            success?: boolean;
-            message?: string;
-            accountCreated?: boolean;
-            temporaryPasswordEmailSent?: boolean;
-            smtpErrorDetail?: string | null;
-          }
-        | undefined;
-      const statusOk = data?.success !== false;
-      const smtp = data?.smtpErrorDetail?.trim();
-      const accountCreated = data?.accountCreated === true;
-      const emailRequested = form.sendTemporaryPasswordEmail;
-      const emailFailed = emailRequested && !data?.temporaryPasswordEmailSent;
+      setMessage('');
 
-      let text: string;
-      if (accountCreated && emailRequested && emailFailed) {
-        text =
-          "Account was created, but email delivery failed. Please check SMTP credentials or resend later.";
-        if (smtp) {
-          text += ` ${smtp}`;
-        }
-      } else {
-        const detail = data?.message || "Employee account processed.";
-        const emailStatus = emailRequested
-          ? data?.temporaryPasswordEmailSent
-            ? " Email sent successfully."
-            : ` Email could not be sent.${smtp ? ` ${smtp}` : " Check SMTP configuration."}`
-          : "";
-        text = `${detail}${emailStatus}`.trim();
-      }
+      await api.post('/hr/employee-accounts', {
+        employeeCode: form.employeeCode.trim(),
+        fullName: form.fullName.trim(),
+        email: form.email.trim().toLowerCase(),
+        roleName: form.roleName,
+        departmentId: form.departmentId ? Number(form.departmentId) : null,
+        positionId: form.positionId ? Number(form.positionId) : null,
+        sendTemporaryPasswordEmail: form.sendTemporaryPasswordEmail,
+      });
 
-      setMessage({ type: statusOk ? "success" : "error", text });
-      if (!statusOk) {
-        return;
-      }
-      setForm({
-        employeeCode: "",
-        fullName: "",
-        email: "",
-        departmentName: "",
-        positionName: "",
-        roleName: "EMPLOYEE",
-        sendTemporaryPasswordEmail: true,
-      });
-    } catch (error: unknown) {
-      console.error(error);
-      const err = error as { response?: { data?: { message?: string; error?: string } } };
-      setMessage({
-        type: "error",
-        text:
-          err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          "We could not create the account. Check the details and try again.",
-      });
+      setMessage('Employee login account created successfully.');
+      setForm(emptyForm);
+      onCreated?.();
+    } catch (err: any) {
+      setMessage(
+        err?.response?.data?.message ||
+          'Failed to create employee login account.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="employee-page employee-form-create">
-      <div className="employee-form-header-row">
-        <Link to="/hr/employee" className="employee-back-link">
-          <i className="bi bi-arrow-left" aria-hidden />
-          <span>Employees</span>
-        </Link>
-      </div>
+    <div className="epms-emp-modal-overlay" role="presentation" onClick={onClose}>
+      <div
+        className="epms-emp-modal epms-emp-modal--wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-account-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="epms-emp-modal__accent" />
 
-      <header className="employee-hero">
-        <p className="employee-hero-badge">HR — onboarding</p>
-        <h1>Create employee account</h1>
-        <p>
-          Add login credentials and basic assignment details. The department and position can match
-          names already in the system, or will be created or linked as configured on the server.
-        </p>
-      </header>
+        <div className="epms-emp-modal__head">
+          <div>
+            <h2 id="create-account-title" className="epms-emp-modal__title">
+              Create employee login account
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create login account with correct department and position IDs.
+            </p>
+          </div>
 
-      <div className="employee-surface">
-        <div className="employee-surface-inner">
-          {message && (
-            <div
-              className={
-                message.type === "success" ? "employee-form-alert success" : "employee-form-alert error"
-              }
-              role="status"
-            >
-              {message.text}
-            </div>
-          )}
+          <button
+            type="button"
+            className="epms-emp-modal__close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <i className="bi bi-x-lg" aria-hidden />
+          </button>
+        </div>
 
-          <form onSubmit={handleSubmit} className="employee-form" noValidate>
-            <div className="employee-form-section">
-              <h2 className="employee-form-section-title">
+        <form className="epms-emp-form" onSubmit={handleSubmit}>
+          <div className="epms-emp-form-body">
+            {message && (
+              <div className="my-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {message}
+              </div>
+            )}
+
+            <div className="epms-emp-form-section">
+              <h3>
                 <i className="bi bi-person-vcard" aria-hidden />
-                Profile and access
-              </h2>
-              <p className="employee-form-section-desc">Identifiers and sign-in details for the new user.</p>
+                Account information
+              </h3>
 
-              <div className="employee-form-grid">
-                <div className="employee-form-field">
-                  <label htmlFor="employeeCode">
-                    Employee code <span className="employee-form-optional">optional</span>
-                  </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="epms-emp-field block">
+                  <span className="epms-emp-field__label">Employee code</span>
                   <input
-                    id="employeeCode"
                     name="employeeCode"
-                    className="employee-form-input"
+                    className="epms-emp-input-field"
                     value={form.employeeCode}
-                    onChange={handleInputChange}
-                    placeholder="e.g. EMP-1024"
-                    autoComplete="off"
+                    onChange={handleChange}
+                    placeholder="Example: EMP001"
                   />
-                </div>
+                </label>
 
-                <div className="employee-form-field">
-                  <label htmlFor="fullName">Full name</label>
+                <label className="epms-emp-field block">
+                  <span className="epms-emp-field__label">Full name</span>
                   <input
-                    id="fullName"
                     name="fullName"
-                    className="employee-form-input"
+                    className="epms-emp-input-field"
                     value={form.fullName}
-                    onChange={handleInputChange}
-                    placeholder="Name as it should appear in the system"
-                    autoComplete="name"
+                    onChange={handleChange}
+                    placeholder="Example: Goku S"
                   />
-                </div>
+                </label>
 
-                <div className="employee-form-field employee-form-field-span-2">
-                  <label htmlFor="email">
-                    Work email <span className="employee-form-required">*</span>
-                  </label>
+                <label className="epms-emp-field block sm:col-span-2">
+                  <span className="epms-emp-field__label">
+                    Email <span className="text-red-600">*</span>
+                  </span>
                   <input
-                    id="email"
                     name="email"
                     type="email"
-                    className="employee-form-input"
+                    required
+                    className="epms-emp-input-field"
                     value={form.email}
-                    onChange={handleInputChange}
-                    placeholder="name@company.com"
-                    autoComplete="email"
+                    onChange={handleChange}
+                    placeholder="employee@example.com"
                   />
-                </div>
+                </label>
 
-                <div className="employee-form-field">
-                  <label htmlFor="roleName">System role</label>
+                <label className="epms-emp-field block">
+                  <span className="epms-emp-field__label">Role</span>
                   <select
-                    id="roleName"
                     name="roleName"
-                    className="employee-form-select"
+                    className="epms-emp-input-field"
                     value={form.roleName}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                   >
-                    {roleOptions.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
+                    <option value="EMPLOYEE">Employee</option>
+                    <option value="HR">HR</option>
+                    <option value="MANAGER">Manager</option>
+                  </select>
+                </label>
+
+                <label className="epms-emp-field block">
+                  <span className="epms-emp-field__label">Department</span>
+                  <select
+                    name="departmentId"
+                    className="epms-emp-input-field"
+                    value={form.departmentId}
+                    onChange={handleChange}
+                    disabled={orgPickersLoading}
+                  >
+                    <option value="">
+                      {orgPickersLoading ? 'Loading…' : '— Select department —'}
+                    </option>
+
+                    {departments.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.departmentName}
                       </option>
                     ))}
                   </select>
-                </div>
+                </label>
 
-                <div className="employee-form-field employee-form-field-span-2">
-                  <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <input
-                      name="sendTemporaryPasswordEmail"
-                      type="checkbox"
-                      checked={form.sendTemporaryPasswordEmail}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, sendTemporaryPasswordEmail: e.target.checked }))
-                      }
-                    />
-                    Send temporary password email and force first-login password change
-                  </label>
-                </div>
+                <label className="epms-emp-field block">
+                  <span className="epms-emp-field__label">Position</span>
+                  <select
+                    name="positionId"
+                    className="epms-emp-input-field"
+                    value={form.positionId}
+                    onChange={handleChange}
+                    disabled={orgPickersLoading}
+                  >
+                    <option value="">
+                      {orgPickersLoading ? 'Loading…' : '— Select position —'}
+                    </option>
+
+                    {positions.map((p) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.positionTitle}
+                        {p.levelCode ? ` (${p.levelCode})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="mt-2 text-sm text-slate-700 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    name="sendTemporaryPasswordEmail"
+                    className="mr-2"
+                    checked={form.sendTemporaryPasswordEmail}
+                    onChange={handleChange}
+                  />
+                  Send temporary password onboarding email
+                </label>
               </div>
             </div>
+          </div>
 
-            <div className="employee-form-section-divider" />
+          <div className="epms-emp-form-footer">
+            <button
+              type="button"
+              className="epms-emp-btn epms-emp-btn--ghost"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancel
+            </button>
 
-            <div className="employee-form-section">
-              <h2 className="employee-form-section-title">
-                <i className="bi bi-building" aria-hidden />
-                Work assignment
-              </h2>
-              <p className="employee-form-section-desc">Department and position labels as stored in EPMS.</p>
-
-              <div className="employee-form-grid">
-                <div className="employee-form-field">
-                  <label htmlFor="departmentName">Department</label>
-                  <input
-                    id="departmentName"
-                    name="departmentName"
-                    className="employee-form-input"
-                    value={form.departmentName}
-                    onChange={handleInputChange}
-                    placeholder="e.g. Engineering"
-                  />
-                </div>
-
-                <div className="employee-form-field">
-                  <label htmlFor="positionName">Position</label>
-                  <input
-                    id="positionName"
-                    name="positionName"
-                    className="employee-form-input"
-                    value={form.positionName}
-                    onChange={handleInputChange}
-                    placeholder="e.g. Software Engineer"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="employee-form-actions">
-              <Link to="/hr/employee/import" className="employee-btn secondary">
-                <i className="bi bi-upload" />
-                Import instead
-              </Link>
-              <button type="submit" className="employee-btn primary" disabled={loading}>
-                {loading ? (
-                  <>
-                    <span className="employee-form-spinner" aria-hidden />
-                    Creating…
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-check-lg" />
-                    Create account
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
+            <button
+              type="submit"
+              className="epms-emp-btn epms-emp-btn--primary"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <i className="bi bi-hourglass-split" aria-hidden />
+                  Creating…
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check-lg" aria-hidden />
+                  Create account
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
-export default CreateEmployeeAccount;
+export default CreateEmployeeAccountModal;
