@@ -1,4 +1,4 @@
-export type UserRole = 'Employee' | 'HR';
+export type UserRole = 'Employee' | 'HR' | 'DepartmentHead';
 
 export interface NavItem {
   label: string;
@@ -30,14 +30,33 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Teams', path: '/hr/team', icon: 'bi-people-fill' },
     { label: 'Departments', path: '/hr/department', icon: 'bi-building' },
   ],
+  DepartmentHead: [
+    {
+      label: 'Department Dashboard',
+      path: '/department-head/dashboard',
+      icon: 'bi-building-check',
+      end: true,
+    },
+  ],
 };
 
 export const resolveUserRole = (user?: UserLike | null): UserRole => {
   if (!user) return 'Employee';
 
-  const roleList = user.roles ?? [];
-  if (roleList.some((role) => role.toUpperCase() === 'HR')) return 'HR';
-  if (user.dashboard === 'HR_DASHBOARD') return 'HR';
+  const normalizedRoles = (user.roles ?? []).map((role) =>
+    role.replace('ROLE_', '').replace(/\s+/g, '_').toUpperCase()
+  );
+
+  if (
+    normalizedRoles.includes('DEPARTMENT_HEAD') ||
+    user.dashboard === 'DEPARTMENT_HEAD_DASHBOARD'
+  ) {
+    return 'DepartmentHead';
+  }
+
+  if (normalizedRoles.includes('HR') || user.dashboard === 'HR_DASHBOARD') {
+    return 'HR';
+  }
 
   return 'Employee';
 };

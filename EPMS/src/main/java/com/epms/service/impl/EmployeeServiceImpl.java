@@ -27,6 +27,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import com.epms.security.SecurityUtils;
+import com.epms.security.UserPrincipal;
 
 @Service
 @RequiredArgsConstructor
@@ -383,5 +385,41 @@ public class EmployeeServiceImpl implements EmployeeService {
                 null,
                 null
         );
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<EmployeeResponseDto> getMyDepartmentEmployees(boolean includeInactive) {
+        Integer departmentId = requireCurrentDepartmentId();
+
+        return employeeRepository.findCurrentByDepartmentId(departmentId, includeInactive)
+                .stream()
+                .map(this::mapToDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EmployeeResponseDto getMyDepartmentEmployeeById(Integer id) {
+        EmployeeResponseDto dto = getEmployeeById(id);
+        assertSameDepartment(dto.getCurrentDepartmentId());
+        return dto;
+    }
+
+    private Integer requireCurrentDepartmentId() {
+        UserPrincipal currentUser = SecurityUtils.currentUser();
+
+        if (currentUser.getDepartmentId() == null) {
+            throw new BusinessValidationException("Current department head has no assigned department.");
+        }
+
+        return currentUser.getDepartmentId();
+    }
+
+    private void assertSameDepartment(Integer requestedDepartmentId) {
+        Integer currentDepartmentId = requireCurrentDepartmentId();
+
+        if (requestedDepartmentId == null || !requestedDepartmentId.equals(currentDepartmentId)) {
+            throw new BusinessValidationException("You can only access employees from your own department.");
+        }
     }
 }

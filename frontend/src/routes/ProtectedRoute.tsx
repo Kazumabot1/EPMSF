@@ -24,8 +24,15 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
 
   if (allowedRoles?.length) {
     const role = resolveUserRole(user);
+
     if (!allowedRoles.includes(role)) {
-      const fallbackPath = role === 'HR' ? '/dashboard' : '/employee/dashboard';
+      const fallbackPath =
+        role === 'HR'
+          ? '/dashboard'
+          : role === 'DepartmentHead'
+            ? '/department-head/dashboard'
+            : '/employee/dashboard';
+
       return <Navigate to={fallbackPath} replace />;
     }
   }

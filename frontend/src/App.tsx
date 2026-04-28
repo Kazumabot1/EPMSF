@@ -30,7 +30,8 @@ import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
 import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
-import CreateEmployeeAccountModal from "./pages/employee/CreateEmployeeAccountModal";
+
+import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 
 function App() {
   return (
@@ -107,6 +108,15 @@ function App() {
                     description="Stay updated on appraisals, KPIs, and tasks."
                   />
                 }
+              />
+            </Route>
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
+            <Route element={<AppLayout />}>
+              <Route
+                path="/department-head/dashboard"
+                element={<DepartmentHeadDashboard />}
               />
             </Route>
           </Route>

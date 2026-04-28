@@ -2,14 +2,10 @@ import EmployeeHeader from '../components/header/EmployeeHeader';
 import HRHeader from '../components/header/HRHeader';
 import type { UserRole } from '../config/roleNavigation';
 
-interface UserLike {
-  fullName?: string;
-}
-
 interface RoleBasedHeaderProps {
   role: UserRole;
   collapsed: boolean;
-  user?: UserLike | null;
+  user?: any;
 }
 
 const RoleBasedHeader = ({ role, collapsed, user }: RoleBasedHeaderProps) => {

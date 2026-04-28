@@ -197,9 +197,10 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     value={form.roleName}
                     onChange={handleChange}
                   >
-                    <option value="EMPLOYEE">Employee</option>
-                    <option value="HR">HR</option>
-                    <option value="MANAGER">Manager</option>
+                   <option value="EMPLOYEE">Employee</option>
+                   <option value="HR">HR</option>
+                   <option value="MANAGER">Manager</option>
+                  <option value="DEPARTMENT_HEAD">Department Head</option>
                   </select>
                 </label>
 
