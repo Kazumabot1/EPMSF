@@ -3,17 +3,13 @@ package com.epms.service;
 import com.epms.dto.OneOnOneActionItemRequestDto;
 import com.epms.dto.OneOnOneActionItemResponseDto;
 
-import java.util.List;
+import java.util.Optional;
 
 public interface OneOnOneActionItemService {
 
-    OneOnOneActionItemResponseDto createOneOnOneActionItem(OneOnOneActionItemRequestDto requestDto);
+    /** Create or update the single action item for a meeting */
+    OneOnOneActionItemResponseDto saveActionItem(OneOnOneActionItemRequestDto request);
 
-    List<OneOnOneActionItemResponseDto> getAllOneOnOneActionItems();
-
-    OneOnOneActionItemResponseDto getOneOnOneActionItemById(Integer id);
-
-    OneOnOneActionItemResponseDto updateOneOnOneActionItem(Integer id, OneOnOneActionItemRequestDto requestDto);
-
-    void deleteOneOnOneActionItem(Integer id);
+    /** Get the action item for a meeting (may be empty if not yet entered) */
+    Optional<OneOnOneActionItemResponseDto> getByMeetingId(Integer meetingId);
 }

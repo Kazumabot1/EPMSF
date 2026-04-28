@@ -1,3 +1,6 @@
+/*
+// App.tsx
+ */
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HrEmployeeAccountImport from './pages/employee/HrEmployeeAccountImport';
 import Home from './components/Home';
@@ -31,6 +34,12 @@ import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
 import KpiFormPage from './pages/hr/performance-kpi/form/KpiFormPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
+import Notifications from "./pages/Notifications";
+
+
+/*
+<Route path="/notifications" element={<Notifications />} />
+ */
 
 function App() {
   return (
@@ -64,7 +73,10 @@ function App() {
             <Route path="/role-permissions" element={<RolePermissions />} />
 
             <Route path="/pip-updates" element={<PipUpdates />} />
-            <Route path="/notifications" element={<NotificationTemplates />} />
+
+<Route path="/notifications" element={<Notifications />} />
+<Route path="/notification-templates" element={<NotificationTemplates />} />
+
             <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
             <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
 

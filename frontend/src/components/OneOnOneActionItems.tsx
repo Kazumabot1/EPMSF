@@ -1,239 +1,471 @@
-import { useState, useEffect } from 'react';
-import api from '../api';
+import React, { useState, useEffect, useCallback } from 'react';
+import './one-on-one.css';
+import {
+  getUpcomingMeetings,
+  getOngoingMeetings,
+  getPastMeetings,
+  finishMeeting,
+  createMeeting,
+  saveActionItem,
+} from '../services/oneOnOneService';
+import type { Meeting } from '../services/oneOnOneService';
 
-interface OneOnOneActionItem {
-  id: number;
-  meetingId: number;
-  description: string;
-  owner: string;
-  dueDate: string;
-  status: string;
-  createdAt: string;
-}
+// ── Helpers ──────────────────────────────────────────────────────
+const pad = (n: number) => String(n).padStart(2, '0');
 
-const OneOnOneActionItems = () => {
-  const [items, setItems] = useState<OneOnOneActionItem[]>([]);
-  const [form, setForm] = useState({ meetingId: '', description: '', owner: '', dueDate: '', status: '' });
-  const [editing, setEditing] = useState<OneOnOneActionItem | null>(null);
-  const [showForm, setShowForm] = useState(false);
+const fmtDateTime = (iso: string | null): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+const buildIso = (
+  day: string, month: string, year: string,
+  hour: string, minute: string, ampm: 'AM' | 'PM'
+): string | null => {
+  const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+  let h = parseInt(hour), min = parseInt(minute);
+  if (isNaN(d) || isNaN(m) || isNaN(y) || isNaN(h) || isNaN(min)) return null;
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  const dt = new Date(y, m - 1, d, h, min, 0);
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}:00`;
+};
+
+type Tab = 'upcoming' | 'ongoing' | 'past';
+
+// ── Component ────────────────────────────────────────────────────
+const OneOnOneActionItems: React.FC = () => {
+  const [tab, setTab] = useState<Tab>('upcoming');
+  const [upcoming, setUpcoming] = useState<Meeting[]>([]);
+  const [ongoing, setOngoing] = useState<Meeting[]>([]);
+  const [past, setPast] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchItems();
+  // Modal state
+  const [modalMeeting, setModalMeeting] = useState<Meeting | null>(null);
+  const [description, setDescription] = useState('');
+  const [fuDay, setFuDay] = useState('');
+  const [fuMonth, setFuMonth] = useState('');
+  const [fuYear, setFuYear] = useState('');
+  const [fuHour, setFuHour] = useState('');
+  const [fuMinute, setFuMinute] = useState('');
+  const [fuAmPm, setFuAmPm] = useState<'AM' | 'PM'>('AM');
+  const [modalSaving, setModalSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Past-view modal
+  const [pastModal, setPastModal] = useState<Meeting | null>(null);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [up, on, pa] = await Promise.all([
+        getUpcomingMeetings(),
+        getOngoingMeetings(),
+        getPastMeetings(),
+      ]);
+      setUpcoming(up);
+      setOngoing(on);
+      setPast(pa);
+    } catch {
+      // silently ignore — individual tab errors shown inline
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchItems = async () => {
-    setLoading(true);
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // ── Open ongoing modal ──────────────────────────────────────────
+  const openModal = (m: Meeting) => {
+    setModalMeeting(m);
+    setDescription(m.actionItem?.description ?? '');
+    setFuDay(''); setFuMonth(''); setFuYear('');
+    setFuHour(''); setFuMinute(''); setFuAmPm('AM');
+    setModalError('');
+  };
+
+  const closeModal = () => {
+    setModalMeeting(null);
+    setModalError('');
+  };
+
+  // ── Save action item description ────────────────────────────────
+  const handleSaveDescription = async () => {
+    if (!modalMeeting) return;
+    await saveActionItem({ meetingId: modalMeeting.id, description });
+  };
+
+  // ── END: finish meeting, no follow-up ───────────────────────────
+  const handleEnd = async () => {
+    if (!modalMeeting) return;
+    setModalSaving(true);
+    setModalError('');
     try {
-      const response = await api.get('/api/one-on-one-action-items');
-      setItems(response.data);
-    } catch (error) {
-      console.error('Error fetching action items:', error);
+      if (description.trim()) {
+        await saveActionItem({ meetingId: modalMeeting.id, description });
+      }
+      await finishMeeting(modalMeeting.id);
+      closeModal();
+      await loadAll();
+    } catch {
+      setModalError('Failed to finish meeting. Please try again.');
     } finally {
-      setLoading(false);
+      setModalSaving(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  // ── FINISH with follow-up: create new follow-up meeting + finish current ──
+  const handleFinishWithFollowUp = async () => {
+    if (!modalMeeting) return;
+    const fuIso = buildIso(fuDay, fuMonth, fuYear, fuHour, fuMinute, fuAmPm);
+    if (!fuIso) {
+      setModalError('Please fill in all follow-up date and time fields.');
+      return;
+    }
+    if (new Date(fuIso) <= new Date()) {
+      setModalError('Follow-up date must be in the future.');
+      return;
+    }
+    setModalSaving(true);
+    setModalError('');
     try {
-      if (editing) {
-        await api.put(`/api/one-on-one-action-items/${editing.id}`, form);
-      } else {
-        await api.post('/api/one-on-one-action-items', form);
+      // Save description first
+      if (description.trim()) {
+        await saveActionItem({ meetingId: modalMeeting.id, description });
       }
-      fetchItems();
-      setForm({ meetingId: '', description: '', owner: '', dueDate: '', status: '' });
-      setEditing(null);
-      setShowForm(false);
-    } catch (error) {
-      console.error('Error saving action item:', error);
+      // Create the follow-up meeting
+      await createMeeting({
+        employeeId: modalMeeting.employeeId,
+        scheduledDate: fuIso,
+        notes: '',
+        parentMeetingId: modalMeeting.id,
+      });
+      // Finalize the current meeting
+      await finishMeeting(modalMeeting.id);
+      closeModal();
+      await loadAll();
+    } catch {
+      setModalError('Failed to set follow-up. Please try again.');
     } finally {
-      setLoading(false);
+      setModalSaving(false);
     }
   };
 
-  const handleEdit = (item: OneOnOneActionItem) => {
-    setForm({ meetingId: item.meetingId.toString(), description: item.description, owner: item.owner, dueDate: item.dueDate, status: item.status });
-    setEditing(item);
-    setShowForm(true);
+  // ── Render helpers ──────────────────────────────────────────────
+  const renderUpcoming = () => {
+    if (loading) return <Spinner />;
+    if (upcoming.length === 0) return <Empty text="No upcoming meetings at the moment." />;
+    return (
+      <div className="oom-cards">
+        {upcoming.map((m) => (
+          <div key={m.id} className="oom-meeting-card" style={{ cursor: 'default' }}>
+            <div className="oom-card-left">
+              <h3>{m.employeeFirstName} {m.employeeLastName}</h3>
+              <p>🕐 {fmtDateTime(m.scheduledDate)}</p>
+              {m.notes && <p style={{ fontStyle: 'italic', fontSize: 12 }}>"{m.notes}"</p>}
+              <p style={{ fontSize: 12 }}>
+                Scheduled by: {m.managerFirstName} {m.managerLastName}
+              </p>
+            </div>
+            <div className="oom-card-right">
+              <span className={`oom-badge ${m.followUp ? 'oom-badge--followup' : 'oom-badge--upcoming'}`}>
+                {m.followUp ? '🔁 Follow Up' : '⏳ Upcoming'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this action item?')) {
-      setLoading(true);
-      try {
-        await api.delete(`/api/one-on-one-action-items/${id}`);
-        fetchItems();
-      } catch (error) {
-        console.error('Error deleting action item:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const renderOngoing = () => {
+    if (loading) return <Spinner />;
+    if (ongoing.length === 0) return <Empty text="No ongoing meetings right now." />;
+    return (
+      <div className="oom-cards">
+        {ongoing.map((m) => (
+          <div key={m.id} className="oom-meeting-card" onClick={() => openModal(m)}>
+            <div className="oom-card-left">
+              <h3>{m.employeeFirstName} {m.employeeLastName}</h3>
+              <p>🕐 {fmtDateTime(m.scheduledDate)}</p>
+              {m.notes && <p style={{ fontStyle: 'italic', fontSize: 12 }}>"{m.notes}"</p>}
+              <p style={{ fontSize: 12 }}>Click to manage →</p>
+            </div>
+            <div className="oom-card-right">
+              <span className="oom-badge oom-badge--ongoing">🟢 Ongoing</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderPast = () => {
+    if (loading) return <Spinner />;
+    if (past.length === 0) return <Empty text="No past meetings yet." />;
+    return (
+      <div className="oom-cards">
+        {past.map((m) => (
+          <div key={m.id} className="oom-meeting-card past-card" onClick={() => setPastModal(m)}>
+            <div className="oom-card-left">
+              <h3>{m.employeeFirstName} {m.employeeLastName}</h3>
+              <p>🕐 {fmtDateTime(m.scheduledDate)}</p>
+              <p style={{ fontSize: 12 }}>
+                ✅ Finalized: {fmtDateTime(m.isFinalized)}
+              </p>
+            </div>
+            <div className="oom-card-right">
+              <span className="oom-badge oom-badge--past">✓ Past</span>
+              {m.followUp && (
+                <span className="oom-badge oom-badge--followup" style={{ fontSize: 10 }}>
+                  🔁 Follow Up
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">One-on-One Action Items Management</h1>
-        <p className="text-gray-600">Track and manage meeting action items</p>
+    <div className="oom-page">
+      {/* ── Header ── */}
+      <div className="oom-header">
+        <h1>🗒️ Action Items</h1>
+        <p>Track all your 1:1 meetings — upcoming, ongoing, and past.</p>
       </div>
 
-      <div className="mb-6">
-        <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm({ meetingId: '', description: '', owner: '', dueDate: '', status: '' }); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg shadow-md transition duration-300"
-        >
-          Add New Action Item
-        </button>
+      {/* ── Tabs ── */}
+      <div className="oom-tabs">
+        {(['upcoming', 'ongoing', 'past'] as Tab[]).map((t) => (
+          <button
+            key={t}
+            id={`oom-tab-${t}`}
+            className={`oom-tab${tab === t ? ' active' : ''}`}
+            onClick={() => setTab(t)}
+          >
+            {t === 'upcoming' ? '⏳ Upcoming' : t === 'ongoing' ? '🟢 Ongoing' : '✓ Past'}
+          </button>
+        ))}
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {editing ? 'Edit Action Item' : 'Add New Action Item'}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Meeting ID</label>
-                  <input
-                    type="number"
-                    value={form.meetingId}
-                    onChange={(e) => setForm({ ...form, meetingId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter meeting ID"
-                    required
-                  />
+      {/* ── Tab content ── */}
+      {tab === 'upcoming' && renderUpcoming()}
+      {tab === 'ongoing' && renderOngoing()}
+      {tab === 'past' && renderPast()}
+
+      {/* ── Ongoing Meeting Modal ── */}
+      {modalMeeting && (
+        <div className="oom-modal-overlay" onClick={closeModal}>
+          <div className="oom-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="oom-modal-header">
+              <h2>
+                {modalMeeting.followUp ? '🔁 Follow-Up Meeting' : '🟢 Ongoing Meeting'}
+              </h2>
+              <button className="oom-modal-close" onClick={closeModal}>×</button>
+            </div>
+
+            <div className="oom-modal-body">
+              {/* Meeting info */}
+              <div className="oom-modal-info-row">
+                <span>Employee</span>
+                <span>{modalMeeting.employeeFirstName} {modalMeeting.employeeLastName}</span>
+              </div>
+              <div className="oom-modal-info-row">
+                <span>Scheduled</span>
+                <span>{fmtDateTime(modalMeeting.scheduledDate)}</span>
+              </div>
+              {modalMeeting.notes && (
+                <div className="oom-modal-info-row">
+                  <span>Notes</span>
+                  <span style={{ maxWidth: 260, textAlign: 'right' }}>{modalMeeting.notes}</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <input
-                    type="text"
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter action item description"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Owner</label>
-                  <input
-                    type="text"
-                    value={form.owner}
-                    onChange={(e) => setForm({ ...form, owner: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter owner name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                  <input
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Select due date"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <input
-                    type="text"
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., PENDING, COMPLETED"
-                  />
-                </div>
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition duration-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition duration-300"
-                  >
-                    {loading ? 'Saving...' : (editing ? 'Update' : 'Create')}
-                  </button>
-                </div>
-              </form>
+              )}
+              <hr className="oom-modal-divider" />
+
+              {/* Action item description */}
+              <div className="oom-field">
+                <label className="oom-label">Meeting Description / Action Items</label>
+                <textarea
+                  id="oom-description"
+                  className="oom-textarea"
+                  style={{ minHeight: 110 }}
+                  placeholder="Write the outcome, decisions, or action items from this meeting…"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+
+              {/* Follow-up date (only allowed if this is NOT already a follow-up) */}
+              {!modalMeeting.followUp && (
+                <>
+                  <hr className="oom-modal-divider" />
+                  <div className="oom-field">
+                    <label className="oom-label">
+                      Follow-Up Date &amp; Time{' '}
+                      <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                        (optional — leave blank to fully end the meeting)
+                      </span>
+                    </label>
+                    <div className="oom-date-row" style={{ flexWrap: 'wrap' }}>
+                      <div className="oom-date-part oom-date-part--dd">
+                        <label>Day</label>
+                        <input
+                          id="oom-fu-day"
+                          type="number" min={1} max={31} placeholder="DD"
+                          value={fuDay} onChange={(e) => setFuDay(e.target.value.slice(0, 2))}
+                        />
+                      </div>
+                      <span className="oom-date-sep">/</span>
+                      <div className="oom-date-part oom-date-part--mm">
+                        <label>Month</label>
+                        <input
+                          id="oom-fu-month"
+                          type="number" min={1} max={12} placeholder="MM"
+                          value={fuMonth} onChange={(e) => setFuMonth(e.target.value.slice(0, 2))}
+                        />
+                      </div>
+                      <span className="oom-date-sep">/</span>
+                      <div className="oom-date-part oom-date-part--yy">
+                        <label>Year</label>
+                        <input
+                          id="oom-fu-year"
+                          type="number" min={2024} max={2099} placeholder="YYYY"
+                          value={fuYear} onChange={(e) => setFuYear(e.target.value.slice(0, 4))}
+                        />
+                      </div>
+                      <div className="oom-date-part">
+                        <label>Hour</label>
+                        <input
+                          id="oom-fu-hour"
+                          type="number" min={1} max={12} placeholder="HH"
+                          style={{ width: 56 }}
+                          value={fuHour} onChange={(e) => setFuHour(e.target.value.slice(0, 2))}
+                        />
+                      </div>
+                      <span className="oom-date-sep" style={{ marginTop: 18 }}>:</span>
+                      <div className="oom-date-part">
+                        <label>Min</label>
+                        <input
+                          id="oom-fu-minute"
+                          type="number" min={0} max={59} placeholder="MM"
+                          style={{ width: 56 }}
+                          value={fuMinute} onChange={(e) => setFuMinute(e.target.value.slice(0, 2))}
+                        />
+                      </div>
+                      <div className="oom-ampm-toggle">
+                        <button type="button" className={fuAmPm === 'AM' ? 'active' : ''} onClick={() => setFuAmPm('AM')}>AM</button>
+                        <button type="button" className={fuAmPm === 'PM' ? 'active' : ''} onClick={() => setFuAmPm('PM')}>PM</button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {modalError && <div className="oom-error">⚠ {modalError}</div>}
+            </div>
+
+            <div className="oom-modal-footer">
+              <button id="oom-modal-cancel" className="oom-btn-ghost" onClick={closeModal} disabled={modalSaving}>
+                Cancel
+              </button>
+
+              <button
+                id="oom-modal-end"
+                className="oom-btn-teal"
+                onClick={handleEnd}
+                disabled={modalSaving}
+              >
+                {modalSaving ? 'Saving…' : '✓ END Meeting'}
+              </button>
+
+              {!modalMeeting.followUp && (
+                <button
+                  id="oom-modal-followup"
+                  className="oom-btn-primary"
+                  onClick={handleFinishWithFollowUp}
+                  disabled={modalSaving}
+                >
+                  {modalSaving ? 'Saving…' : '🔁 Finish + Follow-Up'}
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Action Items List</h2>
+      {/* ── Past Meeting View Modal (read-only) ── */}
+      {pastModal && (
+        <div className="oom-modal-overlay" onClick={() => setPastModal(null)}>
+          <div className="oom-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="oom-modal-header">
+              <h2>✓ Past Meeting Details</h2>
+              <button className="oom-modal-close" onClick={() => setPastModal(null)}>×</button>
+            </div>
+            <div className="oom-modal-body">
+              <InfoRow label="Employee" value={`${pastModal.employeeFirstName} ${pastModal.employeeLastName}`} />
+              <InfoRow label="Creator" value={`${pastModal.managerFirstName} ${pastModal.managerLastName}`} />
+              <InfoRow label="Scheduled" value={fmtDateTime(pastModal.scheduledDate)} />
+              <InfoRow label="Finalized" value={fmtDateTime(pastModal.isFinalized)} />
+              {pastModal.followUpDate && (
+                <InfoRow label="Follow-up Date" value={fmtDateTime(pastModal.followUpDate)} />
+              )}
+              {pastModal.followUp && (
+                <InfoRow label="Type" value="🔁 Follow-Up Meeting" />
+              )}
+              <hr className="oom-modal-divider" />
+              <div className="oom-field">
+                <label className="oom-label">Notes</label>
+                <p style={{ fontSize: 13, color: '#c0c0d8', margin: 0, lineHeight: 1.6 }}>
+                  {pastModal.notes || '—'}
+                </p>
+              </div>
+              <div className="oom-field">
+                <label className="oom-label">Action Items / Description</label>
+                <p style={{ fontSize: 13, color: '#c0c0d8', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  {pastModal.actionItem?.description || '— No description recorded —'}
+                </p>
+              </div>
+            </div>
+            <div className="oom-modal-footer">
+              <button className="oom-btn-ghost" onClick={() => setPastModal(null)}>Close</button>
+            </div>
+          </div>
         </div>
-        {loading && !showForm ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Loading...</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meeting ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.meetingId}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{item.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.owner}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dueDate}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.status}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="text-indigo-600 hover:text-indigo-900 transition duration-300"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-600 hover:text-red-900 transition duration-300"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {items.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                      No action items found. Click "Add New Action Item" to create one.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
+
+// ── Sub-components ────────────────────────────────────────────────
+const Spinner: React.FC = () => (
+  <div className="oom-spinner-wrap">
+    <div className="oom-spinner" />
+  </div>
+);
+
+const Empty: React.FC<{ text: string }> = ({ text }) => (
+  <div className="oom-empty">
+    <div className="oom-empty-icon">📭</div>
+    <p>{text}</p>
+  </div>
+);
+
+const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="oom-modal-info-row">
+    <span>{label}</span>
+    <span>{value}</span>
+  </div>
+);
 
 export default OneOnOneActionItems;
