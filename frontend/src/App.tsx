@@ -145,9 +145,9 @@ function App() {
               <Route path="/pip-updates" element={<PipUpdates />} />
               <Route path="/notifications" element={<NotificationTemplates />} />
               <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
-              <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
-otifications" element={<NotificationTemplates />} />
-            <Route path="/one-on-one-meet
+
+
+
               <Route path="/hr/position/create" element={<PositionCreate />} />
               <Route path="/hr/position-level/create" element={<PositionLevelCreate />} />
               <Route path="/hr/position/table" element={<PositionTable />} />
