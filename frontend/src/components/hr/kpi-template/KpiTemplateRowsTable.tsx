@@ -12,12 +12,13 @@ type Props = {
   onAddRow: () => void;
   onRemoveRow: (rowId: string) => void;
   onRowChange: (rowId: string, patch: Partial<KpiTemplateRowDraft>) => void;
+  readOnly?: boolean;
 };
 
 const cellInput =
   'kpi-tpl-input min-h-[38px] w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
 
-const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemoveRow, onRowChange }: Props) => {
+const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemoveRow, onRowChange, readOnly = false }: Props) => {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-900/[0.03]">
       <div className="overflow-x-auto">
@@ -44,6 +45,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                   </span>
                   <select
                     value={row.kpiItemId ?? ''}
+                    disabled={readOnly}
                     onChange={(event) => {
                       const value = event.target.value;
                       const id = value === '' ? null : Number(value);
@@ -66,7 +68,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                   <input
                     type="text"
                     value={row.kpiLabel}
-                    disabled={row.kpiItemId !== null}
+                    disabled={readOnly || row.kpiItemId !== null}
                     onChange={(event) => onRowChange(row.rowId, { kpiLabel: event.target.value })}
                     placeholder="Or custom KPI name"
                     className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
@@ -75,6 +77,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                 <td className="px-3 py-3">
                   <select
                     value={row.kpiCategoryId ?? ''}
+                    disabled={readOnly}
                     onChange={(event) => {
                       const v = event.target.value;
                       onRowChange(row.rowId, { kpiCategoryId: v === '' ? null : Number(v) });
@@ -94,6 +97,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     type="number"
                     inputMode="decimal"
                     value={row.target ?? ''}
+                    disabled={readOnly}
                     onChange={(event) => {
                       const v = event.target.value;
                       onRowChange(row.rowId, { target: v === '' ? null : Number(v) });
@@ -104,6 +108,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                 <td className="px-3 py-3">
                   <select
                     value={row.kpiUnitId ?? ''}
+                    disabled={readOnly}
                     onChange={(event) => {
                       const v = event.target.value;
                       onRowChange(row.rowId, { kpiUnitId: v === '' ? null : Number(v) });
@@ -130,6 +135,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     min={0}
                     max={100}
                     value={row.weight ?? ''}
+                    disabled={readOnly}
                     onChange={(event) => {
                       const v = event.target.value;
                       onRowChange(row.rowId, { weight: v === '' ? null : Number(v) });
@@ -149,15 +155,17 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                   </span>
                 </td>
                 <td className="px-2 py-3">
-                  <button
-                    type="button"
-                    onClick={() => onRemoveRow(row.rowId)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition hover:bg-red-50 hover:text-red-600"
-                    title="Remove row"
-                    aria-label="Remove row"
-                  >
-                    <i className="bi bi-trash" />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveRow(row.rowId)}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                      title="Remove row"
+                      aria-label="Remove row"
+                    >
+                      <i className="bi bi-trash" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -166,10 +174,12 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
       </div>
 
       <div className="flex flex-col gap-3 border-t border-gray-200 bg-gradient-to-r from-gray-50 via-violet-50/30 to-gray-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <button type="button" onClick={onAddRow} className="kpi-tpl-btn-primary w-full justify-center sm:w-auto">
-          <i className="bi bi-plus-lg text-lg" aria-hidden />
-          Add KPI row
-        </button>
+        {!readOnly && (
+          <button type="button" onClick={onAddRow} className="kpi-tpl-btn-primary w-full justify-center sm:w-auto">
+            <i className="bi bi-plus-lg text-lg" aria-hidden />
+            Add KPI row
+          </button>
+        )}
         <p className="max-w-md text-xs leading-relaxed text-gray-600">
           <span className="font-semibold text-gray-800">Weighted score</span> (PM phase):{' '}
           <code className="rounded-md bg-white px-2 py-0.5 font-mono text-[11px] text-gray-800 shadow-sm ring-1 ring-gray-200">

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import { kpiStatusBadgeClass } from '../../../components/hr/kpi-template/kpiTemplateUi';
+import KpiTemplateCreateModal from '../../../components/hr/kpi-template/KpiTemplateCreateModal';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
 import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
 
@@ -17,6 +17,9 @@ const KpiTemplateListPage = () => {
   const [templates, setTemplates] = useState<KpiTemplateResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'view' | 'edit'>('create');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   const load = async () => {
     try {
@@ -55,6 +58,24 @@ const KpiTemplateListPage = () => {
     }
   };
 
+  const openCreate = () => {
+    setModalMode('create');
+    setSelectedTemplateId(null);
+    setCreateOpen(true);
+  };
+
+  const openView = (id: number) => {
+    setModalMode('view');
+    setSelectedTemplateId(id);
+    setCreateOpen(true);
+  };
+
+  const openEdit = (id: number) => {
+    setModalMode('edit');
+    setSelectedTemplateId(id);
+    setCreateOpen(true);
+  };
+
   return (
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
@@ -86,10 +107,10 @@ const KpiTemplateListPage = () => {
                 <i className="bi bi-arrow-clockwise text-base text-gray-500" aria-hidden />
                 Refresh
               </button>
-              <Link to="/hr/kpi-template/new" className="kpi-tpl-btn-primary no-underline">
+              <button type="button" onClick={openCreate} className="kpi-tpl-btn-primary">
                 <i className="bi bi-plus-lg text-lg" aria-hidden />
                 New template
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -141,10 +162,10 @@ const KpiTemplateListPage = () => {
               <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-gray-600">
                 Create your first KPI template to attach metrics to job positions and kick off PM assignments later.
               </p>
-              <Link to="/hr/kpi-template/new" className="kpi-tpl-btn-primary mt-8 inline-flex no-underline">
+              <button type="button" onClick={openCreate} className="kpi-tpl-btn-primary mt-8 inline-flex">
                 <i className="bi bi-plus-circle text-lg" aria-hidden />
                 Create template
-              </Link>
+              </button>
             </div>
           )}
 
@@ -192,22 +213,24 @@ const KpiTemplateListPage = () => {
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
-                              <Link
-                                to={`/hr/kpi-template/${template.id}`}
+                              <button
+                                type="button"
+                                onClick={() => openView(template.id)}
                                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
                                 title="View"
                                 aria-label="View"
                               >
                                 <i className="bi bi-eye text-lg" />
-                              </Link>
-                              <Link
-                                to={`/hr/kpi-template/${template.id}/edit`}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(template.id)}
                                 className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
                                 title="Edit"
                                 aria-label="Edit"
                               >
                                 <i className="bi bi-pencil-square text-lg" />
-                              </Link>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => void handleDelete(template.id, template.title)}
@@ -229,6 +252,13 @@ const KpiTemplateListPage = () => {
           )}
         </section>
       </div>
+      <KpiTemplateCreateModal
+        open={createOpen}
+        mode={modalMode}
+        templateId={selectedTemplateId}
+        onClose={() => setCreateOpen(false)}
+        onSaved={load}
+      />
     </div>
   );
 };
