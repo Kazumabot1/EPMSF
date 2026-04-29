@@ -41,4 +41,5 @@ public interface TeamRepository extends JpaRepository<Team, Integer> {
     List<Team> findByTeamLeaderId(Integer leaderId);
 
     List<Team> findByTeamLeaderIdAndStatusIgnoreCase(Integer leaderId, String status);
+
 }

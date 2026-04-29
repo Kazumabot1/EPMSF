@@ -16,4 +16,7 @@ public interface EmployeeService {
     EmployeeResponseDto updateEmployee(Integer id, EmployeeRequestDto request);
 
     EmployeeResponseDto deactivateEmployee(Integer id);
+    List<EmployeeResponseDto> getMyDepartmentEmployees(boolean includeInactive);
+
+    EmployeeResponseDto getMyDepartmentEmployeeById(Integer id);
 }

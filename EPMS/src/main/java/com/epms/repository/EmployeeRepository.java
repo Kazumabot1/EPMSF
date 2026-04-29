@@ -23,4 +23,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     Optional<Employee> findWithDepartmentsById(@Param("id") Integer id);
 
     Optional<Employee> findByEmail(String email);
+    @EntityGraph(attributePaths = {"employeeDepartments", "employeeDepartments.department", "position", "position.level"})
+    @Query("""
+       SELECT DISTINCT e FROM Employee e
+       JOIN e.employeeDepartments ed
+       WHERE ed.department.id = :departmentId
+       AND ed.enddate IS NULL
+       AND (:includeInactive = true OR e.active IS NULL OR e.active = true)
+       """)
+    List<Employee> findCurrentByDepartmentId(
+            @Param("departmentId") Integer departmentId,
+            @Param("includeInactive") boolean includeInactive
+    );
 }

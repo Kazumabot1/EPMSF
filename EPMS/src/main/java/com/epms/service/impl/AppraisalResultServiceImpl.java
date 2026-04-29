@@ -1,4 +1,3 @@
-
 package com.epms.service.impl;
 
 import com.epms.dto.AppraisalResultRequestDto;
@@ -7,6 +6,8 @@ import com.epms.entity.AppraisalResult;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.AppraisalResultRepository;
+import com.epms.repository.EmployeeRepository;
+import com.epms.repository.AppraisalCycleRepository;
 import com.epms.service.AppraisalResultService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,8 @@ import java.util.List;
 public class AppraisalResultServiceImpl implements AppraisalResultService {
 
     private final AppraisalResultRepository appraisalResultRepository;
+    private final EmployeeRepository employeeRepository;
+    private final AppraisalCycleRepository appraisalCycleRepository;
 
     @Override
     public AppraisalResultResponseDto createAppraisalResult(AppraisalResultRequestDto requestDto) {
@@ -61,8 +64,16 @@ public class AppraisalResultServiceImpl implements AppraisalResultService {
     }
 
     private void applyChanges(AppraisalResult result, AppraisalResultRequestDto requestDto) {
-        result.setEmployeeId(requestDto.getEmployeeId());
-        result.setCycleId(requestDto.getCycleId());
+        // Fetch and set Employee entity
+        var employee = employeeRepository.findById(requestDto.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + requestDto.getEmployeeId()));
+        result.setEmployee(employee);
+
+        // Fetch and set AppraisalCycle entity
+        var cycle = appraisalCycleRepository.findById(requestDto.getCycleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appraisal Cycle not found with id: " + requestDto.getCycleId()));
+        result.setCycle(cycle);
+
         result.setSelfScore(requestDto.getSelfScore());
         result.setManagerScore(requestDto.getManagerScore());
         result.setSelfComment(requestDto.getSelfComment());
@@ -115,8 +126,8 @@ public class AppraisalResultServiceImpl implements AppraisalResultService {
     private AppraisalResultResponseDto mapToResponseDto(AppraisalResult result) {
         AppraisalResultResponseDto dto = new AppraisalResultResponseDto();
         dto.setId(result.getId());
-        dto.setEmployeeId(result.getEmployeeId());
-        dto.setCycleId(result.getCycleId());
+        dto.setEmployeeId(result.getEmployee().getId());
+        dto.setCycleId(result.getCycle().getId());
         dto.setSelfScore(result.getSelfScore());
         dto.setManagerScore(result.getManagerScore());
         dto.setFinalScore(result.getFinalScore());

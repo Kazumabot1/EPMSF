@@ -21,6 +21,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import com.epms.security.SecurityUtils;
+import com.epms.security.UserPrincipal;
+import com.epms.exception.BusinessValidationException;
 
 @Service
 @RequiredArgsConstructor
@@ -361,5 +364,78 @@ public class TeamServiceImpl implements TeamService {
 
     private boolean isActive(String status) {
         return "Active".equalsIgnoreCase(status);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<TeamResponseDto> getMyDepartmentTeams() {
+        Integer departmentId = requireCurrentDepartmentId();
+        return getTeamsByDepartment(departmentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TeamResponseDto getMyDepartmentTeamById(Integer id) {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Team not found: " + id));
+
+        assertSameDepartment(team.getDepartment() != null ? team.getDepartment().getId() : null);
+
+        return mapToResponseDto(team);
+    }
+
+    @Override
+    @Transactional
+    public TeamResponseDto createMyDepartmentTeam(TeamRequestDto dto) {
+        Integer departmentId = requireCurrentDepartmentId();
+        Integer currentUserId = SecurityUtils.currentUserId();
+
+        dto.setDepartmentId(departmentId);
+        dto.setCreatedById(currentUserId);
+
+        return createTeam(dto);
+    }
+
+    @Override
+    @Transactional
+    public TeamResponseDto updateMyDepartmentTeam(Integer id, TeamRequestDto dto) {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Team not found: " + id));
+
+        assertSameDepartment(team.getDepartment() != null ? team.getDepartment().getId() : null);
+
+        dto.setDepartmentId(team.getDepartment().getId());
+        dto.setCreatedById(SecurityUtils.currentUserId());
+
+        return updateTeam(id, dto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CandidateResponseDto> getMyDepartmentCandidateUsers() {
+        return getCandidateUsers(requireCurrentDepartmentId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CandidateResponseDto> getMyDepartmentCandidateMembers() {
+        return getCandidateMembers(requireCurrentDepartmentId());
+    }
+
+    private Integer requireCurrentDepartmentId() {
+        UserPrincipal currentUser = SecurityUtils.currentUser();
+
+        if (currentUser.getDepartmentId() == null) {
+            throw new BusinessValidationException("Current department head has no assigned department.");
+        }
+
+        return currentUser.getDepartmentId();
+    }
+
+    private void assertSameDepartment(Integer requestedDepartmentId) {
+        Integer currentDepartmentId = requireCurrentDepartmentId();
+
+        if (requestedDepartmentId == null || !requestedDepartmentId.equals(currentDepartmentId)) {
+            throw new BusinessValidationException("You can only access teams from your own department.");
+        }
     }
 }

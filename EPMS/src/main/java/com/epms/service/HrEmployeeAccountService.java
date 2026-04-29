@@ -43,6 +43,23 @@ public class HrEmployeeAccountService {
         this.employeeRepository = employeeRepository;
         this.userAccountProvisioningService = userAccountProvisioningService;
     }
+    private Department findDepartment(HrEmployeeAccountCreateRequest request) {
+        if (request.getDepartmentId() != null) {
+            return departmentRepository.findById(request.getDepartmentId())
+                    .orElse(null);
+        }
+
+        return getOrCreateDepartment(request.getDepartmentName());
+    }
+
+    private Position findPosition(HrEmployeeAccountCreateRequest request) {
+        if (request.getPositionId() != null) {
+            return positionRepository.findById(request.getPositionId())
+                    .orElse(null);
+        }
+
+        return findPosition(request.getPositionName());
+    }
 
     @Transactional
     public AccountProvisionResult createOrUpdateEmployeeAccount(HrEmployeeAccountCreateRequest request) {
@@ -68,12 +85,12 @@ public class HrEmployeeAccountService {
         user.setFullName(clean(request.getFullName()));
         user.setUpdatedAt(new Date());
 
-        Department department = getOrCreateDepartment(request.getDepartmentName());
+        Department department = findDepartment(request);
         if (department != null) {
             user.setDepartmentId(department.getId());
         }
 
-        Position position = findPosition(request.getPositionName());
+        Position position = findPosition(request);
         if (position != null) {
             user.setPosition(position);
         }

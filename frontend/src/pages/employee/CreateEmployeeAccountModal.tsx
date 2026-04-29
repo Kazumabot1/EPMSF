@@ -14,9 +14,9 @@ const emptyForm = {
   employeeCode: '',
   fullName: '',
   email: '',
+  departmentName: '',
+  positionName: '',
   roleName: 'EMPLOYEE',
-  departmentId: '',
-  positionId: '',
   sendTemporaryPasswordEmail: true,
 };
 
@@ -91,14 +91,9 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
       setLoading(true);
       setMessage('');
 
-      await api.post('/hr/employee-accounts', {
-        employeeCode: form.employeeCode.trim(),
-        fullName: form.fullName.trim(),
+      await api.post('/users', {
+        ...form,
         email: form.email.trim().toLowerCase(),
-        roleName: form.roleName,
-        departmentId: form.departmentId ? Number(form.departmentId) : null,
-        positionId: form.positionId ? Number(form.positionId) : null,
-        sendTemporaryPasswordEmail: form.sendTemporaryPasswordEmail,
       });
 
       setMessage('Employee login account created successfully.');
@@ -131,7 +126,7 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
               Create employee login account
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Create login account with correct department and position IDs.
+              Create a login account from the employee list.
             </p>
           </div>
 
@@ -167,7 +162,6 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     className="epms-emp-input-field"
                     value={form.employeeCode}
                     onChange={handleChange}
-                    placeholder="Example: EMP001"
                   />
                 </label>
 
@@ -178,7 +172,6 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     className="epms-emp-input-field"
                     value={form.fullName}
                     onChange={handleChange}
-                    placeholder="Example: Goku S"
                   />
                 </label>
 
@@ -193,7 +186,6 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     className="epms-emp-input-field"
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="employee@example.com"
                   />
                 </label>
 
@@ -205,19 +197,19 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     value={form.roleName}
                     onChange={handleChange}
                   >
-                    <option value="EMPLOYEE">Employee</option>
-                    <option value="HR">HR</option>
-                    <option value="MANAGER">Manager</option>
-                    <option value="DEPARTMENT_HEAD">Department Head</option>
+                   <option value="EMPLOYEE">Employee</option>
+                   <option value="HR">HR</option>
+                   <option value="MANAGER">Manager</option>
+                  <option value="DEPARTMENT_HEAD">Department Head</option>
                   </select>
                 </label>
 
                 <label className="epms-emp-field block">
                   <span className="epms-emp-field__label">Department</span>
                   <select
-                    name="departmentId"
+                    name="departmentName"
                     className="epms-emp-input-field"
-                    value={form.departmentId}
+                    value={form.departmentName}
                     onChange={handleChange}
                     disabled={orgPickersLoading}
                   >
@@ -226,7 +218,7 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     </option>
 
                     {departments.map((d) => (
-                      <option key={d.id} value={String(d.id)}>
+                      <option key={d.id} value={d.departmentName}>
                         {d.departmentName}
                       </option>
                     ))}
@@ -236,9 +228,9 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                 <label className="epms-emp-field block">
                   <span className="epms-emp-field__label">Position</span>
                   <select
-                    name="positionId"
+                    name="positionName"
                     className="epms-emp-input-field"
-                    value={form.positionId}
+                    value={form.positionName}
                     onChange={handleChange}
                     disabled={orgPickersLoading}
                   >
@@ -247,7 +239,7 @@ const CreateEmployeeAccountModal = ({ open, onClose, onCreated }: Props) => {
                     </option>
 
                     {positions.map((p) => (
-                      <option key={p.id} value={String(p.id)}>
+                      <option key={p.id} value={p.positionTitle}>
                         {p.positionTitle}
                         {p.levelCode ? ` (${p.levelCode})` : ''}
                       </option>
