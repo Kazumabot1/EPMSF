@@ -1,3 +1,4 @@
+/* Sidebar.tsx file: */
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';

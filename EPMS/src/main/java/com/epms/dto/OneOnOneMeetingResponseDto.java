@@ -76,4 +76,7 @@ public class OneOnOneMeetingResponseDto {
     private boolean followUp;
 
     private OneOnOneActionItemResponseDto actionItem;
+
+    private String followUpNotes;
+
 }

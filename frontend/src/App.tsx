@@ -1,3 +1,4 @@
+/* App.tsx */
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HrEmployeeAccountImport from './pages/employee/HrEmployeeAccountImport';
 import Home from './components/Home';
@@ -151,11 +152,6 @@ function App() {
 
             <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
             <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
-              <Route path="/pip-updates" element={<PipUpdates />} />
-              <Route path="/notifications" element={<NotificationTemplates />} />
-              <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
-
-
 
               <Route path="/hr/position/create" element={<PositionCreate />} />
               <Route path="/hr/position-level/create" element={<PositionLevelCreate />} />

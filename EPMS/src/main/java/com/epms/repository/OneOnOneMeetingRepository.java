@@ -74,4 +74,41 @@ public interface OneOnOneMeetingRepository extends JpaRepository<OneOnOneMeeting
             @Param("employeeId") Integer employeeId,
             @Param("now") LocalDateTime now
     );
+
+    @Query("""
+SELECT m FROM OneOnOneMeeting m
+WHERE (m.manager.id = :employeeId OR m.employee.id = :employeeId)
+AND m.status = false
+AND m.isFinalized IS NULL
+AND m.scheduledDate > :now
+ORDER BY m.scheduledDate ASC
+""")
+    List<OneOnOneMeeting> findUpcomingForUser(Integer employeeId, LocalDateTime now);
+
+
+    @Query("""
+SELECT m FROM OneOnOneMeeting m
+WHERE (m.manager.id = :employeeId OR m.employee.id = :employeeId)
+AND m.status = true
+AND m.isFinalized IS NULL
+""")
+    List<OneOnOneMeeting> findOngoingForUser(Integer employeeId);
+
+
+    @Query("""
+SELECT m FROM OneOnOneMeeting m
+WHERE (m.manager.id = :employeeId OR m.employee.id = :employeeId)
+AND m.isFinalized IS NOT NULL
+""")
+    List<OneOnOneMeeting> findPastForUser(Integer employeeId);
+
+
+    @Query("""
+SELECT m FROM OneOnOneMeeting m
+WHERE m.status = false
+AND m.isFinalized IS NULL
+AND m.reminder24hSent = false
+AND m.scheduledDate BETWEEN :now AND :limit
+""")
+    List<OneOnOneMeeting> findMeetingsForReminder(LocalDateTime now, LocalDateTime limit);
 }

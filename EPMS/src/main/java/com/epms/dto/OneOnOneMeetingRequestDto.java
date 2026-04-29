@@ -28,4 +28,5 @@ public class OneOnOneMeetingRequestDto {
 
     // true only after HR confirms warning modal
     private Boolean forceCreate = false;
+    private String followUpNotes;
 }

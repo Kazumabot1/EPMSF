@@ -71,6 +71,7 @@ public interface OneOnOneMeetingService {
 
     OneOnOneMeetingResponseDto createMeeting(OneOnOneMeetingRequestDto request);
 
+
     OneOnOneMeetingResponseDto updateMeeting(Integer id, OneOnOneMeetingRequestDto request);
 
     void deleteMeeting(Integer id);

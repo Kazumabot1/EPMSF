@@ -1,3 +1,4 @@
+/* OneOnOneActionItems.tsx file:  */
 import React, { useState, useEffect, useCallback } from 'react';
 import './one-on-one.css';
 import {
@@ -167,7 +168,8 @@ const OneOnOneActionItems: React.FC = () => {
     return (
       <div className="oom-cards">
         {upcoming.map((m) => (
-          <div key={m.id} className="oom-meeting-card" style={{ cursor: 'default' }}>
+         /*  <div key={m.id} className="oom-meeting-card" style={{ cursor: 'default' }}> */
+         <div key={m.id} className="oom-meeting-card" onClick={() => openUpcomingModal(m)}>
             <div className="oom-card-left">
               <h3>{m.employeeFirstName} {m.employeeLastName}</h3>
               <p>🕐 {fmtDateTime(m.scheduledDate)}</p>

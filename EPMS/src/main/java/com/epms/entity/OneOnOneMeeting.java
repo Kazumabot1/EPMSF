@@ -60,4 +60,11 @@ public class OneOnOneMeeting {
     // One meeting has at most one action item
     @OneToOne(mappedBy = "meeting", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private OneOnOneActionItem actionItem;
+
+    @Column(name = "follow_up_notes", length = 1000)
+    private String followUpNotes;
+
+    @Column(name = "reminder_24h_sent")
+    private Boolean reminder24hSent = false;
+
 }
