@@ -27,5 +27,5 @@ public class KpiUnit {
     @OneToMany(mappedBy = "kpiUnit", fetch = FetchType.LAZY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    private List<Kpi> kpis = new ArrayList<>();
+    private List<KpiFormItem> kpiFormItems = new ArrayList<>();
 }

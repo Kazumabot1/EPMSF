@@ -1,3 +1,4 @@
+/* Sidebar.tsx file: */
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
@@ -114,7 +115,7 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
               { to: '/hr/performance-kpi/unit', label: 'KPI Units', icon: 'bi bi-speedometer2' },
               { to: '/hr/performance-kpi/category', label: 'KPI Categories', icon: 'bi bi-tags' },
               { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
-              { to: '/hr/performance-kpi/form', label: 'KPI Forms', icon: 'bi bi-ui-checks-grid' },
+              { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
             ],
           },
 

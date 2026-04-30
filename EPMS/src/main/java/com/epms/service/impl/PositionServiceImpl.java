@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
 import java.util.List;
 
 @Service
@@ -34,7 +33,6 @@ public class PositionServiceImpl implements PositionService {
         position.setDescription(normalizeText(dto.getDescription()));
         position.setStatus(dto.getStatus() != null ? dto.getStatus() : Boolean.TRUE);
         position.setCreatedBy(normalizeText(dto.getCreatedBy()));
-        position.setCreatedAt(new Date());
 
         Position savedPosition = positionRepository.save(position);
         return mapToResponseDto(savedPosition);

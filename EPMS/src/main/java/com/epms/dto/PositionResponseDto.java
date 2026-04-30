@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -17,6 +17,6 @@ public class PositionResponseDto {
     private String levelCode;
     private String description;
     private Boolean status;
-    private Date createdAt;
+    private LocalDateTime createdAt;
     private String createdBy;
 }

@@ -8,7 +8,15 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 @Entity
-@Table(name = "team_member")
+@Table(
+        name = "team_member",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_team_member_team_user",
+                        columnNames = {"team_id", "member_user_id"}
+                )
+        }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -28,7 +36,7 @@ public class TeamMember {
 
     @Temporal(TemporalType.DATE)
     @Column(name = "started_date", nullable = false)
-    private Date startedDate;
+    private Date startedDate = new Date();
 
     @Temporal(TemporalType.DATE)
     @Column(name = "ended_date")

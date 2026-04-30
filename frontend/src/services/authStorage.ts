@@ -1,3 +1,4 @@
+// authStorage.ts
 import type { AuthResponse } from "../types/auth";
 
 const ACCESS_TOKEN_KEY = "epmsAccessToken";

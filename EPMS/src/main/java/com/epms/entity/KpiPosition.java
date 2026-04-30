@@ -1,103 +1,67 @@
 package com.epms.entity;
 
+import com.epms.entity.enums.KpiPositionStatus;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import lombok.*;
+
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "kpi_positions")
+@Table(
+        name = "kpi_positions",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"kpi_form_id", "position_id"})
+        }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class KpiPosition {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    // KPI Form / Template
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kpi_id", nullable = false)
-    private Kpi kpiForm;
+    @JoinColumn(name = "kpi_form_id", nullable = false)
+    private KpiForm kpiForm;
 
+    // Position linked to this KPI Form
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id", nullable = false)
     private Position position;
 
-    @Column(name = "score")
-    private Double score;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private KpiPositionStatus status = KpiPositionStatus.ACTIVE;
 
-    @Column(name = "weighted_score")
-    private Double weightedScore;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_by", referencedColumnName = "id")
+    private User assignedByUser;
 
-    @Column(name = "target_value")
-    private Double targetValue;
-
-    @Column(name = "actual_value")
-    private Double actualValue;
-
-    @Column(name = "status")
-    private String status = "ACTIVE";
-
-    @Column(name = "assigned_date")
-    @Temporal(TemporalType.TIMESTAMP)
-    private java.util.Date assignedDate;
-
-    @Column(name = "last_evaluated_date")
-    @Temporal(TemporalType.TIMESTAMP)
-    private java.util.Date lastEvaluatedDate;
-
-    @Column(name = "assigned_by")
+    @Column(name = "assigned_by_string")
     private String assignedBy;
 
-    // Helper method to calculate weighted score
+    @Column(name = "assigned_at", nullable = false)
+    private LocalDateTime assignedAt;
+
+    @Column(name = "removed_at")
+    private LocalDateTime removedAt;
+
     @PrePersist
-    @PreUpdate
-    public void calculateWeightedScore() {
-        if (score != null && kpiForm != null && kpiForm.getWeight() != null) {
-            this.weightedScore = (score * kpiForm.getWeight()) / 100.0;
+    public void prePersist() {
+        if (assignedAt == null) {
+            assignedAt = LocalDateTime.now();
+        }
+
+        if (status == null) {
+            status = KpiPositionStatus.ACTIVE;
         }
     }
 
-    // Helper method to calculate achievement percentage
-    public Double getAchievementPercentage() {
-        if (targetValue != null && targetValue > 0 && actualValue != null) {
-            return (actualValue / targetValue) * 100;
-        }
-        return null;
-    }
-
-    // Helper method to check if target is achieved
-    public Boolean isTargetAchieved() {
-        if (actualValue != null && targetValue != null) {
-            return actualValue >= targetValue;
-        }
-        return false;
-    }
-
-    // Helper method to get performance rating based on score
-    public String getPerformanceRating() {
-        if (score == null) return "NOT_RATED";
-        if (score >= 90) return "EXCELLENT";
-        if (score >= 75) return "GOOD";
-        if (score >= 60) return "SATISFACTORY";
-        if (score >= 40) return "NEEDS_IMPROVEMENT";
-        return "POOR";
-    }
-
-    // Helper method to get variance from target
-    public Double getTargetVariance() {
-        if (actualValue != null && targetValue != null) {
-            return actualValue - targetValue;
-        }
-        return null;
-    }
-
-    // Helper method to get variance percentage
-    public Double getTargetVariancePercentage() {
-        if (actualValue != null && targetValue != null && targetValue > 0) {
-            return ((actualValue - targetValue) / targetValue) * 100;
-        }
-        return null;
+    public boolean isActive() {
+        return status == KpiPositionStatus.ACTIVE;
     }
 }

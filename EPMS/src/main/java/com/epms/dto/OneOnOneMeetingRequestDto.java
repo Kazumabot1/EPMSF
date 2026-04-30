@@ -1,24 +1,32 @@
+//package com.epms.dto;
+//
+//import lombok.Data;
+//
+//import java.time.LocalDateTime;
+//
+//@Data
+//public class OneOnOneMeetingRequestDto {
+//
+//    private Integer employeeId;       // The employee being met with
+//    private LocalDateTime scheduledDate; // Full datetime: e.g. 2026-05-01T10:30:00
+//    private String notes;             // Notes for the meeting
+//    private Integer parentMeetingId;  // Null unless this is a follow-up meeting
+//}
 package com.epms.dto;
 
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class OneOnOneMeetingRequestDto {
 
-    @NotNull(message = "Manager ID must not be null")
-    private Integer managerId;
-    @NotNull(message = "Employee ID must not be null")
     private Integer employeeId;
-    private Date scheduledDate;
+    private LocalDateTime scheduledDate;
     private String notes;
-    private String status;
-    private Date followUpDate;
-    private Boolean isFinalized;
+    private Integer parentMeetingId;
+
+    // true only after HR confirms warning modal
+    private Boolean forceCreate = false;
+    private String followUpNotes;
 }

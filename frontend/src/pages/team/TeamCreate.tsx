@@ -43,6 +43,20 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
     return Number(user?.id || user?.userId || 1);
   };
 
+  const isCandidateAvailable = (user: CandidateUser): boolean => {
+    return user.available ?? user.isAvailable ?? true;
+  };
+
+  const candidateLabel = (user: CandidateUser): string => {
+    if (!isCandidateAvailable(user)) {
+      return `${user.name} ⚠️ (already in a team: ${
+        user.currentTeamName || "Unknown Team"
+      })`;
+    }
+
+    return user.name;
+  };
+
   useEffect(() => {
     loadDepartments();
   }, []);
@@ -86,6 +100,24 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
   };
 
   const toggleMember = (id: number) => {
+    const member = members.find((item) => item.id === id);
+
+    if (!member) return;
+
+    if (!isCandidateAvailable(member)) {
+      setMessage(
+        `${member.name} is already in a team: ${
+          member.currentTeamName || "Unknown Team"
+        }`
+      );
+      return;
+    }
+
+    if (Number(teamLeaderId) === id) {
+      setMessage("Team leader cannot also be a member.");
+      return;
+    }
+
     setMemberUserIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
@@ -107,6 +139,37 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
 
     if (!teamName.trim() || departmentId === "" || teamLeaderId === "") {
       setMessage("Please fill all required fields.");
+      return;
+    }
+
+    const selectedLeader = leaders.find(
+      (leader) => leader.id === Number(teamLeaderId)
+    );
+
+    if (selectedLeader && !isCandidateAvailable(selectedLeader)) {
+      setMessage(
+        `${selectedLeader.name} is already in a team: ${
+          selectedLeader.currentTeamName || "Unknown Team"
+        }`
+      );
+      return;
+    }
+
+    const unavailableMember = members.find(
+      (member) => memberUserIds.includes(member.id) && !isCandidateAvailable(member)
+    );
+
+    if (unavailableMember) {
+      setMessage(
+        `${unavailableMember.name} is already in a team: ${
+          unavailableMember.currentTeamName || "Unknown Team"
+        }`
+      );
+      return;
+    }
+
+    if (memberUserIds.includes(Number(teamLeaderId))) {
+      setMessage("Team leader cannot also be a member.");
       return;
     }
 
@@ -139,7 +202,7 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
         error?.response?.data?.message ||
           error?.response?.data?.error ||
           error?.response?.data?.data ||
-          "Failed to create team."
+          "Failed to save team."
       );
     } finally {
       setLoading(false);
@@ -201,18 +264,15 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
             required
           >
             <option value="">Select team leader</option>
-            {leaders.map((leader) => (
-              <option
-                key={leader.id}
-                value={leader.id}
-                disabled={leader.isAvailable === false}
-              >
-                {leader.name}
-                {leader.isAvailable === false
-                  ? ` (Already in ${leader.currentTeamName})`
-                  : ""}
-              </option>
-            ))}
+            {leaders.map((leader) => {
+              const disabled = !isCandidateAvailable(leader);
+
+              return (
+                <option key={leader.id} value={leader.id} disabled={disabled}>
+                  {candidateLabel(leader)}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -240,34 +300,34 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
         </div>
 
         <div className="team-field">
-          <label>Team Members</label>
+          <label>Members</label>
 
           {!departmentId && (
             <p className="text-muted">Select a department first.</p>
           )}
 
           {departmentId && members.length === 0 && (
-            <p className="text-muted">No available members found.</p>
+            <p className="text-muted">No members found.</p>
           )}
 
           <div className="team-members-list">
             {members.map((member) => {
               const isLeader = Number(teamLeaderId) === member.id;
               const isSelected = memberUserIds.includes(member.id);
-              const isDisabled =
-                isLeader || (member.isAvailable === false && !isSelected);
+              const alreadyInTeam = !isCandidateAvailable(member);
+              const disabled = isLeader || alreadyInTeam;
 
               return (
                 <label
                   key={member.id}
-                  className={`team-member-item ${
-                    isDisabled ? "disabled" : ""
-                  }`}
+                  className={`team-member-item ${disabled ? "disabled" : ""}`}
                   title={
                     isLeader
                       ? "Team leader cannot also be a member"
-                      : isDisabled
-                      ? `This user is in ${member.currentTeamName}`
+                      : alreadyInTeam
+                      ? `Already in a team: ${
+                          member.currentTeamName || "Unknown Team"
+                        }`
                       : ""
                   }
                 >
@@ -275,9 +335,12 @@ const TeamCreate: React.FC<TeamCreateProps> = ({
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleMember(member.id)}
-                    disabled={isDisabled}
+                    disabled={disabled}
                   />
-                  <span>{member.name}</span>
+                  <span>
+                    {candidateLabel(member)}
+                    {isLeader ? " (selected as team leader)" : ""}
+                  </span>
                 </label>
               );
             })}

@@ -17,6 +17,17 @@ const getEmployeeName = (employee: EmployeeResponse) =>
   `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() ||
   '-';
 
+const getCandidateAvailable = (candidate: CandidateUser) =>
+  candidate.available ?? candidate.isAvailable ?? true;
+
+const getExistingMemberIds = (team: TeamResponse | null): number[] => {
+  return (
+    team?.members
+      ?.map((member) => member.userId ?? member.employeeId)
+      .filter((id): id is number => id !== undefined && id !== null) ?? []
+  );
+};
+
 const DepartmentHeadDashboard = () => {
   const [departmentName, setDepartmentName] = useState('');
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
@@ -51,8 +62,6 @@ const DepartmentHeadDashboard = () => {
         fetchDepartmentHeadCandidateUsers(),
         fetchDepartmentHeadCandidateMembers(),
       ]);
-
-      console.log('DEPT HEAD DASHBOARD DATA:', dashboard);
 
       setDepartmentName(dashboard.departmentName ?? '');
       setEmployees(dashboard.employees ?? []);
@@ -96,11 +105,7 @@ const DepartmentHeadDashboard = () => {
     setTeamLeaderId(team.teamLeaderId ?? '');
     setTeamGoal(team.teamGoal ?? '');
     setStatus(team.status ?? 'Active');
-    setMemberUserIds(
-      team.members
-        ?.map((member) => member.userId ?? member.employeeId)
-        .filter((id): id is number => id !== undefined && id !== null) ?? []
-    );
+    setMemberUserIds(getExistingMemberIds(team));
     setFormMessage('');
     setShowTeamForm(true);
   };
@@ -111,6 +116,28 @@ const DepartmentHeadDashboard = () => {
   };
 
   const toggleMember = (id: number) => {
+    const member = members.find((item) => item.id === id);
+
+    if (!member) return;
+
+    const existingIds = getExistingMemberIds(editingTeam);
+    const isExisting = existingIds.includes(id);
+    const available = getCandidateAvailable(member);
+
+    if (!available && !isExisting) {
+      setFormMessage(
+        `${member.name} is already in a team: ${
+          member.currentTeamName || 'Unknown Team'
+        }`
+      );
+      return;
+    }
+
+    if (Number(teamLeaderId) === id) {
+      setFormMessage('Team leader cannot also be a member.');
+      return;
+    }
+
     setMemberUserIds((prev) =>
       prev.includes(id)
         ? prev.filter((memberId) => memberId !== id)
@@ -123,6 +150,50 @@ const DepartmentHeadDashboard = () => {
 
     if (!teamName.trim() || teamLeaderId === '') {
       setFormMessage('Team name and team leader are required.');
+      return;
+    }
+
+    const selectedLeader = leaders.find(
+      (leader) => leader.id === Number(teamLeaderId)
+    );
+
+    const isCurrentLeader =
+      editingTeam && editingTeam.teamLeaderId === Number(teamLeaderId);
+
+    if (
+      selectedLeader &&
+      !getCandidateAvailable(selectedLeader) &&
+      !isCurrentLeader
+    ) {
+      setFormMessage(
+        `${selectedLeader.name} is already in a team: ${
+          selectedLeader.currentTeamName || 'Unknown Team'
+        }`
+      );
+      return;
+    }
+
+    const existingIds = getExistingMemberIds(editingTeam);
+
+    const unavailableMember = members.find((member) => {
+      const selected = memberUserIds.includes(member.id);
+      const alreadyInTeam = !getCandidateAvailable(member);
+      const isExisting = existingIds.includes(member.id);
+
+      return selected && alreadyInTeam && !isExisting;
+    });
+
+    if (unavailableMember) {
+      setFormMessage(
+        `${unavailableMember.name} is already in a team: ${
+          unavailableMember.currentTeamName || 'Unknown Team'
+        }`
+      );
+      return;
+    }
+
+    if (memberUserIds.includes(Number(teamLeaderId))) {
+      setFormMessage('Team leader cannot also be a member.');
       return;
     }
 
@@ -183,7 +254,11 @@ const DepartmentHeadDashboard = () => {
       {error && (
         <div className="team-alert error">
           {error}
-          <button className="team-btn secondary" onClick={loadPage} style={{ marginLeft: 12 }}>
+          <button
+            className="team-btn secondary"
+            onClick={loadPage}
+            style={{ marginLeft: 12 }}
+          >
             Retry
           </button>
         </div>
@@ -268,7 +343,10 @@ const DepartmentHeadDashboard = () => {
                       <td>{team.members?.length ?? 0}</td>
                       <td>{team.teamGoal || '-'}</td>
                       <td>
-                        <button className="team-btn ghost" onClick={() => openEdit(team)}>
+                        <button
+                          className="team-btn ghost"
+                          onClick={() => openEdit(team)}
+                        >
                           <i className="bi bi-pencil-square" />
                           Edit
                         </button>
@@ -306,7 +384,9 @@ const DepartmentHeadDashboard = () => {
                         <strong>{getEmployeeName(employee)}</strong>
                       </td>
                       <td>{employee.email || '-'}</td>
-                      <td>{employee.positionTitle || employee.positionName || '-'}</td>
+                      <td>
+                        {employee.positionTitle || employee.positionName || '-'}
+                      </td>
                       <td>
                         <span
                           className={`team-pill ${
@@ -329,7 +409,11 @@ const DepartmentHeadDashboard = () => {
         <div className="team-modal-overlay">
           <div className="team-modal-content">
             <div className="team-modal-header">
-              <h2>{editingTeam ? `Edit Team: ${editingTeam.teamName}` : 'Create Team'}</h2>
+              <h2>
+                {editingTeam
+                  ? `Edit Team: ${editingTeam.teamName}`
+                  : 'Create Team'}
+              </h2>
 
               <button className="team-btn ghost" onClick={closeForm}>
                 <i className="bi bi-x-lg" />
@@ -337,9 +421,15 @@ const DepartmentHeadDashboard = () => {
             </div>
 
             <div className="team-modal-body">
-              {formMessage && <div className="team-alert error">{formMessage}</div>}
+              {formMessage && (
+                <div className="team-alert error">{formMessage}</div>
+              )}
 
-              <form id="department-head-team-form" className="team-form" onSubmit={handleSubmitTeam}>
+              <form
+                id="department-head-team-form"
+                className="team-form"
+                onSubmit={handleSubmitTeam}
+              >
                 <div className="team-field">
                   <label>
                     Team Name <span className="team-required">*</span>
@@ -365,20 +455,30 @@ const DepartmentHeadDashboard = () => {
                     className="team-select"
                     value={teamLeaderId}
                     onChange={(event) =>
-                      setTeamLeaderId(event.target.value ? Number(event.target.value) : '')
+                      setTeamLeaderId(
+                        event.target.value ? Number(event.target.value) : ''
+                      )
                     }
                     required
                   >
                     <option value="">Select leader</option>
                     {leaders.map((leader) => {
-                      const isCurrentLeader = editingTeam?.teamLeaderId === leader.id;
-                      const disabled = leader.isAvailable === false && !isCurrentLeader;
+                      const isCurrentLeader =
+                        editingTeam?.teamLeaderId === leader.id;
+                      const available = getCandidateAvailable(leader);
+                      const disabled = !available && !isCurrentLeader;
 
                       return (
-                        <option key={leader.id} value={leader.id} disabled={disabled}>
+                        <option
+                          key={leader.id}
+                          value={leader.id}
+                          disabled={disabled}
+                        >
                           {leader.name}
                           {disabled
-                            ? ` (Already in ${leader.currentTeamName})`
+                            ? ` ⚠️ (already in a team: ${
+                                leader.currentTeamName || 'Unknown Team'
+                              })`
                             : isCurrentLeader
                               ? ' (Current)'
                               : ''}
@@ -414,14 +514,29 @@ const DepartmentHeadDashboard = () => {
                   <label>Members</label>
                   <div className="team-members-list">
                     {members.map((member) => {
+                      const existingIds = getExistingMemberIds(editingTeam);
+                      const isExisting = existingIds.includes(member.id);
                       const selected = memberUserIds.includes(member.id);
                       const isLeader = Number(teamLeaderId) === member.id;
-                      const disabled = isLeader || (member.isAvailable === false && !selected);
+                      const available = getCandidateAvailable(member);
+                      const alreadyInTeam = !available && !isExisting;
+                      const disabled = isLeader || alreadyInTeam;
 
                       return (
                         <label
                           key={member.id}
-                          className={`team-member-item ${disabled ? 'disabled' : ''}`}
+                          className={`team-member-item ${
+                            disabled ? 'disabled' : ''
+                          }`}
+                          title={
+                            isLeader
+                              ? 'Team leader cannot also be a member'
+                              : alreadyInTeam
+                                ? `Already in a team: ${
+                                    member.currentTeamName || 'Unknown Team'
+                                  }`
+                                : ''
+                          }
                         >
                           <input
                             type="checkbox"
@@ -429,7 +544,17 @@ const DepartmentHeadDashboard = () => {
                             disabled={disabled}
                             onChange={() => toggleMember(member.id)}
                           />
-                          <span>{member.name}</span>
+                          <span>
+                            {member.name}
+                            {alreadyInTeam
+                              ? ` ⚠️ (already in a team: ${
+                                  member.currentTeamName || 'Unknown Team'
+                                })`
+                              : isExisting
+                                ? ' (Current member)'
+                                : ''}
+                            {isLeader ? ' (selected as team leader)' : ''}
+                          </span>
                         </label>
                       );
                     })}
@@ -439,7 +564,11 @@ const DepartmentHeadDashboard = () => {
             </div>
 
             <div className="team-modal-footer">
-              <button className="team-btn secondary" onClick={closeForm} disabled={saving}>
+              <button
+                className="team-btn secondary"
+                onClick={closeForm}
+                disabled={saving}
+              >
                 Cancel
               </button>
 

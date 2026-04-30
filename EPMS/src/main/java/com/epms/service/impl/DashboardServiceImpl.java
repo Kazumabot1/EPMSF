@@ -1,10 +1,10 @@
 package com.epms.service.impl;
 
 import com.epms.dto.DashboardSummaryResponse;
-import com.epms.entity.Kpi;
+import com.epms.entity.KpiForm;
 import com.epms.entity.Notification;
 import com.epms.entity.User;
-import com.epms.repository.KpiRepository;
+import com.epms.repository.KpiFormRepository;
 import com.epms.repository.NotificationRepository;
 import com.epms.repository.PipRepository;
 import com.epms.repository.UserRepository;
@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 
@@ -23,7 +24,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
-    private final KpiRepository kpiRepository;
+    private final KpiFormRepository kpiFormRepository;
     private final PipRepository pipRepository;
 
     @Override
@@ -37,7 +38,7 @@ public class DashboardServiceImpl implements DashboardService {
                 : 0;
 
         long unreadNotifications = notificationRepository.countByUser_IdAndIsReadFalse(user.getId());
-        long kpisCreated = kpiRepository.countByCreatedByUser_Id(user.getId());
+        long kpisCreated = kpiFormRepository.countByCreatedByUser_Id(user.getId());
         long activePipsManaged = pipRepository.count();
 
         List<DashboardSummaryResponse.NotificationItem> recentNotifications =
@@ -47,9 +48,8 @@ public class DashboardServiceImpl implements DashboardService {
                         .toList();
 
         List<DashboardSummaryResponse.KpiItem> recentKpis =
-                kpiRepository.findAllBy().stream()
-                        .limit(5)
-                        .map(this::mapKpi)
+                kpiFormRepository.findTop5ByOrderByCreatedAtDesc().stream()
+                        .map(this::mapKpiTemplate)
                         .toList();
 
         return DashboardSummaryResponse.builder()
@@ -92,13 +92,17 @@ public class DashboardServiceImpl implements DashboardService {
                 .build();
     }
 
-    private DashboardSummaryResponse.KpiItem mapKpi(Kpi kpi) {
+    private DashboardSummaryResponse.KpiItem mapKpiTemplate(KpiForm form) {
+        Long createdMillis = null;
+        if (form.getCreatedAt() != null) {
+            createdMillis = form.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        }
         return DashboardSummaryResponse.KpiItem.builder()
-                .id(kpi.getId())
-                .title(kpi.getTitle())
-                .target(kpi.getTarget())
-                .weight(kpi.getWeight())
-                .createdAt(kpi.getCreatedAt() != null ? kpi.getCreatedAt().getTime() : null)
+                .id(form.getId())
+                .title(form.getTitle())
+                .target(null)
+                .weight(form.getTotalWeight())
+                .createdAt(createdMillis)
                 .build();
     }
 }

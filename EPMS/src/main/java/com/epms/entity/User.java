@@ -62,7 +62,7 @@ public class User {
     private Date updatedAt;
 
     @OneToMany(mappedBy = "createdByUser", fetch = FetchType.LAZY)
-    private List<Kpi> createdKpiForms = new ArrayList<>();
+    private List<KpiForm> createdKpiTemplates = new ArrayList<>();
 
     @OneToMany(mappedBy = "createdByUser", fetch = FetchType.LAZY)
     private List<Team> createdTeams = new ArrayList<>();

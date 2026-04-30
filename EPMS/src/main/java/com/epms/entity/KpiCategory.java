@@ -21,8 +21,8 @@ public class KpiCategory {
 
     private String name;
 
-    @OneToMany(mappedBy = "kpiCategory", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Kpi> kpis = new ArrayList<>();
+    @OneToMany(mappedBy = "kpiCategory", fetch = FetchType.LAZY)
+    private List<KpiFormItem> kpiFormItems = new ArrayList<>();
 
     @OneToMany(mappedBy = "kpiCategory", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<KpiItem> kpiItems = new ArrayList<>();

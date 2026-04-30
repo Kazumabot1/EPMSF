@@ -49,11 +49,22 @@ public class Team {
     private List<TeamMember> teamMembers = new ArrayList<>();
 
     public void addTeamMember(TeamMember member) {
-        teamMembers.add(member);
+        if (member == null) return;
+
+        if (!teamMembers.contains(member)) {
+            teamMembers.add(member);
+        }
+
         member.setTeam(this);
+
+        if (member.getStartedDate() == null) {
+            member.setStartedDate(new Date());
+        }
     }
 
     public void removeTeamMember(TeamMember member) {
+        if (member == null) return;
+
         teamMembers.remove(member);
         member.setTeam(null);
     }
@@ -62,5 +73,25 @@ public class Team {
         for (TeamMember member : new ArrayList<>(teamMembers)) {
             removeTeamMember(member);
         }
+    }
+
+    public boolean isActiveTeam() {
+        return status != null && status.equalsIgnoreCase("Active");
+    }
+
+    public boolean isLeader(Integer userId) {
+        return userId != null
+                && teamLeader != null
+                && userId.equals(teamLeader.getId());
+    }
+
+    public boolean hasMember(Integer userId) {
+        if (userId == null || teamMembers == null) return false;
+
+        return teamMembers.stream()
+                .anyMatch(member ->
+                        member.getMemberUser() != null
+                                && userId.equals(member.getMemberUser().getId())
+                );
     }
 }

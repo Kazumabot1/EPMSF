@@ -1,16 +1,17 @@
 package com.epms.entity;
 
+import com.epms.entity.enums.KpiChangeType;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import java.util.Date;
+import lombok.*;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "kpi_version_history")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class KpiVersionHistory {
 
     @Id
@@ -18,11 +19,15 @@ public class KpiVersionHistory {
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kpi_id", nullable = false)
-    private Kpi kpiForm;
+    @JoinColumn(name = "kpi_form_id", nullable = false)
+    private KpiForm kpiForm;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kpi_form_item_id")
+    private KpiFormItem kpiFormItem;
 
     @Column(name = "column_name", nullable = false)
-    private String kpiColumnName;
+    private String columnName;
 
     @Column(name = "old_value", columnDefinition = "TEXT")
     private String oldValue;
@@ -30,9 +35,8 @@ public class KpiVersionHistory {
     @Column(name = "new_value", columnDefinition = "TEXT")
     private String newValue;
 
-    @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "changed_at", nullable = false)
-    private Date changedAt;
+    private LocalDateTime changedAt;
 
     @Column(name = "changed_reason")
     private String changedReason;
@@ -48,29 +52,11 @@ public class KpiVersionHistory {
     private Integer versionNumber;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "change_type")
-    private ChangeType changeType;
+    @Column(name = "change_type", length = 40)
+    private KpiChangeType changeType;
 
-    // Enum for change types
-    public enum ChangeType {
-        CREATED,
-        UPDATED,
-        DELETED,
-        RESTORED,
-        WEIGHT_MODIFIED,
-        TARGET_MODIFIED,
-        CATEGORY_CHANGED
-    }
-
-    // Helper method to format the change description
-    public String getChangeDescription() {
-        if (changeType == ChangeType.CREATED) {
-            return String.format("KPI created with %s: %s", kpiColumnName, newValue);
-        } else if (changeType == ChangeType.DELETED) {
-            return String.format("KPI deleted. Previous %s was: %s", kpiColumnName, oldValue);
-        } else {
-            return String.format("%s changed from '%s' to '%s'",
-                    kpiColumnName, oldValue, newValue);
-        }
+    @PrePersist
+    public void prePersist() {
+        if (changedAt == null) changedAt = LocalDateTime.now();
     }
 }
