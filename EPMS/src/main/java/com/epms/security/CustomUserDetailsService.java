@@ -32,12 +32,13 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final PermissionRepository permissionRepository;
     private final DashboardResolver dashboardResolver;
 
-    // Modified by KHN
     @Override
-    @Transactional(readOnly = true) // Required: Position is LAZY - needs open session
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByEmailAndActiveTrue(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Active user not found with email: " + username));
+        String email = username == null ? "" : username.trim();
+
+        User user = userRepository.findActiveByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Active user not found with email: " + email));
 
         List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
         List<Integer> roleIds = userRoles.stream().map(UserRole::getRoleId).distinct().toList();
@@ -57,10 +58,8 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         List<String> roleList = roleNames.stream().toList();
         List<String> permissionList = permissionNames.stream().toList();
-        // Modified by KHN
         String dashboard = dashboardResolver.resolveDashboard(roleList,
                 user.getPosition() != null ? user.getPosition().getPositionTitle() : null);
-        // END HERE
 
         return new UserPrincipal(user, roleList, permissionList, dashboard);
     }

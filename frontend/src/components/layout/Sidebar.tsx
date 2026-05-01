@@ -71,6 +71,8 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             ],
           },
 
+          { to: '/hr/assessment-scores', label: 'Assessment Scores', icon: 'bi bi-clipboard-data' },
+
           {
             to: '/user-roles',
             label: 'Access Control',

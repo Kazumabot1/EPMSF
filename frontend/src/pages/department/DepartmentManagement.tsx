@@ -1,60 +1,46 @@
-import { useEffect, useState } from "react";
-import DepartmentForm from "./DepartmentForm";
+import { useEffect, useMemo, useState } from 'react';
+import DepartmentForm from './DepartmentForm';
+import type { DepartmentFormValues } from './DepartmentForm';
+import {
+  createDepartment,
+  deleteDepartment,
+  fetchDepartments,
+  updateDepartment,
+} from '../../services/departmentService';
+import type { Department } from '../../services/departmentService';
+import './department-ui.css';
 
-interface Department {
-  id: number;
-  departmentName?: string;
-  name?: string;
-  departmentCode?: string;
-  headEmployee?: string | null;
-  status?: boolean | number;
-  createdAt?: string;
-  createdBy?: string;
-}
+const emptyFormValues: DepartmentFormValues = {
+  departmentName: '',
+  departmentCode: '',
+  headEmployee: '',
+};
 
-interface DepartmentRequest {
-  departmentName: string;
-}
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string; error?: string } } }).response;
+    return response?.data?.message || response?.data?.error || fallback;
+  }
+  return fallback;
+};
 
 const DepartmentManagement = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(
-    null
-  );
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-
-  const extractDepartments = (body: any): Department[] => {
-    console.log("RAW DEPARTMENT BODY:", body);
-
-    if (Array.isArray(body)) return body;
-    if (Array.isArray(body?.data)) return body.data;
-    if (Array.isArray(body?.data?.data)) return body.data.data;
-    if (Array.isArray(body?.result)) return body.result;
-    if (Array.isArray(body?.content)) return body.content;
-    if (Array.isArray(body?.departments)) return body.departments;
-
-    return [];
-  };
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [query, setQuery] = useState('');
 
   const loadDepartments = async () => {
     try {
       setLoading(true);
-      setMessage("");
-
-      const response = await fetch(`/api/departments?t=${Date.now()}`);
-      const body = await response.json();
-
-      const list = extractDepartments(body);
-
-      console.log("FINAL DEPARTMENT LIST:", list);
-
-      setDepartments(list);
+      setMessage('');
+      setDepartments(await fetchDepartments());
     } catch (error) {
-      console.error("Failed to load departments:", error);
       setDepartments([]);
-      setMessage("Unable to load departments.");
+      setMessage(getErrorMessage(error, 'Unable to load departments.'));
     } finally {
       setLoading(false);
     }
@@ -64,105 +50,96 @@ const DepartmentManagement = () => {
     loadDepartments();
   }, []);
 
-  const handleCreate = async (request: DepartmentRequest) => {
+  const filteredDepartments = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return departments;
+    return departments.filter((department) =>
+      [department.departmentName, department.departmentCode, department.headEmployee, department.createdBy]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q)),
+    );
+  }, [departments, query]);
+
+  const handleCreate = async (values: DepartmentFormValues) => {
     try {
-      setMessage("");
-
-      const response = await fetch("/api/departments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          departmentName: request.departmentName,
-          departmentCode: "",
-          headEmployee: null,
-        }),
+      setSaving(true);
+      setMessage('');
+      await createDepartment({
+        departmentName: values.departmentName,
+        departmentCode: values.departmentCode || null,
+        headEmployee: values.headEmployee || null,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to create department");
-      }
-
       await loadDepartments();
       setShowForm(false);
+      setMessage('Department created successfully.');
     } catch (error) {
-      console.error("Failed to create department:", error);
-      setMessage("Unable to create department. Please check your input and try again.");
+      setMessage(getErrorMessage(error, 'Unable to create department. Please check your input and try again.'));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleUpdate = async (request: DepartmentRequest) => {
+  const handleUpdate = async (values: DepartmentFormValues) => {
     if (!editingDepartment) return;
 
     try {
-      setMessage("");
-
-      const response = await fetch(`/api/departments/${editingDepartment.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          departmentName: request.departmentName,
-          departmentCode: editingDepartment.departmentCode || "",
-          headEmployee: editingDepartment.headEmployee || null,
-        }),
+      setSaving(true);
+      setMessage('');
+      await updateDepartment(editingDepartment.id, {
+        departmentName: values.departmentName,
+        departmentCode: values.departmentCode || null,
+        headEmployee: values.headEmployee || null,
+        status: editingDepartment.status ?? true,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update department");
-      }
-
       await loadDepartments();
       setEditingDepartment(null);
       setShowForm(false);
+      setMessage('Department updated successfully.');
     } catch (error) {
-      console.error("Failed to update department:", error);
-      setMessage("Unable to update department.");
+      setMessage(getErrorMessage(error, 'Unable to update department.'));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (department: Department) => {
-    const name = department.departmentName || department.name || "this department";
-
-    if (!window.confirm(`Delete ${name}?`)) return;
+    if (!window.confirm(`Deactivate ${department.departmentName}?`)) return;
 
     try {
-      setMessage("");
-
-      const response = await fetch(`/api/departments/${department.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete department");
-      }
-
+      setMessage('');
+      await deleteDepartment(department.id);
       await loadDepartments();
+      setMessage('Department deactivated successfully.');
     } catch (error) {
-      console.error("Failed to delete department:", error);
-      setMessage("Unable to delete department.");
+      setMessage(getErrorMessage(error, 'Unable to deactivate department.'));
     }
   };
 
   const openCreate = () => {
     setEditingDepartment(null);
     setShowForm(true);
-    setMessage("");
+    setMessage('');
   };
 
   const openEdit = (department: Department) => {
     setEditingDepartment(department);
     setShowForm(true);
-    setMessage("");
+    setMessage('');
   };
 
   const closeForm = () => {
     setEditingDepartment(null);
     setShowForm(false);
-    setMessage("");
+    setMessage('');
   };
+
+  const initialValues: DepartmentFormValues = editingDepartment
+    ? {
+        departmentName: editingDepartment.departmentName || '',
+        departmentCode: editingDepartment.departmentCode || '',
+        headEmployee: editingDepartment.headEmployee || '',
+      }
+    : emptyFormValues;
 
   return (
     <div className="team-page">
@@ -171,11 +148,15 @@ const DepartmentManagement = () => {
           <i className="bi bi-building" />
           Organization
         </span>
-        <h1>Department</h1>
-        <p>Create, update, and remove departments for your organization.</p>
+        <h1>Departments</h1>
+        <p>Create, update, and deactivate departments for your organization.</p>
       </div>
 
-      {message && <div className="team-alert error">{message}</div>}
+      {message && (
+        <div className={`team-alert ${message.toLowerCase().includes('success') ? 'success' : 'error'}`}>
+          {message}
+        </div>
+      )}
 
       <div className="team-surface">
         <div className="team-surface-inner">
@@ -190,14 +171,21 @@ const DepartmentManagement = () => {
             </button>
           </div>
 
+          <div className="team-table-toolbar" style={{ paddingTop: 0 }}>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search departments..."
+              className="team-search-input"
+              style={{ maxWidth: 420 }}
+            />
+          </div>
+
           {showForm && (
             <DepartmentForm
-              initialValues={{
-                departmentName:
-                  editingDepartment?.departmentName ||
-                  editingDepartment?.name ||
-                  "",
-              }}
+              initialValues={initialValues}
+              submitLabel={editingDepartment ? 'Update Department' : 'Create Department'}
+              loading={saving}
               onSubmit={editingDepartment ? handleUpdate : handleCreate}
               onCancel={closeForm}
             />
@@ -205,9 +193,9 @@ const DepartmentManagement = () => {
 
           {loading ? (
             <div className="team-state">Loading departments...</div>
-          ) : departments.length === 0 ? (
+          ) : filteredDepartments.length === 0 ? (
             <div className="team-state">
-              No departments yet. Click Create Department to add one.
+              No departments found. Click Create Department to add one.
             </div>
           ) : (
             <div className="team-table-wrap">
@@ -217,6 +205,7 @@ const DepartmentManagement = () => {
                     <th>ID</th>
                     <th>Department Name</th>
                     <th>Code</th>
+                    <th>Head Employee</th>
                     <th>Status</th>
                     <th>Created By</th>
                     <th>Actions</th>
@@ -224,22 +213,16 @@ const DepartmentManagement = () => {
                 </thead>
 
                 <tbody>
-                  {departments.map((department) => (
+                  {filteredDepartments.map((department) => (
                     <tr key={department.id}>
                       <td>{department.id}</td>
-                      <td>{department.departmentName || department.name || "-"}</td>
-                      <td>{department.departmentCode || "-"}</td>
+                      <td>{department.departmentName || '-'}</td>
+                      <td>{department.departmentCode || '-'}</td>
+                      <td>{department.headEmployee || '-'}</td>
+                      <td>{department.status === false ? 'Inactive' : 'Active'}</td>
+                      <td>{department.createdBy || '-'}</td>
                       <td>
-                        {department.status === false || department.status === 0
-                          ? "Inactive"
-                          : "Active"}
-                      </td>
-                      <td>{department.createdBy || "-"}</td>
-                      <td>
-                        <button
-                          className="team-btn ghost"
-                          onClick={() => openEdit(department)}
-                        >
+                        <button className="team-btn ghost" onClick={() => openEdit(department)}>
                           Edit
                         </button>
 
@@ -248,7 +231,7 @@ const DepartmentManagement = () => {
                           onClick={() => handleDelete(department)}
                           style={{ marginLeft: 8 }}
                         >
-                          Delete
+                          Deactivate
                         </button>
                       </td>
                     </tr>

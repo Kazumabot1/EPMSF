@@ -35,7 +35,7 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.email = user.getEmail();
         this.password = user.getPassword();
-        this.active = Boolean.TRUE.equals(user.getActive());
+        this.active = user.getActive() == null || Boolean.TRUE.equals(user.getActive());
         this.managerId = user.getManagerId();
         this.departmentId = user.getDepartmentId();
         this.fullName = user.getFullName();

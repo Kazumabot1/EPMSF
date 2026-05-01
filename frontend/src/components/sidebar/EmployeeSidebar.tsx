@@ -1,13 +1,20 @@
 import { NavLink } from 'react-router-dom';
 import { roleNavigation } from '../../config/roleNavigation';
+import type { UserRole } from '../../config/roleNavigation';
 
 interface EmployeeSidebarProps {
+  role?: UserRole;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-const EmployeeSidebar = ({ collapsed, onToggleCollapse }: EmployeeSidebarProps) => {
-  const navigation = roleNavigation.Employee;
+const displayRoleName = (role: UserRole) => {
+  if (role === 'DepartmentHead') return 'Department Head';
+  return role;
+};
+
+const EmployeeSidebar = ({ role = 'Employee', collapsed, onToggleCollapse }: EmployeeSidebarProps) => {
+  const navigation = roleNavigation[role] ?? roleNavigation.Employee;
 
   return (
     <aside className={`employee-sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -28,7 +35,7 @@ const EmployeeSidebar = ({ collapsed, onToggleCollapse }: EmployeeSidebarProps) 
       {!collapsed && (
         <div className="employee-role-chip">
           <p>CURRENT ROLE</p>
-          <strong>Employee</strong>
+          <strong>{displayRoleName(role)}</strong>
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { roleNavigation } from '../../config/roleNavigation';
 
 interface DepartmentHeadSidebarProps {
   collapsed: boolean;
@@ -34,17 +35,20 @@ const DepartmentHeadSidebar = ({
       )}
 
       <nav className="employee-nav">
-        <NavLink
-          to="/department-head/dashboard"
-          end
-          title={collapsed ? 'Department Dashboard' : undefined}
-          className={({ isActive }) =>
-            `employee-nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`
-          }
-        >
-          <i className="bi bi-building-check" />
-          {!collapsed && <span>Department Dashboard</span>}
-        </NavLink>
+        {roleNavigation.DepartmentHead.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end={item.end}
+            title={collapsed ? item.label : undefined}
+            className={({ isActive }) =>
+              `employee-nav-link ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`
+            }
+          >
+            <i className={`bi ${item.icon}`} />
+            {!collapsed && <span>{item.label}</span>}
+          </NavLink>
+        ))}
       </nav>
 
       <div className="employee-sidebar-footer">
@@ -52,6 +56,7 @@ const DepartmentHeadSidebar = ({
           type="button"
           onClick={onToggleCollapse}
           className="employee-sidebar-collapse"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
           {!collapsed && <span>Collapse</span>}

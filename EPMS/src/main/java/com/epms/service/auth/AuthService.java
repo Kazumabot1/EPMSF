@@ -16,7 +16,7 @@ import com.epms.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -45,26 +45,28 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        String key = request.getEmail() == null ? "anonymous" : request.getEmail().trim().toLowerCase();
+        String email = normalizeEmail(request.getEmail());
+        String key = email.isBlank() ? "anonymous" : email.toLowerCase();
+
         authRateLimitService.check(key);
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            request.getEmail(),
+                            email,
                             request.getPassword()
                     )
             );
             authRateLimitService.success(key);
-        } catch (BadCredentialsException ex) {
+        } catch (AuthenticationException ex) {
             authRateLimitService.fail(key);
-            throw new BadCredentialsException("Invalid email or password");
+            throw new BadRequestException("Invalid email or password");
         }
 
-        User user = userRepository.findByEmailAndActiveTrue(request.getEmail())
+        User user = userRepository.findActiveByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         UserPrincipal principal =
-                (UserPrincipal) customUserDetailsService.loadUserByUsername(request.getEmail());
+                (UserPrincipal) customUserDetailsService.loadUserByUsername(email);
 
         refreshTokenRepository.deleteByUserId(user.getId());
 
@@ -84,7 +86,7 @@ public class AuthService {
         }
 
         User user = userRepository.findById(storedToken.getUserId())
-                .filter(u -> Boolean.TRUE.equals(u.getActive()))
+                .filter(u -> u.getActive() == null || Boolean.TRUE.equals(u.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found for refresh token"));
 
         UserPrincipal principal =
@@ -105,10 +107,8 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) {
-            if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
-                throw new BadRequestException("Current temporary password is required");
-            }
+        if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
+            throw new BadRequestException("Current password is required");
         }
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
@@ -117,6 +117,10 @@ public class AuthService {
 
         if (request.getNewPassword() == null || request.getNewPassword().length() < 8) {
             throw new BadRequestException("New password must be at least 8 characters long");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new BadRequestException("New password must be different from the current password");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -128,6 +132,10 @@ public class AuthService {
         userRepository.save(user);
 
         refreshTokenRepository.deleteByUserId(userId);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim();
     }
 
     private RefreshToken createRefreshToken(Integer userId) {

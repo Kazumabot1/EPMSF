@@ -27,7 +27,7 @@ const RoleBasedSidebar = ({
     );
   }
 
-  return <EmployeeSidebar collapsed={collapsed} onToggleCollapse={onToggleCollapse} />;
+  return <EmployeeSidebar role={role} collapsed={collapsed} onToggleCollapse={onToggleCollapse} />;
 };
 
 export default RoleBasedSidebar;

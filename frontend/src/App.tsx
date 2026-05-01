@@ -17,9 +17,13 @@ import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 import EmployeeMyDashboard from './pages/employee/EmployeeMyDashboard';
 import EmployeeManagement from './pages/employee/EmployeeManagement';
 import EmployeeRoutePlaceholder from './pages/employee/EmployeeRoutePlaceholder';
+import EmployeeSelfAssessmentPage from './pages/employee/EmployeeSelfAssessmentPage';
+import EmployeeAssessmentScoresPage from './pages/employee/EmployeeAssessmentScoresPage';
 import TeamManagement from './pages/team/TeamManagement';
 import TeamCreate from './pages/team/TeamCreate';
 import DepartmentManagement from './pages/department/DepartmentManagement';
+import ManagerDashboard from './pages/manager/ManagerDashboard';
+import CeoDashboard from './pages/ceo/CeoDashboard';
 
 import PositionCreate from './pages/position/Create';
 import PositionTable from './pages/position/Table';
@@ -32,14 +36,9 @@ import KpiTemplateDetailPage from './pages/hr/kpi-template/KpiTemplateDetailPage
 import KpiTemplateEditorPage from './pages/hr/kpi-template/KpiTemplateEditorPage';
 import KpiTemplateListPage from './pages/hr/kpi-template/KpiTemplateListPage';
 import ProfilePage from './pages/hr/ProfilePage';
+import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
-import Notifications from "./pages/Notifications";
-
-
-/*
-<Route path="/notifications" element={<Notifications />} />
- */
-
+import Notifications from './pages/Notifications';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 
 function App() {
@@ -64,24 +63,8 @@ function App() {
                   />
                 }
               />
-              <Route
-                path="/employee/appraisals"
-                element={
-                  <EmployeeRoutePlaceholder
-                    title="My Appraisals"
-                    description="Review appraisal cycles, statuses, and results."
-                  />
-                }
-              />
-              <Route
-                path="/employee/self-assessment"
-                element={
-                  <EmployeeRoutePlaceholder
-                    title="Self-Assessment"
-                    description="Complete and submit your self-assessment forms."
-                  />
-                }
-              />
+              <Route path="/employee/appraisals" element={<EmployeeAssessmentScoresPage />} />
+              <Route path="/employee/self-assessment" element={<EmployeeSelfAssessmentPage />} />
               <Route
                 path="/employee/feedback"
                 element={
@@ -121,12 +104,52 @@ function App() {
             </Route>
           </Route>
 
+          <Route element={<ProtectedRoute allowedRoles={['Manager']} />}>
+            <Route element={<AppLayout />}>
+              <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+              <Route
+                path="/manager/appraisals"
+                element={
+                  <EmployeeRoutePlaceholder
+                    title="Team Appraisals"
+                    description="Manager appraisal workflow placeholder."
+                  />
+                }
+              />
+              <Route
+                path="/manager/reports"
+                element={
+                  <EmployeeRoutePlaceholder
+                    title="Team Reports"
+                    description="Manager reporting workflow placeholder."
+                  />
+                }
+              />
+            </Route>
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['Executive']} />}>
+            <Route element={<AppLayout />}>
+              <Route path="/executive/dashboard" element={<CeoDashboard />} />
+              <Route
+                path="/executive/reports"
+                element={
+                  <EmployeeRoutePlaceholder
+                    title="Executive Reports"
+                    description="Executive performance reports placeholder."
+                  />
+                }
+              />
+            </Route>
+          </Route>
+
           <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
             <Route element={<AppLayout />}>
               <Route
                 path="/department-head/dashboard"
                 element={<DepartmentHeadDashboard />}
               />
+              <Route path="/hr/assessment-scores" element={<AssessmentScoreTablePage />} />
             </Route>
           </Route>
 
@@ -142,18 +165,19 @@ function App() {
               <Route path="/hr/team" element={<TeamManagement />} />
               <Route path="/hr/team/create" element={<TeamCreate />} />
               <Route path="/hr/department" element={<DepartmentManagement />} />
+              <Route path="/hr/assessment-scores" element={<AssessmentScoreTablePage />} />
 
               <Route path="/permissions" element={<Permissions />} />
               <Route path="/user-roles" element={<UserRoles />} />
               <Route path="/role-permissions" element={<RolePermissions />} />
 
-            <Route path="/pip-updates" element={<PipUpdates />} />
+              <Route path="/pip-updates" element={<PipUpdates />} />
 
-<Route path="/notifications" element={<Notifications />} />
-<Route path="/notification-templates" element={<NotificationTemplates />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/notification-templates" element={<NotificationTemplates />} />
 
-            <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
-            <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
+              <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
+              <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
 
               <Route path="/hr/position/create" element={<PositionCreate />} />
               <Route path="/hr/position-level/create" element={<PositionLevelCreate />} />

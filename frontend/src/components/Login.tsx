@@ -18,12 +18,19 @@ function Login() {
     switch (dashboard) {
       case 'EMPLOYEE_DASHBOARD':
         return '/employee/dashboard';
+
       case 'MANAGER_DASHBOARD':
         return '/manager/dashboard';
+
+      case 'PROJECT_MANAGER_DASHBOARD':
+        return '/project-manager/dashboard';
+
       case 'DEPARTMENT_HEAD_DASHBOARD':
         return '/department-head/dashboard';
+
       case 'EXECUTIVE_DASHBOARD':
         return '/executive/dashboard';
+
       case 'ADMIN_DASHBOARD':
       case 'HR_DASHBOARD':
       default:
@@ -50,7 +57,11 @@ function Login() {
       }
 
       login(payload);
-      navigate(payload.mustChangePassword ? '/change-password' : resolveRoute(payload.dashboard), { replace: true });
+
+      navigate(
+        payload.mustChangePassword ? '/change-password' : resolveRoute(payload.dashboard),
+        { replace: true }
+      );
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
