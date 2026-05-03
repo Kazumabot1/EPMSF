@@ -1,3 +1,4 @@
+/*
 import { NavLink } from 'react-router-dom';
 import { roleNavigation } from '../../config/roleNavigation';
 
@@ -63,6 +64,44 @@ const DepartmentHeadSidebar = ({
         </button>
       </div>
     </aside>
+  );
+};
+
+export default DepartmentHeadSidebar;
+ */
+
+
+/*
+DepartmentHeadSidebar.tsx file: */
+
+
+
+/* DepartmentHeadSidebar.tsx
+   Why this file is fixed:
+   - Uses the same dropdown-capable sidebar as Manager/Employee.
+   - Department Head now gets:
+     PIP
+       Create
+       Past Plans
+*/
+
+import EmployeeSidebar from './EmployeeSidebar';
+
+interface DepartmentHeadSidebarProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+const DepartmentHeadSidebar = ({
+  collapsed,
+  onToggleCollapse,
+}: DepartmentHeadSidebarProps) => {
+  return (
+    <EmployeeSidebar
+      role="DepartmentHead"
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    />
   );
 };
 
