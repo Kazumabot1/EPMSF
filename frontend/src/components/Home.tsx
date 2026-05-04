@@ -3,20 +3,34 @@ import api from '../services/api';
 
 function Home() {
   const [data, setData] = useState<any>(null);
+  const [totalEmployees, setTotalEmployees] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Load dashboard summary (KPIs, notifications, user info)
     api.get('/dashboard/summary')
       .then((res) => setData(res.data))
       .catch((err) => {
         const status = err?.response?.status;
-
         if (status === 401 || status === 403) {
           setError('Your session is not authorized for this dashboard.');
           return;
         }
-
         setError('Failed to load dashboard');
+      });
+
+    // Load total active employee count from the employees endpoint
+    api.get('/employees')
+      .then((res) => {
+        const list: any[] = res.data?.data ?? res.data ?? [];
+        // Count only active employees
+        const active = Array.isArray(list)
+          ? list.filter((e: any) => e.active !== false && e.status !== 'INACTIVE').length
+          : 0;
+        setTotalEmployees(active);
+      })
+      .catch(() => {
+        setTotalEmployees(null); // fallback: will show directReports
       });
   }, []);
 
@@ -38,8 +52,8 @@ function Home() {
                 <p>Total Employees</p>
                 <span className="hr-stat-icon blue"><i className="bi bi-people" /></span>
               </div>
-              <h3>{data.stats?.directReports ?? 0}</h3>
-              <small>Visible to HR</small>
+              <h3>{totalEmployees ?? data.stats?.directReports ?? 0}</h3>
+              <small>Active in system</small>
             </article>
 
             <article className="hr-stat-card">

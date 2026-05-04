@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
+import { exportToExcel, todayStr } from '../../utils/exportExcel';
 import './admin-dashboard.css';
 
 type DepartmentOption = {
@@ -104,14 +105,21 @@ const AdminDashboard = () => {
   }, []);
 
   const roleOptions = useMemo(() => {
-    if (options.roles.length) return options.roles;
+    // CEO/Executive role is excluded from admin account creation — managed separately
+    const EXCLUDED_ROLES = ['CEO', 'ROLE_CEO', 'EXECUTIVE', 'ROLE_EXECUTIVE'];
 
-    return [
-      { id: 1, name: 'EMPLOYEE' },
-      { id: 2, name: 'HR' },
-      { id: 3, name: 'ADMIN' },
-      { id: 4, name: 'MANAGER' },
-    ];
+    const filtered = options.roles.length
+      ? options.roles
+      : [
+          { id: 1, name: 'EMPLOYEE' },
+          { id: 2, name: 'HR' },
+          { id: 3, name: 'ADMIN' },
+          { id: 4, name: 'MANAGER' },
+        ];
+
+    return filtered.filter(
+      (r) => !EXCLUDED_ROLES.includes(r.name.replace(/^ROLE_/i, '').toUpperCase())
+    );
   }, [options.roles]);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -389,6 +397,30 @@ const AdminDashboard = () => {
           <h2>
             <i className="bi bi-table" /> Recent People ({users.length})
           </h2>
+          <button
+            className="adm-btn primary"
+            onClick={() =>
+              exportToExcel(
+                users.map((u) => ({
+                  fullName: u.fullName ?? '',
+                  email: u.email ?? '',
+                  employeeCode: u.employeeCode ?? '',
+                  status: u.success === false ? 'Needs Attention' : 'Active',
+                })) as any,
+                [
+                  { header: 'Full Name',      key: 'fullName'      },
+                  { header: 'Email',           key: 'email'         },
+                  { header: 'Employee Code',   key: 'employeeCode'  },
+                  { header: 'Status',          key: 'status'        },
+                ],
+                `admin_users_${todayStr()}`
+              )
+            }
+            disabled={users.length === 0}
+            title="Export to Excel"
+          >
+            <i className="bi bi-file-earmark-excel" /> Export Excel
+          </button>
         </div>
 
         <div className="adm-table-wrap">

@@ -5,6 +5,7 @@ import EmployeeFormModal from '../../components/employee/EmployeeFormModal';
 import EmployeeViewModal from '../../components/employee/EmployeeViewModal';
 import EmployeeDeactivateDialog from '../../components/employee/EmployeeDeactivateDialog';
 import '../../components/employee/employee-crud.css';
+import { exportToExcel, todayStr } from '../../utils/exportExcel';
 import {
   fetchEmployees,
   isEmployeeActive,
@@ -192,6 +193,46 @@ const EmployeeManagement = () => {
               <i className="bi bi-upload" aria-hidden />
               Import (Excel / CSV)
             </Link>
+
+            <button
+              type="button"
+              className="epms-emp-btn epms-emp-btn--import"
+              disabled={filtered.length === 0}
+              title={`Export ${filtered.length} visible employee(s) to Excel`}
+              onClick={() =>
+                exportToExcel(
+                  filtered.map((e) => ({
+                    fullName:
+                      e.fullName?.trim() ||
+                      [e.firstName, e.lastName].filter(Boolean).join(' ').trim() ||
+                      '',
+                    position: e.positionTitle
+                      ? `${e.positionTitle}${e.positionLevelCode ? ` (${e.positionLevelCode})` : ''}`
+                      : '',
+                    department: e.currentDepartment || e.parentDepartment || '',
+                    phone: e.phoneNumber || '',
+                    nrc: e.staffNrc || '',
+                    gender: e.gender || '',
+                    status: isEmployeeActive(e) ? 'Active' : 'Inactive',
+                    email: e.email || '',
+                  })) as any,
+                  [
+                    { header: 'Full Name',   key: 'fullName'    },
+                    { header: 'Position',    key: 'position'    },
+                    { header: 'Department',  key: 'department'  },
+                    { header: 'Phone',       key: 'phone'       },
+                    { header: 'NRC',         key: 'nrc'         },
+                    { header: 'Gender',      key: 'gender'      },
+                    { header: 'Status',      key: 'status'      },
+                    { header: 'Email',       key: 'email'       },
+                  ],
+                  `hr_employees_${todayStr()}`
+                )
+              }
+            >
+              <i className="bi bi-file-earmark-excel" aria-hidden />
+              Export Excel
+            </button>
           </div>
         </header>
 

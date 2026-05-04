@@ -56,19 +56,7 @@ const UserRoles = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this user role?')) {
-      setLoading(true);
-      try {
-        await api.delete(`/api/user-roles/${id}`);
-        fetchUserRoles();
-      } catch (error) {
-        console.error('Error deleting user role:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
+
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -164,18 +152,12 @@ const UserRoles = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{userRole.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userRole.userId}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userRole.roleId}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => handleEdit(userRole)}
                         className="text-indigo-600 hover:text-indigo-900 transition duration-300"
                       >
                         Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(userRole.id)}
-                        className="text-red-600 hover:text-red-900 transition duration-300"
-                      >
-                        Delete
                       </button>
                     </td>
                   </tr>
