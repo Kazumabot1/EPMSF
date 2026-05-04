@@ -1685,6 +1685,26 @@ public class PipServiceImpl implements PipService {
         pip.setUpdatedAt(LocalDateTime.now());
         pipRepository.save(pip);
 
+        User pipEmployee = getUser(pip.getEmployeeUserId(), "Employee user not found.");
+        StringBuilder phaseNote = new StringBuilder();
+        phaseNote.append("Phase ").append(phase.getPhaseNumber()).append(" of your PIP");
+        String goalPrev = pipGoalPreview(pip.getGoal());
+        if (!goalPrev.isEmpty()) {
+            phaseNote.append(" \"" + goalPrev + "\"");
+        }
+        phaseNote.append(" was updated to ").append(phaseStatusForNotification(newStatus)).append(".");
+        if (reason != null && !reason.isBlank()) {
+            String note = reason.length() > 300 ? reason.substring(0, 297).trim() + "..." : reason;
+            phaseNote.append(" Note: ").append(note);
+        }
+
+        notificationService.send(
+                pipEmployee.getId(),
+                "PIP Phase Updated",
+                phaseNote.toString(),
+                "PIP"
+        );
+
         return toDetail(getPip(pipId), currentUser);
     }
 
@@ -2058,6 +2078,23 @@ public class PipServiceImpl implements PipService {
         }
 
         return normalized;
+    }
+
+    private String pipGoalPreview(String goal) {
+        if (goal == null || goal.isBlank()) {
+            return "";
+        }
+        String g = goal.trim();
+        return g.length() <= 120 ? g : g.substring(0, 117).trim() + "...";
+    }
+
+    private String phaseStatusForNotification(String normalizedStatus) {
+        return switch (normalizedStatus) {
+            case "HASNT_STARTED_YET" -> "Not started yet";
+            case "ONGOING" -> "Ongoing";
+            case "COMPLETED" -> "Completed";
+            default -> normalizedStatus.replace('_', ' ').toLowerCase(Locale.ROOT);
+        };
     }
 
     private void assertWordLimit(String value, String fieldName) {

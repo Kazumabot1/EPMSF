@@ -8,6 +8,7 @@ import com.epms.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,6 +41,23 @@ public class NotificationController {
         return GenericApiResponse.success(
                 "Unread notifications count",
                 notificationRepository.countByUser_IdAndIsReadFalse(userId)
+        );
+    }
+
+    @PutMapping("/read-all")
+    @Transactional
+    public GenericApiResponse<Integer> markAllAsRead() {
+        Integer userId = SecurityUtils.currentUserId();
+
+        List<Notification> unread = notificationRepository.findByUser_IdAndIsReadFalse(userId);
+        for (Notification n : unread) {
+            n.setIsRead(true);
+        }
+        notificationRepository.saveAll(unread);
+
+        return GenericApiResponse.success(
+                "All notifications marked as read",
+                unread.size()
         );
     }
 

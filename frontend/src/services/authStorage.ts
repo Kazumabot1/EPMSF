@@ -1,5 +1,5 @@
 // authStorage.ts
-import type { AuthResponse } from "../types/auth";
+import type { AuthResponse, CurrentUserResponse } from "../types/auth";
 
 const ACCESS_TOKEN_KEY = "epmsAccessToken";
 const REFRESH_TOKEN_KEY = "epmsRefreshToken";
@@ -30,6 +30,24 @@ export const authStorage = {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+  },
+
+  /** Persist profile fields from GET /api/auth/me (tokens unchanged). */
+  setUserFromCurrent(payload: CurrentUserResponse) {
+    localStorage.setItem(
+      USER_KEY,
+      JSON.stringify({
+        id: payload.id,
+        email: payload.email,
+        fullName: payload.fullName,
+        employeeCode: payload.employeeCode,
+        position: payload.position,
+        roles: payload.roles ?? [],
+        permissions: payload.permissions ?? [],
+        dashboard: payload.dashboard,
+        mustChangePassword: payload.mustChangePassword ?? false,
+      })
+    );
   },
 
   getAccessToken() {

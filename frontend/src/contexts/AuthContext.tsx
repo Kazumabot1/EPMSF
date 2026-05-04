@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { authStorage } from '../services/authStorage';
+import api from '../services/api';
 import type { AuthResponse } from '../types/auth';
 
 interface User {
@@ -41,13 +42,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Hydrate from authStorage on mount
+  /**
+   * Validate the session with the server before trusting localStorage.
+   * Avoids showing HR shell + 403 when tokens are stale or roles/dashboard drifted.
+   */
   useEffect(() => {
-    const stored = authStorage.getUser();
-    if (stored && authStorage.getAccessToken()) {
-      setUser(stored as User);
-    }
-    setLoading(false);
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      const token = authStorage.getAccessToken();
+      if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await api.get('/auth/me');
+        const body = res.data?.data ?? res.data;
+        if (cancelled || !body) return;
+
+        authStorage.setUserFromCurrent(body);
+        setUser({
+          id: body.id,
+          email: body.email,
+          fullName: body.fullName,
+          employeeCode: body.employeeCode,
+          position: body.position,
+          roles: body.roles ?? [],
+          permissions: body.permissions ?? [],
+          dashboard: body.dashboard,
+          mustChangePassword: body.mustChangePassword ?? false,
+        });
+      } catch {
+        if (!cancelled) {
+          authStorage.clearSession();
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback((payload: AuthResponse) => {
