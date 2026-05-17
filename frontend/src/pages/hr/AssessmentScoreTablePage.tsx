@@ -10,6 +10,7 @@ import type {
   EmployeeAssessment,
 } from '../../types/employeeAssessment';
 import '../appraisal/appraisal.css';
+import './assessment-score-table.css';
 
 type RoleFlags = {
   isHr: boolean;
@@ -36,61 +37,71 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 const normalizeRoleName = (role: string) =>
-  role
+  String(role ?? '')
     .replace(/^ROLE_/i, '')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
     .replace(/[\s-]+/g, '_')
     .toUpperCase();
 
 const getCurrentRoleFlags = (): RoleFlags => {
   const user = authStorage.getUser();
   const roles = (user?.roles ?? []).map((role: string) => normalizeRoleName(role));
-  const dashboard = String(user?.dashboard ?? '').toUpperCase();
+  const dashboard = normalizeRoleName(String(user?.dashboard ?? ''));
 
   return {
-    isHr: roles.includes('HR') || roles.includes('ADMIN') || dashboard.includes('HR'),
+    isHr:
+      roles.includes('HR') ||
+      roles.includes('ADMIN') ||
+      dashboard.includes('HR') ||
+      dashboard.includes('ADMIN'),
+
     isDepartmentHead:
       roles.includes('DEPARTMENT_HEAD') ||
       roles.includes('DEPARTMENTHEAD') ||
-      dashboard.includes('DEPARTMENT_HEAD'),
+      roles.includes('DEPT_HEAD') ||
+      roles.includes('HEAD_OF_DEPARTMENT') ||
+      dashboard.includes('DEPARTMENT_HEAD') ||
+      dashboard.includes('DEPARTMENTHEAD') ||
+      dashboard.includes('DEPT_HEAD'),
   };
 };
 
 const scoreBadgeClass = (label?: string) => {
   switch (label) {
     case 'Outstanding':
-      return 'border-emerald-300 bg-emerald-100 text-emerald-800';
+      return 'ast-score-outstanding';
     case 'Good':
-      return 'border-blue-300 bg-blue-100 text-blue-800';
+      return 'ast-score-good';
     case 'Meet Requirement':
-      return 'border-yellow-300 bg-yellow-100 text-yellow-800';
+      return 'ast-score-meet';
     case 'Need Improvement':
-      return 'border-orange-300 bg-orange-100 text-orange-800';
+      return 'ast-score-improve';
     case 'Unsatisfactory':
-      return 'border-red-300 bg-red-100 text-red-800';
+      return 'ast-score-bad';
     default:
-      return 'border-slate-300 bg-slate-100 text-slate-700';
+      return 'ast-score-default';
   }
 };
 
 const statusBadgeClass = (status?: string) => {
   switch (status) {
     case 'DRAFT':
-      return 'border-slate-200 bg-slate-50 text-slate-600';
+      return 'ast-status-draft';
     case 'SUBMITTED':
-      return 'border-violet-200 bg-violet-50 text-violet-700';
+      return 'ast-status-submitted';
     case 'PENDING_MANAGER':
-      return 'border-yellow-200 bg-yellow-50 text-yellow-800';
+      return 'ast-status-pending-manager';
     case 'PENDING_DEPARTMENT_HEAD':
-      return 'border-orange-200 bg-orange-50 text-orange-800';
+      return 'ast-status-pending-dept';
     case 'PENDING_HR':
-      return 'border-sky-200 bg-sky-50 text-sky-700';
+      return 'ast-status-pending-hr';
     case 'APPROVED':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      return 'ast-status-approved';
     case 'DECLINED':
     case 'REJECTED':
-      return 'border-red-200 bg-red-50 text-red-700';
+      return 'ast-status-declined';
     default:
-      return 'border-slate-200 bg-slate-50 text-slate-600';
+      return 'ast-status-default';
   }
 };
 
@@ -192,7 +203,7 @@ const SignatureSlot = ({
   name?: string | null;
   signedAt?: string | null;
 }) => (
-  <div className="appraisal-signature-slot">
+  <div className="appraisal-signature-slot ast-signature-slot">
     {imageData ? (
       <>
         <img
@@ -212,19 +223,17 @@ const SignatureSlot = ({
 const SignatureBadges = ({ row }: { row: AssessmentScoreRow }) => {
   const badges = [
     { label: 'Employee', signed: row.employeeSigned },
-      { label: 'Dept Head', signed: row.departmentHeadSigned },
+    { label: 'Dept Head', signed: row.departmentHeadSigned },
     { label: 'HR', signed: row.hrSigned },
   ];
 
   return (
-    <div className="flex min-w-[160px] flex-wrap gap-1.5">
+    <div className="ast-signature-badges">
       {badges.map((badge) => (
         <span
           key={badge.label}
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold ${
-            badge.signed
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-slate-200 bg-slate-50 text-slate-500'
+          className={`ast-signature-badge ${
+            badge.signed ? 'ast-signature-done' : 'ast-signature-pending'
           }`}
         >
           <i className={`bi ${badge.signed ? 'bi-check-circle-fill' : 'bi-clock'}`} />
@@ -251,7 +260,11 @@ const AssessmentDetailModal = ({
     : defaultScoreBands;
 
   const items = flattenItems(assessment);
-  const canDeptHeadSign = roleFlags.isDepartmentHead && ['PENDING_DEPARTMENT_HEAD', 'PENDING_MANAGER', 'SUBMITTED'].includes(assessment.status);
+
+  const canDeptHeadSign =
+    roleFlags.isDepartmentHead &&
+    ['PENDING_DEPARTMENT_HEAD', 'PENDING_MANAGER', 'SUBMITTED'].includes(assessment.status);
+
   const canHrAct = roleFlags.isHr && assessment.status === 'PENDING_HR';
 
   const [deptHeadComment, setDeptHeadComment] = useState('');
@@ -259,7 +272,9 @@ const AssessmentDetailModal = ({
   const [declineReason, setDeclineReason] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
-  const [submittingAction, setSubmittingAction] = useState<'dept-head' | 'approve' | 'decline' | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<
+    'dept-head' | 'approve' | 'decline' | null
+  >(null);
 
   const handleDeptHeadSign = async () => {
     if (!assessment.id) return;
@@ -333,26 +348,20 @@ const AssessmentDetailModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4">
-      <div className="w-full max-w-6xl rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+    <div className="ast-modal-backdrop">
+      <div className="ast-modal">
+        <div className="ast-modal-header">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Self-Assessment Details</h2>
-            <p className="text-sm text-slate-500">
-              Review the employee submission, signatures, comments, and workflow actions.
-            </p>
+            <h2>Self-Assessment Details</h2>
+            <p>Review the employee submission, signatures, comments, and workflow actions.</p>
           </div>
 
-          <button
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            type="button"
-            onClick={onClose}
-          >
+          <button className="ast-btn ast-btn-light" type="button" onClick={onClose}>
             Close
           </button>
         </div>
 
-        <div className="appraisal-page-shell" style={{ padding: 16 }}>
+        <div className="appraisal-page-shell ast-modal-body">
           <div className="appraisal-card appraisal-form-sheet">
             <div className="appraisal-template-banner">
               <h2>{assessment.formName || 'Employee Self-assessment Form'}</h2>
@@ -376,11 +385,13 @@ const AssessmentDetailModal = ({
                 <p><strong>Period:</strong> {assessment.period || '-'}</p>
                 <p>
                   <strong>Status:</strong>{' '}
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusBadgeClass(assessment.status)}`}>
+                  <span className={`ast-badge ${statusBadgeClass(assessment.status)}`}>
                     {assessment.status}
                   </span>
                 </p>
-                <p><strong>Score:</strong> {assessment.scorePercent ?? 0}% ({assessment.totalScore ?? 0}/{assessment.maxScore ?? 0})</p>
+                <p>
+                  <strong>Score:</strong> {assessment.scorePercent ?? 0}% ({assessment.totalScore ?? 0}/{assessment.maxScore ?? 0})
+                </p>
                 <p><strong>Performance:</strong> {assessment.performanceLabel || '-'}</p>
               </div>
             </div>
@@ -391,7 +402,7 @@ const AssessmentDetailModal = ({
                 <span className="appraisal-muted">{items.length} question(s)</span>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
+              <div className="ast-table-scroll">
                 <table className="self-assessment-table">
                   <thead>
                     <tr>
@@ -480,7 +491,7 @@ const AssessmentDetailModal = ({
               </div>
             </div>
 
-            <div className="appraisal-signature-grid self-assessment-signature-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(160px, 1fr))' }}>
+            <div className="appraisal-signature-grid self-assessment-signature-grid ast-final-signatures">
               <SignatureSlot
                 label="Signature of Employee & Date"
                 imageData={assessment.employeeSignatureImageData}
@@ -488,6 +499,7 @@ const AssessmentDetailModal = ({
                 name={assessment.employeeSignatureName || assessment.employeeName}
                 signedAt={assessment.employeeSignedAt || assessment.submittedAt}
               />
+
               <SignatureSlot
                 label="Signature of Dept. Head & Date"
                 imageData={assessment.departmentHeadSignatureImageData}
@@ -495,6 +507,7 @@ const AssessmentDetailModal = ({
                 name={assessment.departmentHeadSignatureName || assessment.departmentHeadName}
                 signedAt={assessment.departmentHeadSignedAt}
               />
+
               <SignatureSlot
                 label="Signature of HR & Date"
                 imageData={assessment.hrSignatureImageData}
@@ -505,18 +518,17 @@ const AssessmentDetailModal = ({
             </div>
 
             {(canDeptHeadSign || canHrAct) && (
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <h4 className="mb-4 text-base font-bold text-slate-900">Workflow Action</h4>
+              <div className="ast-action-panel">
+                <h4>Workflow Action</h4>
 
                 {canDeptHeadSign && (
-                  <div className="space-y-4">
-                    <label className="block text-sm font-semibold text-slate-700">
-                      Department head comment optional
+                  <div className="ast-action-stack">
+                    <label className="ast-field">
+                      <span>Department head comment optional</span>
                       <textarea
                         value={deptHeadComment}
                         onChange={(event) => setDeptHeadComment(event.target.value)}
                         rows={3}
-                        className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         placeholder="Add a comment before forwarding to HR..."
                       />
                     </label>
@@ -525,7 +537,7 @@ const AssessmentDetailModal = ({
                       type="button"
                       disabled={submittingAction !== null}
                       onClick={() => void handleDeptHeadSign()}
-                      className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+                      className="ast-btn ast-btn-primary"
                     >
                       {submittingAction === 'dept-head' ? 'Signing...' : 'Sign & Forward to HR'}
                     </button>
@@ -533,46 +545,46 @@ const AssessmentDetailModal = ({
                 )}
 
                 {canHrAct && (
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="space-y-4 rounded-2xl border border-emerald-200 bg-white p-4">
-                      <h5 className="font-bold text-emerald-800">Approve Assessment</h5>
-                      <label className="block text-sm font-semibold text-slate-700">
-                        HR comment optional
+                  <div className="ast-hr-grid">
+                    <div className="ast-approval-card ast-approve-card">
+                      <h5>Approve Assessment</h5>
+                      <label className="ast-field">
+                        <span>HR comment optional</span>
                         <textarea
                           value={hrComment}
                           onChange={(event) => setHrComment(event.target.value)}
                           rows={3}
-                          className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                           placeholder="Add final HR comment..."
                         />
                       </label>
+
                       <button
                         type="button"
                         disabled={submittingAction !== null}
                         onClick={() => void handleHrApprove()}
-                        className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
+                        className="ast-btn ast-btn-success"
                       >
                         {submittingAction === 'approve' ? 'Approving...' : 'Approve'}
                       </button>
                     </div>
 
-                    <div className="space-y-4 rounded-2xl border border-red-200 bg-white p-4">
-                      <h5 className="font-bold text-red-800">Decline Assessment</h5>
-                      <label className="block text-sm font-semibold text-slate-700">
-                        Decline reason required
+                    <div className="ast-approval-card ast-decline-card">
+                      <h5>Decline Assessment</h5>
+                      <label className="ast-field">
+                        <span>Decline reason required</span>
                         <textarea
                           value={declineReason}
                           onChange={(event) => setDeclineReason(event.target.value)}
                           rows={3}
-                          className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-100"
                           placeholder="Explain why this assessment is declined..."
                         />
                       </label>
+
                       <button
                         type="button"
                         disabled={submittingAction !== null}
                         onClick={() => void handleHrDecline()}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                        className="ast-btn ast-btn-danger"
                       >
                         {submittingAction === 'decline' ? 'Declining...' : 'Decline'}
                       </button>
@@ -580,16 +592,8 @@ const AssessmentDetailModal = ({
                   </div>
                 )}
 
-                {actionMessage && (
-                  <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-                    {actionMessage}
-                  </p>
-                )}
-                {actionError && (
-                  <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                    {actionError}
-                  </p>
-                )}
+                {actionMessage && <p className="ast-action-message success">{actionMessage}</p>}
+                {actionError && <p className="ast-action-message error">{actionError}</p>}
               </div>
             )}
 
@@ -641,8 +645,7 @@ const AssessmentScoreTablePage = () => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return rows.filter((row) => {
-      const matchesStatus =
-        statusFilter === 'ALL' || row.status === statusFilter;
+      const matchesStatus = statusFilter === 'ALL' || row.status === statusFilter;
 
       const matchesSearch =
         !normalizedSearch ||
@@ -705,7 +708,7 @@ const AssessmentScoreTablePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 p-6">
+    <div className="ast-page">
       {selectedAssessment && (
         <AssessmentDetailModal
           assessment={selectedAssessment}
@@ -715,188 +718,144 @@ const AssessmentScoreTablePage = () => {
         />
       )}
 
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 shadow-xl">
-          <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-center">
-            <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
-                <i className="bi bi-clipboard-data" />
-                Assessment Workflow
-              </p>
+      <div className="ast-container">
+        <div className="ast-hero">
+          <div>
+            <p className="ast-hero-pill">
+              <i className="bi bi-clipboard-data" />
+              Assessment Workflow
+            </p>
 
-              <h1 className="text-3xl font-bold text-white">
-                Employee Self-Assessment Scores
-              </h1>
+            <h1>Employee Self-Assessment Scores</h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-indigo-100">
-                Review self-assessments, manager remarks, department head signature, and HR final actions.
-              </p>
-            </div>
+            <p>
+              Review self-assessments, manager remarks, department head signature,
+              and HR final actions.
+            </p>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => void loadScoreTable()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 shadow-lg shadow-indigo-900/20 transition hover:-translate-y-0.5 hover:bg-indigo-50"
-            >
-              <i className={`bi bi-arrow-repeat ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+          <button type="button" onClick={() => void loadScoreTable()} className="ast-refresh-btn">
+            <i className={`bi bi-arrow-repeat ${loading ? 'ast-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+
+        <div className="ast-stat-grid">
+          <div className="ast-stat-card">
+            <span>Total Records</span>
+            <strong>{rows.length}</strong>
+          </div>
+
+          <div className="ast-stat-card">
+            <span>In Workflow</span>
+            <strong className="green">{activeRows.length}</strong>
+          </div>
+
+          <div className="ast-stat-card">
+            <span>Pending HR</span>
+            <strong className="blue">{pendingHrRows.length}</strong>
+          </div>
+
+          <div className="ast-stat-card">
+            <span>Top Score</span>
+            <strong className="purple">{topScore}%</strong>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Total Records</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{rows.length}</p>
+        <div className="ast-toolbar">
+          <div className="ast-search">
+            <i className="bi bi-search" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search employee, code, department, form, period, status, label..."
+            />
           </div>
 
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">In Workflow</p>
-            <p className="mt-2 text-3xl font-bold text-emerald-600">{activeRows.length}</p>
-          </div>
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as 'ALL' | AssessmentStatus)}
+          >
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
 
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Pending HR</p>
-            <p className="mt-2 text-3xl font-bold text-blue-600">{pendingHrRows.length}</p>
-          </div>
-
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Top Score</p>
-            <p className="mt-2 text-3xl font-bold text-purple-600">{topScore}%</p>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-white bg-white/90 p-5 shadow-sm backdrop-blur">
-          <div className="grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-center">
-            <div className="relative">
-              <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                placeholder="Search employee, code, department, form, period, status, label..."
-              />
-            </div>
-
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as 'ALL' | AssessmentStatus)}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-            >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-
-            <span className="rounded-full bg-indigo-50 px-4 py-2 text-center text-xs font-bold text-indigo-700">
-              Showing {filteredRows.length} of {rows.length}
-            </span>
-          </div>
+          <span className="ast-showing">
+            Showing {filteredRows.length} of {rows.length}
+          </span>
         </div>
 
         {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 shadow-sm">
-            <i className="bi bi-exclamation-triangle mr-2" />
+          <div className="ast-alert-error">
+            <i className="bi bi-exclamation-triangle" />
             {error}
           </div>
         )}
 
-        <div className="overflow-hidden rounded-3xl border border-white bg-white/90 shadow-sm backdrop-blur">
-          <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center">
+        <div className="ast-table-card">
+          <div className="ast-table-header">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Assessment Score Records
-              </h2>
-
-              <p className="text-sm text-slate-500">
-                Click View Details to review the employee's full self-assessment.
-              </p>
+              <h2>Assessment Score Records</h2>
+              <p>Click View Details to review the employee's full self-assessment.</p>
             </div>
 
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-              <span className="h-2 w-2 rounded-full bg-indigo-500" />
+            <span className="ast-view-pill">
+              <span />
               {pageLabel}
             </span>
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-sm text-slate-500">
-              <i className="bi bi-arrow-repeat mb-3 block animate-spin text-3xl text-indigo-600" />
+            <div className="ast-empty-state">
+              <i className="bi bi-arrow-repeat ast-spin" />
               Loading assessment scores...
             </div>
           ) : filteredRows.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-50 text-3xl text-indigo-600">
-                <i className="bi bi-clipboard-x" />
-              </div>
-
-              <h3 className="font-bold text-slate-900">No assessment scores found</h3>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Once employees submit self-assessments, their scores will appear here.
-              </p>
+            <div className="ast-empty-state">
+              <i className="bi bi-clipboard-x" />
+              <strong>No assessment scores found</strong>
+              <p>Once employees submit self-assessments, their scores will appear here.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
+            <div className="ast-table-scroll">
+              <table className="ast-table">
+                <thead>
                   <tr>
-                    <th className="px-6 py-4">Employee</th>
-                    <th className="px-6 py-4">Form</th>
-                    <th className="px-6 py-4">Department</th>
-                    <th className="px-6 py-4">Period</th>
-                    <th className="px-6 py-4">Score</th>
-                    <th className="px-6 py-4">Performance</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Signatures</th>
-                    <th className="px-6 py-4">Submitted</th>
-                    <th className="px-6 py-4 text-right">Action</th>
+                    <th>Employee</th>
+                    <th>Form</th>
+                    <th>Department</th>
+                    <th>Period</th>
+                    <th>Score</th>
+                    <th>Performance</th>
+                    <th>Status</th>
+                    <th>Signatures</th>
+                    <th>Submitted</th>
+                    <th className="right">Action</th>
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100">
+                <tbody>
                   {filteredRows.map((row) => (
-                    <tr
-                      key={`${row.id}-${row.employeeId ?? row.employeeCode ?? row.employeeName}`}
-                      className="transition hover:bg-indigo-50/40"
-                    >
-                      <td className="px-6 py-5">
-                        <div className="font-bold text-slate-900">
-                          {row.employeeName || 'Unknown Employee'}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {row.employeeCode || 'No employee code'}
-                        </div>
+                    <tr key={`${row.id}-${row.employeeId ?? row.employeeCode ?? row.employeeName}`}>
+                      <td>
+                        <strong>{row.employeeName || 'Unknown Employee'}</strong>
+                        <small>{row.employeeCode || 'No employee code'}</small>
                       </td>
 
-                      <td className="px-6 py-5 text-slate-600">
-                        {row.formName || '-'}
-                      </td>
+                      <td>{row.formName || '-'}</td>
+                      <td>{row.departmentName || 'No department'}</td>
+                      <td><strong>{row.period || '—'}</strong></td>
 
-                      <td className="px-6 py-5 text-slate-600">
-                        {row.departmentName || 'No department'}
-                      </td>
-
-                      <td className="px-6 py-5 font-medium text-slate-700">
-                        {row.period || '—'}
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <div className="min-w-[140px]">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-bold text-slate-900">
-                              {row.scorePercent ?? 0}%
-                            </span>
-
-                            <span className="text-xs text-slate-500">
-                              {row.totalScore ?? 0}/{row.maxScore ?? 0}
-                            </span>
+                      <td>
+                        <div className="ast-score-cell">
+                          <div>
+                            <strong>{row.scorePercent ?? 0}%</strong>
+                            <span>{row.totalScore ?? 0}/{row.maxScore ?? 0}</span>
                           </div>
 
-                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-indigo-600"
+                          <div className="ast-progress">
+                            <span
                               style={{
                                 width: `${Math.min(Number(row.scorePercent || 0), 100)}%`,
                               }}
@@ -905,40 +864,30 @@ const AssessmentScoreTablePage = () => {
                         </div>
                       </td>
 
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${scoreBadgeClass(
-                            row.performanceLabel,
-                          )}`}
-                        >
+                      <td>
+                        <span className={`ast-badge ${scoreBadgeClass(row.performanceLabel)}`}>
                           {row.performanceLabel || 'Not scored'}
                         </span>
                       </td>
 
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusBadgeClass(
-                            row.status,
-                          )}`}
-                        >
+                      <td>
+                        <span className={`ast-badge ${statusBadgeClass(row.status)}`}>
                           {row.status || '—'}
                         </span>
                       </td>
 
-                      <td className="px-6 py-5">
+                      <td>
                         <SignatureBadges row={row} />
                       </td>
 
-                      <td className="px-6 py-5 text-xs text-slate-500">
-                        {formatDateTime(row.submittedAt)}
-                      </td>
+                      <td className="muted-small">{formatDateTime(row.submittedAt)}</td>
 
-                      <td className="px-6 py-5 text-right">
+                      <td className="right">
                         <button
                           type="button"
                           disabled={detailLoadingId === row.id}
                           onClick={() => void openDetails(row)}
-                          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+                          className="ast-btn ast-btn-primary ast-btn-small"
                         >
                           {detailLoadingId === row.id ? 'Opening...' : 'View Details'}
                         </button>
@@ -951,7 +900,9 @@ const AssessmentScoreTablePage = () => {
           )}
         </div>
 
-        <p className="text-right text-xs text-slate-500">Average active workflow score: {averageScore}%</p>
+        <p className="ast-average-note">
+          Average active workflow score: {averageScore}%
+        </p>
       </div>
     </div>
   );
