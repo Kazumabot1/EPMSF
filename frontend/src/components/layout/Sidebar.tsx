@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
+import SidebarCompanyLogo from './SidebarCompanyLogo';
 
 type SidebarProps = {
   collapsed: boolean;
@@ -265,7 +266,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="hr-sidebar-top">
         <div className="hr-brand">
-          <div className="hr-brand-mark">E</div>
+          <SidebarCompanyLogo />
 
           {!collapsed && (
             <div className="hr-brand-copy">

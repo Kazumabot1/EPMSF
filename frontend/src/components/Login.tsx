@@ -35,6 +35,7 @@ const isStrongPassword = (password: string) =>
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -277,7 +278,7 @@ function Login() {
             <input
               id="password"
               className="login-input"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="Password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -285,9 +286,13 @@ function Login() {
             />
 
             <div className="login-form-actions">
-              <label className="remember-wrap">
-                <input type="checkbox" />
-                <span>Remember me</span>
+              <label className="show-password-wrap">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={(event) => setShowPassword(event.target.checked)}
+                />
+                <span>Show password</span>
               </label>
 
               <button type="button" className="forgot-link" onClick={openForgotModal}>

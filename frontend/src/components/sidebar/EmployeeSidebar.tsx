@@ -441,6 +441,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { roleNavigation } from '../../config/roleNavigation';
 import type { NavItem, UserRole } from '../../config/roleNavigation';
+import SidebarCompanyLogo from '../layout/SidebarCompanyLogo';
 
 interface EmployeeSidebarProps {
   role?: UserRole;
@@ -506,9 +507,7 @@ const EmployeeSidebar = ({
     <aside className={`employee-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="employee-sidebar-top">
         <div className="employee-brand">
-          <div className="employee-brand-mark">
-            <i className="bi bi-lightning-charge-fill" />
-          </div>
+          <SidebarCompanyLogo />
 
           {!collapsed && (
             <div className="employee-brand-copy">

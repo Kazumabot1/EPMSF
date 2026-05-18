@@ -275,18 +275,21 @@
   margin-top: 2px;
 }
 
-.remember-wrap {
+.show-password-wrap {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: #8d93a4;
   font-size: 12px;
+  cursor: pointer;
+  user-select: none;
 }
 
-.remember-wrap input {
+.show-password-wrap input {
   width: 14px;
   height: 14px;
   accent-color: #7a5be3;
+  cursor: pointer;
 }
 
 .forgot-password-link {
