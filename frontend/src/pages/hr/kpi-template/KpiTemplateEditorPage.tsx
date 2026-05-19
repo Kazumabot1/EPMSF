@@ -288,47 +288,33 @@ const KpiTemplateEditorPage = () => {
           className="space-y-8"
           onSubmit={handleUseFormSubmit}
         >
-          <section className="kpi-tpl-card p-6 sm:p-8">
-            <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
-                <i className="bi bi-info-circle text-xl" aria-hidden />
-              </span>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Basics</h2>
-                <p className="mt-0.5 text-sm text-gray-500">Template title and position assignment</p>
+          <section className="kpi-tpl-card overflow-hidden p-0">
+            <div className="p-6 sm:p-8">
+              <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
+                  <i className="bi bi-info-circle text-xl" aria-hidden />
+                </span>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Basics</h2>
+                  <p className="mt-0.5 text-sm text-gray-500">Template title and position assignment</p>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+                <label className="flex flex-col gap-2">
+                  <FieldLabel>Title</FieldLabel>
+                  <input
+                    required
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="e.g. Sales Manager KPIs"
+                    className={fieldClass}
+                  />
+                </label>
+
               <label className="flex flex-col gap-2">
-                <FieldLabel>Title</FieldLabel>
-                <input
-                  required
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="e.g. Sales Manager KPIs"
-                  className={fieldClass}
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="kpi-tpl-card p-6 sm:p-8">
-            <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100">
-                <i className="bi bi-briefcase text-xl" aria-hidden />
-              </span>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Position</h2>
-                <p className="mt-0.5 text-sm text-gray-500">
-                  One KPI template per position. Positions that already have a template are disabled when creating.
-                </p>
-              </div>
-            </div>
-
-            <label className="flex max-w-md flex-col gap-2">
-              <FieldLabel>Position</FieldLabel>
-              <div className="relative">
+                <FieldLabel>Position</FieldLabel>
+                <div className="relative">
                   <i className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
                   <select
                     required
@@ -354,35 +340,35 @@ const KpiTemplateEditorPage = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+                {positions.length > 0 && (
+                  <p className="text-sm text-gray-500">
+                    {!isEdit
+                      ? `${availablePositionCount} of ${positions.length} position${positions.length === 1 ? '' : 's'} available for a new KPI template.`
+                      : `${positions.length} position${positions.length === 1 ? '' : 's'} in the organization.`}
+                  </p>
+                )}
+                {positions.length === 0 && (
+                  <p className="text-sm text-amber-700">
+                    No positions found.{' '}
+                    <Link to="/hr/position/table" className="font-semibold underline">
+                      Create positions
+                    </Link>{' '}
+                    before linking a KPI template.
+                  </p>
+                )}
+                {!isEdit && existingTemplate && (
+                  <KpiPositionExistingAlert
+                    templateTitle={existingTemplate.templateTitle}
+                    onEdit={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}/edit`)}
+                    onView={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}`)}
+                  />
+                )}
+              </label>
               </div>
-              {positions.length > 0 && (
-                <p className="text-sm text-gray-500">
-                  {!isEdit
-                    ? `${availablePositionCount} of ${positions.length} position${positions.length === 1 ? '' : 's'} available for a new KPI template.`
-                    : `${positions.length} position${positions.length === 1 ? '' : 's'} in the organization.`}
-                </p>
-              )}
-              {positions.length === 0 && (
-                <p className="text-sm text-amber-700">
-                  No positions found.{' '}
-                  <Link to="/hr/position/table" className="font-semibold underline">
-                    Create positions
-                  </Link>{' '}
-                  before linking a KPI template.
-                </p>
-              )}
-              {!isEdit && existingTemplate && (
-                <KpiPositionExistingAlert
-                  templateTitle={existingTemplate.templateTitle}
-                  onEdit={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}/edit`)}
-                  onView={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}`)}
-                />
-              )}
-            </label>
-          </section>
+            </div>
 
-          <section className="kpi-tpl-card overflow-hidden p-0">
-            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-6 py-6 sm:px-8">
+            <div className="flex flex-wrap items-end justify-between gap-4 border-y border-gray-100 bg-gradient-to-r from-gray-50 to-white px-6 py-6 sm:px-8">
               <div className="flex items-start gap-4">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
                   <i className="bi bi-table text-xl" aria-hidden />
@@ -394,7 +380,7 @@ const KpiTemplateEditorPage = () => {
                   </p>
                 </div>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 text-right shadow-sm">
+              <div className="text-right">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Total weight</p>
                 <p
                   className={`text-3xl font-bold tabular-nums tracking-tight ${

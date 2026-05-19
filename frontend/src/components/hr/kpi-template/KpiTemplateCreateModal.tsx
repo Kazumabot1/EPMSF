@@ -440,47 +440,47 @@ function MotionlessModalShell(props: ShellProps) {
                 className={fieldClass}
               />
             </label>
-          </div>
 
-          <label className="kpi-tpl-modal-positions">
-            <p>Position</p>
-            <select
-              required
-              value={positionId ?? ''}
-              disabled={isView || isSubmitting}
-              onChange={(event) => {
-                const next = event.target.value ? Number(event.target.value) : null;
-                void onPositionChange(next != null && Number.isNaN(next) ? null : next);
-              }}
-              className={`${fieldClass} cursor-pointer`}
-            >
-              <option value="">
-                {positionsCount === 0
-                  ? 'No positions in system'
-                  : availablePositionCount === 0
-                    ? 'All positions already have a KPI form'
-                    : 'Select position...'}
-              </option>
-              {positionOptions.map((option) => (
-                <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
-                  {option.label}
+            <label className="kpi-tpl-modal-positions">
+              <p>Position</p>
+              <select
+                required
+                value={positionId ?? ''}
+                disabled={isView || isSubmitting}
+                onChange={(event) => {
+                  const next = event.target.value ? Number(event.target.value) : null;
+                  void onPositionChange(next != null && Number.isNaN(next) ? null : next);
+                }}
+                className={`${fieldClass} cursor-pointer`}
+              >
+                <option value="">
+                  {positionsCount === 0
+                    ? 'No positions in system'
+                    : availablePositionCount === 0
+                      ? 'All positions already have a KPI form'
+                      : 'Select position...'}
                 </option>
-              ))}
-            </select>
-            {positionsCount > 0 && isCreate && (
-              <p className="mt-2 text-sm text-gray-500">
-                {availablePositionCount} of {positionsCount} position
-                {positionsCount === 1 ? '' : 's'} available for a new KPI form.
-              </p>
-            )}
-            {isCreate && existingTemplate && (
-              <KpiPositionExistingAlert
-                templateTitle={existingTemplate.templateTitle}
-                onEdit={() => onOpenExistingTemplate(existingTemplate, 'edit')}
-                onView={() => onOpenExistingTemplate(existingTemplate, 'view')}
-              />
-            )}
-          </label>
+                {positionOptions.map((option) => (
+                  <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {positionsCount > 0 && isCreate && (
+                <p className="mt-2 text-sm text-gray-500">
+                  {availablePositionCount} of {positionsCount} position
+                  {positionsCount === 1 ? '' : 's'} available for a new KPI form.
+                </p>
+              )}
+              {isCreate && existingTemplate && (
+                <KpiPositionExistingAlert
+                  templateTitle={existingTemplate.templateTitle}
+                  onEdit={() => onOpenExistingTemplate(existingTemplate, 'edit')}
+                  onView={() => onOpenExistingTemplate(existingTemplate, 'view')}
+                />
+              )}
+            </label>
+          </div>
 
           <KpiTemplateRowsTable
             rows={rows}
