@@ -47,6 +47,7 @@ public final class AssessmentFormDtos {
         private LocalDate startDate;
         private LocalDate endDate;
         private List<String> targetRoles = new ArrayList<>();
+        private List<Integer> targetDepartmentIds = new ArrayList<>();
         private List<AssessmentSectionPayload> sections = new ArrayList<>();
         private List<AssessmentScoreBandPayload> scoreBands = new ArrayList<>();
     }
@@ -88,6 +89,7 @@ public final class AssessmentFormDtos {
         private LocalDate endDate;
         private Boolean isActive;
         private List<String> targetRoles = new ArrayList<>();
+        private List<Integer> targetDepartmentIds = new ArrayList<>();
         private Date createdAt;
         private Date updatedAt;
         private List<AssessmentSectionResponse> sections = new ArrayList<>();

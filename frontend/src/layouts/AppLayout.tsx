@@ -30,7 +30,11 @@ const AppLayout = () => {
         onToggleCollapse={() => setCollapsed((prev) => !prev)}
       />
 
-      <RoleBasedHeader role={role} collapsed={collapsed} user={user} />
+      <RoleBasedHeader
+        role={role}
+        collapsed={collapsed}
+        user={user}
+      />
 
       {usesHrShell ? (
         <main className={`hr-content ${collapsed ? 'collapsed' : ''}`}>

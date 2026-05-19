@@ -118,12 +118,12 @@ const normalizeAssessment = (payload: any): EmployeeAssessment | null => {
           item.sectionTitle ?? section.title ?? `Section ${sectionIndex + 1}`,
         questionText: item.questionText ?? item.text ?? item.title ?? '',
         itemOrder: item.itemOrder ?? item.orderNo ?? itemIndex + 1,
-        responseType: item.responseType ?? 'YES_NO_RATING',
+        responseType: 'YES_NO_RATING',
         isRequired: item.isRequired ?? true,
-        weight: Number(item.weight ?? 1),
+        weight: 1,
         rating: item.rating ?? null,
         maxRating: item.maxRating ?? 5,
-        comment: item.comment ?? item.answerText ?? item.textAnswer ?? '',
+        comment: '',
         yesNoAnswer: item.yesNoAnswer ?? item.booleanAnswer ?? null,
       })),
     };
@@ -274,6 +274,17 @@ const isMissingDraft = (error: any) => {
   return status === 404 || status === 204;
 };
 
+
+const normalizeRequestPayload = (payload: AssessmentRequest): AssessmentRequest => ({
+  ...payload,
+  items: (payload.items ?? []).map((item) => ({
+    ...item,
+    responseType: 'YES_NO_RATING',
+    weight: 1,
+    comment: '',
+  })),
+});
+
 export const employeeAssessmentService = {
   async template(): Promise<EmployeeAssessment | null> {
     const response = await api.get('/employee-assessments/template');
@@ -344,9 +355,11 @@ export const employeeAssessmentService = {
     payload: AssessmentRequest,
     assessmentId?: number | null,
   ): Promise<EmployeeAssessment> {
+    const normalizedPayload = normalizeRequestPayload(payload);
+
     const response = assessmentId
-      ? await api.put(`/employee-assessments/${assessmentId}`, payload)
-      : await api.post('/employee-assessments', payload);
+      ? await api.put(`/employee-assessments/${assessmentId}`, normalizedPayload)
+      : await api.post('/employee-assessments', normalizedPayload);
 
     return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
   },
@@ -362,13 +375,13 @@ export const employeeAssessmentService = {
 
       const response = await api.post(
         `/employee-assessments/${payloadOrId}/submit`,
-        maybePayload,
+        normalizeRequestPayload(maybePayload),
       );
 
       return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
     }
 
-    const payload = payloadOrId;
+    const payload = normalizeRequestPayload(payloadOrId);
     const savedDraft = await this.saveDraft(payload, null);
 
     if (!savedDraft?.id) {
