@@ -139,6 +139,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Categories', path: '/hr/performance-kpi/category', icon: 'bi-tags' },
         { label: 'KPI Items', path: '/hr/performance-kpi/item', icon: 'bi-card-checklist' },
         { label: 'KPI Templates', path: '/hr/kpi-template', icon: 'bi-ui-checks-grid' },
+        { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
       ],
     },
   ],
@@ -238,6 +239,7 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
 
   const normalizedRoles = (user.roles ?? []).map(normalizeRoleName);
   const dashboard = normalizeRoleName(user.dashboard ?? '');
+  const normalizedPosition = normalizeRoleName(user.position ?? '');
 
   if (normalizedRoles.includes('ADMIN') || dashboard === 'ADMIN_DASHBOARD') {
     return 'Admin';
@@ -255,7 +257,12 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
     return 'DepartmentHead';
   }
 
-  if (normalizedRoles.includes('HR') || dashboard === 'HR_DASHBOARD') {
+  if (
+    normalizedRoles.includes('HR') ||
+    dashboard === 'HR_DASHBOARD' ||
+    normalizedPosition.includes('HR') ||
+    normalizedPosition.includes('HUMAN_RESOURCE')
+  ) {
     return 'HR';
   }
 

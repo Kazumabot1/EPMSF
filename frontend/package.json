@@ -14,7 +14,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@stomp/stompjs": "^7.3.0",
     "@tanstack/react-query": "^5.100.10",
-    "axios": "^1.15.2",
+    "axios": "^1.16.1",
     "bootstrap-icons": "^1.13.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

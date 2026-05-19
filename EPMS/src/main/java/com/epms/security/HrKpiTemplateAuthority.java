@@ -81,8 +81,8 @@ public final class HrKpiTemplateAuthority {
         }
 
         if (principal instanceof UserPrincipal userPrincipal) {
-            String dashboard = userPrincipal.getDashboard();
-            if (dashboard != null && HR_DASHBOARDS.contains(dashboard)) {
+            String dashboard = normalizeAuthorityName(userPrincipal.getDashboard());
+            if (!dashboard.isBlank() && HR_DASHBOARDS.contains(dashboard)) {
                 return true;
             }
 
@@ -127,7 +127,7 @@ public final class HrKpiTemplateAuthority {
         }
 
         if (principal instanceof UserPrincipal userPrincipal) {
-            String dashboard = userPrincipal.getDashboard();
+            String dashboard = normalizeAuthorityName(userPrincipal.getDashboard());
             if ("HR_DASHBOARD".equals(dashboard) || "ADMIN_DASHBOARD".equals(dashboard)) {
                 return true;
             }
@@ -205,6 +205,7 @@ public final class HrKpiTemplateAuthority {
         return value
                 .replaceFirst("(?i)^ROLE_", "")
                 .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
                 .replaceAll("[^A-Za-z0-9]+", "_")
                 .replaceAll("^_+|_+$", "")
                 .toUpperCase();

@@ -26,8 +26,8 @@ export interface KpiTemplateItem {
 export interface KpiTemplateResponse {
   id: number;
   title: string;
-  startDate: string;
-  endDate: string;
+  startDate?: string | null;
+  endDate?: string | null;
   status: KpiFormStatus;
   version: number;
   createdAt: string | null;
@@ -40,8 +40,6 @@ export interface KpiTemplateResponse {
 
 export interface KpiTemplateRequest {
   title: string;
-  startDate: string;
-  endDate: string;
   status: KpiFormStatus;
   positionIds: number[];
   items: KpiTemplateItem[];

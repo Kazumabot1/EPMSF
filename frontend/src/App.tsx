@@ -51,6 +51,8 @@ import KpiItemPage from './pages/hr/performance-kpi/item/KpiItemPage';
 import KpiTemplateDetailPage from './pages/hr/kpi-template/KpiTemplateDetailPage';
 import KpiTemplateEditorPage from './pages/hr/kpi-template/KpiTemplateEditorPage';
 import KpiTemplateListPage from './pages/hr/kpi-template/KpiTemplateListPage';
+import KpiTemplateCycleListPage from './pages/hr/kpi-template/KpiTemplateCycleListPage';
+import KpiTemplateCycleEditorPage from './pages/hr/kpi-template/KpiTemplateCycleEditorPage';
 import HrEmployeeKpiListPage from './pages/hr/kpi-template/HrEmployeeKpiListPage';
 
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
@@ -204,7 +206,7 @@ function App() {
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['HR']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['HR', 'Admin']} />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Home />} />
@@ -246,11 +248,18 @@ function App() {
               <Route path="/hr/performance-kpi/unit" element={<KpiUnitPage />} />
               <Route path="/hr/performance-kpi/category" element={<KpiCategoryPage />} />
               <Route path="/hr/performance-kpi/item" element={<KpiItemPage />} />
+              <Route
+                path="/hr/performance-kpi/form"
+                element={<Navigate to="/hr/kpi-template" replace />}
+              />
 
               <Route path="/hr/kpi-template/new" element={<KpiTemplateEditorPage />} />
               <Route path="/hr/kpi-template/:id/edit" element={<KpiTemplateEditorPage />} />
               <Route path="/hr/kpi-template/:id" element={<KpiTemplateDetailPage />} />
               <Route path="/hr/kpi-template" element={<KpiTemplateListPage />} />
+              <Route path="/hr/kpi-template-cycle/new" element={<KpiTemplateCycleEditorPage />} />
+              <Route path="/hr/kpi-template-cycle/:id/edit" element={<KpiTemplateCycleEditorPage />} />
+              <Route path="/hr/kpi-template-cycle" element={<KpiTemplateCycleListPage />} />
               <Route path="/hr/employee-kpis" element={<HrEmployeeKpiListPage />} />
             </Route>
           </Route>

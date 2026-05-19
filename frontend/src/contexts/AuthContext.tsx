@@ -7,7 +7,9 @@ import React, {
 } from 'react';
 import type { ReactNode } from 'react';
 import api from '../services/api';
+import { isBackendUnreachableStatus } from '../services/apiError';
 import { authStorage } from '../services/authStorage';
+import { isAxiosError } from 'axios';
 import type { AuthResponse } from '../types/auth';
 
 interface User {
@@ -88,6 +90,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('epmsUser', JSON.stringify(currentUser));
       setUser(currentUser);
     } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      // Keep the session when the API is down (Vite proxy 502); only clear on auth failures.
+      if (status === 401 || status === 403) {
+        authStorage.clearSession();
+        setUser(null);
+        return;
+      }
+      if (isBackendUnreachableStatus(status)) {
+        const cached = localStorage.getItem('epmsUser');
+        if (cached) {
+          try {
+            setUser(normalizeUser(JSON.parse(cached)));
+          } catch {
+            setUser(null);
+          }
+        }
+        return;
+      }
       authStorage.clearSession();
       setUser(null);
     }

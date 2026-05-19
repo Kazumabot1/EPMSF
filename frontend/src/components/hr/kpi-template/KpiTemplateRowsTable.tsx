@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { KpiCategory } from '../../../types/kpiCategory';
 import type { KpiItem } from '../../../types/kpiItem';
 import type { KpiTemplateRowDraft } from '../../../types/kpiTemplate';
@@ -19,8 +20,45 @@ const cellInput =
   'kpi-tpl-input min-h-[38px] w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
 
 const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemoveRow, onRowChange, readOnly = false }: Props) => {
+  const totalWeight = rows.reduce((sum, row) => sum + (row.weight ?? 0), 0);
+  const masterDataMissing = categories.length === 0 || units.length === 0;
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-900/[0.03]">
+      {masterDataMissing && !readOnly && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Master data required for KPI rows</p>
+          <p className="mt-1 text-amber-800/90">
+            {categories.length === 0 && (
+              <>
+                Add categories in{' '}
+                <Link to="/hr/performance-kpi/category" className="font-semibold underline">
+                  KPI Categories
+                </Link>
+                .{' '}
+              </>
+            )}
+            {units.length === 0 && (
+              <>
+                Add units in{' '}
+                <Link to="/hr/performance-kpi/unit" className="font-semibold underline">
+                  KPI Units
+                </Link>
+                .{' '}
+              </>
+            )}
+            {items.length === 0 && (
+              <>
+                Optional catalog items:{' '}
+                <Link to="/hr/performance-kpi/item" className="font-semibold underline">
+                  KPI Items
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="min-w-[980px] w-full border-collapse text-left text-sm">
           <thead className="kpi-tpl-thead">
@@ -170,6 +208,24 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+              <td colSpan={5} className="px-3 py-3 text-right text-xs uppercase tracking-wide text-gray-600">
+                Total weight
+              </td>
+              <td
+                className={`px-3 py-3 tabular-nums ${
+                  totalWeight !== 100 ? 'text-amber-700' : 'text-gray-900'
+                }`}
+              >
+                {totalWeight}%
+              </td>
+              <td colSpan={2} className="bg-violet-50/60 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-violet-700/85">
+                Total score (PM)
+              </td>
+              <td className="w-12" />
+            </tr>
+          </tfoot>
         </table>
       </div>
 

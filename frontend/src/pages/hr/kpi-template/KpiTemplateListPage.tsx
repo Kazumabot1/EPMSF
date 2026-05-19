@@ -1,30 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
-import { kpiStatusBadgeClass } from '../../../components/hr/kpi-template/kpiTemplateUi';
-import KpiTemplateCreateModal from '../../../components/hr/kpi-template/KpiTemplateCreateModal';
-import UseKpiDepartmentModal from '../../../components/hr/kpi-template/UseKpiDepartmentModal';
+import {
+  formatTemplatePositionLabels,
+  kpiStatusBadgeClass,
+  sumTemplateItemWeights,
+} from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
 import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
 
-const canUseTemplate = (status: string | undefined) => status === 'ACTIVE' || status === 'FINALIZED';
-
-const formatDate = (value: string | null) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-};
-
 const KpiTemplateListPage = () => {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<KpiTemplateResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'view' | 'edit'>('create');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
-  const [useKpiOpen, setUseKpiOpen] = useState(false);
-  const [useKpiTemplate, setUseKpiTemplate] = useState<{ id: number; title: string } | null>(null);
+  const [query, setQuery] = useState('');
 
   const load = async () => {
     try {
@@ -45,10 +36,17 @@ const KpiTemplateListPage = () => {
     void load();
   }, []);
 
-  const sorted = useMemo(
-    () => [...templates].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')),
-    [templates],
-  );
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = [...templates].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+    if (!q) {
+      return list;
+    }
+    return list.filter((template) => {
+      const positionText = formatTemplatePositionLabels(template.positions).toLowerCase();
+      return template.title.toLowerCase().includes(q) || positionText.includes(q);
+    });
+  }, [query, templates]);
 
   const handleDelete = async (id: number, title: string) => {
     if (!window.confirm(`Delete KPI template "${title}"?`)) {
@@ -63,36 +61,11 @@ const KpiTemplateListPage = () => {
     }
   };
 
-  const openCreate = () => {
-    setModalMode('create');
-    setSelectedTemplateId(null);
-    setCreateOpen(true);
-  };
-
-  const openView = (id: number) => {
-    setModalMode('view');
-    setSelectedTemplateId(id);
-    setCreateOpen(true);
-  };
-
-  const openEdit = (id: number) => {
-    setModalMode('edit');
-    setSelectedTemplateId(id);
-    setCreateOpen(true);
-  };
-
-  const openUseKpi = (template: KpiTemplateResponse) => {
-    setUseKpiTemplate({ id: template.id, title: template.title });
-    setUseKpiOpen(true);
-  };
-
   return (
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
         <header className="kpi-tpl-card--hero relative overflow-hidden p-6 sm:p-8 lg:p-10">
           <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-16 left-1/4 h-56 w-56 rounded-full bg-indigo-400/10 blur-3xl" />
-
           <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex max-w-2xl gap-5">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-violet-800 text-3xl text-white shadow-lg shadow-violet-900/25 ring-4 ring-violet-500/15">
@@ -106,8 +79,8 @@ const KpiTemplateListPage = () => {
                   KPI templates
                 </h1>
                 <p className="mt-3 text-sm leading-relaxed text-gray-600">
-                  Define reusable KPI structures by position. Weights must sum to{' '}
-                  <strong className="font-semibold text-gray-900">100%</strong> before going ACTIVE or FINALIZED.
+                  Define KPI rows per position (KPI, category, target, unit, weight). Managers enter actuals and
+                  scores later; employees view completed forms.
                 </p>
               </div>
             </div>
@@ -117,10 +90,10 @@ const KpiTemplateListPage = () => {
                 <i className="bi bi-arrow-clockwise text-base text-gray-500" aria-hidden />
                 Refresh
               </button>
-              <button type="button" onClick={openCreate} className="kpi-tpl-btn-primary">
+              <a href="/hr/kpi-template/new" className="kpi-tpl-btn-primary no-underline">
                 <i className="bi bi-plus-lg text-lg" aria-hidden />
                 New template
-              </button>
+              </a>
             </div>
           </div>
 
@@ -130,7 +103,7 @@ const KpiTemplateListPage = () => {
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-700">
                   <i className="bi bi-stack" aria-hidden />
                 </span>
-                <span className="tabular-nums text-gray-900">{sorted.length}</span>
+                <span className="tabular-nums text-gray-900">{filtered.length}</span>
                 <span className="font-medium text-gray-500">templates</span>
               </div>
             </div>
@@ -138,6 +111,19 @@ const KpiTemplateListPage = () => {
         </header>
 
         <section className="mt-10">
+          {!loading && !error && templates.length > 0 && (
+            <div className="mb-4">
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search by title or position…"
+                className="kpi-tpl-input w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm"
+                aria-label="Search templates"
+              />
+            </div>
+          )}
+
           {loading && (
             <div className="kpi-tpl-card p-12 sm:p-16">
               <div className="flex flex-col items-center justify-center gap-5 py-6">
@@ -149,9 +135,6 @@ const KpiTemplateListPage = () => {
 
           {error && !loading && (
             <div className="kpi-tpl-card border-red-200 bg-red-50/80 p-10 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-600">
-                <i className="bi bi-exclamation-triangle text-2xl" aria-hidden />
-              </div>
               <p className="font-semibold text-red-900">{error}</p>
               <button
                 type="button"
@@ -163,110 +146,101 @@ const KpiTemplateListPage = () => {
             </div>
           )}
 
-          {!loading && !error && sorted.length === 0 && (
+          {!loading && !error && filtered.length === 0 && (
             <div className="kpi-tpl-card px-6 py-16 text-center sm:px-12 sm:py-20">
-              <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-100 to-gray-100 text-5xl text-violet-400 shadow-inner ring-1 ring-violet-200/60">
-                <i className="bi bi-inboxes" aria-hidden />
-              </div>
-              <h2 className="text-xl font-bold tracking-tight text-gray-900">No templates yet</h2>
+              <h2 className="text-xl font-bold tracking-tight text-gray-900">
+                {templates.length === 0 ? 'No templates yet' : 'No matching templates'}
+              </h2>
               <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-gray-600">
-                Create your first KPI template to attach metrics to job positions and kick off PM assignments later.
+                {templates.length === 0
+                  ? 'Create a KPI template and link it to a position. One template per position.'
+                  : 'Try a different search term.'}
               </p>
-              <button type="button" onClick={openCreate} className="kpi-tpl-btn-primary mt-8 inline-flex">
-                <i className="bi bi-plus-circle text-lg" aria-hidden />
-                Create template
-              </button>
+              {templates.length === 0 && (
+                <a href="/hr/kpi-template/new" className="kpi-tpl-btn-primary mt-8 inline-flex no-underline">
+                  <i className="bi bi-plus-circle text-lg" aria-hidden />
+                  Create template
+                </a>
+              )}
             </div>
           )}
 
-          {!loading && !error && sorted.length > 0 && (
+          {!loading && !error && filtered.length > 0 && (
             <div className="kpi-tpl-card overflow-hidden p-0">
               <div className="kpi-tpl-table-wrap">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[760px] w-full border-collapse text-left text-sm">
+                  <table className="min-w-[900px] w-full border-collapse text-left text-sm">
                     <thead className="kpi-tpl-thead">
                       <tr className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                         <th className="px-5 py-4">Template</th>
-                        <th className="px-5 py-4">Period</th>
+                        <th className="px-5 py-4">Position</th>
+                        <th className="px-5 py-4 text-center">KPIs</th>
+                        <th className="px-5 py-4 text-right">Weight</th>
                         <th className="px-5 py-4">Status</th>
                         <th className="px-5 py-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {sorted.map((template) => (
-                        <tr key={template.id} className="transition-colors hover:bg-violet-50/50">
-                          <td className="px-5 py-4">
-                            <div className="flex items-start gap-3">
-                              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-violet-700 ring-1 ring-gray-200/80">
-                                <i className="bi bi-file-earmark-text text-lg" aria-hidden />
+                      {filtered.map((template) => {
+                        const totalWeight = sumTemplateItemWeights(template.items);
+                        return (
+                          <tr key={template.id} className="transition-colors hover:bg-violet-50/50">
+                            <td className="px-5 py-4">
+                              <p className="font-semibold text-gray-900">{template.title}</p>
+                              <p className="mt-0.5 text-xs text-gray-500">Version {template.version ?? 1}</p>
+                            </td>
+                            <td className="max-w-[220px] px-5 py-4 text-gray-700">
+                              {formatTemplatePositionLabels(template.positions)}
+                            </td>
+                            <td className="px-5 py-4 text-center tabular-nums text-gray-800">
+                              {template.items.length}
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <span
+                                className={`tabular-nums font-semibold ${
+                                  totalWeight !== 100 ? 'text-amber-700' : 'text-gray-900'
+                                }`}
+                              >
+                                {totalWeight}%
                               </span>
-                              <div className="min-w-0">
-                                <p className="font-semibold text-gray-900">{template.title}</p>
-                                <p className="mt-0.5 text-xs text-gray-500">Version {template.version ?? 1}</p>
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className={kpiStatusBadgeClass(template.status)}>{template.status}</span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/hr/kpi-template/${template.id}`)}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
+                                  title="View"
+                                  aria-label="View"
+                                >
+                                  <i className="bi bi-eye text-lg" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/hr/kpi-template/${template.id}/edit`)}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
+                                  title="Edit"
+                                  aria-label="Edit"
+                                >
+                                  <i className="bi bi-pencil-square text-lg" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDelete(template.id, template.title)}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                                  title="Delete"
+                                  aria-label="Delete"
+                                >
+                                  <i className="bi bi-trash text-lg" />
+                                </button>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 text-gray-700">
-                            <div className="flex flex-col gap-1.5">
-                              <span className="inline-flex items-center gap-2 text-xs text-gray-600">
-                                <i className="bi bi-calendar-event text-gray-400" aria-hidden />
-                                {formatDate(template.startDate)}
-                              </span>
-                              <span className="inline-flex items-center gap-2 text-xs text-gray-600">
-                                <i className="bi bi-calendar-check text-gray-400" aria-hidden />
-                                {formatDate(template.endDate)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className={kpiStatusBadgeClass(template.status)}>{template.status}</span>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openUseKpi(template)}
-                                disabled={!canUseTemplate(template.status)}
-                                className="inline-flex h-10 min-w-[2.5rem] items-center justify-center rounded-xl border border-transparent px-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                                title={
-                                  canUseTemplate(template.status)
-                                    ? 'Assign to department & notify managers'
-                                    : 'Set template to ACTIVE or FINALIZED first'
-                                }
-                              >
-                                Use KPI
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openView(template.id)}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
-                                title="View"
-                                aria-label="View"
-                              >
-                                <i className="bi bi-eye text-lg" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openEdit(template.id)}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
-                                title="Edit"
-                                aria-label="Edit"
-                              >
-                                <i className="bi bi-pencil-square text-lg" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDelete(template.id, template.title)}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                                title="Delete"
-                                aria-label="Delete"
-                              >
-                                <i className="bi bi-trash text-lg" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -275,20 +249,6 @@ const KpiTemplateListPage = () => {
           )}
         </section>
       </div>
-      <KpiTemplateCreateModal
-        open={createOpen}
-        mode={modalMode}
-        templateId={selectedTemplateId}
-        onClose={() => setCreateOpen(false)}
-        onSaved={load}
-      />
-      <UseKpiDepartmentModal
-        open={useKpiOpen}
-        templateId={useKpiTemplate?.id ?? null}
-        templateTitle={useKpiTemplate?.title ?? ''}
-        onClose={() => setUseKpiOpen(false)}
-        onApplied={load}
-      />
     </div>
   );
 };

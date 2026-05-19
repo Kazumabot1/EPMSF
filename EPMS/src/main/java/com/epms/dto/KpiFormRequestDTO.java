@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,12 +20,6 @@ public class KpiFormRequestDTO {
 
     @NotBlank
     private String title;
-
-    @NotNull
-    private LocalDate startDate;
-
-    @NotNull
-    private LocalDate endDate;
 
     @Builder.Default
     private KpiFormStatus status = KpiFormStatus.DRAFT;

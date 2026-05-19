@@ -2,6 +2,8 @@ package com.epms.entity;
 
 import com.epms.entity.enums.KpiPositionStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "kpi_positions",
         uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"position_id"}),
                 @UniqueConstraint(columnNames = {"kpi_form_id", "position_id"})
         }
 )
@@ -39,6 +42,7 @@ public class KpiPosition {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_by", referencedColumnName = "id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private User assignedByUser;
 
     @Column(name = "assigned_by_string")
