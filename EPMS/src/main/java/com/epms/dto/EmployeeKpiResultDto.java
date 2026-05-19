@@ -22,6 +22,8 @@ public class EmployeeKpiResultDto {
     private Double totalScore;
     private Double totalWeightedScore;
     private LocalDateTime finalizedAt;
+    private String earlyFinalizedReason;
+    private Boolean finalizedBeforeEndDate;
 
     @Builder.Default
     private List<ManagerKpiScoreLineDto> lines = new ArrayList<>();

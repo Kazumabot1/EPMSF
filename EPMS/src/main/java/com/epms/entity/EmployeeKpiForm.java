@@ -34,6 +34,11 @@ public class EmployeeKpiForm {
     @EqualsAndHashCode.Exclude
     private KpiForm kpiForm;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kpi_template_cycle_id")
+    @EqualsAndHashCode.Exclude
+    private KpiTemplateCycle kpiTemplateCycle;
+
     @Column(name = "assigned_at", nullable = false)
     private LocalDateTime assignedAt;
 
@@ -49,6 +54,17 @@ public class EmployeeKpiForm {
 
     @Column(name = "finalized_at")
     private LocalDateTime finalizedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "finalized_by_user_id", referencedColumnName = "id")
+    @EqualsAndHashCode.Exclude
+    private User finalizedByUser;
+
+    @Column(name = "early_finalized_reason", columnDefinition = "TEXT")
+    private String earlyFinalizedReason;
+
+    @Column(name = "finalized_before_end_date")
+    private Boolean finalizedBeforeEndDate;
 
     @Column(name = "sent_at")
     private LocalDateTime sentAt;

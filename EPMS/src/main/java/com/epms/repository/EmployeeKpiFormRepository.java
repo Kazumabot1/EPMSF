@@ -19,7 +19,13 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
 
     Optional<EmployeeKpiForm> findByEmployee_IdAndKpiForm_Id(Integer employeeId, Integer kpiFormId);
 
-    @EntityGraph(attributePaths = {"kpiForm", "scores", "scores.kpiFormItem", "scores.kpiFormItem.kpiUnit"})
+    Optional<EmployeeKpiForm> findByEmployee_IdAndKpiForm_IdAndKpiTemplateCycle_Id(
+            Integer employeeId,
+            Integer kpiFormId,
+            Integer kpiTemplateCycleId
+    );
+
+    @EntityGraph(attributePaths = {"kpiForm", "kpiTemplateCycle", "scores", "scores.kpiFormItem", "scores.kpiFormItem.kpiUnit"})
     @Query("SELECT ekf FROM EmployeeKpiForm ekf WHERE ekf.employee.id = :employeeId AND ekf.status = :status")
     List<EmployeeKpiForm> findDetailedByEmployeeAndStatus(
             @Param("employeeId") Integer employeeId,
@@ -29,6 +35,7 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
     @EntityGraph(attributePaths = {
             "employee",
             "employee.position",
+            "kpiTemplateCycle",
             "scores",
             "scores.kpiFormItem",
             "scores.kpiFormItem.kpiUnit"
@@ -39,11 +46,34 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
             @Param("employeeIds") Collection<Integer> employeeIds
     );
 
+    @EntityGraph(attributePaths = {
+            "employee",
+            "employee.position",
+            "kpiForm",
+            "kpiTemplateCycle",
+            "scores",
+            "scores.kpiFormItem",
+            "scores.kpiFormItem.kpiUnit"
+    })
+    @Query(
+            """
+                    SELECT ekf FROM EmployeeKpiForm ekf
+                    WHERE ekf.employee.id IN :employeeIds
+                    AND ekf.status = :status
+                    ORDER BY ekf.finalizedAt DESC, ekf.id DESC
+                    """
+    )
+    List<EmployeeKpiForm> findByEmployeeIdInAndStatusWithDetail(
+            @Param("employeeIds") Collection<Integer> employeeIds,
+            @Param("status") EmployeeKpiStatus status
+    );
+
     @Query(
             """
                     SELECT DISTINCT ekf FROM EmployeeKpiForm ekf
                     JOIN FETCH ekf.employee emp
                     JOIN FETCH ekf.kpiForm kf
+                    LEFT JOIN FETCH ekf.kpiTemplateCycle kc
                     JOIN FETCH ekf.scores sc
                     JOIN FETCH sc.kpiFormItem item
                     LEFT JOIN FETCH item.kpiUnit
@@ -58,13 +88,14 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
                         kf.id,
                         kf.title,
                         SUM(CASE WHEN ekf.status <> com.epms.entity.enums.EmployeeKpiStatus.FINALIZED THEN 1 ELSE 0 END),
-                        kf.startDate,
-                        kf.endDate
+                        CASE WHEN kc.startDate IS NOT NULL THEN kc.startDate ELSE kf.startDate END,
+                        CASE WHEN kc.endDate IS NOT NULL THEN kc.endDate ELSE kf.endDate END
                     )
                     FROM EmployeeKpiForm ekf
                     JOIN ekf.kpiForm kf
+                    LEFT JOIN ekf.kpiTemplateCycle kc
                     WHERE ekf.employee.id IN :employeeIds
-                    GROUP BY kf.id, kf.title, kf.startDate, kf.endDate
+                    GROUP BY kf.id, kf.title, kc.startDate, kc.endDate, kf.startDate, kf.endDate
                     ORDER BY kf.title
                     """
     )
@@ -77,6 +108,7 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
             "employee.employeeDepartments.currentDepartment",
             "employee.employeeDepartments.parentDepartment",
             "kpiForm",
+            "kpiTemplateCycle",
             "scores",
             "scores.kpiFormItem",
             "scores.kpiFormItem.kpiUnit"
@@ -91,6 +123,7 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
             "employee.employeeDepartments.currentDepartment",
             "employee.employeeDepartments.parentDepartment",
             "kpiForm",
+            "kpiTemplateCycle",
             "scores",
             "scores.kpiFormItem",
             "scores.kpiFormItem.kpiUnit"
@@ -102,11 +135,15 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
             """
                     SELECT DISTINCT ekf FROM EmployeeKpiForm ekf
                     JOIN FETCH ekf.kpiForm kf
+                    LEFT JOIN FETCH ekf.kpiTemplateCycle kc
                     JOIN FETCH ekf.scores sc
                     JOIN FETCH sc.kpiFormItem item
                     LEFT JOIN FETCH item.kpiUnit
                     WHERE ekf.status <> :finalizedStatus
-                    AND kf.endDate <= :today
+                    AND (
+                        (kc.id IS NOT NULL AND kc.endDate <= :today)
+                        OR (kc.id IS NULL AND kf.endDate <= :today)
+                    )
                     """
     )
     List<EmployeeKpiForm> findNonFinalizedPastPeriodEnd(@Param("today") LocalDate today, @Param("finalizedStatus") EmployeeKpiStatus finalizedStatus);

@@ -12,6 +12,7 @@ import com.epms.repository.KpiTemplateCycleFormRepository;
 import com.epms.repository.KpiTemplateCycleRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
+import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.KpiTemplateCycleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,6 +36,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiTemplateCycleFormRepository cycleFormRepository;
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
+    private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @Override
     @Transactional
@@ -122,6 +124,10 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
         cycle.setUpdatedByUser(currentUser());
         cycleRepository.save(cycle);
+        cycleRepository.flush();
+        if (active) {
+            employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+        }
         return getById(id);
     }
 

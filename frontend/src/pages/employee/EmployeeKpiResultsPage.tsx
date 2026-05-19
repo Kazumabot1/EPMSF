@@ -86,6 +86,11 @@ const EmployeeKpiResultsPage = () => {
                   </>
                 )}
               </p>
+              {r.earlyFinalizedReason && (
+                <p style={{ margin: '.65rem 0 0', fontSize: '.82rem', color: '#475569' }}>
+                  Finalization reason: <strong style={{ color: '#0f172a' }}>{r.earlyFinalizedReason}</strong>
+                </p>
+              )}
             </header>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>

@@ -28,6 +28,8 @@ public class HrEmployeeKpiRowDto {
     private Double totalScore;
     private Double totalWeightedScore;
     private LocalDateTime finalizedAt;
+    private String earlyFinalizedReason;
+    private Boolean finalizedBeforeEndDate;
 
     private LocalDate periodStartDate;
     private LocalDate periodEndDate;
