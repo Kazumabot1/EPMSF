@@ -50,6 +50,16 @@ public class EmployeeAssessmentController {
         );
     }
 
+    @GetMapping("/my-history")
+    public ResponseEntity<GenericApiResponse<List<ScoreTableRowResponse>>> getMyHistory() {
+        return ResponseEntity.ok(
+                GenericApiResponse.success(
+                        "My assessment history fetched",
+                        assessmentService.getMyHistory()
+                )
+        );
+    }
+
     @GetMapping("/score-table")
     public ResponseEntity<GenericApiResponse<List<ScoreTableRowResponse>>> getScoreTable() {
         return ResponseEntity.ok(

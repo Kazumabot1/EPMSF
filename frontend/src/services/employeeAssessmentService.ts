@@ -421,6 +421,11 @@ export const employeeAssessmentService = {
     return normalizeList<any>(response, []).map(normalizeScoreRow);
   },
 
+  async getMyHistory(): Promise<AssessmentScoreRow[]> {
+    const response = await api.get('/employee-assessments/my-history');
+    return normalizeList<any>(response, []).map(normalizeScoreRow);
+  },
+
   async getScoreTable(): Promise<AssessmentScoreRow[]> {
     const response = await api.get('/employee-assessments/score-table');
     return normalizeList<any>(response, []).map(normalizeScoreRow);

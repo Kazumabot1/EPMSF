@@ -103,7 +103,37 @@ public class EmployeeAssessmentService {
     @Transactional(readOnly = true)
     public AssessmentResponse getTemplateForCurrentUser() {
         User user = currentUserEntity();
-        AssessmentFormDefinition form = findAssignedActiveFormForCurrentUser();
+
+        // First: check if the user already has a non-DRAFT assessment (submitted/approved/etc.)
+        // This allows employees to view their submitted assessment even if the form period is now closed.
+        Optional<EmployeeAssessment> existingNonDraft = assessmentRepository
+                .findByUserIdOrderByUpdatedAtDesc(user.getId())
+                .stream()
+                .filter(a -> a.getStatus() != null && !AssessmentStatus.DRAFT.equals(a.getStatus()))
+                .findFirst();
+
+        if (existingNonDraft.isPresent()) {
+            return toResponse(existingNonDraft.get());
+        }
+
+        // Fall back to finding the active form for drafts / new assessments
+        AssessmentFormDefinition form;
+        try {
+            form = findAssignedActiveFormForCurrentUser();
+        } catch (Exception e) {
+            // If there is no active form and no submitted assessment, also check for a DRAFT
+            Optional<EmployeeAssessment> existingDraft = assessmentRepository
+                    .findByUserIdOrderByUpdatedAtDesc(user.getId())
+                    .stream()
+                    .filter(a -> AssessmentStatus.DRAFT.equals(a.getStatus()))
+                    .findFirst();
+
+            if (existingDraft.isPresent()) {
+                return toResponse(existingDraft.get());
+            }
+
+            throw e;
+        }
 
         return assessmentRepository
                 .findFirstByUserIdAndAssessmentFormIdAndStatusInOrderByUpdatedAtDesc(
@@ -118,6 +148,16 @@ public class EmployeeAssessmentService {
     @Transactional(readOnly = true)
     public AssessmentResponse getLatestDraftForCurrentUser() {
         return getTemplateForCurrentUser();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScoreTableRowResponse> getMyHistory() {
+        Integer userId = SecurityUtils.currentUserId();
+        return assessmentRepository
+                .findByUserIdOrderByUpdatedAtDesc(userId)
+                .stream()
+                .map(this::toScoreRow)
+                .toList();
     }
 
     @Transactional(readOnly = true)

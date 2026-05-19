@@ -50,4 +50,6 @@ public interface EmployeeAssessmentRepository extends JpaRepository<EmployeeAsse
     );
 
     List<EmployeeAssessment> findByStatusOrderBySubmittedAtDesc(AssessmentStatus status);
+
+    List<EmployeeAssessment> findByUserIdOrderByUpdatedAtDesc(Integer userId);
 }
