@@ -3,7 +3,7 @@
 import { isAxiosError } from 'axios';
 import api from './api';
 
-import { extractApiErrorMessage, toApiRequestError } from './apiError';
+import { ApiRequestError, extractApiErrorMessage, toApiRequestError } from './apiError';
 
 import type { UseKpiTemplateResult } from '../types/kpiWorkflow';
 
@@ -222,6 +222,24 @@ export const kpiTemplateService = {
 
 
   async createTemplate(payload: KpiTemplateRequest): Promise<KpiTemplateResponse> {
+    const positionId = payload.positionIds?.length === 1 ? payload.positionIds[0] : undefined;
+    if (positionId != null) {
+      const availability = await this.checkPositionAvailability(positionId);
+      if (!availability.available) {
+        throw new ApiRequestError(
+          availability.templateTitle
+            ? `This position already has a KPI form: ${availability.templateTitle}.`
+            : 'This position already has a KPI form. Choose another position or edit the existing form.',
+          {
+            status: 409,
+            existingTemplateId:
+              availability.existingTemplateId != null && availability.existingTemplateId > 0
+                ? availability.existingTemplateId
+                : undefined,
+          },
+        );
+      }
+    }
 
     try {
 
