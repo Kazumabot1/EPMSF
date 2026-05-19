@@ -98,6 +98,18 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard2-pulse',
         children: [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }],
       },
+      {
+        to: '/hr/performance-kpi/unit',
+        label: 'KPI Management',
+        icon: 'bi bi-speedometer2',
+        children: [
+          { to: '/hr/performance-kpi/unit', label: 'KPI Units', icon: 'bi bi-speedometer2' },
+          { to: '/hr/performance-kpi/category', label: 'KPI Categories', icon: 'bi bi-tags' },
+          { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
+          { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
+          { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
+        ],
+      },
     ];
 
     const hrNavItems: NavItem[] = [
@@ -189,6 +201,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/performance-kpi/category', label: 'KPI Categories', icon: 'bi bi-tags' },
           { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
           { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
+          { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
         ],
       },
     ];

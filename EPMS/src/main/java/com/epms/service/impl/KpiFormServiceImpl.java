@@ -3,26 +3,33 @@ package com.epms.service.impl;
 import com.epms.dto.KpiFormItemDTO;
 import com.epms.dto.KpiFormRequestDTO;
 import com.epms.dto.KpiFormResponseDTO;
+import com.epms.dto.KpiPositionAssignmentDto;
+import com.epms.dto.KpiPositionAvailabilityDto;
+import com.epms.dto.PositionResponseDto;
 import com.epms.entity.*;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiPositionStatus;
 import com.epms.repository.*;
+import com.epms.exception.KpiTemplatePositionConflictException;
 import com.epms.security.SecurityUtils;
 import com.epms.service.KpiFormService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class KpiFormServiceImpl implements KpiFormService {
-    private static final Set<Integer> ALLOWED_TEMPLATE_DURATIONS_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+
+    private static final String KPI_POSITIONS_TABLE = "kpi_positions";
 
     private final KpiFormRepository kpiFormRepository;
     private final KpiPositionRepository kpiPositionRepository;
@@ -36,7 +43,6 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public KpiFormResponseDTO createTemplate(KpiFormRequestDTO dto) {
-        validateDates(dto);
         validateItems(dto.getItems());
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
@@ -46,8 +52,6 @@ public class KpiFormServiceImpl implements KpiFormService {
 
         KpiForm form = KpiForm.builder()
                 .title(dto.getTitle().trim())
-                .startDate(dto.getStartDate())
-                .endDate(dto.getEndDate())
                 .status(status)
                 .createdByUser(author)
                 .createdBy(author.getEmail())
@@ -65,7 +69,6 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public KpiFormResponseDTO updateTemplate(Integer id, KpiFormRequestDTO dto) {
-        validateDates(dto);
         validateItems(dto.getItems());
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
@@ -77,8 +80,6 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
         form.setTitle(dto.getTitle().trim());
-        form.setStartDate(dto.getStartDate());
-        form.setEndDate(dto.getEndDate());
         form.setStatus(status);
         form.setUpdatedByUser(editor);
 
@@ -113,7 +114,10 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Transactional(readOnly = true)
     public List<KpiFormResponseDTO> getAllTemplates() {
         return kpiFormRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(this::toSummaryDto)
+                .map(form -> {
+                    List<KpiPosition> links = kpiPositionRepository.findWithPositionByKpiForm_Id(form.getId());
+                    return toSummaryDto(form, links);
+                })
                 .toList();
     }
 
@@ -126,7 +130,117 @@ public class KpiFormServiceImpl implements KpiFormService {
         return toDetailDto(form, links);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<Integer> getAssignedPositionIds(Integer excludeFormId) {
+        return kpiPositionRepository.findAssignedPositionIds(excludeFormId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public KpiFormResponseDTO getTemplateByPositionId(Integer positionId) {
+        KpiPosition link = kpiPositionRepository.findWithFormByPositionId(positionId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "No KPI template is assigned to this position."
+                ));
+        return getTemplateById(link.getKpiForm().getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<KpiPositionAssignmentDto> getPositionAssignments(Integer excludeFormId) {
+        return kpiPositionRepository.findActiveAssignments(excludeFormId).stream()
+                .filter(kp -> kp.getPosition() != null && kp.getKpiForm() != null)
+                .map(kp -> KpiPositionAssignmentDto.builder()
+                        .positionId(kp.getPosition().getId())
+                        .positionTitle(kp.getPosition().getPositionTitle())
+                        .templateId(kp.getKpiForm().getId())
+                        .templateTitle(kp.getKpiForm().getTitle())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public KpiPositionAvailabilityDto checkPositionAvailability(Integer positionId, Integer excludeFormId) {
+        Optional<KpiPosition> existingLink = findOccupyingLink(positionId, excludeFormId);
+        logDuplicateCheck(positionId, excludeFormId, existingLink);
+        if (existingLink.isEmpty()) {
+            return KpiPositionAvailabilityDto.builder().available(true).build();
+        }
+        KpiPosition link = existingLink.get();
+        return KpiPositionAvailabilityDto.builder()
+                .available(false)
+                .existingTemplateId(link.getKpiForm().getId())
+                .templateTitle(link.getKpiForm().getTitle())
+                .positionTitle(link.getPosition().getPositionTitle())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PositionResponseDto> getAvailablePositions(Integer excludeFormId) {
+        List<Position> positions = positionRepository.findAvailableForKpiTemplate(excludeFormId);
+        log.info(
+                "KPI template available-positions (table={}): excludeFormId={}, count={}",
+                KPI_POSITIONS_TABLE,
+                excludeFormId,
+                positions.size()
+        );
+        return positions.stream().map(this::toPositionResponseDto).toList();
+    }
+
+    /**
+     * Same lookup used by create/update duplicate guard and GET available-positions (via NOT EXISTS).
+     */
+    private Optional<KpiPosition> findOccupyingLink(Integer positionId, Integer excludeFormId) {
+        return excludeFormId == null
+                ? kpiPositionRepository.findWithFormByPositionId(positionId)
+                : kpiPositionRepository.findWithFormByPositionIdExcludingForm(positionId, excludeFormId);
+    }
+
+    private void logDuplicateCheck(Integer positionId, Integer excludeFormId, Optional<KpiPosition> existingLink) {
+        if (existingLink.isEmpty()) {
+            log.info(
+                    "KPI template position check (table={}): positionId={}, available=true, excludeFormId={}",
+                    KPI_POSITIONS_TABLE,
+                    positionId,
+                    excludeFormId
+            );
+            return;
+        }
+        Integer matchedTemplateId = existingLink.get().getKpiForm().getId();
+        log.info(
+                "Position {} already linked to KPI template {} (table={}, excludeFormId={})",
+                positionId,
+                matchedTemplateId,
+                KPI_POSITIONS_TABLE,
+                excludeFormId
+        );
+    }
+
+    private PositionResponseDto toPositionResponseDto(Position position) {
+        PositionLevel level = position.getLevel();
+        return new PositionResponseDto(
+                position.getId(),
+                position.getPositionTitle(),
+                level != null ? level.getId() : null,
+                level != null ? level.getLevelCode() : null,
+                position.getDescription(),
+                position.getStatus(),
+                position.getCreatedAt(),
+                position.getCreatedBy()
+        );
+    }
+
     private KpiFormResponseDTO toSummaryDto(KpiForm form) {
+        return toSummaryDto(form, List.of());
+    }
+
+    private KpiFormResponseDTO toSummaryDto(KpiForm form, List<KpiPosition> links) {
+        List<KpiFormResponseDTO.KpiPositionSummaryDTO> positions = mapPositionSummaries(links);
+
         return KpiFormResponseDTO.builder()
                 .id(form.getId())
                 .title(form.getTitle())
@@ -137,20 +251,14 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .createdAt(form.getCreatedAt())
                 .updatedAt(form.getUpdatedAt())
                 .createdBy(form.getCreatedBy())
-                .createdByUserId(form.getCreatedByUser() != null ? form.getCreatedByUser().getId() : null)
-                .positions(new ArrayList<>())
+                .createdByUserId(resolveCreatedByUserId(form))
+                .positions(positions)
                 .items(new ArrayList<>())
                 .build();
     }
 
     private KpiFormResponseDTO toDetailDto(KpiForm form, List<KpiPosition> links) {
-        List<KpiFormResponseDTO.KpiPositionSummaryDTO> positions = links.stream()
-                .map(kp -> KpiFormResponseDTO.KpiPositionSummaryDTO.builder()
-                        .id(kp.getId())
-                        .positionId(kp.getPosition().getId())
-                        .positionTitle(kp.getPosition().getPositionTitle())
-                        .build())
-                .toList();
+        List<KpiFormResponseDTO.KpiPositionSummaryDTO> positions = mapPositionSummaries(links);
 
         List<KpiFormItemDTO> rows = form.getItems().stream()
                 .sorted((a, b) -> {
@@ -171,10 +279,26 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .createdAt(form.getCreatedAt())
                 .updatedAt(form.getUpdatedAt())
                 .createdBy(form.getCreatedBy())
-                .createdByUserId(form.getCreatedByUser() != null ? form.getCreatedByUser().getId() : null)
+                .createdByUserId(resolveCreatedByUserId(form))
                 .positions(positions)
                 .items(rows)
                 .build();
+    }
+
+    private static Integer resolveCreatedByUserId(KpiForm form) {
+        User creator = form.getCreatedByUser();
+        return creator != null ? creator.getId() : null;
+    }
+
+    private static List<KpiFormResponseDTO.KpiPositionSummaryDTO> mapPositionSummaries(List<KpiPosition> links) {
+        return links.stream()
+                .filter(kp -> kp.getPosition() != null)
+                .map(kp -> KpiFormResponseDTO.KpiPositionSummaryDTO.builder()
+                        .id(kp.getId())
+                        .positionId(kp.getPosition().getId())
+                        .positionTitle(kp.getPosition().getPositionTitle())
+                        .build())
+                .toList();
     }
 
     private KpiFormItemDTO toItemDto(KpiFormItem item) {
@@ -198,25 +322,6 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .score(null)
                 .weightedScore(null)
                 .build();
-    }
-
-    private void validateDates(KpiFormRequestDTO dto) {
-        if (dto.getEndDate().isBefore(dto.getStartDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date must be on or after the start date.");
-        }
-        boolean isAllowedDuration = ALLOWED_TEMPLATE_DURATIONS_MONTHS.stream()
-                .anyMatch(months -> matchesDuration(dto.getStartDate(), dto.getEndDate(), months));
-        if (!isAllowedDuration) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "End date must match one of the allowed durations from start date: 3-11 months or 1 year."
-            );
-        }
-    }
-
-    private boolean matchesDuration(LocalDate startDate, LocalDate endDate, int durationMonths) {
-        LocalDate expectedEndDate = startDate.plusMonths(durationMonths).minusDays(1);
-        return expectedEndDate.equals(endDate);
     }
 
     private void validateItems(List<KpiFormItemDTO> items) {
@@ -250,18 +355,30 @@ public class KpiFormServiceImpl implements KpiFormService {
 
     private void applyPositions(KpiForm form, List<Integer> positionIds) {
         if (positionIds == null || positionIds.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one position.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select a position.");
         }
         List<Integer> distinctIds = positionIds.stream().distinct().toList();
-        for (Integer pid : distinctIds) {
-            Position position = positionRepository.findById(pid)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Position not found: " + pid));
-            KpiPosition link = KpiPosition.builder()
-                    .kpiForm(form)
-                    .position(position)
-                    .build();
-            form.getKpiPositions().add(link);
+        if (distinctIds.size() > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only one position can be assigned per KPI form.");
         }
+        Integer pid = distinctIds.get(0);
+        Integer currentFormId = form.getId();
+        Optional<KpiPosition> existingLink = findOccupyingLink(pid, currentFormId);
+        logDuplicateCheck(pid, currentFormId, existingLink);
+        if (existingLink.isPresent()) {
+            Integer existingTemplateId = existingLink.get().getKpiForm().getId();
+            throw new KpiTemplatePositionConflictException(
+                    existingTemplateId,
+                    "This position already has a KPI form. Choose another position or edit the existing form."
+            );
+        }
+        Position position = positionRepository.findById(pid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Position not found: " + pid));
+        KpiPosition link = KpiPosition.builder()
+                .kpiForm(form)
+                .position(position)
+                .build();
+        form.getKpiPositions().add(link);
     }
 
     private void applyItems(KpiForm form, List<KpiFormItemDTO> rows) {

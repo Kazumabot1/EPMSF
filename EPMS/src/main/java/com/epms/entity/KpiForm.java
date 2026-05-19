@@ -2,6 +2,8 @@ package com.epms.entity;
 
 import com.epms.entity.enums.KpiFormStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,10 +26,10 @@ public class KpiForm {
     @Column(nullable = false, length = 255)
     private String title;
 
-    @Column(name = "start_date", nullable = false)
+    @Column(name = "start_date")
     private LocalDate startDate;
 
-    @Column(name = "end_date", nullable = false)
+    @Column(name = "end_date")
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
@@ -36,6 +38,7 @@ public class KpiForm {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")
+    @NotFound(action = NotFoundAction.IGNORE)
     @EqualsAndHashCode.Exclude
     private User createdByUser;
 
@@ -47,6 +50,7 @@ public class KpiForm {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by", referencedColumnName = "id")
+    @NotFound(action = NotFoundAction.IGNORE)
     @EqualsAndHashCode.Exclude
     private User updatedByUser;
 

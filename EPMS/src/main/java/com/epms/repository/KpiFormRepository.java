@@ -22,6 +22,17 @@ public interface KpiFormRepository extends JpaRepository<KpiForm, Integer> {
 
     List<KpiForm> findAllByOrderByCreatedAtDesc();
 
+    @Query(
+            """
+            SELECT DISTINCT f FROM KpiForm f
+            LEFT JOIN FETCH f.createdByUser
+            LEFT JOIN FETCH f.kpiPositions kp
+            LEFT JOIN FETCH kp.position
+            ORDER BY f.createdAt DESC
+            """
+    )
+    List<KpiForm> findAllSummariesOrderByCreatedAtDesc();
+
     List<KpiForm> findTop5ByOrderByCreatedAtDesc();
 
     long countByCreatedByUser_Id(Integer userId);

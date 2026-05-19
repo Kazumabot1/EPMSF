@@ -1,25 +1,29 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import KpiPositionExistingAlert from '../../../components/hr/kpi-template/KpiPositionExistingAlert';
 import KpiTemplateRowsTable from '../../../components/hr/kpi-template/KpiTemplateRowsTable';
 import '../../../components/hr/kpi-template/kpi-template.css';
-import { kpiCategoryService } from '../../../services/kpiCategoryService';
-import { kpiItemService } from '../../../services/kpiItemService';
+import { handleKpiTemplateSaveError } from '../../../components/hr/kpi-template/kpiTemplateConflict';
+import {
+  buildKpiPositionDropdownOptions,
+  countAvailableKpiPositions,
+} from '../../../components/hr/kpi-template/kpiTemplateUi';
+import {
+  findExistingTemplateForPosition,
+  loadKpiTemplateEditorLookups,
+  loadTemplateFormFields,
+  newKpiTemplateRow,
+  saveKpiTemplateCreateOrUpdate,
+  type ExistingKpiForPosition,
+} from '../../../components/hr/kpi-template/kpiTemplateWorkflow';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
-import { kpiUnitService } from '../../../services/kpiUnitService';
-import { positionService } from '../../../services/positionService';
+import { toApiRequestError } from '../../../services/apiError';
 import type { KpiCategory } from '../../../types/kpiCategory';
 import type { KpiItem } from '../../../types/kpiItem';
 import type { KpiFormStatus, KpiTemplateRequest, KpiTemplateRowDraft } from '../../../types/kpiTemplate';
 import type { KpiUnit } from '../../../types/kpiUnit';
 import type { PositionResponse } from '../../../types/position';
-import {
-  calculateKpiTemplateEndDate,
-  DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
-  inferKpiTemplateDurationMonths,
-  KPI_TEMPLATE_DURATION_OPTIONS,
-  type KpiTemplateDurationMonths,
-} from '../../../components/hr/kpi-template/kpiTemplateUi';
 
 const fieldClass =
   'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
@@ -28,85 +32,96 @@ const FieldLabel = ({ children }: { children: ReactNode }) => (
   <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{children}</span>
 );
 
-const newRow = (): KpiTemplateRowDraft => ({
-  rowId: crypto.randomUUID(),
-  kpiItemId: null,
-  kpiLabel: '',
-  kpiCategoryId: null,
-  kpiUnitId: null,
-  target: null,
-  weight: null,
-});
-
 const KpiTemplateEditorPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const saveInFlightRef = useRef(false);
   const isEdit = Boolean(id) && id !== 'new';
   const templateId = id && id !== 'new' ? Number(id) : NaN;
 
   const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [durationMonths, setDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
   const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
-  const [positionIds, setPositionIds] = useState<number[]>([]);
-  const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newRow()]);
+  const [positionId, setPositionId] = useState<number | null>(null);
+  const [positions, setPositions] = useState<PositionResponse[]>([]);
+  const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
+  const [existingTemplate, setExistingTemplate] = useState<ExistingKpiForPosition | null>(null);
+  const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newKpiTemplateRow()]);
 
   const [categories, setCategories] = useState<KpiCategory[]>([]);
   const [units, setUnits] = useState<KpiUnit[]>([]);
   const [items, setItems] = useState<KpiItem[]>([]);
-  const [positions, setPositions] = useState<PositionResponse[]>([]);
 
   const [loading, setLoading] = useState(false);
-  const [savingAction, setSavingAction] = useState<'draft' | 'active' | null>(null);
+  const [savingAction, setSavingAction] = useState<'draft' | 'use-in-cycle' | null>(null);
+
+  const applyLookups = useCallback((lookups: Awaited<ReturnType<typeof loadKpiTemplateEditorLookups>>) => {
+    setCategories(lookups.categories);
+    setUnits(lookups.units);
+    setItems(lookups.items);
+    setPositions(lookups.positions);
+    setAssignedPositionIds(lookups.assignedPositionIds);
+  }, []);
+
+  const refreshAfterConflict = useCallback(async () => {
+    const excludeFormId = isEdit && !Number.isNaN(templateId) ? templateId : undefined;
+    const lookups = await loadKpiTemplateEditorLookups(excludeFormId, { toastOnPartialFailure: false });
+    setPositions(lookups.positions);
+    setAssignedPositionIds(lookups.assignedPositionIds);
+    setExistingTemplate(null);
+    if (!isEdit && positionId != null && lookups.assignedPositionIds.includes(positionId)) {
+      setPositionId(null);
+    }
+  }, [isEdit, positionId, templateId]);
+
+  const handlePositionChange = useCallback(
+    async (nextPositionId: number | null) => {
+      setPositionId(nextPositionId);
+      if (isEdit || nextPositionId == null) {
+        setExistingTemplate(null);
+        return;
+      }
+      setExistingTemplate(await findExistingTemplateForPosition(nextPositionId));
+    },
+    [isEdit],
+  );
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
         setLoading(true);
-        const [cat, unit, kit, pos] = await Promise.all([
-          kpiCategoryService.getAll(),
-          kpiUnitService.getAll(),
-          kpiItemService.getAll(),
-          positionService.getPositions(),
-        ]);
-        setCategories(cat);
-        setUnits(unit);
-        setItems(kit);
-        setPositions(pos);
+        const excludeFormId = isEdit && !Number.isNaN(templateId) ? templateId : undefined;
+        const lookups = await loadKpiTemplateEditorLookups(excludeFormId);
+        applyLookups(lookups);
+        setExistingTemplate(null);
 
         if (isEdit && !Number.isNaN(templateId)) {
-          const tmpl = await kpiTemplateService.getTemplateById(templateId);
-          setTitle(tmpl.title);
-          const nextStartDate = tmpl.startDate?.slice(0, 10) ?? '';
-          const nextEndDate = tmpl.endDate?.slice(0, 10) ?? '';
-          setStartDate(nextStartDate);
-          setEndDate(nextEndDate);
-          setDurationMonths(inferKpiTemplateDurationMonths(nextStartDate, nextEndDate));
-          setStatus(tmpl.status);
-          setPositionIds(tmpl.positions.map((p) => p.positionId));
-          setRows(
-            tmpl.items.length > 0
-              ? tmpl.items.map((line) => ({
-                  rowId: crypto.randomUUID(),
-                  kpiItemId: line.kpiItemId,
-                  kpiLabel: line.kpiLabel ?? '',
-                  kpiCategoryId: line.kpiCategoryId,
-                  kpiUnitId: line.kpiUnitId,
-                  target: line.target,
-                  weight: line.weight,
-                }))
-              : [newRow()],
-          );
+          const fields = await loadTemplateFormFields(templateId);
+          setTitle(fields.title);
+          setStatus(fields.status);
+          setPositionId(fields.positionId);
+          setRows(fields.rows);
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to load form.');
+        toast.error(toApiRequestError(err, 'Failed to load form.').message);
       } finally {
         setLoading(false);
       }
     };
     void bootstrap();
-  }, [isEdit, templateId]);
+  }, [applyLookups, isEdit, templateId]);
+
+  const positionOptions = useMemo(
+    () =>
+      buildKpiPositionDropdownOptions(positions, assignedPositionIds, positionId, {
+        createOrEditMode: false,
+      }),
+    [positions, assignedPositionIds, positionId],
+  );
+
+  const availablePositionCount = useMemo(
+    () => countAvailableKpiPositions(positionOptions),
+    [positionOptions],
+  );
 
   const totalWeight = useMemo(
     () => rows.reduce((sum, row) => sum + (row.weight ?? 0), 0),
@@ -115,10 +130,8 @@ const KpiTemplateEditorPage = () => {
 
   const buildPayload = (submitStatus: KpiFormStatus): KpiTemplateRequest => ({
     title: title.trim(),
-    startDate,
-    endDate,
     status: submitStatus,
-    positionIds,
+    positionIds: positionId != null ? [positionId] : [],
     items: rows.map((row, index) => ({
       kpiLabel: row.kpiItemId !== null ? null : row.kpiLabel.trim() || null,
       kpiItemId: row.kpiItemId,
@@ -139,9 +152,13 @@ const KpiTemplateEditorPage = () => {
 
   const validate = (submitStatus: KpiFormStatus): string | null => {
     if (!title.trim()) return 'Title is required.';
-    if (!startDate || !endDate) return 'Start and end dates are required.';
-    if (new Date(endDate) < new Date(startDate)) return 'End date must be on or after start date.';
-    if (positionIds.length === 0) return 'Select at least one position.';
+    if (positionId === null) return 'Select a position.';
+    if (!positions.some((p) => p.id === positionId)) {
+      return 'Selected position is invalid. Choose a position from the list.';
+    }
+    if (!isEdit && assignedPositionIds.includes(positionId)) {
+      return 'This position already has a KPI template. Choose another position or edit the existing template.';
+    }
     if (rows.length === 0) return 'Add at least one KPI row.';
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
@@ -158,62 +175,69 @@ const KpiTemplateEditorPage = () => {
     return null;
   };
 
-  const saveTemplate = async (action: 'draft' | 'active') => {
-    const submitStatus: KpiFormStatus = action === 'draft' ? 'DRAFT' : 'ACTIVE';
+  const saveTemplate = async (action: 'draft' | 'use-in-cycle') => {
+    if (saveInFlightRef.current || savingAction !== null) {
+      return;
+    }
+
+    const submitStatus: KpiFormStatus = 'DRAFT';
     const message = validate(submitStatus);
     if (message) {
       toast.error(message);
       return;
     }
+    if (positionId == null) {
+      toast.error('Select a position.');
+      return;
+    }
+
     const payload = buildPayload(submitStatus);
+    saveInFlightRef.current = true;
+    setSavingAction(action);
+
     try {
-      setSavingAction(action);
+      let savedFormId: number;
       if (isEdit && !Number.isNaN(templateId)) {
-        await kpiTemplateService.updateTemplate(templateId, payload);
-        toast.success(action === 'draft' ? 'Draft saved.' : 'Template activated.');
+        const updated = await kpiTemplateService.updateTemplate(templateId, payload);
+        savedFormId = updated.id;
       } else {
-        await kpiTemplateService.createTemplate(payload);
-        toast.success(action === 'draft' ? 'Draft saved.' : 'Template activated.');
+        const result = await saveKpiTemplateCreateOrUpdate({
+          positionId,
+          payload,
+          onSwitchedToEdit: (existingId) => {
+            navigate(`/hr/kpi-template/${existingId}/edit`, { replace: true });
+          },
+        });
+        savedFormId = result.templateId;
+        if (!result.created) {
+          toast.success('KPI template updated for this position.');
+        }
       }
-      navigate('/hr/kpi-template');
+
+      if (action === 'use-in-cycle') {
+        toast.success(
+          isEdit
+            ? 'KPI template updated. Select it in the template cycle.'
+            : 'KPI template created. Select it in the template cycle.',
+        );
+        navigate('/hr/kpi-template-cycle/new', { state: { preselectFormId: savedFormId } });
+      } else {
+        toast.success(isEdit ? 'KPI template updated.' : 'KPI template created.');
+        navigate('/hr/kpi-template');
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed.');
+      if (
+        !(await handleKpiTemplateSaveError(err, navigate, positionId, isEdit ? templateId : undefined, {
+          onConflict: refreshAfterConflict,
+        }))
+      ) {
+        toast.error(toApiRequestError(err, 'Could not save the KPI template.').message);
+      }
     } finally {
+      saveInFlightRef.current = false;
       setSavingAction(null);
     }
   };
-
-  const addPositionFromDropdown = (rawId: string) => {
-    if (!rawId) return;
-    const pid = Number(rawId);
-    if (Number.isNaN(pid)) return;
-    setPositionIds((prev) => (prev.includes(pid) ? prev : [...prev, pid]));
-  };
-
-  const removePosition = (pid: number) => {
-    setPositionIds((prev) => prev.filter((idValue) => idValue !== pid));
-  };
-
-  const handleDurationChange = (value: KpiTemplateDurationMonths) => {
-    setDurationMonths(value);
-    setEndDate(calculateKpiTemplateEndDate(startDate, value));
-  };
-
-  const handleStartDateChange = (value: string) => {
-    setStartDate(value);
-    setEndDate(calculateKpiTemplateEndDate(value, durationMonths));
-  };
-
-  const positionTitleById = useMemo(() => {
-    const map = new Map<number, string>();
-    positions.forEach((p) => map.set(p.id, p.positionTitle));
-    return map;
-  }, [positions]);
-
-  const availablePositions = useMemo(
-    () => positions.filter((p) => !positionIds.includes(p.id)),
-    [positions, positionIds],
-  );
 
   if (loading) {
     return (
@@ -263,7 +287,7 @@ const KpiTemplateEditorPage = () => {
               </span>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Basics</h2>
-                <p className="mt-0.5 text-sm text-gray-500">Title, lifecycle status, and evaluation window</p>
+                <p className="mt-0.5 text-sm text-gray-500">Template title and position assignment</p>
               </div>
             </div>
 
@@ -274,45 +298,9 @@ const KpiTemplateEditorPage = () => {
                   required
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="e.g. Q2 Sales KPIs"
+                  placeholder="e.g. Sales Manager KPIs"
                   className={fieldClass}
                 />
-              </label>
-              <label className="flex flex-col gap-2">
-                <FieldLabel>Status</FieldLabel>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as KpiFormStatus)}
-                  className={`${fieldClass} cursor-pointer`}
-                >
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="FINALIZED">FINALIZED</option>
-                  <option value="SENT">SENT</option>
-                  <option value="ARCHIVED">ARCHIVED</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <FieldLabel>Start date</FieldLabel>
-                <input required type="date" value={startDate} onChange={(e) => handleStartDateChange(e.target.value)} className={fieldClass} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <FieldLabel>Duration</FieldLabel>
-                <select
-                  value={durationMonths}
-                  onChange={(event) => handleDurationChange(Number(event.target.value) as KpiTemplateDurationMonths)}
-                  className={`${fieldClass} cursor-pointer`}
-                >
-                  {KPI_TEMPLATE_DURATION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <FieldLabel>End date</FieldLabel>
-                <input required type="date" value={endDate} disabled className={fieldClass} />
               </label>
             </div>
           </section>
@@ -323,59 +311,66 @@ const KpiTemplateEditorPage = () => {
                 <i className="bi bi-briefcase text-xl" aria-hidden />
               </span>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Positions</h2>
-                <p className="mt-0.5 text-sm text-gray-500">Add one or more roles this template applies to</p>
+                <h2 className="text-lg font-semibold text-gray-900">Position</h2>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  One KPI template per position. Positions that already have a template are disabled when creating.
+                </p>
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <FieldLabel>Assign positions</FieldLabel>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-                <div className="relative w-full lg:max-w-md">
+            <label className="flex max-w-md flex-col gap-2">
+              <FieldLabel>Position</FieldLabel>
+              <div className="relative">
                   <i className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
                   <select
-                    value=""
+                    required
+                    value={positionId ?? ''}
+                    disabled={savingAction !== null}
                     onChange={(event) => {
-                      addPositionFromDropdown(event.target.value);
-                      event.target.value = '';
+                      const next = event.target.value ? Number(event.target.value) : null;
+                      void handlePositionChange(next != null && Number.isNaN(next) ? null : next);
                     }}
                     className={`${fieldClass} cursor-pointer appearance-none pr-10`}
-                    aria-label="Add position"
+                    aria-label="Position"
                   >
                     <option value="">
-                      {availablePositions.length === 0 ? 'All positions added' : 'Select position to add…'}
+                      {positions.length === 0
+                        ? 'No positions in system'
+                        : !isEdit && availablePositionCount === 0
+                          ? 'All positions already have a KPI template'
+                          : 'Select position…'}
                     </option>
-                    {availablePositions.map((position) => (
-                      <option key={position.id} value={position.id}>
-                        {position.positionTitle}
+                    {positionOptions.map((option) => (
+                      <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
-                </div>
-                {positionIds.length > 0 && (
-                  <div className="flex min-h-11 flex-1 flex-wrap items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50/90 px-4 py-3">
-                    {positionIds.map((pid) => (
-                      <span
-                        key={pid}
-                        className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-950 shadow-sm"
-                      >
-                        <i className="bi bi-person-badge text-violet-600" aria-hidden />
-                        {positionTitleById.get(pid) ?? `Position #${pid}`}
-                        <button
-                          type="button"
-                          onClick={() => removePosition(pid)}
-                          className="rounded-full p-0.5 text-violet-800/70 transition hover:bg-violet-100 hover:text-violet-950"
-                          title="Remove"
-                          aria-label={`Remove ${positionTitleById.get(pid) ?? pid}`}
-                        >
-                          <i className="bi bi-x-lg text-sm" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
-            </div>
+              {positions.length > 0 && (
+                <p className="text-sm text-gray-500">
+                  {!isEdit
+                    ? `${availablePositionCount} of ${positions.length} position${positions.length === 1 ? '' : 's'} available for a new KPI template.`
+                    : `${positions.length} position${positions.length === 1 ? '' : 's'} in the organization.`}
+                </p>
+              )}
+              {positions.length === 0 && (
+                <p className="text-sm text-amber-700">
+                  No positions found.{' '}
+                  <Link to="/hr/position/table" className="font-semibold underline">
+                    Create positions
+                  </Link>{' '}
+                  before linking a KPI template.
+                </p>
+              )}
+              {!isEdit && existingTemplate && (
+                <KpiPositionExistingAlert
+                  templateTitle={existingTemplate.templateTitle}
+                  onEdit={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}/edit`)}
+                  onView={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}`)}
+                />
+              )}
+            </label>
           </section>
 
           <section className="kpi-tpl-card overflow-hidden p-0">
@@ -409,7 +404,7 @@ const KpiTemplateEditorPage = () => {
                 categories={categories}
                 units={units}
                 items={items}
-                onAddRow={() => setRows((prev) => [...prev, newRow()])}
+                onAddRow={() => setRows((prev) => [...prev, newKpiTemplateRow()])}
                 onRemoveRow={(rowId) =>
                   setRows((prev) => (prev.length > 1 ? prev.filter((row) => row.rowId !== rowId) : prev))
                 }
@@ -427,7 +422,7 @@ const KpiTemplateEditorPage = () => {
             <button
               type="button"
               onClick={() => void saveTemplate('draft')}
-              disabled={savingAction !== null}
+              disabled={savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
               className="kpi-tpl-btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
               {savingAction === 'draft' ? (
@@ -441,14 +436,15 @@ const KpiTemplateEditorPage = () => {
             </button>
             <button
               type="button"
-              onClick={() => void saveTemplate('active')}
-              disabled={savingAction !== null}
+              onClick={() => void saveTemplate('use-in-cycle')}
+              disabled={savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
               className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              title="Save as draft and open KPI template cycle to include this form"
             >
-              {savingAction === 'active' ? (
+              {savingAction === 'use-in-cycle' ? (
                 <>
                   <span className="kpi-tpl-shimmer inline-block h-4 w-4 rounded-full bg-white/90" />
-                  Activating…
+                  Saving…
                 </>
               ) : (
                 <>

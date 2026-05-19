@@ -8,7 +8,7 @@ const HRDashboard = () => {
     { icon: 'bi-diagram-3',          label: 'Teams',            path: '/hr/team',                        live: true  },
     { icon: 'bi-building',           label: 'Departments',      path: '/hr/department',                  live: true  },
     { icon: 'bi-briefcase',          label: 'Positions',        path: '/hr/position/table',              live: true  },
-    { icon: 'bi-clipboard-data',     label: 'KPI Management',   path: '/hr/performance-kpi/form',        live: true  },
+    { icon: 'bi-ui-checks-grid',     label: 'KPI Templates',    path: '/hr/kpi-template',                live: true  },
     { icon: 'bi-clipboard-check',    label: 'Appraisals',       path: '/one-on-one-meetings',            live: true  },
     { icon: 'bi-chat-dots',          label: '360 Feedback',     path: '/notifications',                  live: false },
     { icon: 'bi-exclamation-triangle',label: 'PIP Management',  path: '/pip-updates',                   live: false },

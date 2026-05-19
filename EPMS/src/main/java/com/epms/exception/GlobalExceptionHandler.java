@@ -1,11 +1,15 @@
 package com.epms.exception;
 
+import com.epms.repository.KpiPositionRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -17,8 +21,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final KpiPositionRepository kpiPositionRepository;
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorResponse> handleBadRequestException(
@@ -45,6 +53,28 @@ public class GlobalExceptionHandler {
                 .error(HttpStatus.CONFLICT.getReasonPhrase())
                 .message(ex.getMessage())
                 .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(KpiTemplatePositionConflictException.class)
+    public ResponseEntity<ErrorResponse> handleKpiTemplatePositionConflictException(
+            KpiTemplatePositionConflictException ex,
+            HttpServletRequest request) {
+        log.info(
+                "KPI template position conflict on {}: existingTemplateId={}, message={}",
+                request.getRequestURI(),
+                ex.getExistingTemplateId(),
+                ex.getMessage()
+        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .existingTemplateId(ex.getExistingTemplateId())
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
@@ -122,6 +152,47 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, status);
     }
 
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+            AuthenticationException ex,
+            HttpServletRequest request) {
+        String message =
+                ex.getMessage() != null && !ex.getMessage().isBlank()
+                        ? ex.getMessage()
+                        : "Authentication required. Please sign in again.";
+
+        ErrorResponse errorResponse =
+                ErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(HttpStatus.UNAUTHORIZED.value())
+                        .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
+                        .message(message)
+                        .path(request.getRequestURI())
+                        .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalStateException(
+            IllegalStateException ex,
+            HttpServletRequest request) {
+        if (ex.getMessage() == null || !ex.getMessage().contains("Authenticated user")) {
+            return handleUnexpectedException(ex, request);
+        }
+
+        ErrorResponse errorResponse =
+                ErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(HttpStatus.UNAUTHORIZED.value())
+                        .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
+                        .message("Authentication required. Please sign in again.")
+                        .path(request.getRequestURI())
+                        .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(
             AccessDeniedException ex,
@@ -195,10 +266,22 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
         String path = request.getRequestURI();
         String message = "Could not save because a duplicate or invalid database record already exists.";
+        Integer existingTemplateId = null;
 
         if (path != null && path.matches(".*/api/v1/feedback/campaigns/\\d+/targets$")) {
             message = "Could not save campaign targets because one or more selected employees are already stored for this campaign. Refresh the campaign and try again.";
+        } else if (path != null && path.contains("/api/hr/kpi-templates")) {
+            message =
+                    "This position already has a KPI form. Choose another position or edit the existing form.";
+            existingTemplateId = resolveKpiTemplateIdFromIntegrityViolation(ex, request);
         }
+
+        log.warn(
+                "Data integrity violation on {}: existingTemplateId={}, cause={}",
+                path,
+                existingTemplateId,
+                ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage()
+        );
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -206,8 +289,53 @@ public class GlobalExceptionHandler {
                 .error(HttpStatus.CONFLICT.getReasonPhrase())
                 .message(message)
                 .path(path)
+                .existingTemplateId(existingTemplateId)
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpectedException(
+            Exception ex,
+            HttpServletRequest request) {
+        log.error("Unhandled error on {}", request.getRequestURI(), ex);
+
+        ErrorResponse errorResponse =
+                ErrorResponse.builder()
+                        .timestamp(LocalDateTime.now())
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                        .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
+                        .message("An unexpected error occurred. Please try again or contact support.")
+                        .path(request.getRequestURI())
+                        .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private Integer resolveKpiTemplateIdFromIntegrityViolation(
+            DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+        String positionIdParam = request.getParameter("checkPositionId");
+        if (positionIdParam != null) {
+            try {
+                int positionId = Integer.parseInt(positionIdParam);
+                return kpiPositionRepository.findActiveWithFormByPositionId(positionId)
+                        .map(link -> link.getKpiForm().getId())
+                        .orElse(null);
+            } catch (NumberFormatException ignored) {
+                // fall through
+            }
+        }
+
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause != null && cause.getMessage() != null) {
+            String msg = cause.getMessage();
+            int idx = msg.indexOf("position_id");
+            if (idx >= 0) {
+                log.debug("KPI position integrity message: {}", msg);
+            }
+        }
+        return null;
     }
 }

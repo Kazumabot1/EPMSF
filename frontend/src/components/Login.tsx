@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { extractApiErrorMessage } from '../services/apiError';
 import type { ApiEnvelope, AuthResponse } from '../types/auth';
 import './login.css';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,11 +15,8 @@ type PasswordRule = {
   passed: boolean;
 };
 
-const getErrorMessage = (err: any, fallback: string) =>
-  err?.response?.data?.message ||
-  err?.response?.data?.error ||
-  err?.message ||
-  fallback;
+const getErrorMessage = (err: unknown, fallback: string) =>
+  extractApiErrorMessage(err, fallback);
 
 const getPasswordRules = (password: string): PasswordRule[] => [
   { label: 'At least 8 characters', passed: password.length >= 8 },

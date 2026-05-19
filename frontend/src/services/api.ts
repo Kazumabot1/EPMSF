@@ -1,5 +1,6 @@
 import axios, { AxiosHeaders } from 'axios';
 import { authStorage } from './authStorage';
+import { isBackendUnreachableStatus } from './apiError';
 
 const api = axios.create({
   baseURL: '/api',
@@ -49,10 +50,17 @@ api.interceptors.response.use(
     const headers = AxiosHeaders.from(error?.config?.headers);
     const hasAuthorizationHeader = Boolean(headers.get('Authorization'));
 
-    console.error(
-      `API request failed: status=${status}, url=${url}, hasToken=${hasToken}, hasAuthorizationHeader=${hasAuthorizationHeader}`,
-      error?.response?.data,
-    );
+    // 409 conflicts and gateway errors are handled in UI; avoid noisy console errors.
+    if (status !== 409 && !isBackendUnreachableStatus(status)) {
+      console.error('API Error:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        path: error.response?.data?.path ?? url,
+        validationErrors: error.response?.data?.validationErrors,
+        hasToken,
+        hasAuthorizationHeader,
+      });
+    }
 
     if (status === 401) {
       authStorage.clearSession();

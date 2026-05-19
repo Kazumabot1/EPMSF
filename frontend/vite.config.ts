@@ -19,6 +19,25 @@ export default defineConfig({
       '/api': {
         target: apiProxyTarget,
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, _req, res) => {
+            console.warn(
+              `[vite] API proxy could not reach ${apiProxyTarget}. Start the EPMS backend (port 8081) and MySQL, then retry.`,
+              err.message,
+            );
+            if (res && 'writeHead' in res && !res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(
+                JSON.stringify({
+                  message:
+                    'Cannot reach the API server. Start the EPMS backend on http://localhost:8081 (MySQL must be running), then try again.',
+                  status: 502,
+                  error: 'Bad Gateway',
+                }),
+              );
+            }
+          });
+        },
       },
       '/ws': {
         target: apiProxyTarget,

@@ -2,6 +2,9 @@ package com.epms.controller;
 
 import com.epms.dto.KpiFormRequestDTO;
 import com.epms.dto.KpiFormResponseDTO;
+import com.epms.dto.KpiPositionAssignmentDto;
+import com.epms.dto.KpiPositionAvailabilityDto;
+import com.epms.dto.PositionResponseDto;
 import com.epms.dto.UseKpiDepartmentRequest;
 import com.epms.dto.UseKpiTemplateResultDto;
 import com.epms.service.EmployeeKpiWorkflowService;
@@ -43,6 +46,37 @@ public class KpiTemplateController {
     @GetMapping("/list")
     public ResponseEntity<List<KpiFormResponseDTO>> list() {
         return ResponseEntity.ok(kpiFormService.getAllTemplates());
+    }
+
+    /**
+     * Without {@code checkPositionId}: active position → KPI template links.
+     * With {@code checkPositionId}: whether that position can receive a new form (pre-create check).
+     */
+    @GetMapping("/available-positions")
+    public ResponseEntity<List<PositionResponseDto>> availablePositions(
+            @RequestParam(required = false) Integer excludeFormId
+    ) {
+        return ResponseEntity.ok(kpiFormService.getAvailablePositions(excludeFormId));
+    }
+
+    @GetMapping("/assigned-position-ids")
+    public ResponseEntity<?> assignedPositionIds(
+            @RequestParam(required = false) Integer excludeFormId,
+            @RequestParam(required = false) Integer checkPositionId,
+            @RequestParam(required = false) String view
+    ) {
+        if ("available".equalsIgnoreCase(view)) {
+            return ResponseEntity.ok(kpiFormService.getAvailablePositions(excludeFormId));
+        }
+        if (checkPositionId != null) {
+            return ResponseEntity.ok(kpiFormService.checkPositionAvailability(checkPositionId, excludeFormId));
+        }
+        return ResponseEntity.ok(kpiFormService.getPositionAssignments(excludeFormId));
+    }
+
+    @GetMapping("/by-position/{positionId}")
+    public ResponseEntity<KpiFormResponseDTO> getByPosition(@PathVariable Integer positionId) {
+        return ResponseEntity.ok(kpiFormService.getTemplateByPositionId(positionId));
     }
 
     @GetMapping("/{id}")

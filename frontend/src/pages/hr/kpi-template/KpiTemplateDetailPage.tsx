@@ -2,16 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
-import { kpiStatusBadgeClass } from '../../../components/hr/kpi-template/kpiTemplateUi';
+import {
+  formatTemplatePositionLabels,
+  kpiStatusBadgeClass,
+  sumTemplateItemWeights,
+} from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
 import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
-
-const formatDate = (value: string | null) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-};
 
 const KpiTemplateDetailPage = () => {
   const { id } = useParams();
@@ -71,6 +68,7 @@ const KpiTemplateDetailPage = () => {
   const sortedItems = [...template.items].sort(
     (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
   );
+  const totalWeight = sumTemplateItemWeights(sortedItems);
 
   return (
     <div className="kpi-tpl-page">
@@ -106,25 +104,14 @@ const KpiTemplateDetailPage = () => {
             </div>
           </div>
 
-          <dl className="relative mt-10 grid gap-4 border-t border-gray-200/90 pt-10 sm:grid-cols-3">
+          <dl className="relative mt-10 grid gap-4 border-t border-gray-200/90 pt-10">
             <div className="rounded-xl bg-gray-50/90 px-5 py-4 ring-1 ring-gray-200/90">
-              <dt className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">
-                <i className="bi bi-calendar-range text-violet-600" aria-hidden />
-                Period
-              </dt>
-              <dd className="mt-2 text-sm font-semibold text-gray-900">
-                {formatDate(template.startDate)} — {formatDate(template.endDate)}
-              </dd>
-            </div>
-            <div className="rounded-xl bg-gray-50/90 px-5 py-4 ring-1 ring-gray-200/90 sm:col-span-2">
               <dt className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">
                 <i className="bi bi-people text-violet-600" aria-hidden />
                 Positions
               </dt>
               <dd className="mt-2 text-sm font-medium leading-relaxed text-gray-800">
-                {template.positions.length > 0
-                  ? template.positions.map((position) => position.positionTitle).join(' · ')
-                  : '—'}
+                {formatTemplatePositionLabels(template.positions)}
               </dd>
             </div>
           </dl>
@@ -174,6 +161,17 @@ const KpiTemplateDetailPage = () => {
                       );
                     })}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+                      <td colSpan={5} className="px-4 py-3.5 text-right text-gray-700">
+                        Total weight
+                      </td>
+                      <td className="px-4 py-3.5 tabular-nums text-gray-900">{totalWeight}%</td>
+                      <td colSpan={2} className="bg-violet-50/50 px-4 py-3.5 text-center text-xs text-violet-700/80">
+                        Total score — PM phase
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
