@@ -49,12 +49,12 @@ const KpiTemplateListPage = () => {
   }, [query, templates]);
 
   const handleDelete = async (id: number, title: string) => {
-    if (!window.confirm(`Delete KPI template "${title}"?`)) {
+    if (!window.confirm(`Archive KPI template "${title}"?`)) {
       return;
     }
     try {
       await kpiTemplateService.deleteTemplate(id);
-      toast.success('Template deleted.');
+      toast.success('Template archived.');
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed.');

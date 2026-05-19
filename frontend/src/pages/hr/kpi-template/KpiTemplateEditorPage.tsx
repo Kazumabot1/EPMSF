@@ -180,7 +180,7 @@ const KpiTemplateEditorPage = () => {
       return null;
     }
 
-    const submitStatus: KpiFormStatus = 'DRAFT';
+    const submitStatus: KpiFormStatus = action === 'use-in-cycle' ? 'ACTIVE' : 'DRAFT';
     const message = validate(submitStatus);
     if (message) {
       toast.error(message);
@@ -215,11 +215,11 @@ const KpiTemplateEditorPage = () => {
       }
 
       if (action === 'use-in-cycle') {
-        toast.success(isEdit ? 'KPI template updated.' : 'KPI template created.');
+        toast.success(isEdit ? 'KPI template activated.' : 'KPI template created and activated.');
         navigate('/hr/kpi-template');
         return null;
       } else {
-        toast.success(isEdit ? 'KPI template updated.' : 'KPI template created.');
+        toast.success(isEdit ? 'KPI template draft saved.' : 'KPI template draft created.');
         navigate('/hr/kpi-template');
         return null;
       }

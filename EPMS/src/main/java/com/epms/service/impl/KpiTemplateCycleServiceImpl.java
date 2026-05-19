@@ -6,6 +6,7 @@ import com.epms.entity.KpiForm;
 import com.epms.entity.KpiTemplateCycle;
 import com.epms.entity.KpiTemplateCycleForm;
 import com.epms.entity.User;
+import com.epms.entity.enums.KpiFormStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.KpiFormRepository;
 import com.epms.repository.KpiTemplateCycleFormRepository;
@@ -158,6 +159,12 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                             HttpStatus.BAD_REQUEST,
                             "KPI form not found: " + formId
                     ));
+            if (form.getStatus() != KpiFormStatus.ACTIVE) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "KPI template cycles can only use active KPI forms: " + form.getTitle()
+                );
+            }
             formsById.put(formId, form);
         }
         for (KpiForm form : formsById.values()) {

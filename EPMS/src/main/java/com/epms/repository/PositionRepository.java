@@ -22,6 +22,7 @@ public interface PositionRepository extends JpaRepository<Position, Integer> {
                 SELECT 1 FROM KpiPosition kp
                 WHERE kp.position.id = p.id
                   AND (:excludeFormId IS NULL OR kp.kpiForm.id <> :excludeFormId)
+                  AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             )
             ORDER BY p.positionTitle ASC
             """)

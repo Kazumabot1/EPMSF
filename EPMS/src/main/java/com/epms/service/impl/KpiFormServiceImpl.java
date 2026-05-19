@@ -39,7 +39,6 @@ public class KpiFormServiceImpl implements KpiFormService {
     private final KpiUnitRepository kpiUnitRepository;
     private final KpiItemRepository kpiItemRepository;
     private final UserRepository userRepository;
-    private final EmployeeKpiFormRepository employeeKpiFormRepository;
 
     @Override
     @Transactional
@@ -139,15 +138,15 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public void deleteTemplate(Integer id) {
-        if (employeeKpiFormRepository.countByKpiForm_Id(id) > 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Cannot delete this KPI template because employees are already assigned."
-            );
-        }
         KpiForm form = kpiFormRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
-        kpiFormRepository.delete(form);
+        User editor = userRepository.findById(SecurityUtils.currentUserId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        form.setStatus(KpiFormStatus.ARCHIVED);
+        form.setUpdatedByUser(editor);
+        form.getKpiPositions().clear();
+        kpiFormRepository.save(form);
     }
 
     @Override
@@ -431,6 +430,9 @@ public class KpiFormServiceImpl implements KpiFormService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only one position can be assigned per KPI form.");
         }
         Integer pid = distinctIds.get(0);
+        kpiPositionRepository.deleteArchivedLinksByPositionId(pid);
+        kpiPositionRepository.flush();
+
         Integer currentFormId = form.getId();
         Optional<KpiPosition> existingLink = findOccupyingLink(pid, currentFormId);
         logDuplicateCheck(pid, currentFormId, existingLink);
