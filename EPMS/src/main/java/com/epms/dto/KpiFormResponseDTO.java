@@ -27,8 +27,11 @@ public class KpiFormResponseDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime finalizedAt;
+    private LocalDateTime sentAt;
     private String createdBy;
     private Integer createdByUserId;
+    private Integer updatedByUserId;
 
     @Builder.Default
     private List<KpiPositionSummaryDTO> positions = new ArrayList<>();

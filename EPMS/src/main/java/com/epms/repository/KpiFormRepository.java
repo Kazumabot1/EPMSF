@@ -1,37 +1,29 @@
 package com.epms.repository;
 
 import com.epms.entity.KpiForm;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface KpiFormRepository extends JpaRepository<KpiForm, Integer> {
 
-    @Query(
-            "SELECT DISTINCT f FROM KpiForm f "
-                    + "LEFT JOIN FETCH f.items i "
-                    + "LEFT JOIN FETCH i.kpiCategory "
-                    + "LEFT JOIN FETCH i.kpiUnit "
-                    + "LEFT JOIN FETCH i.kpiItem "
-                    + "WHERE f.id = :id"
-    )
-    Optional<KpiForm> findDetailWithItemsById(@Param("id") Integer id);
+    @EntityGraph(attributePaths = {
+            "items",
+            "items.kpiCategory",
+            "items.kpiUnit",
+            "items.kpiItem"
+    })
+    Optional<KpiForm> findDetailWithItemsById(Integer id);
 
+    @EntityGraph(attributePaths = {
+            "createdByUser",
+            "updatedByUser",
+            "kpiPositions",
+            "kpiPositions.position"
+    })
     List<KpiForm> findAllByOrderByCreatedAtDesc();
-
-    @Query(
-            """
-            SELECT DISTINCT f FROM KpiForm f
-            LEFT JOIN FETCH f.createdByUser
-            LEFT JOIN FETCH f.kpiPositions kp
-            LEFT JOIN FETCH kp.position
-            ORDER BY f.createdAt DESC
-            """
-    )
-    List<KpiForm> findAllSummariesOrderByCreatedAtDesc();
 
     List<KpiForm> findTop5ByOrderByCreatedAtDesc();
 
