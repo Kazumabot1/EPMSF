@@ -61,6 +61,23 @@ export type ExistingKpiForPosition = {
   templateTitle?: string;
 };
 
+function deriveAssignedPositionIds(
+  positions: PositionResponse[],
+  availablePositions: PositionResponse[],
+  assignedPositionIds: number[],
+): number[] {
+  const assigned = new Set(assignedPositionIds);
+  const available = new Set(availablePositions.map((position) => position.id));
+
+  for (const position of positions) {
+    if (!available.has(position.id)) {
+      assigned.add(position.id);
+    }
+  }
+
+  return [...assigned];
+}
+
 /** Resolve occupied position ids from template list when assigned-position-ids API is unavailable. */
 export async function resolveAssignedPositionIdsFromTemplates(
   excludeFormId?: number,
@@ -193,11 +210,12 @@ export async function loadKpiTemplateEditorLookups(
     }
   };
 
-  const [categories, units, items, positions, assignedPositionIds] = await Promise.all([
+  const [categories, units, items, positions, availablePositions, assignedPositionIds] = await Promise.all([
     load('KPI categories', () => kpiCategoryService.getAll(), []),
     load('KPI units', () => kpiUnitService.getAll(), []),
     load('KPI items', () => kpiItemService.getAll(), []),
     load('positions', () => positionService.getPositions(), []),
+    load('available positions', () => kpiTemplateService.getAvailablePositions(excludeFormId), []),
     load('assigned positions', () => loadAssignedPositionIds(excludeFormId), []),
   ]);
 
@@ -205,7 +223,13 @@ export async function loadKpiTemplateEditorLookups(
     toast.error(`Could not load: ${failures.join(', ')}. Other dropdowns may still be usable.`);
   }
 
-  return { categories, units, items, positions, assignedPositionIds };
+  return {
+    categories,
+    units,
+    items,
+    positions,
+    assignedPositionIds: deriveAssignedPositionIds(positions, availablePositions, assignedPositionIds),
+  };
 }
 
 export { EMPTY_LOOKUPS as emptyKpiTemplateEditorLookups };

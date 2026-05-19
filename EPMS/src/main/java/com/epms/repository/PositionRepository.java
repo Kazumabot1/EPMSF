@@ -12,8 +12,8 @@ public interface PositionRepository extends JpaRepository<Position, Integer> {
     Optional<Position> findByPositionTitleIgnoreCase(String positionTitle);
 
     /**
-     * Positions with no active row in {@code kpi_positions}, optionally ignoring one form when editing.
-     * Must stay aligned with {@link com.epms.repository.KpiPositionRepository#findActiveWithFormByPositionId}.
+     * Positions with no occupying row in {@code kpi_positions}, optionally ignoring one form when editing.
+     * Must stay aligned with the create/update duplicate guard.
      */
     @Query("""
             SELECT DISTINCT p FROM Position p

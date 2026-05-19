@@ -215,12 +215,9 @@ const KpiTemplateEditorPage = () => {
       }
 
       if (action === 'use-in-cycle') {
-        toast.success(
-          isEdit
-            ? 'KPI template updated. Select it in the template cycle.'
-            : 'KPI template created. Select it in the template cycle.',
-        );
-        return savedFormId;
+        toast.success(isEdit ? 'KPI template updated.' : 'KPI template created.');
+        navigate('/hr/kpi-template');
+        return null;
       } else {
         toast.success(isEdit ? 'KPI template updated.' : 'KPI template created.');
         navigate('/hr/kpi-template');
@@ -243,19 +240,7 @@ const KpiTemplateEditorPage = () => {
 
   const handleUseFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const savedFormId = await saveTemplate('use-in-cycle');
-    if (savedFormId != null) {
-      let formIdInput = form.querySelector('input[name="formId"]') as HTMLInputElement | null;
-      if (!formIdInput) {
-        formIdInput = document.createElement('input');
-        formIdInput.type = 'hidden';
-        formIdInput.name = 'formId';
-        form.appendChild(formIdInput);
-      }
-      formIdInput.value = String(savedFormId);
-      form.submit();
-    }
+    await saveTemplate('use-in-cycle');
   };
 
   if (loading) {
@@ -299,8 +284,6 @@ const KpiTemplateEditorPage = () => {
         </div>
 
         <form
-          method="post"
-          action="/hr/kpi-template-cycle/new"
           noValidate
           className="space-y-8"
           onSubmit={handleUseFormSubmit}
@@ -463,7 +446,7 @@ const KpiTemplateEditorPage = () => {
               type="submit"
               disabled={savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
               className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-              title="Save as draft and open KPI template cycle to include this form"
+              title="Save this form and return to the KPI template list"
             >
               {savingAction === 'use-in-cycle' ? (
                 <>

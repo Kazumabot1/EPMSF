@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "kpi_positions",
         uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"position_id"}),
                 @UniqueConstraint(columnNames = {"kpi_form_id", "position_id"})
         }
 )
