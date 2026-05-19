@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import {
@@ -90,10 +90,10 @@ const KpiTemplateListPage = () => {
                 <i className="bi bi-arrow-clockwise text-base text-gray-500" aria-hidden />
                 Refresh
               </button>
-              <Link to="/hr/kpi-template/new" className="kpi-tpl-btn-primary no-underline">
+              <a href="/hr/kpi-template/new" className="kpi-tpl-btn-primary no-underline">
                 <i className="bi bi-plus-lg text-lg" aria-hidden />
                 New template
-              </Link>
+              </a>
             </div>
           </div>
 
@@ -157,10 +157,10 @@ const KpiTemplateListPage = () => {
                   : 'Try a different search term.'}
               </p>
               {templates.length === 0 && (
-                <Link to="/hr/kpi-template/new" className="kpi-tpl-btn-primary mt-8 inline-flex no-underline">
+                <a href="/hr/kpi-template/new" className="kpi-tpl-btn-primary mt-8 inline-flex no-underline">
                   <i className="bi bi-plus-circle text-lg" aria-hidden />
                   Create template
-                </Link>
+                </a>
               )}
             </div>
           )}
