@@ -175,20 +175,20 @@ const KpiTemplateEditorPage = () => {
     return null;
   };
 
-  const saveTemplate = async (action: 'draft' | 'use-in-cycle') => {
+  const saveTemplate = async (action: 'draft' | 'use-in-cycle'): Promise<number | null> => {
     if (saveInFlightRef.current || savingAction !== null) {
-      return;
+      return null;
     }
 
     const submitStatus: KpiFormStatus = 'DRAFT';
     const message = validate(submitStatus);
     if (message) {
       toast.error(message);
-      return;
+      return null;
     }
     if (positionId == null) {
       toast.error('Select a position.');
-      return;
+      return null;
     }
 
     const payload = buildPayload(submitStatus);
@@ -220,10 +220,11 @@ const KpiTemplateEditorPage = () => {
             ? 'KPI template updated. Select it in the template cycle.'
             : 'KPI template created. Select it in the template cycle.',
         );
-        navigate('/hr/kpi-template-cycle/new', { state: { preselectFormId: savedFormId } });
+        return savedFormId;
       } else {
         toast.success(isEdit ? 'KPI template updated.' : 'KPI template created.');
         navigate('/hr/kpi-template');
+        return null;
       }
     } catch (err) {
       if (
@@ -233,15 +234,28 @@ const KpiTemplateEditorPage = () => {
       ) {
         toast.error(toApiRequestError(err, 'Could not save the KPI template.').message);
       }
+      return null;
     } finally {
       saveInFlightRef.current = false;
       setSavingAction(null);
     }
   };
 
-  const handleUseFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleUseFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    void saveTemplate('use-in-cycle');
+    const form = event.currentTarget;
+    const savedFormId = await saveTemplate('use-in-cycle');
+    if (savedFormId != null) {
+      let formIdInput = form.querySelector('input[name="formId"]') as HTMLInputElement | null;
+      if (!formIdInput) {
+        formIdInput = document.createElement('input');
+        formIdInput.type = 'hidden';
+        formIdInput.name = 'formId';
+        form.appendChild(formIdInput);
+      }
+      formIdInput.value = String(savedFormId);
+      form.submit();
+    }
   };
 
   if (loading) {
