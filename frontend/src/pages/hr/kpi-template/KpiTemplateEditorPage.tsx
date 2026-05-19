@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import KpiPositionExistingAlert from '../../../components/hr/kpi-template/KpiPositionExistingAlert';
@@ -239,6 +239,11 @@ const KpiTemplateEditorPage = () => {
     }
   };
 
+  const handleUseFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void saveTemplate('use-in-cycle');
+  };
+
   if (loading) {
     return (
       <div className="kpi-tpl-page">
@@ -279,7 +284,13 @@ const KpiTemplateEditorPage = () => {
           </Link>
         </div>
 
-        <form noValidate className="space-y-8">
+        <form
+          method="post"
+          action="/hr/kpi-template-cycle/new"
+          noValidate
+          className="space-y-8"
+          onSubmit={handleUseFormSubmit}
+        >
           <section className="kpi-tpl-card p-6 sm:p-8">
             <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
@@ -435,8 +446,7 @@ const KpiTemplateEditorPage = () => {
               )}
             </button>
             <button
-              type="button"
-              onClick={() => void saveTemplate('use-in-cycle')}
+              type="submit"
               disabled={savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
               className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
               title="Save as draft and open KPI template cycle to include this form"
