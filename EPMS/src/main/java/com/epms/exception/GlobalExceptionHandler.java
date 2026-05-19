@@ -271,9 +271,16 @@ public class GlobalExceptionHandler {
         if (path != null && path.matches(".*/api/v1/feedback/campaigns/\\d+/targets$")) {
             message = "Could not save campaign targets because one or more selected employees are already stored for this campaign. Refresh the campaign and try again.";
         } else if (path != null && path.contains("/api/hr/kpi-templates")) {
-            message =
-                    "This position already has a KPI form. Choose another position or edit the existing form.";
-            existingTemplateId = resolveKpiTemplateIdFromIntegrityViolation(ex, request);
+            String causeMessage = mostSpecificCauseMessage(ex);
+            if (isKpiPositionConflict(causeMessage)) {
+                message =
+                        "This position already has a KPI form. Choose another position or edit the existing form.";
+                existingTemplateId = resolveKpiTemplateIdFromIntegrityViolation(ex, request);
+            } else if (causeMessage != null
+                    && (causeMessage.toLowerCase().contains("start_date")
+                    || causeMessage.toLowerCase().contains("end_date"))) {
+                message = "KPI template date columns are not aligned with the app. Restart the backend to apply the schema fix, or run the KPI nullable date migration.";
+            }
         }
 
         log.warn(
@@ -337,5 +344,24 @@ public class GlobalExceptionHandler {
             }
         }
         return null;
+    }
+
+    private static boolean isKpiPositionConflict(String causeMessage) {
+        if (causeMessage == null) {
+            return false;
+        }
+        String msg = causeMessage.toLowerCase();
+        return msg.contains("kpi_positions")
+                || msg.contains("position_id")
+                || msg.contains("uk82x6nm6ro3k7p1ttuxflwbofq")
+                || msg.contains("uk_kpi_positions_position_id");
+    }
+
+    private static String mostSpecificCauseMessage(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause != null && cause.getMessage() != null) {
+            return cause.getMessage();
+        }
+        return ex.getMessage();
     }
 }

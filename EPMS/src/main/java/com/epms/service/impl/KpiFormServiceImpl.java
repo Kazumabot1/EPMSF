@@ -50,6 +50,15 @@ public class KpiFormServiceImpl implements KpiFormService {
         User author = userRepository.findById(SecurityUtils.currentUserId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
+        Integer existingTemplateId = findExistingTemplateIdForCreate(dto.getPositionIds());
+        if (existingTemplateId != null) {
+            log.info(
+                    "POST /kpi-templates/create received occupied position; updating existing KPI template {} instead.",
+                    existingTemplateId
+            );
+            return updateExistingTemplate(existingTemplateId, dto, status, author);
+        }
+
         KpiForm form = KpiForm.builder()
                 .title(dto.getTitle().trim())
                 .status(status)
@@ -73,11 +82,20 @@ public class KpiFormServiceImpl implements KpiFormService {
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
 
-        KpiForm form = kpiFormRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
-
         User editor = userRepository.findById(SecurityUtils.currentUserId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        return updateExistingTemplate(id, dto, status, editor);
+    }
+
+    private KpiFormResponseDTO updateExistingTemplate(
+            Integer id,
+            KpiFormRequestDTO dto,
+            KpiFormStatus status,
+            User editor
+    ) {
+        KpiForm form = kpiFormRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
 
         form.setTitle(dto.getTitle().trim());
         form.setStatus(status);
@@ -94,6 +112,19 @@ public class KpiFormServiceImpl implements KpiFormService {
 
         kpiFormRepository.save(form);
         return getTemplateById(id);
+    }
+
+    private Integer findExistingTemplateIdForCreate(List<Integer> positionIds) {
+        if (positionIds == null || positionIds.isEmpty()) {
+            return null;
+        }
+        List<Integer> distinctIds = positionIds.stream().distinct().toList();
+        if (distinctIds.size() != 1) {
+            return null;
+        }
+        return findOccupyingLink(distinctIds.get(0), null)
+                .map(link -> link.getKpiForm().getId())
+                .orElse(null);
     }
 
     @Override

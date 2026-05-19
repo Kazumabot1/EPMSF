@@ -42,6 +42,8 @@ public class KpiFormSchemaFix implements ApplicationRunner {
                 return;
             }
             ensureCreatedByStringColumn(conn);
+            ensureNullableDateColumn(conn, "start_date");
+            ensureNullableDateColumn(conn, "end_date");
             migrateLegacyCreatedByColumn(conn);
             normalizeFormStatus(conn);
         } catch (SQLException e) {
@@ -56,6 +58,17 @@ public class KpiFormSchemaFix implements ApplicationRunner {
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("ALTER TABLE kpi_form ADD COLUMN created_by_string VARCHAR(255) NULL");
             log.info("Added kpi_form.created_by_string column.");
+        }
+    }
+
+    private void ensureNullableDateColumn(Connection conn, String columnName) throws SQLException {
+        if (!"NO".equalsIgnoreCase(columnNullable(conn, "kpi_form", columnName))) {
+            return;
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE kpi_form MODIFY COLUMN " + columnName + " DATE NULL");
+            log.info("Relaxed kpi_form.{} to nullable.", columnName);
         }
     }
 
@@ -115,6 +128,21 @@ public class KpiFormSchemaFix implements ApplicationRunner {
 
     private static boolean columnExists(Connection conn, String tableName, String columnName) throws SQLException {
         return columnDataType(conn, tableName, columnName) != null;
+    }
+
+    private static String columnNullable(Connection conn, String tableName, String columnName) throws SQLException {
+        try (Statement st = conn.createStatement();
+                ResultSet rs = st.executeQuery(
+                        "SELECT IS_NULLABLE FROM information_schema.columns "
+                                + "WHERE table_schema = DATABASE() "
+                                + "AND table_name = '" + tableName + "' "
+                                + "AND column_name = '" + columnName + "'"
+                )) {
+            if (!rs.next()) {
+                return null;
+            }
+            return rs.getString(1);
+        }
     }
 
     private static String columnDataType(Connection conn, String tableName, String columnName) throws SQLException {
