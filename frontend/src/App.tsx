@@ -43,6 +43,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
+import ReportingDashboardPage from './pages/reports/ReportingDashboardPage';
 
 import PositionCreate from './pages/position/Create';
 import PositionTable from './pages/position/Table';
@@ -119,7 +120,15 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Employee']} />}>
             <Route element={<AppLayout />}>
               <Route path="/employee/dashboard" element={<EmployeeMyDashboard />} />
-              <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/employee/dashboard" />}>
+
+              <Route
+                element={
+                  <PositionPermissionRoute
+                    permission="teamView"
+                    fallbackPath="/employee/dashboard"
+                  />
+                }
+              >
                 <Route path="/employee/team-management" element={<TeamManagement />} />
               </Route>
 
@@ -159,7 +168,6 @@ function App() {
               <Route path="/manager/dashboard" element={<ManagerDashboard />} />
               <Route path="/manager/self-assessment" element={<EmployeeSelfAssessmentPage />} />
 
-              {/* Self-assessment review: manager can view assigned forms and add remarks only. No manager signature required. */}
               <Route path="/manager/assessment-review" element={<ManagerAssessmentReviewPage />} />
               <Route path="/manager/self-assessment-review" element={<ManagerAssessmentReviewPage />} />
 
@@ -170,15 +178,7 @@ function App() {
               <Route path="/manager/appraisals" element={<EmployeePerformanceReviewPage />} />
               <Route path="/manager/appraisals/history" element={<AppraisalHistoryListPage role="pm" />} />
 
-              <Route
-                path="/manager/reports"
-                element={
-                  <EmployeeRoutePlaceholder
-                    title="Team Reports"
-                    description="Manager reporting workflow placeholder."
-                  />
-                }
-              />
+              <Route path="/manager/reports" element={<ReportingDashboardPage />} />
 
               <Route path="/pip/create" element={<PipCreatePage />} />
             </Route>
@@ -186,18 +186,10 @@ function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['Executive']} />}>
             <Route element={<AppLayout />}>
-              <Route path="/ceo/dashboard" element={<CeoDashboard />} />
-              <Route path="/executive/dashboard" element={<Navigate to="/ceo/dashboard" replace />} />
-
-              <Route
-                path="/ceo/reports"
-                element={
-                  <EmployeeRoutePlaceholder
-                    title="Executive Reports"
-                    description="Executive performance reports placeholder."
-                  />
-                }
-              />
+              <Route path="/executive/dashboard" element={<CeoDashboard />} />
+              <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/reports" element={<ReportingDashboardPage />} />
+              <Route path="/ceo/reports" element={<Navigate to="/executive/reports" replace />} />
             </Route>
           </Route>
 
@@ -206,9 +198,9 @@ function App() {
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
               <Route path="/department-head/self-assessment" element={<EmployeeSelfAssessmentPage />} />
 
-              {/* Self-assessment approval: Department Head signature is required before HR. */}
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
+              <Route path="/department-head/reports" element={<ReportingDashboardPage />} />
 
               <Route path="/department-head/appraisals/review" element={<AppraisalReviewQueuePage mode="dept-head" />} />
               <Route path="/department-head/appraisals/history" element={<AppraisalHistoryListPage role="dept-head" />} />
@@ -233,11 +225,9 @@ function App() {
 
               <Route path="/hr/department" element={<DepartmentManagement />} />
               <Route path="/hr/department-comparison" element={<DepartmentComparisonPage />} />
+              <Route path="/hr/reports" element={<ReportingDashboardPage />} />
 
-              {/* Self-assessment HR side. HR can approve/decline completed workflow items. */}
               <Route path="/hr/assessment-scores" element={<AssessmentScoreTablePage />} />
-
-              {/* Form builder. Existing forms should be locked by the page/backend after creation. */}
               <Route path="/hr/assessment-forms" element={<AssessmentFormBuilderPage />} />
 
               <Route path="/hr/feedback/dashboard" element={<HrFeedbackDashboard />} />

@@ -71,6 +71,13 @@ function notifIconClass(type?: string | null) {
   return 'bi bi-bell';
 }
 
+const cleanRole = (role?: string | null) => {
+  return String(role || 'User')
+    .replace(/^ROLE_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const Header = ({ collapsed }: HeaderProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -86,7 +93,7 @@ const Header = ({ collapsed }: HeaderProps) => {
 
   const email = user?.email ?? 'user@company.com';
   const userName = user?.fullName ?? 'User';
-  const primaryRole = user?.roles?.[0] ?? 'User';
+  const primaryRole = cleanRole(user?.roles?.[0] ?? user?.dashboard ?? 'User');
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeNotif = useCallback(() => setNotifOpen(false), []);
@@ -151,7 +158,7 @@ const Header = ({ collapsed }: HeaderProps) => {
     navigate('/login', { replace: true });
   };
 
-  const markAllRead = async (e: MouseEvent) => {
+  const markAllRead = async (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
 
     try {
@@ -310,7 +317,7 @@ const Header = ({ collapsed }: HeaderProps) => {
               aria-labelledby="hr-user-menu-button"
             >
               <Link
-                to="/hr/profile"
+                to="/profile"
                 className="hr-user-dropdown-item"
                 role="menuitem"
                 onClick={closeMenu}

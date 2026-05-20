@@ -1,63 +1,59 @@
 package com.epms.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Carries all permission flags for a position.
- * Role decides the dashboard. Position permissions decide which actions are enabled.
- */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class PositionPermissionDto {
+    private Integer positionId;
+    private String positionTitle;
 
-    private Boolean oneOnOneCreate = false;
-    private Boolean oneOnOneDeptSelection = false;
-    private Boolean oneOnOneTeamSelection = false;
+    private Boolean oneOnOneCreate;
+    private Boolean oneOnOneDeptSelection;
+    private Boolean oneOnOneTeamSelection;
 
-    private Boolean teamCreate = false;
-    private Boolean teamEdit = false;
-    private Boolean teamHistory = false;
-    private Boolean teamView = false;
-    private Boolean teamAssignAsLeader = false;
-    private Boolean teamAssignAsPm = false;
-    private Boolean teamAssignAsMember = false;
+    private Boolean teamCreate;
+    private Boolean teamEdit;
+    private Boolean teamHistory;
+    private Boolean teamView;
+    private Boolean teamAssignAsLeader;
+    private Boolean teamAssignAsPm;
+    private Boolean teamAssignAsMember;
 
-    private Boolean pipCreate = false;
-    private Boolean pipEdit = false;
-    private Boolean pipViewAll = false;
+    private Boolean pipCreate;
+    private Boolean pipEdit;
+    private Boolean pipViewAll;
 
-    private Boolean appraisalReview = false;
-    private Boolean appraisalApprove = false;
-    private Boolean appraisalView = false;
-    private Boolean appraisalScoreInput = false;
-    private Boolean appraisalSign = false;
+    private Boolean appraisalReview;
+    private Boolean appraisalApprove;
+    private Boolean appraisalView;
+    private Boolean appraisalScoreInput;
+    private Boolean appraisalSign;
 
-    private Boolean kpiCreate = false;
-    private Boolean kpiEdit = false;
-    private Boolean kpiScore = false;
-    private Boolean kpiView = false;
-    private Boolean kpiInput = false;
+    private Boolean kpiCreate;
+    private Boolean kpiEdit;
+    private Boolean kpiScore;
+    private Boolean kpiView;
+    private Boolean kpiInput;
 
-    private Boolean selfAssessmentView = false;
-    private Boolean selfAssessmentInput = false;
-    private Boolean selfAssessmentLock = false;
-    private Boolean selfAssessmentSign = false;
+    private Boolean selfAssessmentView;
+    private Boolean selfAssessmentInput;
+    private Boolean selfAssessmentLock;
+    private Boolean selfAssessmentSign;
 
-    private Boolean feedbackFormCreate = false;
-    private Boolean feedbackSend = false;
-    private Boolean continuousFeedbackView = false;
-    private Boolean continuousFeedbackGive = false;
+    private Boolean feedbackFormCreate;
+    private Boolean feedbackSend;
+    private Boolean continuousFeedbackView;
+    private Boolean continuousFeedbackGive;
 
-    private Boolean departmentCrud = false;
-    private Boolean departmentComparisonView = false;
-    private Boolean positionCrud = false;
-    private Boolean employeeCrud = false;
-    private Boolean employeeExcelImport = false;
-
-    public static boolean safe(Boolean value) {
-        return Boolean.TRUE.equals(value);
-    }
+    private Boolean departmentCrud;
+    private Boolean departmentComparisonView;
+    private Boolean positionCrud;
+    private Boolean employeeCrud;
+    private Boolean employeeExcelImport;
 }

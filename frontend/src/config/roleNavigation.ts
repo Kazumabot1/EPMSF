@@ -1,10 +1,5 @@
 import type { PositionPermission } from '../types/positionPermission';
 
-/*
-  Role-based navigation configuration.
-  Roles: Employee | Admin | HR | DepartmentHead | Manager | Executive
-*/
-
 export type UserRole =
   | 'Employee'
   | 'Admin'
@@ -34,6 +29,7 @@ export const disabledFeatureMessage = (positionName?: string | null) =>
 export const roleNavigation: Record<UserRole, NavItem[]> = {
   Employee: [
     { label: 'My Dashboard', path: '/employee/dashboard', icon: 'bi-columns-gap', end: true },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'My KPIs', path: '/employee/kpis', icon: 'bi-bullseye' },
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
@@ -50,6 +46,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Admin: [
     { label: 'Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
@@ -68,7 +65,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   HR: [
     { label: 'Dashboard', path: '/dashboard', icon: 'bi-grid-1x2', end: true },
-    { label: 'Profile', path: '/hr/profile', icon: 'bi-person' },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'Employees', path: '/hr/employee', icon: 'bi-people' },
     {
       label: 'Teams',
@@ -86,7 +83,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-building',
       children: [
         { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
-        { label: 'Department Comparison', path: '/hr/department-comparison', icon: 'bi-columns-gap', permissionField: 'departmentComparisonView' },
+        {
+          label: 'Department Comparison',
+          path: '/hr/department-comparison',
+          icon: 'bi-columns-gap',
+          permissionField: 'departmentComparisonView',
+        },
       ],
     },
     {
@@ -94,10 +96,22 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/hr/assessment-scores',
       icon: 'bi-clipboard-data',
       children: [
-        { label: 'Scores', path: '/hr/assessment-scores', icon: 'bi-clipboard-data', end: true, permissionField: 'selfAssessmentView' },
-        { label: 'Form Create', path: '/hr/assessment-forms', icon: 'bi-ui-checks-grid', permissionField: 'selfAssessmentInput' },
+        {
+          label: 'Scores',
+          path: '/hr/assessment-scores',
+          icon: 'bi-clipboard-data',
+          end: true,
+          permissionField: 'selfAssessmentView',
+        },
+        {
+          label: 'Form Create',
+          path: '/hr/assessment-forms',
+          icon: 'bi-ui-checks-grid',
+          permissionField: 'selfAssessmentInput',
+        },
       ],
     },
+    { label: 'Reports', path: '/hr/reports', icon: 'bi-file-earmark-bar-graph' },
     {
       label: 'Appraisals',
       path: '/hr/appraisal',
@@ -128,7 +142,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-clipboard2-pulse',
       children: [{ label: 'Past Plans', path: '/pip/past-plans', icon: 'bi-clock-history' }],
     },
-    { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Positions',
       path: '/hr/position/create',
@@ -149,24 +162,29 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Categories', path: '/hr/performance-kpi/category', icon: 'bi-tags' },
         { label: 'KPI Items', path: '/hr/performance-kpi/item', icon: 'bi-card-checklist' },
         { label: 'KPI Templates', path: '/hr/kpi-template', icon: 'bi-ui-checks-grid' },
+        { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
+        { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
       ],
     },
   ],
 
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'Self-Assessment', path: '/department-head/self-assessment', icon: 'bi-pencil-square' },
     {
-      label: 'Teams',
-      path: '/department-head/teams',
-      icon: 'bi-people-fill',
-      children: [
-        { label: 'Teams', path: '/department-head/teams', icon: 'bi-people-fill', end: true },
-        { label: 'Create Team', path: '/department-head/teams/create', icon: 'bi-plus-square', permissionField: 'teamCreate' },
-        { label: 'Team History', path: '/department-head/team-history', icon: 'bi-clock-history', permissionField: 'teamHistory' },
-      ],
+      label: 'Continuous Feedback',
+      path: '/continuous-feedback',
+      icon: 'bi-chat-dots',
+      permissionField: 'continuousFeedbackGive',
     },
-    { label: 'Continuous Feedback', path: '/continuous-feedback', icon: 'bi-chat-dots', permissionField: 'continuousFeedbackGive' },
-    { label: 'Assessment Review', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data', permissionField: 'selfAssessmentView' },
+    {
+      label: 'Assessment Review',
+      path: '/department-head/assessment-scores',
+      icon: 'bi-clipboard-data',
+      permissionField: 'selfAssessmentView',
+    },
+    { label: 'Performance Reports', path: '/department-head/reports', icon: 'bi-file-earmark-bar-graph' },
     {
       label: 'Appraisals',
       path: '/department-head/appraisals',
@@ -199,14 +217,25 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
-    { label: 'Continuous Feedback', path: '/continuous-feedback', icon: 'bi-chat-dots', permissionField: 'continuousFeedbackGive' },
-    { label: 'KPI Scoring', path: '/manager/kpi-scoring', icon: 'bi-bullseye', permissionField: 'kpiInput' },
-    { label: 'Self-Assessment Review', path: '/manager/assessment-review', icon: 'bi-person-check', permissionField: 'selfAssessmentSign' },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    {
+      label: 'Continuous Feedback',
+      path: '/continuous-feedback',
+      icon: 'bi-chat-dots',
+      permissionField: 'continuousFeedbackGive',
+    },
+    {
+      label: 'KPI Scoring',
+      path: '/manager/kpi-scoring',
+      icon: 'bi-bullseye',
+      permissionField: 'kpiInput',
+    },
     { label: 'Self-Assessment', path: '/manager/self-assessment', icon: 'bi-pencil-square' },
     {
       label: 'Self-Assessment Review',
       path: '/manager/assessment-review',
       icon: 'bi-person-check',
+      permissionField: 'selfAssessmentSign',
     },
     {
       label: 'Team Appraisals',
@@ -250,6 +279,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'Reports', path: '/executive/reports', icon: 'bi-bar-chart-line' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
   ],
@@ -293,7 +323,6 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
   ) {
     return 'HR';
   }
-  if (normalizedRoles.includes('HR') || dashboard === 'HR_DASHBOARD') return 'HR';
 
   if (
     normalizedRoles.includes('MANAGER') ||

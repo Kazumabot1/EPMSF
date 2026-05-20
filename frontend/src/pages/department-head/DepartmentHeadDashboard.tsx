@@ -246,7 +246,9 @@ const DepartmentHeadDashboard = () => {
         </span>
 
         <h1>{departmentName || 'My Department'}</h1>
-        <p>Manage teams, employees, and self-assessment reviews from your department.</p>
+        <p>
+          Manage teams, employees, self-assessment reviews, and department performance reports.
+        </p>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
           <button
@@ -256,6 +258,15 @@ const DepartmentHeadDashboard = () => {
           >
             <i className="bi bi-clipboard-check" />
             Self-Assessment Review
+          </button>
+
+          <button
+            className="team-btn primary"
+            type="button"
+            onClick={() => navigate('/department-head/reports')}
+          >
+            <i className="bi bi-file-earmark-bar-graph" />
+            Department Reports
           </button>
 
           <button className="team-btn secondary" type="button" onClick={loadPage}>
@@ -308,10 +319,22 @@ const DepartmentHeadDashboard = () => {
             </div>
 
             <div className="col-md-3">
-              <div className="team-card">
-                <strong>{departmentName || '-'}</strong>
-                <span>Department</span>
-              </div>
+              <button
+                type="button"
+                className="team-card"
+                onClick={() => navigate('/department-head/reports')}
+                style={{
+                  width: '100%',
+                  cursor: 'pointer',
+                  border: 'none',
+                  textAlign: 'left',
+                }}
+              >
+                <strong>
+                  <i className="bi bi-file-earmark-bar-graph" /> Reports
+                </strong>
+                <span>Department Analytics</span>
+              </button>
             </div>
 
             <div className="col-md-3">
@@ -332,6 +355,20 @@ const DepartmentHeadDashboard = () => {
                 <span>Self-Assessments</span>
               </button>
             </div>
+          </div>
+
+          <div className="team-alert" style={{ marginBottom: 24 }}>
+            <strong>Reporting:</strong>{' '}
+            Department reports show employee performance summaries, department score
+            comparison, PIP status, feedback completion, and performance recommendations.
+            <button
+              type="button"
+              className="team-btn ghost"
+              onClick={() => navigate('/department-head/reports')}
+              style={{ marginLeft: 8 }}
+            >
+              Open Reports
+            </button>
           </div>
 
           <div className="team-alert" style={{ marginBottom: 24 }}>

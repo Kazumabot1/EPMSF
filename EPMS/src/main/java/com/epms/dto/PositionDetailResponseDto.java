@@ -1,23 +1,25 @@
 package com.epms.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Data
-@NoArgsConstructor
+@Builder
 @AllArgsConstructor
+@NoArgsConstructor
 public class PositionDetailResponseDto {
-
     private Integer id;
     private String positionTitle;
     private Integer levelId;
     private String levelCode;
+    private Integer roleId;
+    private String roleName;
     private String description;
     private Boolean status;
     private LocalDateTime createdAt;
@@ -31,14 +33,20 @@ public class PositionDetailResponseDto {
     private Integer departmentCount;
     private Integer teamCount;
 
-    private List<DepartmentUsageDto> departments = new ArrayList<>();
-    private List<EmployeeUsageDto> employees = new ArrayList<>();
-    private List<UserOnlyAccountDto> userOnlyAccounts = new ArrayList<>();
+    @Builder.Default
+    private List<DepartmentUsage> departments = new ArrayList<>();
+
+    @Builder.Default
+    private List<EmployeeUsage> employees = new ArrayList<>();
+
+    @Builder.Default
+    private List<UserOnlyAccount> userOnlyAccounts = new ArrayList<>();
 
     @Data
-    @NoArgsConstructor
+    @Builder
     @AllArgsConstructor
-    public static class DepartmentUsageDto {
+    @NoArgsConstructor
+    public static class DepartmentUsage {
         private Integer departmentId;
         private String departmentName;
         private String departmentCode;
@@ -47,13 +55,16 @@ public class PositionDetailResponseDto {
         private Integer inactiveEmployeeCount;
         private Integer loginAccountCount;
         private Integer userOnlyAccountCount;
+
+        @Builder.Default
         private List<String> employeeNames = new ArrayList<>();
     }
 
     @Data
-    @NoArgsConstructor
+    @Builder
     @AllArgsConstructor
-    public static class EmployeeUsageDto {
+    @NoArgsConstructor
+    public static class EmployeeUsage {
         private Integer employeeId;
         private Integer userId;
         private String employeeCode;
@@ -63,7 +74,7 @@ public class PositionDetailResponseDto {
         private Boolean active;
         private Boolean loginAccountCreated;
         private String accountStatus;
-        private Date joinDate;
+        private String joinDate;
 
         private Integer currentDepartmentId;
         private String currentDepartment;
@@ -72,24 +83,28 @@ public class PositionDetailResponseDto {
         private Integer usageDepartmentId;
         private String usageDepartmentName;
         private String departmentUsageLabel;
-        private Date departmentStartDate;
-        private Date departmentEndDate;
+        private String departmentStartDate;
+        private String departmentEndDate;
 
+        @Builder.Default
         private List<String> teamNames = new ArrayList<>();
+
+        @Builder.Default
         private List<String> teamRoles = new ArrayList<>();
     }
 
     @Data
-    @NoArgsConstructor
+    @Builder
     @AllArgsConstructor
-    public static class UserOnlyAccountDto {
+    @NoArgsConstructor
+    public static class UserOnlyAccount {
         private Integer userId;
         private String fullName;
         private String email;
         private String employeeCode;
         private Boolean active;
         private String accountStatus;
-        private Date joinDate;
+        private String joinDate;
         private Integer departmentId;
         private String departmentName;
     }

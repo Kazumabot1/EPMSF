@@ -5,8 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface PositionPermissionAuditRepository extends JpaRepository<PositionPermissionAudit, Integer> {
-
-    /** All audit rows for a position, newest first. */
+public interface PositionPermissionAuditRepository extends JpaRepository<PositionPermissionAudit, Long> {
     List<PositionPermissionAudit> findByPositionIdOrderByEditedAtDesc(Integer positionId);
 }

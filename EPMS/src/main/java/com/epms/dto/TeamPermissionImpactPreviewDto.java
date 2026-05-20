@@ -15,19 +15,19 @@ import java.util.List;
 public class TeamPermissionImpactPreviewDto {
     private Integer positionId;
     private String positionTitle;
-    private boolean hasImpact;
-    private int memberRemovalCount;
-    private int projectManagerRemovalCount;
-    private int teamInactivationCount;
+    private Boolean hasImpact;
+    private Integer memberRemovalCount;
+    private Integer projectManagerRemovalCount;
+    private Integer teamInactivationCount;
 
     @Builder.Default
-    private List<ImpactItem> items = new ArrayList<>();
+    private List<Item> items = new ArrayList<>();
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ImpactItem {
+    public static class Item {
         private String impactType;
         private Integer teamId;
         private String teamName;

@@ -7,8 +7,7 @@ import com.epms.dto.PositionResponseDto;
 import java.util.List;
 
 public interface PositionService {
-
-    PositionResponseDto create(PositionRequestDto dto);
+    PositionResponseDto create(PositionRequestDto request);
 
     List<PositionResponseDto> getAll();
 
@@ -16,7 +15,5 @@ public interface PositionService {
 
     PositionDetailResponseDto getDetails(Integer id);
 
-    PositionResponseDto update(Integer id, PositionRequestDto dto);
-
-    void delete(Integer id);
+    PositionResponseDto update(Integer id, PositionRequestDto request);
 }
