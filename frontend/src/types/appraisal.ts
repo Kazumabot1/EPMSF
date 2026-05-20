@@ -9,7 +9,7 @@ export type EmployeeAppraisalStatus =
   | 'REJECTED'
   | 'RETURNED';
 export type AppraisalReviewStage = 'PM' | 'DEPT_HEAD' | 'HR';
-export type AppraisalDecision = 'APPROVED' | 'REJECTED' | 'RETURNED';
+export type AppraisalDecision = 'DRAFT' | 'APPROVED' | 'REJECTED' | 'RETURNED';
 
 export interface AppraisalCriterionRequest {
   id?: number;
@@ -89,6 +89,8 @@ export interface AppraisalCycleRequest {
   startDate?: string | null;
   endDate?: string | null;
   submissionDeadline: string;
+  managerSubmissionDeadline?: string | null;
+  deptHeadSubmissionDeadline?: string | null;
   departmentIds: number[];
 }
 
@@ -109,6 +111,8 @@ export interface AppraisalCycleResponse {
   startDate: string;
   endDate: string;
   submissionDeadline: string;
+  managerSubmissionDeadline?: string | null;
+  deptHeadSubmissionDeadline?: string | null;
   status: AppraisalCycleStatus;
   locked: boolean;
   departmentIds: number[];
@@ -181,6 +185,8 @@ export interface EmployeeAppraisalFormResponse {
   cycleStartDate?: string | null;
   cycleEndDate?: string | null;
   cycleSubmissionDeadline?: string | null;
+  cycleManagerSubmissionDeadline?: string | null;
+  cycleDeptHeadSubmissionDeadline?: string | null;
   cycleLocked?: boolean | null;
   employeeId: number;
   employeeName: string;

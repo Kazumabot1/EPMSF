@@ -22,5 +22,7 @@ public class AppraisalCycleRequest {
     private LocalDate startDate;
     private LocalDate endDate;
     private LocalDate submissionDeadline;
+    private LocalDate managerSubmissionDeadline;
+    private LocalDate deptHeadSubmissionDeadline;
     private List<Integer> departmentIds = new ArrayList<>();
 }

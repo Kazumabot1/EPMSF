@@ -42,7 +42,7 @@ public class AppraisalTemplateController {
             @PathVariable Integer templateId,
             @Valid @RequestBody AppraisalTemplateRequest request
     ) {
-        AppraisalTemplateResponse response = appraisalTemplateService.updateDraftTemplate(templateId, request);
+        AppraisalTemplateResponse response = appraisalTemplateService.updateDraftTemplate(templateId, request, SecurityUtils.currentUserId());
         return ResponseEntity.ok(GenericApiResponse.success("Appraisal template updated", response));
     }
 

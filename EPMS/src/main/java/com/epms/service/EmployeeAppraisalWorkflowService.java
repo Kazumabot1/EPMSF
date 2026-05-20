@@ -13,9 +13,15 @@ public interface EmployeeAppraisalWorkflowService {
 
     EmployeeAppraisalFormResponse createPmDraft(Integer cycleId, Integer employeeId, Integer pmUserId);
 
+    EmployeeAppraisalFormResponse savePmDraft(Integer employeeAppraisalFormId, PmAppraisalSubmitRequest request, Integer pmUserId);
+
     EmployeeAppraisalFormResponse submitPmReview(Integer employeeAppraisalFormId, PmAppraisalSubmitRequest request, Integer pmUserId);
 
+    EmployeeAppraisalFormResponse saveDeptHeadDraft(Integer employeeAppraisalFormId, AppraisalReviewSubmitRequest request, Integer deptHeadUserId);
+
     EmployeeAppraisalFormResponse submitDeptHeadReview(Integer employeeAppraisalFormId, AppraisalReviewSubmitRequest request, Integer deptHeadUserId);
+
+    EmployeeAppraisalFormResponse saveHrDraft(Integer employeeAppraisalFormId, AppraisalReviewSubmitRequest request, Integer hrUserId);
 
     EmployeeAppraisalFormResponse approveByHr(Integer employeeAppraisalFormId, AppraisalReviewSubmitRequest request, Integer hrUserId);
 
@@ -30,6 +36,8 @@ public interface EmployeeAppraisalWorkflowService {
     List<EmployeeAppraisalFormResponse> getDeptHeadHistory(Integer deptHeadUserId);
 
     List<EmployeeAppraisalFormResponse> getHrReviewQueue();
+
+    List<EmployeeAppraisalFormResponse> getHrReviewedRecords();
 
     List<EmployeeAppraisalFormResponse> getEmployeeVisibleForms(Integer employeeId);
 }

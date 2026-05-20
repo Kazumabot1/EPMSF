@@ -102,6 +102,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Appraisal Create Records', path: '/hr/appraisal/create-records', icon: 'bi-journal-check' },
         { label: 'Cycle Records', path: '/hr/appraisal/cycles', icon: 'bi-arrow-repeat' },
         { label: 'Manager + Dept Review Check', path: '/hr/appraisal/review-check', icon: 'bi-shield-check' },
+        { label: 'Employee Reviews', path: '/hr/appraisal/employee-reviews', icon: 'bi-person-lines-fill' },
       ],
     },
     { label: '360 Feedback', path: '/hr/feedback/dashboard', icon: 'bi-chat-dots' },
