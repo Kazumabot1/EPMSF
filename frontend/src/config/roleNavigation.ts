@@ -1,3 +1,4 @@
+
 /*
   Role-based navigation configuration.
   Roles: Employee | Admin | HR | DepartmentHead | Manager | Executive
@@ -153,6 +154,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-building-check',
       end: true,
     },
+    { label: 'Self-Assessment', path: '/department-head/self-assessment', icon: 'bi-pencil-square' },
     { label: 'Assessment Review', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data' },
     {
       label: 'Appraisals',
@@ -186,6 +188,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
+    { label: 'Self-Assessment', path: '/manager/self-assessment', icon: 'bi-pencil-square' },
     {
       label: 'Self-Assessment Review',
       path: '/manager/assessment-review',

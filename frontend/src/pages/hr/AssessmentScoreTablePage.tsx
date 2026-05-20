@@ -263,7 +263,7 @@ const AssessmentDetailModal = ({
 
   const canDeptHeadSign =
     roleFlags.isDepartmentHead &&
-    ['PENDING_DEPARTMENT_HEAD', 'PENDING_MANAGER', 'SUBMITTED'].includes(assessment.status);
+    assessment.status === 'PENDING_DEPARTMENT_HEAD';
 
   const canHrAct = roleFlags.isHr && assessment.status === 'PENDING_HR';
 
@@ -411,7 +411,6 @@ const AssessmentDetailModal = ({
                       <th rowSpan={2}>Yes</th>
                       <th rowSpan={2}>No</th>
                       <th colSpan={5}>Rating</th>
-                      <th rowSpan={2}>Comment</th>
                     </tr>
 
                     <tr>
@@ -433,7 +432,6 @@ const AssessmentDetailModal = ({
                           <td key={rating}>{item.rating === rating ? '●' : ''}</td>
                         ))}
 
-                        <td>{item.comment || '-'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import KpiNotificationMessageBody from '../notifications/KpiNotificationMessageBody';
 import SignatureModal from '../signature/SignatureModal';
+import ProfileHeaderAvatar from '../ProfileHeaderAvatar';
 
 type HeaderProps = {
   collapsed: boolean;
@@ -21,39 +22,40 @@ type NotifItem = {
 
 function unwrap<T>(res: { data?: { data?: T } & T }): T | undefined {
   const body = res?.data as { data?: T } | undefined;
+
   if (body && typeof body === 'object' && 'data' in body && body.data !== undefined) {
     return body.data;
   }
+
   return res?.data as T | undefined;
 }
 
 function formatNotifTime(createdAt: NotifItem['createdAt']) {
   if (createdAt == null) return '';
+
   try {
     if (Array.isArray(createdAt)) {
       const [y, mo, d, h = 0, mi = 0, s = 0] = createdAt;
+
       return new Date(y, mo - 1, d, h, mi, s).toLocaleString(undefined, {
         dateStyle: 'medium',
         timeStyle: 'short',
       });
     }
+
     const d = new Date(createdAt);
+
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+    return d.toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
   } catch {
     return '';
   }
 }
-/*
-function notifIconClass(type?: string | null) {
-  const t = String(type ?? '')
-    .trim()
-    .toUpperCase();
-  if (t === 'MEETING') return 'bi bi-calendar-event';
-  if (t === 'PIP') return 'bi bi-clipboard2-pulse';
-  if (t === 'APPRAISAL') return 'bi bi-exclamation-triangle';
-  return 'bi bi-bell';
-} */
+
 function notifIconClass(type?: string | null) {
   const t = String(type ?? '')
     .trim()
@@ -68,11 +70,6 @@ function notifIconClass(type?: string | null) {
 
   return 'bi bi-bell';
 }
-
-
-
-
-
 
 const Header = ({ collapsed }: HeaderProps) => {
   const navigate = useNavigate();
@@ -90,7 +87,6 @@ const Header = ({ collapsed }: HeaderProps) => {
   const email = user?.email ?? 'user@company.com';
   const userName = user?.fullName ?? 'User';
   const primaryRole = user?.roles?.[0] ?? 'User';
-  const avatarLetter = (userName.trim().charAt(0) || email.charAt(0)).toUpperCase();
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeNotif = useCallback(() => setNotifOpen(false), []);
@@ -101,8 +97,10 @@ const Header = ({ collapsed }: HeaderProps) => {
         api.get('/notifications'),
         api.get('/notifications/unread-count'),
       ]);
+
       const list = unwrap<NotifItem[]>(listRes);
       const count = unwrap<number>(countRes);
+
       setNotifItems(Array.isArray(list) ? list.slice(0, 5) : []);
       setUnreadCount(typeof count === 'number' ? count : 0);
     } catch {
@@ -119,7 +117,7 @@ const Header = ({ collapsed }: HeaderProps) => {
   useEffect(() => {
     if (!menuOpen && !notifOpen) return;
 
-    const onDocMouseDown = (e: MouseEvent) => {
+    const onDocMouseDown = (e: globalThis.MouseEvent) => {
       const target = e.target as Node;
 
       if (menuRef.current && !menuRef.current.contains(target)) {
@@ -153,8 +151,9 @@ const Header = ({ collapsed }: HeaderProps) => {
     navigate('/login', { replace: true });
   };
 
-  const markAllRead = async (e: React.MouseEvent) => {
+  const markAllRead = async (e: MouseEvent) => {
     e.stopPropagation();
+
     try {
       await api.put('/notifications/read-all');
       await loadNotifications();
@@ -165,6 +164,7 @@ const Header = ({ collapsed }: HeaderProps) => {
 
   const onNotifItemClick = async (id: number, isRead: boolean | null | undefined) => {
     if (isRead) return;
+
     try {
       await api.put(`/notifications/${id}/read`);
       await loadNotifications();
@@ -194,6 +194,7 @@ const Header = ({ collapsed }: HeaderProps) => {
             }}
           >
             <i className="bi bi-bell" />
+
             {unreadCount > 0 ? (
               <span className="hr-notification-badge">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -205,6 +206,7 @@ const Header = ({ collapsed }: HeaderProps) => {
             <div className="hr-notif-popover" role="dialog" aria-label="Notifications">
               <div className="hr-notif-popover__header">
                 <span className="hr-notif-popover__title">Notifications</span>
+
                 <button type="button" className="hr-notif-popover__mark-all" onClick={markAllRead}>
                   Mark all read
                 </button>
@@ -229,6 +231,7 @@ const Header = ({ collapsed }: HeaderProps) => {
                       }}
                     >
                       <i className={`hr-notif-popover__item-icon ${notifIconClass(n.type)}`} aria-hidden />
+
                       <span className="hr-notif-popover__item-main">
                         <span className="hr-notif-popover__item-title">{n.title}</span>
                         <span className="hr-notif-popover__item-msg">
@@ -240,8 +243,11 @@ const Header = ({ collapsed }: HeaderProps) => {
                             onKpiLinkNavigate={() => onNotifItemClick(n.id, n.isRead)}
                           />
                         </span>
-                        <span className="hr-notif-popover__item-time">{formatNotifTime(n.createdAt)}</span>
+                        <span className="hr-notif-popover__item-time">
+                          {formatNotifTime(n.createdAt)}
+                        </span>
                       </span>
+
                       <span
                         className={`hr-notif-popover__item-dot ${n.isRead ? 'is-read' : ''}`}
                         aria-hidden
@@ -277,9 +283,11 @@ const Header = ({ collapsed }: HeaderProps) => {
             aria-controls="hr-user-dropdown"
             id="hr-user-menu-button"
           >
-            <span className="hr-user-avatar" aria-hidden>
-              {avatarLetter}
-            </span>
+            <ProfileHeaderAvatar
+              className="hr-user-avatar"
+              name={userName}
+              email={email}
+            />
 
             <div className="hr-user-chip-meta">
               <strong>{userName}</strong>
@@ -310,6 +318,7 @@ const Header = ({ collapsed }: HeaderProps) => {
                 <i className="bi bi-person" />
                 Profile
               </Link>
+
               <button
                 type="button"
                 className="hr-user-dropdown-item"
@@ -336,6 +345,7 @@ const Header = ({ collapsed }: HeaderProps) => {
           )}
         </div>
       </div>
+
       <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
     </header>
   );

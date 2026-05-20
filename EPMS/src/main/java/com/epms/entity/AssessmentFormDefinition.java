@@ -63,6 +63,14 @@ public class AssessmentFormDefinition {
     @Column(name = "target_role", nullable = false, length = 60)
     private List<String> targetRoles = new ArrayList<>();
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "assessment_form_target_departments",
+            joinColumns = @JoinColumn(name = "form_id")
+    )
+    @Column(name = "department_id", nullable = false)
+    private List<Integer> targetDepartmentIds = new ArrayList<>();
+
     @OneToMany(
             mappedBy = "form",
             cascade = CascadeType.ALL,
@@ -96,12 +104,28 @@ public class AssessmentFormDefinition {
             active = true;
         }
 
+        if (targetRoles == null) {
+            targetRoles = new ArrayList<>();
+        }
+
+        if (targetDepartmentIds == null) {
+            targetDepartmentIds = new ArrayList<>();
+        }
+
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     public void preUpdate() {
+        if (targetRoles == null) {
+            targetRoles = new ArrayList<>();
+        }
+
+        if (targetDepartmentIds == null) {
+            targetDepartmentIds = new ArrayList<>();
+        }
+
         updatedAt = new Date();
     }
 }

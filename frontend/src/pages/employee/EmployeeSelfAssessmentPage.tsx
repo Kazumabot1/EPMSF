@@ -29,16 +29,12 @@ const errMsg = (e: unknown, fb: string) => {
 const flat = (a: EmployeeAssessment): AssessmentItem[] =>
   a.sections.flatMap(s => s.items.map(i => ({ ...i, sectionTitle: i.sectionTitle || s.title })));
 
-const needsYN = (i: AssessmentItem) => { const t = i.responseType ?? 'YES_NO_RATING'; return t === 'YES_NO' || t === 'YES_NO_RATING'; };
-const needsR = (i: AssessmentItem) => { const t = i.responseType ?? 'YES_NO_RATING'; return t === 'RATING' || t === 'YES_NO_RATING'; };
+const needsYN = (_i: AssessmentItem) => true;
+const needsR = (_i: AssessmentItem) => true;
 
 const missing = (i: AssessmentItem) => {
   if (i.isRequired === false) return false;
-  const t = i.responseType ?? 'YES_NO_RATING';
-  if (t === 'TEXT') return !i.comment?.trim();
-  if (t === 'YES_NO') return i.yesNoAnswer == null;
-  if (t === 'YES_NO_RATING') return i.yesNoAnswer == null || i.rating == null;
-  return i.rating == null;
+  return i.yesNoAnswer == null || i.rating == null;
 };
 
 const payload = (a: EmployeeAssessment): AssessmentRequest => ({
@@ -49,7 +45,7 @@ const payload = (a: EmployeeAssessment): AssessmentRequest => ({
     id: i.id ?? null, questionId: i.questionId ?? null,
     sectionTitle: i.sectionTitle, questionText: i.questionText,
     itemOrder: i.itemOrder, rating: i.rating ?? null,
-    comment: i.comment || '', responseType: i.responseType ?? 'YES_NO_RATING',
+    comment: '', responseType: 'YES_NO_RATING',
     yesNoAnswer: i.yesNoAnswer ?? null,
   })),
 });
@@ -79,7 +75,7 @@ const stepIdx = (s: AssessmentStatus) => {
 const STEPS = ['Draft', 'Submitted', 'Dept Head', 'HR Review', 'Final'];
 
 const BANNERS: Record<string, { cls: string; icon: string; title: string; msg: string }> = {
-  SUBMITTED: { cls: 'info', icon: '📨', title: 'Submitted', msg: 'Awaiting department head signature.' },
+  SUBMITTED: { cls: 'info', icon: '📨', title: 'Submitted', msg: 'Awaiting manager review.' },
   PENDING_MANAGER: { cls: 'info', icon: '⏳', title: 'Awaiting Review', msg: 'Your manager can add remarks.' },
   PENDING_DEPARTMENT_HEAD: { cls: 'warning', icon: '🔄', title: 'Awaiting Dept Head', msg: 'Department head needs to sign.' },
   PENDING_HR: { cls: 'info', icon: '📋', title: 'Awaiting HR', msg: 'HR is reviewing.' },
@@ -139,8 +135,8 @@ const EmployeeSelfAssessmentPage = () => {
     const req = flat(assessment).filter(i => i.isRequired !== false);
     const ans = req.filter(i => !missing(i));
     const rated = req.filter(i => needsR(i) && i.rating != null);
-    const ts = rated.reduce((s, i) => s + Number(i.rating || 0) * Number(i.weight || 1), 0);
-    const ms = rated.reduce((s, i) => s + 5 * Number(i.weight || 1), 0);
+    const ts = rated.reduce((s, i) => s + Number(i.rating || 0), 0);
+    const ms = rated.reduce((s) => s + 5, 0);
     const pct = ms === 0 ? 0 : Number(((ts * 100) / ms).toFixed(2));
     const band = bands.find(b => pct >= b.minScore && pct <= b.maxScore);
     return { answered: ans.length, total: req.length, totalScore: ts, maxScore: ms, percent: pct, label: ans.length === 0 ? 'Not scored' : band?.label ?? 'Not scored' };
@@ -149,7 +145,7 @@ const EmployeeSelfAssessmentPage = () => {
   const updateField = (name: 'period' | 'remarks', value: string) =>
     setAssessment(p => p ? { ...p, [name]: value } : p);
 
-  const updateItem = (st: string, order: number, patch: Partial<Pick<AssessmentItem, 'rating' | 'comment' | 'yesNoAnswer'>>) => {
+  const updateItem = (st: string, order: number, patch: Partial<Pick<AssessmentItem, 'rating' | 'yesNoAnswer'>>) => {
     setAssessment(p => {
       if (!p) return p;
       return { ...p, sections: p.sections.map(s => ({ ...s, items: s.items.map(i =>
@@ -256,7 +252,7 @@ const EmployeeSelfAssessmentPage = () => {
           <div className="ess-modal" onClick={e => e.stopPropagation()}>
             <div className="ess-modal-icon">📤</div>
             <h3>Submit Assessment?</h3>
-            <p>Once submitted, you cannot edit. It will be sent for department head review.</p>
+            <p>Once submitted, you cannot edit. It will be sent to your manager first if assigned, then department head and HR.</p>
             <div className="ess-modal-actions">
               <button className="ess-btn ghost" onClick={() => setShowConfirm(false)}>Cancel</button>
               <button className="ess-btn primary" disabled={submitting} onClick={() => void doSubmit()}>
@@ -359,7 +355,6 @@ const EmployeeSelfAssessmentPage = () => {
                       <div key={key} className={`ess-question${bad ? ' invalid' : ''}`}>
                         <div className="ess-q-badges">
                           <span className="ess-badge num">#{item.itemOrder}</span>
-                          <span className="ess-badge type">{item.responseType ?? 'YES_NO_RATING'}</span>
                           {item.isRequired !== false ? <span className="ess-badge required">Required</span> : <span className="ess-badge optional">Optional</span>}
                           {ok && <span className="ess-badge answered">✓</span>}
                         </div>
@@ -379,9 +374,6 @@ const EmployeeSelfAssessmentPage = () => {
                             ))}
                           </div>}
                         </div>
-                        <textarea className="ess-q-comment" rows={item.responseType === 'TEXT' ? 3 : 2} disabled={isLocked}
-                          value={item.comment || ''} placeholder={item.responseType === 'TEXT' ? 'Write your answer…' : 'Optional comment…'}
-                          onChange={e => updateItem(st, item.itemOrder, { comment: e.target.value })} />
                       </div>
                     );
                   })}
