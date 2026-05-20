@@ -1,4 +1,3 @@
-
 /*
   Role-based navigation configuration.
   Roles: Employee | Admin | HR | DepartmentHead | Manager | Executive
@@ -23,6 +22,7 @@ export interface NavItem {
 export interface UserLike {
   roles?: string[];
   dashboard?: string;
+  position?: string;
 }
 
 export const roleNavigation: Record<UserRole, NavItem[]> = {
@@ -91,6 +91,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Form Create', path: '/hr/assessment-forms', icon: 'bi-ui-checks-grid' },
       ],
     },
+    { label: 'Reports', path: '/hr/reports', icon: 'bi-file-earmark-bar-graph' },
     {
       label: 'Appraisals',
       path: '/hr/appraisal',
@@ -154,6 +155,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     },
     { label: 'Self-Assessment', path: '/department-head/self-assessment', icon: 'bi-pencil-square' },
     { label: 'Assessment Review', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data' },
+    { label: 'Performance Reports', path: '/department-head/reports', icon: 'bi-file-earmark-bar-graph' },
     {
       label: 'Appraisals',
       path: '/department-head/appraisals',
