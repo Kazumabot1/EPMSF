@@ -5,6 +5,8 @@ import com.epms.dto.KpiFormResponseDTO;
 import com.epms.dto.KpiPositionAssignmentDto;
 import com.epms.dto.KpiPositionAvailabilityDto;
 import com.epms.dto.PositionResponseDto;
+import com.epms.dto.KpiVersionHistoryDetailDTO;
+import com.epms.dto.KpiVersionHistorySummaryDTO;
 
 import java.util.List;
 
@@ -29,4 +31,10 @@ public interface KpiFormService {
     List<PositionResponseDto> getAvailablePositions(Integer excludeFormId);
 
     KpiFormResponseDTO getTemplateByPositionId(Integer positionId);
+
+    List<KpiVersionHistorySummaryDTO> getVersionHistory();
+
+    List<KpiVersionHistorySummaryDTO> getTemplateVersions(Integer templateId);
+
+    KpiVersionHistoryDetailDTO getTemplateVersionDetail(Integer templateId, Integer versionNumber);
 }

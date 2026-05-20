@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -35,4 +36,9 @@ public class KpiFormRequestDTO {
     @NotEmpty
     @Builder.Default
     private List<KpiFormItemDTO> items = new ArrayList<>();
+
+    /**
+     * Required on update when existing rows are removed. Key is the removed kpi_form_items.id.
+     */
+    private Map<Integer, String> removedItemReasons;
 }

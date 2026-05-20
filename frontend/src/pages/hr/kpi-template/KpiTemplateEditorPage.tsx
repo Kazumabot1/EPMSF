@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import KpiPositionExistingAlert from '../../../components/hr/kpi-template/KpiPositionExistingAlert';
+import KpiRowReasonModal from '../../../components/hr/kpi-template/KpiRowReasonModal';
 import KpiTemplateRowsTable from '../../../components/hr/kpi-template/KpiTemplateRowsTable';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import { handleKpiTemplateSaveError } from '../../../components/hr/kpi-template/kpiTemplateConflict';
@@ -46,6 +47,12 @@ const KpiTemplateEditorPage = () => {
   const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
   const [existingTemplate, setExistingTemplate] = useState<ExistingKpiForPosition | null>(null);
   const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newKpiTemplateRow()]);
+  const [removedItemReasons, setRemovedItemReasons] = useState<Record<number, string>>({});
+  const [reasonAction, setReasonAction] = useState<
+    | { type: 'add' }
+    | { type: 'remove'; row: KpiTemplateRowDraft }
+    | null
+  >(null);
 
   const [categories, setCategories] = useState<KpiCategory[]>([]);
   const [units, setUnits] = useState<KpiUnit[]>([]);
@@ -100,6 +107,7 @@ const KpiTemplateEditorPage = () => {
           setStatus(fields.status);
           setPositionId(fields.positionId);
           setRows(fields.rows);
+          setRemovedItemReasons({});
         }
       } catch (err) {
         toast.error(toApiRequestError(err, 'Failed to load form.').message);
@@ -146,8 +154,10 @@ const KpiTemplateEditorPage = () => {
       actual: null,
       score: null,
       weightedScore: null,
-      id: null,
+      id: row.id ?? null,
+      changeReason: row.id == null ? row.changeReason ?? null : null,
     })),
+    removedItemReasons,
   });
 
   const validate = (submitStatus: KpiFormStatus): string | null => {
@@ -173,6 +183,25 @@ const KpiTemplateEditorPage = () => {
       return 'Total weight must equal 100% for ACTIVE or FINALIZED templates.';
     }
     return null;
+  };
+
+  const rowLabel = (row: KpiTemplateRowDraft) => {
+    const catalogName = row.kpiItemId != null ? items.find((item) => item.id === row.kpiItemId)?.name : null;
+    return catalogName ?? (row.kpiLabel.trim() || 'New KPI row');
+  };
+
+  const handleReasonConfirm = (reason: string) => {
+    if (reasonAction?.type === 'add') {
+      setRows((prev) => [...prev, { ...newKpiTemplateRow(), changeReason: reason }]);
+    }
+    if (reasonAction?.type === 'remove') {
+      const removed = reasonAction.row;
+      setRows((prev) => (prev.length > 1 ? prev.filter((row) => row.rowId !== removed.rowId) : prev));
+      if (removed.id != null) {
+        setRemovedItemReasons((prev) => ({ ...prev, [removed.id as number]: reason }));
+      }
+    }
+    setReasonAction(null);
   };
 
   const saveTemplate = async (action: 'draft' | 'use-in-cycle'): Promise<number | null> => {
@@ -224,12 +253,17 @@ const KpiTemplateEditorPage = () => {
         return null;
       }
     } catch (err) {
+      const apiError = toApiRequestError(err, 'Could not save the KPI template.');
+      if (isEdit && apiError.status === 409) {
+        toast.error(apiError.message);
+        return null;
+      }
       if (
         !(await handleKpiTemplateSaveError(err, navigate, positionId, isEdit ? templateId : undefined, {
           onConflict: refreshAfterConflict,
         }))
       ) {
-        toast.error(toApiRequestError(err, 'Could not save the KPI template.').message);
+        toast.error(apiError.message);
       }
       return null;
     } finally {
@@ -398,10 +432,13 @@ const KpiTemplateEditorPage = () => {
                 categories={categories}
                 units={units}
                 items={items}
-                onAddRow={() => setRows((prev) => [...prev, newKpiTemplateRow()])}
-                onRemoveRow={(rowId) =>
-                  setRows((prev) => (prev.length > 1 ? prev.filter((row) => row.rowId !== rowId) : prev))
-                }
+                onAddRow={() => setReasonAction({ type: 'add' })}
+                onRemoveRow={(rowId) => {
+                  const row = rows.find((candidate) => candidate.rowId === rowId);
+                  if (row && rows.length > 1) {
+                    setReasonAction({ type: 'remove', row });
+                  }
+                }}
                 onRowChange={(rowId, patch) =>
                   setRows((prev) => prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row)))
                 }
@@ -449,6 +486,14 @@ const KpiTemplateEditorPage = () => {
           </div>
         </form>
       </div>
+      <KpiRowReasonModal
+        open={reasonAction !== null}
+        title={reasonAction?.type === 'remove' ? 'Remove KPI row' : 'Add KPI row'}
+        rowLabel={reasonAction?.type === 'remove' ? rowLabel(reasonAction.row) : undefined}
+        confirmText={reasonAction?.type === 'remove' ? 'Remove row' : 'Add row'}
+        onConfirm={handleReasonConfirm}
+        onCancel={() => setReasonAction(null)}
+      />
     </div>
   );
 };

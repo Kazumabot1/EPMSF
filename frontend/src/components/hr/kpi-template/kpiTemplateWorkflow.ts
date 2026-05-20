@@ -28,6 +28,7 @@ export type KpiTemplateFormFields = {
 
 export const newKpiTemplateRow = (): KpiTemplateRowDraft => ({
   rowId: crypto.randomUUID(),
+  id: null,
   kpiItemId: null,
   kpiLabel: '',
   kpiCategoryId: null,
@@ -45,6 +46,7 @@ export function mapTemplateToFormFields(tmpl: KpiTemplateResponse): KpiTemplateF
       tmpl.items.length > 0
         ? tmpl.items.map((line) => ({
             rowId: crypto.randomUUID(),
+            id: line.id ?? null,
             kpiItemId: line.kpiItemId,
             kpiLabel: line.kpiLabel ?? '',
             kpiCategoryId: line.kpiCategoryId,

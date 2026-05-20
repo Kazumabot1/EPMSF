@@ -141,6 +141,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Categories', path: '/hr/performance-kpi/category', icon: 'bi-tags' },
         { label: 'KPI Items', path: '/hr/performance-kpi/item', icon: 'bi-card-checklist' },
         { label: 'KPI Templates', path: '/hr/kpi-template', icon: 'bi-ui-checks-grid' },
+        { label: 'KPI Version History', path: '/hr/kpi-version-history', icon: 'bi-clock-history' },
         { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
         { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
       ],
