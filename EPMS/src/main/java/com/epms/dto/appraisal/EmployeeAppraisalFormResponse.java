@@ -23,6 +23,8 @@ public class EmployeeAppraisalFormResponse {
     private LocalDate cycleStartDate;
     private LocalDate cycleEndDate;
     private LocalDate cycleSubmissionDeadline;
+    private LocalDate cycleManagerSubmissionDeadline;
+    private LocalDate cycleDeptHeadSubmissionDeadline;
     private Boolean cycleLocked;
     private Integer employeeId;
     private String employeeName;

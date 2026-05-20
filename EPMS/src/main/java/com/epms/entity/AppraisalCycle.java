@@ -53,6 +53,12 @@ public class AppraisalCycle {
     @Column(nullable = false)
     private LocalDate submissionDeadline;
 
+    @Column(name = "manager_submission_deadline")
+    private LocalDate managerSubmissionDeadline;
+
+    @Column(name = "dept_head_submission_deadline")
+    private LocalDate deptHeadSubmissionDeadline;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private AppraisalCycleStatus status = AppraisalCycleStatus.DRAFT;
@@ -71,7 +77,7 @@ public class AppraisalCycle {
     private Date completedAt;
 
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private Date createdAt;
 
     @Temporal(TemporalType.TIMESTAMP)

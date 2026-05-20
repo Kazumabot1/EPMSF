@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchDepartments } from '../../services/departmentService';
 import type { Department } from '../../services/departmentService';
-import { appraisalCycleService, appraisalTemplateService } from '../../services/appraisalService';
+import { appraisalAuditService, appraisalCycleService, appraisalTemplateService, type AppraisalAuditLog } from '../../services/appraisalService';
 import { signatureService } from '../../services/signatureService';
 import { extractApiErrorMessage } from '../../services/apiError';
 import type {
@@ -26,6 +26,8 @@ type DateTextState = {
   startDate: string;
   endDate: string;
   submissionDeadline: string;
+  managerSubmissionDeadline: string;
+  deptHeadSubmissionDeadline: string;
 };
 
 type SignatureDisplayBlockProps = {
@@ -164,10 +166,30 @@ const statusClass = (status: string) => {
   return '';
 };
 
+const canCompleteCycle = (cycle: AppraisalCycleResponse) => Boolean(cycle.locked) || cycle.status === 'LOCKED';
+
 const formatCycleType = (value: AppraisalCycleType) => {
   if (value === 'SEMI_ANNUAL') return 'Semi-Annual';
   if (value === 'CUSTOM') return 'Custom';
   return 'Annual';
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const stripReuseSuffix = (value: string) => value.trim().replace(/\s*\(\d+\)$/, '').trim();
+
+const nextReuseCycleName = (sourceName: string, existingCycles: AppraisalCycleResponse[]) => {
+  const baseName = stripReuseSuffix(sourceName) || sourceName.trim();
+  const suffixPattern = new RegExp(`^${escapeRegExp(baseName)}\\s*\\((\\d+)\\)$`, 'i');
+  const usedNumbers = new Set<number>();
+  existingCycles.forEach((cycle) => {
+    const candidate = cycle.cycleName.trim();
+    const match = suffixPattern.exec(candidate);
+    if (match) usedNumbers.add(Number(match[1]));
+  });
+  let nextNumber = 1;
+  while (usedNumbers.has(nextNumber)) nextNumber += 1;
+  return `${baseName} (${nextNumber})`;
 };
 
 const getPeriodNo = (cycleType: AppraisalCycleType, startDate?: string | null) => {
@@ -205,6 +227,8 @@ const emptyCycle = (): AppraisalCycleRequest => ({
   startDate: `${currentYear}-01-01`,
   endDate: `${currentYear}-12-31`,
   submissionDeadline: getDefaultSubmissionDeadline(`${currentYear}-12-31`),
+  managerSubmissionDeadline: getDefaultSubmissionDeadline(`${currentYear}-12-31`),
+  deptHeadSubmissionDeadline: getDefaultSubmissionDeadline(`${currentYear}-12-31`),
   departmentIds: [],
 });
 
@@ -212,6 +236,8 @@ const buildDateText = (cycle: AppraisalCycleRequest): DateTextState => ({
   startDate: displayDate(cycle.startDate),
   endDate: displayDate(cycle.endDate),
   submissionDeadline: cycle.submissionDeadline ? displayDate(cycle.submissionDeadline) : '',
+  managerSubmissionDeadline: cycle.managerSubmissionDeadline ? displayDate(cycle.managerSubmissionDeadline) : cycle.submissionDeadline ? displayDate(cycle.submissionDeadline) : '',
+  deptHeadSubmissionDeadline: cycle.deptHeadSubmissionDeadline ? displayDate(cycle.deptHeadSubmissionDeadline) : cycle.submissionDeadline ? displayDate(cycle.submissionDeadline) : '',
 });
 
 const makeCriteria = (criteriaText: string, sortOrder: number): AppraisalCriterionRequest => ({
@@ -314,8 +340,17 @@ const AppraisalCyclesPage = () => {
   const [reuseAllDepartments, setReuseAllDepartments] = useState(true);
   const [reuseTemplateForm, setReuseTemplateForm] = useState<AppraisalTemplateRequest | null>(null);
   const [reuseTemplateLoading, setReuseTemplateLoading] = useState(false);
+  const [reuseMode, setReuseMode] = useState<'reuse' | 'edit'>('reuse');
   const [loading, setLoading] = useState(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [cycleSearch, setCycleSearch] = useState('');
+  const [cycleTemplateFilter, setCycleTemplateFilter] = useState('');
+  const [cycleDepartmentFilter, setCycleDepartmentFilter] = useState('');
+  const [cycleTypeFilter, setCycleTypeFilter] = useState('');
+  const [cycleYearFilter, setCycleYearFilter] = useState('');
+  const [editRecordsTitle, setEditRecordsTitle] = useState('');
+  const [editRecords, setEditRecords] = useState<AppraisalAuditLog[]>([]);
+  const [editRecordsLoading, setEditRecordsLoading] = useState(false);
 
   const signatureById = useMemo(() => new Map(signatures.map((signature) => [signature.id, signature])), [signatures]);
 
@@ -328,6 +363,50 @@ const AppraisalCyclesPage = () => {
     () => getComputedDates(reuseForm.cycleType, reuseForm.cycleYear, reuseForm.startDate, reuseForm.endDate),
     [reuseForm.cycleType, reuseForm.cycleYear, reuseForm.startDate, reuseForm.endDate],
   );
+
+  const cycleTemplateOptions = useMemo(() => {
+    const optionMap = new Map<number, string>();
+    cycles.forEach((cycle) => optionMap.set(cycle.templateId, cycle.templateName || `Template #${cycle.templateId}`));
+    return Array.from(optionMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [cycles]);
+
+  const cycleDepartmentOptions = useMemo(() => {
+    const optionMap = new Map<number, string>();
+    departments.forEach((department) => optionMap.set(department.id, department.departmentName));
+    cycles.forEach((cycle) => {
+      cycle.departmentIds.forEach((departmentId, index) => {
+        optionMap.set(departmentId, cycle.departmentNames?.[index] || optionMap.get(departmentId) || `Department #${departmentId}`);
+      });
+    });
+    return Array.from(optionMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [cycles, departments]);
+
+  const cycleYearFilterOptions = useMemo(() => {
+    const years = new Set<number>();
+    cycles.forEach((cycle) => years.add(cycle.cycleYear));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [cycles]);
+
+  const filteredCycles = useMemo(() => {
+    const searchText = cycleSearch.trim().toLowerCase();
+    const selectedDepartmentId = cycleDepartmentFilter ? Number(cycleDepartmentFilter) : null;
+    return cycles.filter((cycle) => {
+      const nameMatches = !searchText || cycle.cycleName.toLowerCase().includes(searchText);
+      const templateMatches = !cycleTemplateFilter || String(cycle.templateId) === cycleTemplateFilter;
+      const departmentMatches = selectedDepartmentId === null || cycle.departmentIds.length === 0 || cycle.departmentIds.includes(selectedDepartmentId);
+      const typeMatches = !cycleTypeFilter || cycle.cycleType === cycleTypeFilter;
+      const yearMatches = !cycleYearFilter || String(cycle.cycleYear) === cycleYearFilter;
+      return nameMatches && templateMatches && departmentMatches && typeMatches && yearMatches;
+    });
+  }, [cycleDepartmentFilter, cycleSearch, cycleTemplateFilter, cycleTypeFilter, cycleYearFilter, cycles]);
+
+  const clearCycleFilters = () => {
+    setCycleSearch('');
+    setCycleTemplateFilter('');
+    setCycleDepartmentFilter('');
+    setCycleTypeFilter('');
+    setCycleYearFilter('');
+  };
 
   const showPopup = (nextPopup: PopupState) => setPopup(nextPopup);
 
@@ -417,13 +496,34 @@ const AppraisalCyclesPage = () => {
     setSelectedCycleTemplate(null);
   };
 
+  const openEditRecords = async (cycle: AppraisalCycleResponse) => {
+    setEditRecordsTitle(cycle.cycleName);
+    setEditRecords([]);
+    setEditRecordsLoading(true);
+    try {
+      const records = await appraisalAuditService.list('APPRAISAL_CYCLE', cycle.id);
+      setEditRecords(records);
+    } catch (error) {
+      showPopup({ title: 'Load Failed', message: extractApiErrorMessage(error, 'Edit records could not be loaded.'), type: 'error' });
+      setEditRecordsTitle('');
+    } finally {
+      setEditRecordsLoading(false);
+    }
+  };
+
+  const closeEditRecords = () => {
+    setEditRecordsTitle('');
+    setEditRecords([]);
+    setEditRecordsLoading(false);
+  };
+
   const buildReusePayload = (cycle: AppraisalCycleResponse): AppraisalCycleRequest => {
     const nextYear = Math.max(cycle.cycleYear + 1, currentYear);
     const nextStartDate = cycle.cycleType === 'ANNUAL' ? `${nextYear}-01-01` : addOneYear(cycle.startDate) || `${nextYear}-01-01`;
     const nextEndDate = cycle.cycleType === 'CUSTOM' ? addOneYear(cycle.endDate) || `${nextYear}-12-31` : undefined;
     const computed = getComputedDates(cycle.cycleType, nextYear, nextStartDate, nextEndDate);
     return {
-      cycleName: `${cycle.cycleName} Copy`,
+      cycleName: nextReuseCycleName(cycle.cycleName, cycles),
       templateId: cycle.templateId,
       cycleType: cycle.cycleType,
       cycleYear: nextYear,
@@ -431,12 +531,52 @@ const AppraisalCyclesPage = () => {
       startDate: computed.startDate,
       endDate: computed.endDate,
       submissionDeadline: getDefaultSubmissionDeadline(computed.endDate),
+      managerSubmissionDeadline: getDefaultSubmissionDeadline(computed.endDate),
+      deptHeadSubmissionDeadline: getDefaultSubmissionDeadline(computed.endDate),
       departmentIds: cycle.departmentIds ?? [],
     };
   };
 
   const openReuseModal = async (cycle: AppraisalCycleResponse) => {
+    setReuseMode('reuse');
     const payload = buildReusePayload(cycle);
+    setReuseSourceCycle(cycle);
+    setReuseForm(payload);
+    setReuseYearText(String(payload.cycleYear));
+    setReuseDateText(buildDateText(payload));
+    setReuseAllDepartments(!payload.departmentIds.length);
+    setReuseTemplateForm(null);
+    setReuseTemplateLoading(true);
+    try {
+      const template = await appraisalTemplateService.get(cycle.templateId);
+      setReuseTemplateForm(templateToReusableForm(template));
+    } catch (error) {
+      showPopup({ title: 'Load Failed', message: extractApiErrorMessage(error, 'Template form for this cycle could not be loaded.'), type: 'error' });
+      setReuseSourceCycle(null);
+    } finally {
+      setReuseTemplateLoading(false);
+    }
+  };
+
+
+  const buildEditPayload = (cycle: AppraisalCycleResponse): AppraisalCycleRequest => ({
+    cycleName: cycle.cycleName,
+    description: cycle.description ?? null,
+    templateId: cycle.templateId,
+    cycleType: cycle.cycleType,
+    cycleYear: cycle.cycleYear,
+    periodNo: cycle.periodNo ?? getPeriodNo(cycle.cycleType, cycle.startDate),
+    startDate: cycle.startDate,
+    endDate: cycle.endDate,
+    submissionDeadline: cycle.submissionDeadline,
+    managerSubmissionDeadline: cycle.managerSubmissionDeadline ?? cycle.submissionDeadline,
+    deptHeadSubmissionDeadline: cycle.deptHeadSubmissionDeadline ?? cycle.submissionDeadline,
+    departmentIds: cycle.departmentIds ?? [],
+  });
+
+  const openEditCycle = async (cycle: AppraisalCycleResponse) => {
+    const payload = buildEditPayload(cycle);
+    setReuseMode('edit');
     setReuseSourceCycle(cycle);
     setReuseForm(payload);
     setReuseYearText(String(payload.cycleYear));
@@ -464,8 +604,8 @@ const AppraisalCyclesPage = () => {
     setCycleForm((previous) => {
       const dates = getComputedDates(cycleType, previous.cycleYear, `${previous.cycleYear}-01-01`, `${previous.cycleYear}-12-31`);
       const submissionDeadline = getDefaultSubmissionDeadline(dates.endDate);
-      const next = { ...previous, cycleType, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, periodNo: getPeriodNo(cycleType, dates.startDate) };
-      setDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline) }));
+      const next = { ...previous, cycleType, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline, periodNo: getPeriodNo(cycleType, dates.startDate) };
+      setDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
       return next;
     });
   };
@@ -474,8 +614,8 @@ const AppraisalCyclesPage = () => {
     setReuseForm((previous) => {
       const dates = getComputedDates(cycleType, previous.cycleYear, `${previous.cycleYear}-01-01`, `${previous.cycleYear}-12-31`);
       const submissionDeadline = getDefaultSubmissionDeadline(dates.endDate);
-      const next = { ...previous, cycleType, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, periodNo: getPeriodNo(cycleType, dates.startDate) };
-      setReuseDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline) }));
+      const next = { ...previous, cycleType, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline, periodNo: getPeriodNo(cycleType, dates.startDate) };
+      setReuseDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
       return next;
     });
   };
@@ -487,8 +627,8 @@ const AppraisalCyclesPage = () => {
     setCycleForm((previous) => {
       const dates = getComputedDates(previous.cycleType, year, `${year}-01-01`, `${year}-12-31`);
       const submissionDeadline = getDefaultSubmissionDeadline(dates.endDate);
-      const next = { ...previous, cycleYear: year, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, periodNo: getPeriodNo(previous.cycleType, dates.startDate) };
-      setDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline) }));
+      const next = { ...previous, cycleYear: year, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline, periodNo: getPeriodNo(previous.cycleType, dates.startDate) };
+      setDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
       return next;
     });
   };
@@ -500,8 +640,8 @@ const AppraisalCyclesPage = () => {
     setReuseForm((previous) => {
       const dates = getComputedDates(previous.cycleType, year, `${year}-01-01`, `${year}-12-31`);
       const submissionDeadline = getDefaultSubmissionDeadline(dates.endDate);
-      const next = { ...previous, cycleYear: year, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, periodNo: getPeriodNo(previous.cycleType, dates.startDate) };
-      setReuseDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline) }));
+      const next = { ...previous, cycleYear: year, startDate: dates.startDate, endDate: dates.endDate, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline, periodNo: getPeriodNo(previous.cycleType, dates.startDate) };
+      setReuseDateText((prev) => ({ ...prev, startDate: displayDate(next.startDate), endDate: displayDate(next.endDate), submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
       return next;
     });
   };
@@ -514,15 +654,17 @@ const AppraisalCyclesPage = () => {
       if (field === 'startDate') {
         const computed = getComputedDates(previous.cycleType, previous.cycleYear, parsed, previous.endDate);
         const submissionDeadline = getDefaultSubmissionDeadline(computed.endDate);
-        setDateText((prev) => ({ ...prev, endDate: displayDate(computed.endDate), submissionDeadline: displayDate(submissionDeadline) }));
-        return { ...previous, startDate: computed.startDate, endDate: computed.endDate, submissionDeadline, periodNo: getPeriodNo(previous.cycleType, computed.startDate) };
+        setDateText((prev) => ({ ...prev, endDate: displayDate(computed.endDate), submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
+        return { ...previous, startDate: computed.startDate, endDate: computed.endDate, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline, periodNo: getPeriodNo(previous.cycleType, computed.startDate) };
       }
       if (field === 'endDate') {
         const submissionDeadline = getDefaultSubmissionDeadline(parsed);
-        setDateText((prev) => ({ ...prev, submissionDeadline: displayDate(submissionDeadline) }));
-        return { ...previous, endDate: parsed, submissionDeadline };
+        setDateText((prev) => ({ ...prev, submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
+        return { ...previous, endDate: parsed, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline };
       }
-      return { ...previous, submissionDeadline: parsed };
+      if (field === 'managerSubmissionDeadline') return { ...previous, managerSubmissionDeadline: parsed };
+      if (field === 'deptHeadSubmissionDeadline') return { ...previous, deptHeadSubmissionDeadline: parsed, submissionDeadline: parsed };
+      return { ...previous, submissionDeadline: parsed, managerSubmissionDeadline: parsed, deptHeadSubmissionDeadline: parsed };
     });
   };
 
@@ -534,15 +676,17 @@ const AppraisalCyclesPage = () => {
       if (field === 'startDate') {
         const computed = getComputedDates(previous.cycleType, previous.cycleYear, parsed, previous.endDate);
         const submissionDeadline = getDefaultSubmissionDeadline(computed.endDate);
-        setReuseDateText((prev) => ({ ...prev, endDate: displayDate(computed.endDate), submissionDeadline: displayDate(submissionDeadline) }));
-        return { ...previous, startDate: computed.startDate, endDate: computed.endDate, submissionDeadline, periodNo: getPeriodNo(previous.cycleType, computed.startDate) };
+        setReuseDateText((prev) => ({ ...prev, endDate: displayDate(computed.endDate), submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
+        return { ...previous, startDate: computed.startDate, endDate: computed.endDate, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline, periodNo: getPeriodNo(previous.cycleType, computed.startDate) };
       }
       if (field === 'endDate') {
         const submissionDeadline = getDefaultSubmissionDeadline(parsed);
-        setReuseDateText((prev) => ({ ...prev, submissionDeadline: displayDate(submissionDeadline) }));
-        return { ...previous, endDate: parsed, submissionDeadline };
+        setReuseDateText((prev) => ({ ...prev, submissionDeadline: displayDate(submissionDeadline), managerSubmissionDeadline: displayDate(submissionDeadline), deptHeadSubmissionDeadline: displayDate(submissionDeadline) }));
+        return { ...previous, endDate: parsed, submissionDeadline, managerSubmissionDeadline: submissionDeadline, deptHeadSubmissionDeadline: submissionDeadline };
       }
-      return { ...previous, submissionDeadline: parsed };
+      if (field === 'managerSubmissionDeadline') return { ...previous, managerSubmissionDeadline: parsed };
+      if (field === 'deptHeadSubmissionDeadline') return { ...previous, deptHeadSubmissionDeadline: parsed, submissionDeadline: parsed };
+      return { ...previous, submissionDeadline: parsed, managerSubmissionDeadline: parsed, deptHeadSubmissionDeadline: parsed };
     });
   };
 
@@ -575,11 +719,17 @@ const AppraisalCyclesPage = () => {
     if (!form.templateId) return 'Select a template form record.';
     if (form.cycleType !== 'ANNUAL' && !parseDisplayDate(dates.startDate)) return 'Start date must use DD/MM/YYYY format.';
     if (form.cycleType === 'CUSTOM' && !parseDisplayDate(dates.endDate)) return 'End date must use DD/MM/YYYY format.';
-    if (!parseDisplayDate(dates.submissionDeadline)) return 'Submission deadline must use DD/MM/YYYY format.';
+    if (!parseDisplayDate(dates.managerSubmissionDeadline)) return 'Manager submission deadline must use DD/MM/YYYY format.';
+    if (!parseDisplayDate(dates.deptHeadSubmissionDeadline)) return 'Dept Head submission deadline must use DD/MM/YYYY format.';
     const computedDates = getComputedDates(form.cycleType, year, form.startDate, form.endDate);
     if (form.cycleType === 'CUSTOM' && form.startDate && form.endDate && form.endDate < form.startDate) return 'End date cannot be before start date.';
-    if (form.submissionDeadline < computedDates.startDate) return 'Submission deadline cannot be before start date.';
-    if (form.submissionDeadline >= computedDates.endDate) return 'Submission deadline must be before end date.';
+    const managerDeadline = form.managerSubmissionDeadline || form.submissionDeadline;
+    const deptHeadDeadline = form.deptHeadSubmissionDeadline || form.submissionDeadline;
+    if (managerDeadline < computedDates.startDate) return 'Manager submission deadline cannot be before start date.';
+    if (managerDeadline >= computedDates.endDate) return 'Manager submission deadline must be before end date.';
+    if (deptHeadDeadline < computedDates.startDate) return 'Dept Head submission deadline cannot be before start date.';
+    if (deptHeadDeadline >= computedDates.endDate) return 'Dept Head submission deadline must be before end date.';
+    if (deptHeadDeadline < managerDeadline) return 'Dept Head submission deadline cannot be before Manager deadline.';
     if (!allDepartments && form.departmentIds.length === 0) return 'Select at least one department or choose all departments.';
     return '';
   };
@@ -642,7 +792,9 @@ const AppraisalCyclesPage = () => {
         startDate: dates.startDate,
         endDate: dates.endDate,
         periodNo: getPeriodNo(cycleForm.cycleType, dates.startDate),
-        submissionDeadline: cycleForm.submissionDeadline,
+        submissionDeadline: cycleForm.deptHeadSubmissionDeadline || cycleForm.submissionDeadline,
+        managerSubmissionDeadline: cycleForm.managerSubmissionDeadline || cycleForm.submissionDeadline,
+        deptHeadSubmissionDeadline: cycleForm.deptHeadSubmissionDeadline || cycleForm.submissionDeadline,
         departmentIds: targetAllDepartments ? [] : cycleForm.departmentIds,
       });
       await loadData();
@@ -669,8 +821,8 @@ const AppraisalCyclesPage = () => {
       return;
     }
     showPopup({
-      title: 'Confirm Re-use Cycle',
-      message: 'Are you sure you want to save this re-used appraisal cycle as a new draft record?',
+      title: reuseMode === 'edit' ? 'Confirm Update Cycle' : 'Confirm Re-use Cycle',
+      message: reuseMode === 'edit' ? 'Save changes to this draft appraisal cycle?' : 'Are you sure you want to save this re-used appraisal cycle as a new draft record?',
       type: 'confirm',
       confirmText: 'Submit',
       cancelText: 'Cancel',
@@ -685,7 +837,7 @@ const AppraisalCyclesPage = () => {
     setLoading(true);
     try {
       const cycleTemplateCopy = await appraisalTemplateService.create(normalizeReusableTemplate(reuseTemplateForm, reuseForm.cycleName, reuseSourceCycle.cycleName));
-      await appraisalCycleService.create({
+      const payload = {
         ...reuseForm,
         templateId: cycleTemplateCopy.id,
         cycleName: reuseForm.cycleName.trim(),
@@ -693,13 +845,20 @@ const AppraisalCyclesPage = () => {
         startDate: dates.startDate,
         endDate: dates.endDate,
         periodNo: getPeriodNo(reuseForm.cycleType, dates.startDate),
-        submissionDeadline: reuseForm.submissionDeadline,
+        submissionDeadline: reuseForm.deptHeadSubmissionDeadline || reuseForm.submissionDeadline,
+        managerSubmissionDeadline: reuseForm.managerSubmissionDeadline || reuseForm.submissionDeadline,
+        deptHeadSubmissionDeadline: reuseForm.deptHeadSubmissionDeadline || reuseForm.submissionDeadline,
         departmentIds: reuseAllDepartments ? [] : reuseForm.departmentIds,
-      });
+      };
+      if (reuseMode === 'edit') {
+        await appraisalCycleService.updateDraft(reuseSourceCycle.id, payload);
+      } else {
+        await appraisalCycleService.create(payload);
+      }
       await loadData();
       showPopup({
         title: 'Success',
-        message: 'Re-used appraisal cycle saved successfully as a new draft record.',
+        message: reuseMode === 'edit' ? 'Draft appraisal cycle updated successfully.' : 'Re-used appraisal cycle saved successfully as a new draft record.',
         type: 'success',
         onOk: closeReuseModal,
       });
@@ -730,7 +889,7 @@ const AppraisalCyclesPage = () => {
   const addReuseSection = () => {
     setReuseTemplateForm((previous) => previous ? {
       ...previous,
-      sections: [...previous.sections, { sectionName: '', description: '', sortOrder: previous.sections.length + 1, active: true, criteria: [makeCriteria('', 1)] }],
+      sections: [...previous.sections, { sectionName: '', description: '', sortOrder: previous.sections.length + 1, active: true, criteria: [] }],
     } : previous);
   };
 
@@ -921,14 +1080,13 @@ const AppraisalCyclesPage = () => {
                 </div>
                 <div className="appraisal-form-block">
                   <h3>Employee Information</h3>
-                  <p className="appraisal-muted">HR can view cycle department and dates only. Employee fields are filled later by Project Manager.</p>
                   <div className="appraisal-inline-grid three appraisal-cycle-employee-grid">
                     <label className="appraisal-field"><span>Employee Name</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Employee ID</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Current Position</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Department</span><input value={selectedCycle.departmentNames?.join(', ') || 'All Departments'} readOnly disabled /></label>
                     <label className="appraisal-field"><span>Assessment Date</span><input value={displayDate(selectedCycle.startDate)} readOnly disabled /></label>
-                    <label className="appraisal-field"><span>Effective Date</span><input value={displayDate(selectedCycle.endDate)} readOnly disabled /></label>
+                    <label className="appraisal-field"><span>End Date</span><input value={displayDate(selectedCycle.endDate)} readOnly disabled /></label>
                   </div>
                 </div>
                 <div className="appraisal-form-block">
@@ -963,7 +1121,6 @@ const AppraisalCyclesPage = () => {
                 <div className="appraisal-form-block"><h3>Score Guide</h3>{renderScoreGuide(selectedCycleTemplate)}</div>
                 <div className="appraisal-form-block">
                   <h3>Other Remarks</h3>
-                  <p className="appraisal-muted">Appraiser's comment for discussion, recommendation, or promotion notes will be filled by reviewers during the appraisal workflow.</p>
                   <div className="appraisal-other-remarks-preview"><span>Appraiser's Comment for Discussion</span></div>
                 </div>
                 {renderSignaturePreview(selectedCycleTemplate)}
@@ -982,7 +1139,7 @@ const AppraisalCyclesPage = () => {
       <div className="appraisal-modal-backdrop">
         <div className="appraisal-modal-box appraisal-modal-box-xl">
           <div className="appraisal-modal-header">
-            <div><h2>Re-use Appraisal Cycle</h2><p>Edit cycle details, copied sections, criteria, and score ranges before saving as a new draft.</p></div>
+            <div><h2>{reuseMode === 'edit' ? 'Edit Draft Appraisal Cycle' : 'Re-use Appraisal Cycle'}</h2></div>
             <button className="appraisal-modal-close" type="button" onClick={closeReuseModal}><i className="bi bi-x-lg" /></button>
           </div>
           <div className="appraisal-modal-body template-form-modal-body">
@@ -996,15 +1153,16 @@ const AppraisalCyclesPage = () => {
                       <span>Cycle Year</span>
                       <input list="reuse-cycle-year-options" value={reuseYearText} onChange={(event) => setReuseCycleYear(event.target.value)} placeholder={String(currentYear)} />
                       <datalist id="reuse-cycle-year-options">{cycleYearOptions.map((year) => <option key={year} value={year} />)}</datalist>
-                      <small>Current year or future years only.</small>
+                      
                     </label>
                     <label className="appraisal-field"><span>Appraisal Name</span><input value={reuseForm.cycleName} onChange={(event) => setReuseForm({ ...reuseForm, cycleName: event.target.value })} /></label>
                     <label className="appraisal-field"><span>Cycle Type</span><select value={reuseForm.cycleType} onChange={(event) => setReuseCycleType(event.target.value as AppraisalCycleType)}><option value="ANNUAL">Annual</option><option value="SEMI_ANNUAL">Semi-Annual</option><option value="CUSTOM">Custom</option></select></label>
                   </div>
                   <div className="appraisal-inline-grid three">
                     {renderDatePickerField({ label: 'Assessment Date', field: 'startDate', textValue: reuseForm.cycleType === 'ANNUAL' ? displayDate(reuseComputedDates.startDate) : reuseDateText.startDate, isoValue: reuseForm.cycleType === 'ANNUAL' ? reuseComputedDates.startDate : reuseForm.startDate, disabled: reuseForm.cycleType === 'ANNUAL', helper: reuseForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : 'Use DD/MM/YYYY or choose from calendar.', reuse: true })}
-                    {renderDatePickerField({ label: 'Effective Date', field: 'endDate', textValue: reuseForm.cycleType === 'CUSTOM' ? reuseDateText.endDate : displayDate(reuseComputedDates.endDate), isoValue: reuseForm.cycleType === 'CUSTOM' ? reuseForm.endDate : reuseComputedDates.endDate, disabled: reuseForm.cycleType !== 'CUSTOM', helper: reuseForm.cycleType === 'CUSTOM' ? 'Use DD/MM/YYYY or choose from calendar.' : 'System calculated.', reuse: true })}
-                    {renderDatePickerField({ label: 'Submission Deadline', field: 'submissionDeadline', textValue: reuseDateText.submissionDeadline, isoValue: reuseForm.submissionDeadline, helper: 'Must be before the end date. Type DD/MM/YYYY or choose from calendar.', reuse: true })}
+                    {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: reuseForm.cycleType === 'CUSTOM' ? reuseDateText.endDate : displayDate(reuseComputedDates.endDate), isoValue: reuseForm.cycleType === 'CUSTOM' ? reuseForm.endDate : reuseComputedDates.endDate, disabled: reuseForm.cycleType !== 'CUSTOM', helper: reuseForm.cycleType === 'CUSTOM' ? 'Use DD/MM/YYYY or choose from calendar.' : 'System calculated.', reuse: true })}
+                    {renderDatePickerField({ label: 'Manager Deadline', field: 'managerSubmissionDeadline', textValue: reuseDateText.managerSubmissionDeadline, isoValue: reuseForm.managerSubmissionDeadline, reuse: true })}
+                    {renderDatePickerField({ label: 'Dept Head Deadline', field: 'deptHeadSubmissionDeadline', textValue: reuseDateText.deptHeadSubmissionDeadline, isoValue: reuseForm.deptHeadSubmissionDeadline, reuse: true })}
                   </div>
                   <div className="appraisal-department-box">
                     <label className="appraisal-checkbox-line"><input type="checkbox" checked={reuseAllDepartments} onChange={(event) => { setReuseAllDepartments(event.target.checked); if (event.target.checked) setReuseForm((previous) => ({ ...previous, departmentIds: [] })); }} /><span>All Departments</span></label>
@@ -1034,7 +1192,7 @@ const AppraisalCyclesPage = () => {
                   ))}
                   <button className="appraisal-button secondary appraisal-add-section-bottom" type="button" onClick={addReuseSection}>Add Section</button>
                 </div>
-                <div className="appraisal-form-block"><h3>Score Ranges</h3><p className="appraisal-muted">Score values are limited to 0–100. Rating labels and explanations remain unchanged.</p>{renderReuseScoreEditor()}</div>
+<div className="appraisal-form-block"><h3>Score Ranges</h3>{renderReuseScoreEditor()}</div>
                 <div className="appraisal-form-block"><h3>Other Remarks</h3><div className="appraisal-other-remarks-preview"><span>Appraiser's Comment for Discussion</span></div></div>
                 {renderSignaturePreview(reuseTemplateForm)}
               </>
@@ -1042,7 +1200,50 @@ const AppraisalCyclesPage = () => {
           </div>
           <div className="appraisal-modal-footer">
             <button className="appraisal-button secondary" type="button" onClick={closeReuseModal}>Cancel</button>
-            <button className="appraisal-button primary" type="button" disabled={loading || reuseTemplateLoading} onClick={askReuseSubmit}>Save Re-used Cycle</button>
+            <button className="appraisal-button primary" type="button" disabled={loading || reuseTemplateLoading} onClick={askReuseSubmit}>{reuseMode === 'edit' ? 'Save Cycle Changes' : 'Save Re-used Cycle'}</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEditRecordsModal = () => {
+    if (!editRecordsTitle) return null;
+    return (
+      <div className="appraisal-modal-backdrop" onMouseDown={closeEditRecords}>
+        <div className="appraisal-modal-box appraisal-modal-box-xl appraisal-edit-records-modal" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="appraisal-modal-header">
+            <div>
+              <h2>Appraisal Cycle Edit Records</h2>
+              <p>{editRecordsTitle}</p>
+            </div>
+            <button className="appraisal-modal-close" type="button" onClick={closeEditRecords}><i className="bi bi-x-lg" /></button>
+          </div>
+          <div className="appraisal-modal-body">
+            {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
+            {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
+            {!editRecordsLoading && editRecords.length > 0 && (
+              <div className="appraisal-edit-record-list">
+                {editRecords.map((record) => (
+                  <div className="appraisal-edit-record-card" key={record.id}>
+                    <div className="appraisal-edit-record-card-head">
+                      <div>
+                        <strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong>
+                        <span>{displayDateTime(record.timestamp)}</span>
+                      </div>
+                      <span className="appraisal-status status-active">{record.action}</span>
+                    </div>
+                    <div className="appraisal-edit-record-values">
+                      <div><strong>Before</strong><p>{record.oldValue || '-'}</p></div>
+                      <div><strong>After</strong><p>{record.newValue || '-'}</p></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="appraisal-modal-footer">
+            <button className="appraisal-button secondary" type="button" onClick={closeEditRecords}>Close</button>
           </div>
         </div>
       </div>
@@ -1058,18 +1259,59 @@ const AppraisalCyclesPage = () => {
 
       <div className="appraisal-card">
         <div className="appraisal-form-block-header">
-          <div><h2>Appraisal Cycles</h2><p className="appraisal-muted">Created appraisal cycles are kept as records. Active cycles are visible to Project Managers.</p></div>
+<div><h2>Appraisal Cycles</h2></div>
           <button className="appraisal-button secondary" type="button" disabled={loading} onClick={() => void loadData()}>Refresh</button>
+        </div>
+        <div className="appraisal-filter-bar appraisal-cycle-filter-bar">
+          <label className="appraisal-filter-field">
+            <span>Search Appraisal Name</span>
+            <input value={cycleSearch} onChange={(event) => setCycleSearch(event.target.value)} placeholder="Search by appraisal name" />
+          </label>
+          <label className="appraisal-filter-field">
+            <span>Template</span>
+            <select value={cycleTemplateFilter} onChange={(event) => setCycleTemplateFilter(event.target.value)}>
+              <option value="">All Templates</option>
+              {cycleTemplateOptions.map(([templateId, templateName]) => <option key={templateId} value={templateId}>{templateName}</option>)}
+            </select>
+          </label>
+          <label className="appraisal-filter-field">
+            <span>Department</span>
+            <select value={cycleDepartmentFilter} onChange={(event) => setCycleDepartmentFilter(event.target.value)}>
+              <option value="">All Departments</option>
+              {cycleDepartmentOptions.map(([departmentId, departmentName]) => <option key={departmentId} value={departmentId}>{departmentName}</option>)}
+            </select>
+          </label>
+          <label className="appraisal-filter-field">
+            <span>Cycle Type</span>
+            <select value={cycleTypeFilter} onChange={(event) => setCycleTypeFilter(event.target.value)}>
+              <option value="">All Cycle Types</option>
+              <option value="ANNUAL">Annual</option>
+              <option value="SEMI_ANNUAL">Semi-Annual</option>
+              <option value="CUSTOM">Custom</option>
+            </select>
+          </label>
+          <label className="appraisal-filter-field">
+            <span>Year</span>
+            <select value={cycleYearFilter} onChange={(event) => setCycleYearFilter(event.target.value)}>
+              <option value="">All Years</option>
+              {cycleYearFilterOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+          <div className="appraisal-filter-actions">
+            <button className="appraisal-button ghost" type="button" onClick={clearCycleFilters}>Clear Filters</button>
+            <span className="appraisal-filter-result">Showing {filteredCycles.length} of {cycles.length}</span>
+          </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="appraisal-table appraisal-cycle-record-table">
-            <thead><tr><th>Appraisal Name</th><th>Template</th><th>Departments</th><th>Cycle Type</th><th>Cycle Year</th><th>Start Date</th><th>End Date</th><th>Submission Deadline</th><th>Created By</th><th>Created At</th><th>Status</th><th>Locked</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Appraisal Name</th><th>Template</th><th>Departments</th><th>Cycle Type</th><th>Cycle Year</th><th>Start Date</th><th>End Date</th><th>Manager Deadline</th><th>Dept Head Deadline</th><th>Created By</th><th>Created At</th><th>Status</th><th>Locked</th><th>Actions</th></tr></thead>
             <tbody>
-              {cycles.length === 0 && <tr><td colSpan={13}><div className="appraisal-empty">No appraisal cycles yet.</div></td></tr>}
-              {cycles.map((cycle) => (
+              {cycles.length === 0 && <tr><td colSpan={14}><div className="appraisal-empty">No appraisal cycles yet.</div></td></tr>}
+              {cycles.length > 0 && filteredCycles.length === 0 && <tr><td colSpan={14}><div className="appraisal-empty">No appraisal cycles match the selected search/filter.</div></td></tr>}
+              {filteredCycles.map((cycle) => (
                 <tr key={cycle.id}>
-                  <td><strong>{cycle.cycleName}</strong></td><td>{cycle.templateName || '-'}</td><td>{cycle.departmentNames?.join(', ') || 'All Departments'}</td><td>{formatCycleType(cycle.cycleType)}</td><td>{cycle.cycleYear}</td><td>{displayDate(cycle.startDate)}</td><td>{displayDate(cycle.endDate)}</td><td>{displayDate(cycle.submissionDeadline)}</td><td>{cycle.createdByEmployeeId || '-'}</td><td>{displayDateTime(cycle.createdAt)}</td><td><span className={`appraisal-status ${statusClass(cycle.status)}`}>{cycle.status}</span></td><td>{cycle.locked ? 'Yes' : 'No'}</td>
-                  <td><div className="appraisal-button-row record-actions"><button className="appraisal-button ghost" type="button" onClick={() => void openCycleView(cycle)}>View Cycle</button>{cycle.status === 'DRAFT' && <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>Active</button>}{cycle.status === 'ACTIVE' && <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>Lock</button>}{cycle.status !== 'COMPLETED' && <button className="appraisal-button secondary" type="button" onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>Complete</button>}<button className="appraisal-button ghost" type="button" onClick={() => void openReuseModal(cycle)}>Re-use</button></div></td>
+                  <td><strong>{cycle.cycleName}</strong></td><td>{cycle.templateName || '-'}</td><td>{cycle.departmentNames?.join(', ') || 'All Departments'}</td><td>{formatCycleType(cycle.cycleType)}</td><td>{cycle.cycleYear}</td><td>{displayDate(cycle.startDate)}</td><td>{displayDate(cycle.endDate)}</td><td>{displayDate(cycle.managerSubmissionDeadline || cycle.submissionDeadline)}</td><td>{displayDate(cycle.deptHeadSubmissionDeadline || cycle.submissionDeadline)}</td><td>{cycle.createdByEmployeeId || '-'}</td><td>{displayDateTime(cycle.createdAt)}</td><td><span className={`appraisal-status ${statusClass(cycle.status)}`}>{cycle.status}</span></td><td>{cycle.locked ? 'Yes' : 'No'}</td>
+                  <td><div className="appraisal-button-row record-actions"><button className="appraisal-button ghost" type="button" onClick={() => void openCycleView(cycle)}>View Cycle</button>{cycle.status === 'DRAFT' && <button className="appraisal-button secondary" type="button" onClick={() => void openEditCycle(cycle)}>Edit</button>}{cycle.status === 'DRAFT' && <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>Active</button>}{cycle.status === 'ACTIVE' && <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>Lock</button>}{cycle.status !== 'COMPLETED' && <button className="appraisal-button secondary" type="button" disabled={!canCompleteCycle(cycle)} title={canCompleteCycle(cycle) ? 'Complete this locked cycle' : 'Cycle must be locked first'} onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>Complete</button>}<button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(cycle)}>Edit Records</button><button className="appraisal-button ghost" type="button" onClick={() => void openReuseModal(cycle)}>Re-use</button></div></td>
                 </tr>
               ))}
             </tbody>
@@ -1079,6 +1321,7 @@ const AppraisalCyclesPage = () => {
 
       {renderCycleFormPreview()}
       {renderReuseModal()}
+      {renderEditRecordsModal()}
       {renderPopup()}
 
       {showCreateModal && (
@@ -1087,15 +1330,16 @@ const AppraisalCyclesPage = () => {
             <div className="appraisal-modal-header"><div><h2>Create Appraisal Cycle</h2><p>Set cycle year first, then choose template, period, and target departments.</p></div><button className="appraisal-modal-close" type="button" onClick={closeCreateModal}><i className="bi bi-x-lg" /></button></div>
             <div className="appraisal-modal-body">
               <div className="appraisal-inline-grid three">
-                <label className="appraisal-field"><span>Cycle Year</span><input list="cycle-year-options" value={cycleYearText} onChange={(event) => setCycleYear(event.target.value)} placeholder={String(currentYear)} /><datalist id="cycle-year-options">{cycleYearOptions.map((year) => <option key={year} value={year} />)}</datalist><small>Current year or future years only.</small></label>
-                <label className="appraisal-field"><span>Appraisal Name</span><input value={cycleForm.cycleName} onChange={(event) => setCycleForm({ ...cycleForm, cycleName: event.target.value })} placeholder="Enter appraisal name" /><small>Manual entry required.</small></label>
+                <label className="appraisal-field"><span>Cycle Year</span><input list="cycle-year-options" value={cycleYearText} onChange={(event) => setCycleYear(event.target.value)} placeholder={String(currentYear)} /><datalist id="cycle-year-options">{cycleYearOptions.map((year) => <option key={year} value={year} />)}</datalist></label>
+                <label className="appraisal-field"><span>Appraisal Name</span><input value={cycleForm.cycleName} onChange={(event) => setCycleForm({ ...cycleForm, cycleName: event.target.value })} placeholder="Enter appraisal name" /></label>
                 <label className="appraisal-field"><span>Cycle Type</span><select value={cycleForm.cycleType} onChange={(event) => setCycleType(event.target.value as AppraisalCycleType)}><option value="ANNUAL">Annual</option><option value="SEMI_ANNUAL">Semi-Annual</option><option value="CUSTOM">Custom</option></select></label>
               </div>
               <div className="appraisal-inline-grid three">
-                <label className="appraisal-field"><span>Template Form</span><select value={cycleForm.templateId} onChange={(event) => setCycleForm({ ...cycleForm, templateId: Number(event.target.value) })}><option value={0}>Select template form record</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.templateName} v{template.versionNo}</option>)}</select></label>
+                <label className="appraisal-field"><span>Template Form</span><select value={cycleForm.templateId} onChange={(event) => setCycleForm({ ...cycleForm, templateId: Number(event.target.value) })}><option value={0}>Select template form record</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.templateName}</option>)}</select></label>
                 {renderDatePickerField({ label: 'Start Date', field: 'startDate', textValue: cycleForm.cycleType === 'ANNUAL' ? displayDate(computedDates.startDate) : dateText.startDate, isoValue: cycleForm.cycleType === 'ANNUAL' ? computedDates.startDate : cycleForm.startDate, disabled: cycleForm.cycleType === 'ANNUAL', helper: cycleForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : 'Use DD/MM/YYYY or choose from calendar.' })}
                 {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: cycleForm.cycleType === 'CUSTOM' ? dateText.endDate : displayDate(computedDates.endDate), isoValue: cycleForm.cycleType === 'CUSTOM' ? cycleForm.endDate : computedDates.endDate, disabled: cycleForm.cycleType !== 'CUSTOM', helper: cycleForm.cycleType === 'CUSTOM' ? 'Use DD/MM/YYYY or choose from calendar.' : 'System calculated.' })}
-                {renderDatePickerField({ label: 'Submission Deadline', field: 'submissionDeadline', textValue: dateText.submissionDeadline, isoValue: cycleForm.submissionDeadline, helper: 'Must be before the end date. Type DD/MM/YYYY or choose from calendar.' })}
+                {renderDatePickerField({ label: 'Manager Deadline', field: 'managerSubmissionDeadline', textValue: dateText.managerSubmissionDeadline, isoValue: cycleForm.managerSubmissionDeadline })}
+                {renderDatePickerField({ label: 'Dept Head Deadline', field: 'deptHeadSubmissionDeadline', textValue: dateText.deptHeadSubmissionDeadline, isoValue: cycleForm.deptHeadSubmissionDeadline })}
               </div>
               <div className="appraisal-department-box">
                 <label className="appraisal-checkbox-line"><input type="checkbox" checked={targetAllDepartments} onChange={(event) => { setTargetAllDepartments(event.target.checked); if (event.target.checked) setCycleForm((previous) => ({ ...previous, departmentIds: [] })); }} /><span>All Departments</span></label>

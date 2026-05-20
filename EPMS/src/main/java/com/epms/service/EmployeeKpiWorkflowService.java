@@ -1,6 +1,7 @@
 package com.epms.service;
 
 import com.epms.dto.EmployeeKpiResultDto;
+import com.epms.dto.FinalizeEmployeeKpiRequest;
 import com.epms.dto.HrEmployeeKpiRowDto;
 import com.epms.dto.ManagerKpiAssignmentDto;
 import com.epms.dto.ManagerKpiTemplateSummaryDto;
@@ -14,13 +15,19 @@ public interface EmployeeKpiWorkflowService {
 
     UseKpiTemplateResultDto useTemplateForDepartment(Integer kpiFormId, UseKpiDepartmentRequest request);
 
+    UseKpiTemplateResultDto useCycleForAllActiveDepartments(Integer cycleId);
+
     List<ManagerKpiTemplateSummaryDto> listKpiTemplatesForManagerDepartment();
 
     List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId);
 
+    List<ManagerKpiAssignmentDto> listFinalizedHistoryForManagerDepartment();
+
     ManagerKpiAssignmentDto updateScores(Integer employeeKpiFormId, UpdateEmployeeKpiScoresRequest request);
 
     UseKpiTemplateResultDto finalizeDepartmentKpi(Integer kpiFormId);
+
+    ManagerKpiAssignmentDto finalizeEmployeeKpi(Integer employeeKpiFormId, FinalizeEmployeeKpiRequest request);
 
     List<EmployeeKpiResultDto> listFinalizedForCurrentEmployee();
 

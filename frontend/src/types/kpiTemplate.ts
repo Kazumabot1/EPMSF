@@ -32,8 +32,11 @@ export interface KpiTemplateResponse {
   version: number;
   createdAt: string | null;
   updatedAt: string | null;
+  finalizedAt?: string | null;
+  sentAt?: string | null;
   createdBy: string | null;
   createdByUserId: number | null;
+  updatedByUserId?: number | null;
   positions: KpiTemplatePositionSummary[];
   items: KpiTemplateItem[];
 }
@@ -41,6 +44,8 @@ export interface KpiTemplateResponse {
 export interface KpiTemplateRequest {
   title: string;
   status: KpiFormStatus;
+  startDate?: string | null;
+  endDate?: string | null;
   positionIds: number[];
   items: KpiTemplateItem[];
 }

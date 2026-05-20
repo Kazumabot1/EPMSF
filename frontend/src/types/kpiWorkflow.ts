@@ -30,9 +30,15 @@ export type ManagerKpiAssignment = {
   employeeKpiFormId: number;
   employeeId: number;
   employeeName: string;
+  positionTitle?: string | null;
+  kpiFormId?: number | null;
+  kpiTitle?: string | null;
   status: string;
   totalScore: number | null;
   totalWeightedScore: number | null;
+  finalizedAt?: string | null;
+  earlyFinalizedReason?: string | null;
+  finalizedBeforeEndDate?: boolean | null;
   periodStartDate?: string | null;
   periodEndDate?: string | null;
   lines: ManagerKpiScoreLine[];
@@ -46,6 +52,8 @@ export type EmployeeKpiResult = {
   totalScore: number | null;
   totalWeightedScore: number | null;
   finalizedAt: string | null;
+  earlyFinalizedReason?: string | null;
+  finalizedBeforeEndDate?: boolean | null;
   lines: ManagerKpiScoreLine[];
 };
 

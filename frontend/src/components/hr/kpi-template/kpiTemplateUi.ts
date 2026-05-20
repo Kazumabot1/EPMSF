@@ -126,7 +126,7 @@ export function filterKpiFormsForCycleSelection<T extends { id: number; status: 
   selectedFormIds: number[] = [],
 ): T[] {
   const selected = new Set(selectedFormIds);
-  return templates.filter((template) => template.status === 'DRAFT' || selected.has(template.id));
+  return templates.filter((template) => template.status === 'ACTIVE' || selected.has(template.id));
 }
 
 export function formatTemplatePositionLabels(

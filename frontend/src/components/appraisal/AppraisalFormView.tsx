@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppraisalRatingInput,
   AppraisalReviewResponse,
@@ -7,10 +7,11 @@ import type {
   EmployeeAppraisalFormResponse,
   PmAppraisalSubmitRequest,
 } from '../../types/appraisal';
-import ConfirmModal from '../ConfirmModal';
+import AppraisalPopup from './AppraisalPopup';
 import { signatureService } from '../../services/signatureService';
 import type { Signature } from '../../types/signature';
 import AppraisalRatingDots from './AppraisalRatingDots';
+import { formatDisplayDate } from '../../utils/appraisalDateFormat';
 import '../../pages/appraisal/appraisal.css';
 
 type AppraisalFormMode = 'pm' | 'dept-head' | 'hr' | 'employee' | 'readonly';
@@ -20,8 +21,20 @@ interface AppraisalFormViewProps {
   mode: AppraisalFormMode;
   busy?: boolean;
   onPmSubmit?: (payload: PmAppraisalSubmitRequest) => Promise<void> | void;
+  onPmDraftSave?: (payload: PmAppraisalSubmitRequest) => Promise<void> | void;
   onReviewSubmit?: (payload: AppraisalReviewSubmitRequest) => Promise<void> | void;
+  onReviewDraftSave?: (payload: AppraisalReviewSubmitRequest) => Promise<void> | void;
   employeeNameField?: ReactNode;
+}
+
+interface AutoSaveSnapshot {
+  key: string;
+  canSavePm: boolean;
+  canSaveReview: boolean;
+  pmPayload: PmAppraisalSubmitRequest;
+  reviewPayload: AppraisalReviewSubmitRequest;
+  pmDraftSave?: (payload: PmAppraisalSubmitRequest) => Promise<void> | void;
+  reviewDraftSave?: (payload: AppraisalReviewSubmitRequest) => Promise<void> | void;
 }
 
 interface ScoreSnapshot {
@@ -67,7 +80,25 @@ const getCurrentStageReview = (form: EmployeeAppraisalFormResponse, mode: Apprai
   return stage ? findReview(form.reviews ?? [], stage) : undefined;
 };
 
-const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString() : '-');
+const buildAutoSaveKey = (
+  formId: number,
+  mode: AppraisalFormMode,
+  ratings: Record<number, number>,
+  comment: string,
+  signatureImageData: string | null,
+  signatureImageType: string | null,
+  selectedSignatureId: number,
+) => JSON.stringify({
+  formId,
+  mode,
+  ratings: Object.entries(ratings).sort(([left], [right]) => Number(left) - Number(right)),
+  comment,
+  signatureImageData,
+  signatureImageType,
+  selectedSignatureId,
+});
+
+const formatDate = formatDisplayDate;
 
 const activeScoreBands = (bands?: AppraisalScoreBandResponse[] | null) => {
   const source = bands && bands.length ? bands : DEFAULT_SCORE_BANDS;
@@ -88,7 +119,9 @@ const AppraisalFormView = ({
   mode,
   busy = false,
   onPmSubmit,
+  onPmDraftSave,
   onReviewSubmit,
+  onReviewDraftSave,
   employeeNameField,
 }: AppraisalFormViewProps) => {
   const [ratings, setRatings] = useState<Record<number, number>>({});
@@ -101,12 +134,24 @@ const AppraisalFormView = ({
   const [signatureError, setSignatureError] = useState('');
   const [confirmPmOpen, setConfirmPmOpen] = useState(false);
   const [confirmReviewOpen, setConfirmReviewOpen] = useState(false);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveReadyRef = useRef(false);
+  const lastAutoSaveKeyRef = useRef('');
+  const autoSaveSnapshotRef = useRef<AutoSaveSnapshot | null>(null);
+  const autoSaveInFlightRef = useRef(false);
+  const queuedAutoSaveRef = useRef<AutoSaveSnapshot | null>(null);
 
   const pmReview = useMemo(() => findReview(form.reviews ?? [], 'PM'), [form.reviews]);
   const deptHeadReview = useMemo(() => findReview(form.reviews ?? [], 'DEPT_HEAD'), [form.reviews]);
   const hrReview = useMemo(() => findReview(form.reviews ?? [], 'HR'), [form.reviews]);
 
   useEffect(() => {
+    autoSaveReadyRef.current = false;
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
     const nextRatings: Record<number, number> = {};
 
     form.sections.forEach((section) => {
@@ -115,16 +160,38 @@ const AppraisalFormView = ({
       });
     });
 
-    setRatings(nextRatings);
     const currentStageReview = getCurrentStageReview(form, mode);
+    const nextComment = currentStageReview?.comment ?? '';
+    const nextSignatureImageData = currentStageReview?.signatureImageData ?? null;
+    const nextSignatureImageType = currentStageReview?.signatureImageType ?? null;
 
-    setComment('');
-    setSignatureImageData(currentStageReview?.signatureImageData ?? null);
-    setSignatureImageType(currentStageReview?.signatureImageType ?? null);
+    setRatings(nextRatings);
+    setComment(nextComment);
+    setSignatureImageData(nextSignatureImageData);
+    setSignatureImageType(nextSignatureImageType);
     setSelectedSignatureId(0);
     setConfirmPmOpen(false);
     setConfirmReviewOpen(false);
-  }, [form, mode]);
+    lastAutoSaveKeyRef.current = buildAutoSaveKey(
+      form.id,
+      mode,
+      nextRatings,
+      nextComment,
+      nextSignatureImageData,
+      nextSignatureImageType,
+      0,
+    );
+
+    const readyTimer = window.setTimeout(() => {
+      autoSaveReadyRef.current = true;
+    }, 0);
+
+    return () => {
+      window.clearTimeout(readyTimer);
+      autoSaveReadyRef.current = false;
+    };
+  }, [form.id, mode]);
+
 
   useEffect(() => {
     if (mode !== 'pm' && mode !== 'dept-head' && mode !== 'hr') {
@@ -171,7 +238,9 @@ const AppraisalFormView = ({
   );
 
   const scoreBands = useMemo(() => activeScoreBands(form.scoreBands), [form.scoreBands]);
-  const isLocked = Boolean(form.locked || form.cycleLocked);
+  const formLocked = Boolean(form.locked);
+  const cycleLockedForCurrentRole = Boolean(form.cycleLocked && mode !== 'hr');
+  const isLocked = formLocked || cycleLockedForCurrentRole;
   const missingRatingCount = allCriteria.filter((criteria) => !ratings[criteria.id]).length;
   const hasSignature = Boolean(signatureImageData && signatureImageType);
   const hasRemark = comment.trim().length > 0;
@@ -211,40 +280,149 @@ const AppraisalFormView = ({
     };
   }, [allCriteria, form.answeredCriteriaCount, form.performanceLabel, form.scorePercent, form.totalPoints, mode, ratings, scoreBands]);
 
+  const buildPmPayload = (includeAllRatings: boolean): PmAppraisalSubmitRequest => ({
+    ratings: (includeAllRatings ? allCriteria : allCriteria.filter((criteria) => Boolean(ratings[criteria.id]))).map<AppraisalRatingInput>((criteria) => ({
+      criteriaId: criteria.id,
+      ratingValue: ratings[criteria.id] ?? 0,
+      comment: '',
+    })),
+    recommendation: '',
+    comment: comment.trim(),
+    managerSignatureId: selectedSignatureId || null,
+    managerSignatureImageData: signatureImageData,
+    managerSignatureImageType: signatureImageType,
+  });
+
+  const buildReviewPayload = (): AppraisalReviewSubmitRequest => ({
+    recommendation: '',
+    comment: comment.trim(),
+    signatureId: selectedSignatureId || null,
+    signatureImageData,
+    signatureImageType,
+  });
+
+  const runAutoSaveSnapshot = useCallback((snapshot: AutoSaveSnapshot | null, force = false) => {
+    if (!snapshot || (!snapshot.canSavePm && !snapshot.canSaveReview)) {
+      return;
+    }
+
+    if (!force && snapshot.key === lastAutoSaveKeyRef.current) {
+      return;
+    }
+
+    if (autoSaveInFlightRef.current) {
+      queuedAutoSaveRef.current = snapshot;
+      return;
+    }
+
+    autoSaveInFlightRef.current = true;
+    lastAutoSaveKeyRef.current = snapshot.key;
+
+    const savePromise = snapshot.canSavePm && snapshot.pmDraftSave
+      ? Promise.resolve(snapshot.pmDraftSave(snapshot.pmPayload))
+      : snapshot.canSaveReview && snapshot.reviewDraftSave
+        ? Promise.resolve(snapshot.reviewDraftSave(snapshot.reviewPayload))
+        : Promise.resolve();
+
+    savePromise
+      .catch(() => {
+        lastAutoSaveKeyRef.current = '';
+      })
+      .finally(() => {
+        autoSaveInFlightRef.current = false;
+        const queuedSnapshot = queuedAutoSaveRef.current;
+        queuedAutoSaveRef.current = null;
+        if (queuedSnapshot && queuedSnapshot.key !== lastAutoSaveKeyRef.current) {
+          runAutoSaveSnapshot(queuedSnapshot, true);
+        }
+      });
+  }, []);
+
+  const autoSaveSnapshot: AutoSaveSnapshot = {
+    key: buildAutoSaveKey(
+      form.id,
+      mode,
+      ratings,
+      comment,
+      signatureImageData,
+      signatureImageType,
+      selectedSignatureId,
+    ),
+    canSavePm: mode === 'pm' && !isLocked && !busy && Boolean(onPmDraftSave),
+    canSaveReview: (mode === 'dept-head' || mode === 'hr') && !isLocked && !busy && Boolean(onReviewDraftSave),
+    pmPayload: buildPmPayload(false),
+    reviewPayload: buildReviewPayload(),
+    pmDraftSave: onPmDraftSave,
+    reviewDraftSave: onReviewDraftSave,
+  };
+  autoSaveSnapshotRef.current = autoSaveSnapshot;
+
+  useEffect(() => {
+    const snapshot = autoSaveSnapshotRef.current;
+
+    if (!snapshot || (!snapshot.canSavePm && !snapshot.canSaveReview) || !autoSaveReadyRef.current) {
+      return;
+    }
+
+    if (snapshot.key === lastAutoSaveKeyRef.current) {
+      return;
+    }
+
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      runAutoSaveSnapshot(autoSaveSnapshotRef.current);
+    }, 600);
+
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [autoSaveSnapshot.key, autoSaveSnapshot.canSavePm, autoSaveSnapshot.canSaveReview, runAutoSaveSnapshot]);
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    runAutoSaveSnapshot(autoSaveSnapshotRef.current, true);
+  }, [runAutoSaveSnapshot]);
+
+
+  const clearPendingAutoSave = () => {
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  };
+
   const submitPm = async () => {
     if (!onPmSubmit) return;
 
-    const payload: PmAppraisalSubmitRequest = {
-      ratings: allCriteria.map<AppraisalRatingInput>((criteria) => ({
-        criteriaId: criteria.id,
-        ratingValue: ratings[criteria.id] ?? 0,
-        comment: '',
-      })),
-      recommendation: '',
-      comment: comment.trim(),
-      managerSignatureId: selectedSignatureId || null,
-      managerSignatureImageData: signatureImageData,
-      managerSignatureImageType: signatureImageType,
-    };
-
-    await onPmSubmit(payload);
+    clearPendingAutoSave();
+    await onPmSubmit(buildPmPayload(true));
   };
 
   const submitReview = async () => {
     if (!onReviewSubmit) return;
-    await onReviewSubmit({
-      recommendation: '',
-      comment: comment.trim(),
-      signatureId: selectedSignatureId || null,
-      signatureImageData,
-      signatureImageType,
-    });
+    clearPendingAutoSave();
+    await onReviewSubmit(buildReviewPayload());
   };
 
   const currentSignatureSrc = signatureImageData && signatureImageType
-    ? `data:${signatureImageType};base64,${signatureImageData}`
+    ? signatureImageData.startsWith('data:')
+      ? signatureImageData
+      : `data:${signatureImageType};base64,${signatureImageData}`
     : null;
   const currentSignatureDateText = formatDate(new Date().toISOString());
+  const remarkBlockTitle = getRemarkBlockTitle(mode);
+  const remarkLabel = getRemarkLabel(mode);
+  const remarkPlaceholder = getRemarkPlaceholder(mode);
   let globalCriteriaNo = 0;
 
   return (
@@ -252,16 +430,8 @@ const AppraisalFormView = ({
       <div className="appraisal-template-banner center">
         <span className="appraisal-form-kicker">Appraisal Cycle Form</span>
         <h2>{form.cycleName}</h2>
-        <p>
-          {form.employeeName} {form.employeeCode ? `(${form.employeeCode})` : ''} - {form.departmentName}
-        </p>
       </div>
 
-      {isLocked && (
-        <div className="appraisal-lock-alert">
-          This appraisal form or cycle is locked by HR. It can be viewed only and cannot be edited or submitted.
-        </div>
-      )}
 
       <div className="appraisal-template-summary-card appraisal-cycle-summary-card compact-summary">
         <div><strong>Appraisal Name</strong><span>{form.cycleName}</span></div>
@@ -272,21 +442,20 @@ const AppraisalFormView = ({
 
       <div className="appraisal-form-block">
         <h3>Employee Information</h3>
-        <p className="appraisal-muted">Select the employee name in this form. Employee ID and position are filled automatically.</p>
         <div className="appraisal-inline-grid three appraisal-cycle-employee-grid">
           {employeeNameField ?? <InfoField label="Employee Name" value={form.employeeName} />}
           <InfoField label="Employee ID" value={form.employeeCode || '-'} />
           <InfoField label="Current Position" value={form.positionName || '-'} />
           <InfoField label="Department" value={form.departmentName} />
           <InfoField label="Assessment Date" value={formatDate(form.cycleStartDate || form.assessmentDate)} />
-          <InfoField label="Effective Date" value={formatDate(form.cycleEndDate || form.effectiveDate)} />
-          <InfoField label="Submission Deadline" value={formatDate(form.cycleSubmissionDeadline)} />
+          <InfoField label="Effective Date" value={formatDate(form.effectiveDate)} />
+          {mode === 'pm' && <InfoField label="Manager Deadline" value={formatDate(form.cycleManagerSubmissionDeadline || form.cycleSubmissionDeadline)} />}
+          {mode === 'dept-head' && <InfoField label="Dept Head Deadline" value={formatDate(form.cycleDeptHeadSubmissionDeadline || form.cycleSubmissionDeadline)} />}
         </div>
       </div>
 
       <div className="appraisal-form-block">
         <h3>Evaluations</h3>
-        <p className="appraisal-muted">Criteria rows do not include remark fields. Select only the rating from 1 to 5.</p>
         {form.sections.map((section) => (
           <section key={section.id} className="appraisal-section-card">
             <div className="appraisal-section-header">
@@ -363,7 +532,6 @@ const AppraisalFormView = ({
               </tr>
             </tbody>
           </table>
-          <p className="appraisal-muted">Scores are calculated live from the selected ratings and recalculated again when the form is submitted.</p>
         </div>
       </div>
 
@@ -375,8 +543,7 @@ const AppraisalFormView = ({
       <div className="appraisal-form-block">
         <div className="appraisal-form-block-header">
           <div>
-            <h3>Submitted Reviews</h3>
-            <p className="appraisal-muted">Manager, Dept Head, and HR remarks and signatures are shown here after submission.</p>
+            <h3>Review Records</h3>
           </div>
         </div>
         <div className="appraisal-inline-grid three">
@@ -388,21 +555,14 @@ const AppraisalFormView = ({
 
       {(mode === 'pm' || mode === 'dept-head' || mode === 'hr') && !isLocked && (
         <div className="appraisal-form-block appraisal-other-remarks-block">
-          <h3>Other Remarks</h3>
-          <p className="appraisal-muted">
-            {mode === 'pm'
-              ? 'Add the appraiser comment, sign only in the Manager signature slot, then submit this employee form to Dept Head.'
-              : mode === 'dept-head'
-                ? 'Check the Manager rating, add the appraiser comment, sign in the Dept Head signature slot, then submit to HR.'
-                : 'Check Manager and Dept Head reviews, add the appraiser comment, sign in the HR signature slot, then submit to the employee.'}
-          </p>
+          <h3>{remarkBlockTitle}</h3>
           <label className="appraisal-field">
-            <span>Appraiser's Comment for Discussion</span>
+            <span>{remarkLabel}</span>
             <textarea
               rows={4}
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              placeholder="Required comment for discussion"
+              placeholder={remarkPlaceholder}
             />
           </label>
 
@@ -452,10 +612,11 @@ const AppraisalFormView = ({
         </div>
       )}
 
-      <ConfirmModal
+      <AppraisalPopup
         open={confirmPmOpen}
-        title="Confirm Submit"
-        message={`Are you sure you want to submit ${form.employeeName}'s appraisal to the Dept Head? After submission, this employee will be removed from the selectable review list.`}
+        type="confirm"
+        title="Submit Manager Review?"
+        message={`Are you sure you want to submit ${form.employeeName}'s appraisal form to the Dept Head? After submission, this employee will be removed from the selectable review list.`}
         confirmText="Submit"
         cancelText="Cancel"
         loading={busy}
@@ -466,12 +627,13 @@ const AppraisalFormView = ({
         onCancel={() => setConfirmPmOpen(false)}
       />
 
-      <ConfirmModal
+      <AppraisalPopup
         open={confirmReviewOpen}
-        title="Confirm Submit"
+        type="confirm"
+        title={mode === 'dept-head' ? 'Submit Dept Head Review?' : 'Submit HR Review?'}
         message={mode === 'dept-head'
-          ? `Submit ${form.employeeName}'s checked appraisal form to HR?`
-          : `Submit ${form.employeeName}'s completed appraisal form to the employee?`}
+          ? `Are you sure you want to submit ${form.employeeName}'s checked appraisal form to HR?`
+          : `Are you sure you want to submit ${form.employeeName}'s completed appraisal form to the employee?`}
         confirmText="Submit"
         cancelText="Cancel"
         loading={busy}
@@ -485,6 +647,27 @@ const AppraisalFormView = ({
   );
 };
 
+
+const getRemarkBlockTitle = (mode: AppraisalFormMode) => {
+  if (mode === 'hr') return 'HR Remarks & Signature';
+  if (mode === 'dept-head') return 'Dept Head Remarks & Signature';
+  if (mode === 'pm') return 'Manager Remarks & Signature';
+  return 'Other Remarks';
+};
+
+const getRemarkLabel = (mode: AppraisalFormMode) => {
+  if (mode === 'hr') return 'HR Remarks';
+  if (mode === 'dept-head') return 'Dept Head Remarks';
+  if (mode === 'pm') return "Appraiser's Comment for Discussion";
+  return 'Remarks';
+};
+
+const getRemarkPlaceholder = (mode: AppraisalFormMode) => {
+  if (mode === 'hr') return 'Enter HR final remarks';
+  if (mode === 'dept-head') return 'Enter Dept Head remarks';
+  if (mode === 'pm') return 'Required comment for discussion';
+  return 'Enter remarks';
+};
 const InfoField = ({ label, value }: { label: string; value: string | number }) => (
   <label className="appraisal-field">
     <span>{label}</span>
@@ -537,52 +720,57 @@ const WorkflowSignatureSection = ({
   signatureLoading,
   signatureError,
   onSignatureSelect,
-}: WorkflowSignatureSectionProps) => (
-  <div className="appraisal-form-block appraisal-workflow-signature-section">
-    <h3>Signature Section</h3>
-    <div className="appraisal-signature-grid appraisal-template-signature-grid appraisal-workflow-signature-grid">
-      <WorkflowSignatureSlot
-        label="Manager Signature & Date"
-        review={pmReview}
-        editable={mode === 'pm'}
-        busy={busy}
-        pendingSignatureSrc={mode === 'pm' ? pendingSignatureSrc : null}
-        pendingDateText={pendingDateText}
-        signatures={signatures}
-        selectedSignatureId={selectedSignatureId}
-        signatureLoading={signatureLoading}
-        signatureError={signatureError}
-        onSignatureSelect={onSignatureSelect}
-      />
-      <WorkflowSignatureSlot
-        label="Dept Head Signature & Date"
-        review={deptHeadReview}
-        editable={mode === 'dept-head'}
-        busy={busy}
-        pendingSignatureSrc={mode === 'dept-head' ? pendingSignatureSrc : null}
-        pendingDateText={pendingDateText}
-        signatures={signatures}
-        selectedSignatureId={selectedSignatureId}
-        signatureLoading={signatureLoading}
-        signatureError={signatureError}
-        onSignatureSelect={onSignatureSelect}
-      />
-      <WorkflowSignatureSlot
-        label="HR Signature / Date / Designation"
-        review={hrReview}
-        editable={mode === 'hr'}
-        busy={busy}
-        pendingSignatureSrc={mode === 'hr' ? pendingSignatureSrc : null}
-        pendingDateText={pendingDateText}
-        signatures={signatures}
-        selectedSignatureId={selectedSignatureId}
-        signatureLoading={signatureLoading}
-        signatureError={signatureError}
-        onSignatureSelect={onSignatureSelect}
-      />
+}: WorkflowSignatureSectionProps) => {
+  const slots = [
+    {
+      key: 'pm',
+      label: 'Manager Signature & Date',
+      review: pmReview,
+      editable: mode === 'pm',
+      pendingSignatureSrc: mode === 'pm' ? pendingSignatureSrc : null,
+    },
+    {
+      key: 'dept-head',
+      label: 'Dept Head Signature & Date',
+      review: deptHeadReview,
+      editable: mode === 'dept-head',
+      pendingSignatureSrc: mode === 'dept-head' ? pendingSignatureSrc : null,
+    },
+    {
+      key: 'hr',
+      label: 'HR Signature / Date / Designation',
+      review: hrReview,
+      editable: mode === 'hr',
+      pendingSignatureSrc: mode === 'hr' ? pendingSignatureSrc : null,
+    },
+  ];
+
+  const orderedSlots = [...slots].sort((left, right) => Number(right.editable) - Number(left.editable));
+
+  return (
+    <div className="appraisal-form-block appraisal-workflow-signature-section">
+      <h3>{mode === 'hr' ? 'HR Signature' : 'Signature Section'}</h3>
+      <div className="appraisal-signature-grid appraisal-template-signature-grid appraisal-workflow-signature-grid">
+        {orderedSlots.map((slot) => (
+          <WorkflowSignatureSlot
+            key={slot.key}
+            label={slot.label}
+            review={slot.review}
+            editable={slot.editable}
+            busy={busy}
+            pendingSignatureSrc={slot.pendingSignatureSrc}
+            pendingDateText={pendingDateText}
+            signatures={signatures}
+            selectedSignatureId={selectedSignatureId}
+            signatureLoading={signatureLoading}
+            signatureError={signatureError}
+            onSignatureSelect={onSignatureSelect}
+          />
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface WorkflowSignatureSlotProps {
   label: string;

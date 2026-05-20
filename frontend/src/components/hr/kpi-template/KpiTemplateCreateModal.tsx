@@ -220,7 +220,7 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
       return;
     }
 
-    const submitStatus: KpiFormStatus = 'DRAFT';
+    const submitStatus: KpiFormStatus = action === 'use-in-cycle' ? 'ACTIVE' : 'DRAFT';
     const message = validate(submitStatus);
     if (message) {
       toast.error(message);
@@ -242,10 +242,10 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
         resetFormFields();
         onClose();
         if (action === 'use-in-cycle') {
-          toast.success('KPI form updated. Select it in the template cycle.');
+          toast.success('KPI form activated. Select it in the template cycle.');
           navigate('/hr/kpi-template-cycle/new', { state: { preselectFormId: updated.id } });
         } else {
-          toast.success('KPI form updated.');
+          toast.success('KPI form draft saved.');
         }
         return;
       }
@@ -265,10 +265,10 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
             onClose();
 
             if (action === 'use-in-cycle') {
-              toast.success('KPI form created. Select it in the template cycle.');
+              toast.success('KPI form created and activated. Select it in the template cycle.');
               navigate('/hr/kpi-template-cycle/new', { state: { preselectFormId: created.id } });
             } else {
-              toast.success('KPI form created.');
+              toast.success('KPI form draft created.');
             }
           }
         }
@@ -440,47 +440,47 @@ function MotionlessModalShell(props: ShellProps) {
                 className={fieldClass}
               />
             </label>
-          </div>
 
-          <label className="kpi-tpl-modal-positions">
-            <p>Position</p>
-            <select
-              required
-              value={positionId ?? ''}
-              disabled={isView || isSubmitting}
-              onChange={(event) => {
-                const next = event.target.value ? Number(event.target.value) : null;
-                void onPositionChange(next != null && Number.isNaN(next) ? null : next);
-              }}
-              className={`${fieldClass} cursor-pointer`}
-            >
-              <option value="">
-                {positionsCount === 0
-                  ? 'No positions in system'
-                  : availablePositionCount === 0
-                    ? 'All positions already have a KPI form'
-                    : 'Select position...'}
-              </option>
-              {positionOptions.map((option) => (
-                <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
-                  {option.label}
+            <label className="kpi-tpl-modal-positions">
+              <p>Position</p>
+              <select
+                required
+                value={positionId ?? ''}
+                disabled={isView || isSubmitting}
+                onChange={(event) => {
+                  const next = event.target.value ? Number(event.target.value) : null;
+                  void onPositionChange(next != null && Number.isNaN(next) ? null : next);
+                }}
+                className={`${fieldClass} cursor-pointer`}
+              >
+                <option value="">
+                  {positionsCount === 0
+                    ? 'No positions in system'
+                    : availablePositionCount === 0
+                      ? 'All positions already have a KPI form'
+                      : 'Select position...'}
                 </option>
-              ))}
-            </select>
-            {positionsCount > 0 && isCreate && (
-              <p className="mt-2 text-sm text-gray-500">
-                {availablePositionCount} of {positionsCount} position
-                {positionsCount === 1 ? '' : 's'} available for a new KPI form.
-              </p>
-            )}
-            {isCreate && existingTemplate && (
-              <KpiPositionExistingAlert
-                templateTitle={existingTemplate.templateTitle}
-                onEdit={() => onOpenExistingTemplate(existingTemplate, 'edit')}
-                onView={() => onOpenExistingTemplate(existingTemplate, 'view')}
-              />
-            )}
-          </label>
+                {positionOptions.map((option) => (
+                  <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {positionsCount > 0 && isCreate && (
+                <p className="mt-2 text-sm text-gray-500">
+                  {availablePositionCount} of {positionsCount} position
+                  {positionsCount === 1 ? '' : 's'} available for a new KPI form.
+                </p>
+              )}
+              {isCreate && existingTemplate && (
+                <KpiPositionExistingAlert
+                  templateTitle={existingTemplate.templateTitle}
+                  onEdit={() => onOpenExistingTemplate(existingTemplate, 'edit')}
+                  onView={() => onOpenExistingTemplate(existingTemplate, 'view')}
+                />
+              )}
+            </label>
+          </div>
 
           <KpiTemplateRowsTable
             rows={rows}

@@ -88,7 +88,7 @@ const HrEmployeeKpiListPage = () => {
     return copy;
   }, [rows, tab, selectedDeptId, departments]);
 
-  const colCount = tab === 'in_progress' ? 8 : 7;
+  const colCount = 8;
 
   const tabBtnStyle = (active: boolean): CSSProperties => ({
     padding: '.45rem .9rem',
@@ -208,6 +208,9 @@ const HrEmployeeKpiListPage = () => {
                 {tab === 'finalized' && (
                   <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Finalized</th>
                 )}
+                {tab === 'finalized' && (
+                  <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Reason</th>
+                )}
                 <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', width: '100px' }} />
               </tr>
             </thead>
@@ -257,6 +260,15 @@ const HrEmployeeKpiListPage = () => {
                     {tab === 'finalized' && (
                       <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#64748b', whiteSpace: 'nowrap' }}>
                         {formatWhen(r.finalizedAt)}
+                      </td>
+                    )}
+                    {tab === 'finalized' && (
+                      <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569', maxWidth: '220px' }}>
+                        {r.earlyFinalizedReason ? (
+                          <span title={r.earlyFinalizedReason}>{r.earlyFinalizedReason}</span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                     )}
                     <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9' }}>

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,11 +39,11 @@ public class KpiFormServiceImpl implements KpiFormService {
     private final KpiUnitRepository kpiUnitRepository;
     private final KpiItemRepository kpiItemRepository;
     private final UserRepository userRepository;
-    private final EmployeeKpiFormRepository employeeKpiFormRepository;
 
     @Override
     @Transactional
     public KpiFormResponseDTO createTemplate(KpiFormRequestDTO dto) {
+        validateDates(dto);
         validateItems(dto.getItems());
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
@@ -61,10 +62,13 @@ public class KpiFormServiceImpl implements KpiFormService {
 
         KpiForm form = KpiForm.builder()
                 .title(dto.getTitle().trim())
+                .startDate(dto.getStartDate())
+                .endDate(dto.getEndDate())
                 .status(status)
                 .createdByUser(author)
                 .createdBy(author.getEmail())
                 .build();
+        applyLifecycleTimestamps(form, status);
 
         applyPositions(form, dto.getPositionIds());
         applyItems(form, dto.getItems());
@@ -78,6 +82,7 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public KpiFormResponseDTO updateTemplate(Integer id, KpiFormRequestDTO dto) {
+        validateDates(dto);
         validateItems(dto.getItems());
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
@@ -98,8 +103,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
 
         form.setTitle(dto.getTitle().trim());
+        form.setStartDate(dto.getStartDate());
+        form.setEndDate(dto.getEndDate());
         form.setStatus(status);
         form.setUpdatedByUser(editor);
+        applyLifecycleTimestamps(form, status);
 
         form.getItems().clear();
         form.getKpiPositions().clear();
@@ -130,15 +138,15 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public void deleteTemplate(Integer id) {
-        if (employeeKpiFormRepository.countByKpiForm_Id(id) > 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Cannot delete this KPI template because employees are already assigned."
-            );
-        }
         KpiForm form = kpiFormRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
-        kpiFormRepository.delete(form);
+        User editor = userRepository.findById(SecurityUtils.currentUserId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        form.setStatus(KpiFormStatus.ARCHIVED);
+        form.setUpdatedByUser(editor);
+        form.getKpiPositions().clear();
+        kpiFormRepository.save(form);
     }
 
     @Override
@@ -281,8 +289,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .version(form.getVersion())
                 .createdAt(form.getCreatedAt())
                 .updatedAt(form.getUpdatedAt())
+                .finalizedAt(form.getFinalizedAt())
+                .sentAt(form.getSentAt())
                 .createdBy(form.getCreatedBy())
                 .createdByUserId(resolveCreatedByUserId(form))
+                .updatedByUserId(resolveUpdatedByUserId(form))
                 .positions(positions)
                 .items(new ArrayList<>())
                 .build();
@@ -309,8 +320,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .version(form.getVersion())
                 .createdAt(form.getCreatedAt())
                 .updatedAt(form.getUpdatedAt())
+                .finalizedAt(form.getFinalizedAt())
+                .sentAt(form.getSentAt())
                 .createdBy(form.getCreatedBy())
                 .createdByUserId(resolveCreatedByUserId(form))
+                .updatedByUserId(resolveUpdatedByUserId(form))
                 .positions(positions)
                 .items(rows)
                 .build();
@@ -319,6 +333,11 @@ public class KpiFormServiceImpl implements KpiFormService {
     private static Integer resolveCreatedByUserId(KpiForm form) {
         User creator = form.getCreatedByUser();
         return creator != null ? creator.getId() : null;
+    }
+
+    private static Integer resolveUpdatedByUserId(KpiForm form) {
+        User updater = form.getUpdatedByUser();
+        return updater != null ? updater.getId() : null;
     }
 
     private static List<KpiFormResponseDTO.KpiPositionSummaryDTO> mapPositionSummaries(List<KpiPosition> links) {
@@ -374,6 +393,14 @@ public class KpiFormServiceImpl implements KpiFormService {
         }
     }
 
+    private void validateDates(KpiFormRequestDTO dto) {
+        if (dto.getStartDate() != null
+                && dto.getEndDate() != null
+                && dto.getEndDate().isBefore(dto.getStartDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date cannot be before start date.");
+        }
+    }
+
     private void validateWeights(KpiFormStatus status, List<KpiFormItemDTO> items) {
         int total = items.stream()
                 .mapToInt(r -> r.getWeight() == null ? 0 : r.getWeight())
@@ -381,6 +408,16 @@ public class KpiFormServiceImpl implements KpiFormService {
         if ((status == KpiFormStatus.ACTIVE || status == KpiFormStatus.FINALIZED) && total != 100) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Total weight must equal 100% before status can be ACTIVE or FINALIZED.");
+        }
+    }
+
+    private void applyLifecycleTimestamps(KpiForm form, KpiFormStatus status) {
+        LocalDateTime now = LocalDateTime.now();
+        if (status == KpiFormStatus.FINALIZED && form.getFinalizedAt() == null) {
+            form.setFinalizedAt(now);
+        }
+        if (status == KpiFormStatus.SENT && form.getSentAt() == null) {
+            form.setSentAt(now);
         }
     }
 
@@ -393,6 +430,9 @@ public class KpiFormServiceImpl implements KpiFormService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only one position can be assigned per KPI form.");
         }
         Integer pid = distinctIds.get(0);
+        kpiPositionRepository.deleteArchivedLinksByPositionId(pid);
+        kpiPositionRepository.flush();
+
         Integer currentFormId = form.getId();
         Optional<KpiPosition> existingLink = findOccupyingLink(pid, currentFormId);
         logDuplicateCheck(pid, currentFormId, existingLink);

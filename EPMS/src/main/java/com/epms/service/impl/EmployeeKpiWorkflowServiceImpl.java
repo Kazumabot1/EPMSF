@@ -10,6 +10,7 @@ import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowService {
 
     public static final String TYPE_KPI_MANAGER_ASSIGNMENT = "KPI_MANAGER_ASSIGNMENT";
@@ -29,6 +31,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     public static final String TYPE_KPI_FINALIZED_HR = "KPI_FINALIZED_HR";
 
     private final KpiFormRepository kpiFormRepository;
+    private final KpiTemplateCycleRepository kpiTemplateCycleRepository;
+    private final KpiTemplateCycleFormRepository kpiTemplateCycleFormRepository;
     private final KpiPositionRepository kpiPositionRepository;
     private final EmployeeRepository employeeRepository;
     private final EmployeeKpiFormRepository employeeKpiFormRepository;
@@ -100,7 +104,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             );
         }
 
-        AggregatedDeptApply aggregated = aggregateApplyAcrossDepartments(form, kpiFormId, positionIds, targetDepartmentIds);
+        AggregatedDeptApply aggregated = aggregateApplyAcrossDepartments(form, null, kpiFormId, positionIds, targetDepartmentIds);
 
         if (aggregated.departmentsWithMatches() == 0) {
             String msg = switch (phraseKind) {
@@ -154,6 +158,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
     private AggregatedDeptApply aggregateApplyAcrossDepartments(
             KpiForm form,
+            KpiTemplateCycle cycle,
             Integer kpiFormId,
             Set<Integer> positionIds,
             List<Integer> departmentIds
@@ -164,7 +169,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         LinkedHashSet<Integer> managers = new LinkedHashSet<>();
 
         for (Integer deptId : departmentIds) {
-            DeptApplySlice slice = applyTemplateToDepartmentSlice(form, kpiFormId, deptId, positionIds);
+            DeptApplySlice slice = applyTemplateToDepartmentSlice(form, cycle, kpiFormId, deptId, positionIds);
             if (!slice.hadCandidates()) {
                 continue;
             }
@@ -187,23 +192,41 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
     private DeptApplySlice applyTemplateToDepartmentSlice(
             KpiForm form,
+            KpiTemplateCycle cycle,
             Integer kpiFormId,
             Integer departmentId,
             Set<Integer> positionIds
     ) {
-        List<Employee> candidates = employeeRepository.findCurrentByWorkingDepartmentId(departmentId, false).stream()
-                .filter(e -> e.getPosition() != null && positionIds.contains(e.getPosition().getId()))
-                .toList();
+        List<Employee> candidates = employeeRepository.findCurrentByWorkingDepartmentId(departmentId, false);
 
         if (candidates.isEmpty()) {
+            log.info(
+                    "KPI assignment diagnostics: templateId={}, cycleId={}, departmentId={} skipped because no active employees are linked to this department.",
+                    kpiFormId,
+                    cycle == null ? null : cycle.getId(),
+                    departmentId
+            );
             return DeptApplySlice.empty();
         }
 
         int created = 0;
         int skipped = 0;
+        int skippedNoPosition = 0;
+        int skippedPositionMismatch = 0;
+        int matched = 0;
 
         for (Employee emp : candidates) {
-            if (employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(emp.getId(), kpiFormId).isPresent()) {
+            if (emp.getPosition() == null) {
+                skippedNoPosition++;
+                continue;
+            }
+            if (!positionIds.contains(emp.getPosition().getId())) {
+                skippedPositionMismatch++;
+                continue;
+            }
+            matched++;
+
+            if (hasExistingKpiAssignment(emp.getId(), kpiFormId, cycle)) {
                 skipped++;
                 continue;
             }
@@ -211,6 +234,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             EmployeeKpiForm ekf = EmployeeKpiForm.builder()
                     .employee(emp)
                     .kpiForm(form)
+                    .kpiTemplateCycle(cycle)
                     .status(EmployeeKpiStatus.ASSIGNED)
                     .scores(new LinkedHashSet<>())
                     .build();
@@ -227,7 +251,114 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         }
 
         LinkedHashSet<Integer> managerIds = resolveManagerUserIds(departmentId);
-        return new DeptApplySlice(true, created, skipped, managerIds);
+        log.info(
+                "KPI assignment diagnostics: templateId={}, cycleId={}, departmentId={}, candidates={}, matchedByPosition={}, created={}, duplicateSkipped={}, noPositionSkipped={}, positionMismatchSkipped={}, managers={}",
+                kpiFormId,
+                cycle == null ? null : cycle.getId(),
+                departmentId,
+                candidates.size(),
+                matched,
+                created,
+                skipped,
+                skippedNoPosition,
+                skippedPositionMismatch,
+                managerIds.size()
+        );
+        return new DeptApplySlice(matched > 0, created, skipped, managerIds);
+    }
+
+    private boolean hasExistingKpiAssignment(Integer employeeId, Integer kpiFormId, KpiTemplateCycle cycle) {
+        if (cycle == null || cycle.getId() == null) {
+            return employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(employeeId, kpiFormId).isPresent();
+        }
+        return employeeKpiFormRepository.findByEmployee_IdAndKpiForm_IdAndKpiTemplateCycle_Id(
+                employeeId,
+                kpiFormId,
+                cycle.getId()
+        ).isPresent();
+    }
+
+    @Override
+    @Transactional
+    public UseKpiTemplateResultDto useCycleForAllActiveDepartments(Integer cycleId) {
+        KpiTemplateCycle cycle = kpiTemplateCycleRepository.findById(cycleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found."));
+
+        List<Integer> targetDepartmentIds = activeDepartmentIds();
+        if (targetDepartmentIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active departments are available.");
+        }
+
+        int created = 0;
+        int skipped = 0;
+        int departmentsWithMatches = 0;
+        LinkedHashSet<Integer> managers = new LinkedHashSet<>();
+
+        List<KpiTemplateCycleForm> links = kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycleId);
+        if (links.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
+        }
+
+        for (KpiTemplateCycleForm link : links) {
+            KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found."));
+            List<KpiPosition> positionLinks = kpiPositionRepository.findWithPositionByKpiForm_Id(form.getId());
+            Set<Integer> positionIds = positionLinks.stream()
+                    .map(kp -> kp.getPosition().getId())
+                    .collect(Collectors.toSet());
+            if (positionIds.isEmpty()) {
+                log.info(
+                        "KPI assignment diagnostics: cycleId={}, templateId={} skipped because the template has no linked positions.",
+                        cycleId,
+                        form.getId()
+                );
+                continue;
+            }
+
+            AggregatedDeptApply aggregated = aggregateApplyAcrossDepartments(
+                    form,
+                    cycle,
+                    form.getId(),
+                    positionIds,
+                    targetDepartmentIds
+            );
+            created += aggregated.created();
+            skipped += aggregated.skipped();
+            departmentsWithMatches += aggregated.departmentsWithMatches();
+            managers.addAll(aggregated.managerIds());
+
+            for (Integer mgrId : aggregated.managerIds()) {
+                notificationService.send(
+                        mgrId,
+                        "KPI scoring requested",
+                        "HR activated KPI cycle \"" + cycle.getCycleName() + "\" with template \""
+                                + form.getTitle()
+                                + "\". Enter scores for assigned employees in your department.",
+                        TYPE_KPI_MANAGER_ASSIGNMENT,
+                        form.getId()
+                );
+            }
+        }
+
+        employeeKpiFormRepository.flush();
+
+        return UseKpiTemplateResultDto.builder()
+                .assignmentsCreated(created)
+                .assignmentsSkippedExisting(skipped)
+                .managersNotified(managers.size())
+                .departmentsWithMatches(departmentsWithMatches)
+                .build();
+    }
+
+    private List<Integer> activeDepartmentIds() {
+        return departmentRepository.findAll().stream()
+                .filter(d -> d.getStatus() == null || Boolean.TRUE.equals(d.getStatus()))
+                .sorted(Comparator.comparing(
+                        d -> d.getDepartmentName() == null ? "" : d.getDepartmentName(),
+                        String.CASE_INSENSITIVE_ORDER
+                ))
+                .map(Department::getId)
+                .toList();
     }
 
     private record DeptApplySlice(boolean hadCandidates, int created, int skipped, LinkedHashSet<Integer> managerIds) {
@@ -261,6 +392,23 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         List<EmployeeKpiForm> forms = employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(kpiFormId, employeeIds);
         return forms.stream().sorted(Comparator.comparing(ekf -> fullName(ekf.getEmployee()))).map(this::toManagerDto).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ManagerKpiAssignmentDto> listFinalizedHistoryForManagerDepartment() {
+        Integer deptId = requireManagerDepartmentId();
+        List<Integer> employeeIds = departmentEmployeeIds(deptId);
+        if (employeeIds.isEmpty()) {
+            return List.of();
+        }
+        return employeeKpiFormRepository.findByEmployeeIdInAndStatusWithDetail(
+                        employeeIds,
+                        EmployeeKpiStatus.FINALIZED
+                )
+                .stream()
+                .map(this::toManagerDto)
+                .toList();
     }
 
     @Override
@@ -391,6 +539,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         List<EmployeeKpiForm> finalizedThisRun = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
+        User managerUser = currentUserEntity();
 
         for (EmployeeKpiForm ekf : forms) {
             if (ekf.getStatus() == EmployeeKpiStatus.FINALIZED) {
@@ -399,6 +548,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             ekf.calculateTotals();
             ekf.setStatus(EmployeeKpiStatus.FINALIZED);
             ekf.setFinalizedAt(now);
+            ekf.setFinalizedByUser(managerUser);
+            ekf.setFinalizedBeforeEndDate(isBeforeOrOnPeriodEnd(ekf));
             ekf.setSentAt(now);
             employeeKpiFormRepository.save(ekf);
             finalizedThisRun.add(ekf);
@@ -413,6 +564,52 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .assignmentsSkippedExisting(0)
                 .managersNotified(0)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public ManagerKpiAssignmentDto finalizeEmployeeKpi(Integer employeeKpiFormId, FinalizeEmployeeKpiRequest request) {
+        Integer deptId = requireManagerDepartmentId();
+        Set<Integer> allowedEmployees = new HashSet<>(departmentEmployeeIds(deptId));
+
+        EmployeeKpiForm ekf = employeeKpiFormRepository.findWithScoresForUpdate(employeeKpiFormId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI assignment not found."));
+
+        if (!allowedEmployees.contains(ekf.getEmployee().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This assignment is outside your department.");
+        }
+        if (ekf.getStatus() == EmployeeKpiStatus.FINALIZED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This KPI assignment is already finalized.");
+        }
+        if (ekf.getScores() == null || ekf.getScores().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No KPI rows are available to finalize.");
+        }
+        for (EmployeeKpiScore sc : ekf.getScores()) {
+            if (sc.getScore() == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Complete all KPI rows before finalizing this employee."
+                );
+            }
+        }
+
+        String reason = request.getReason() == null ? "" : request.getReason().trim();
+        if (reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Finalization reason is required.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        ekf.calculateTotals();
+        ekf.setStatus(EmployeeKpiStatus.FINALIZED);
+        ekf.setFinalizedAt(now);
+        ekf.setSentAt(now);
+        ekf.setFinalizedByUser(currentUserEntity());
+        ekf.setFinalizedBeforeEndDate(isBeforeOrOnPeriodEnd(ekf));
+        ekf.setEarlyFinalizedReason(reason);
+        employeeKpiFormRepository.saveAndFlush(ekf);
+
+        notifyEmployeesAndHrAfterFinalization(ekf.getKpiForm(), List.of(ekf), false);
+        return toManagerDto(ekf);
     }
 
     @Override
@@ -442,6 +639,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             ekf.calculateTotals();
             ekf.setStatus(EmployeeKpiStatus.FINALIZED);
             ekf.setFinalizedAt(now);
+            ekf.setFinalizedBeforeEndDate(false);
             ekf.setSentAt(now);
             employeeKpiFormRepository.save(ekf);
             finalizedThisRun.add(ekf);
@@ -500,8 +698,10 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .totalScore(ekf.getTotalScore())
                 .totalWeightedScore(ekf.getTotalWeightedScore())
                 .finalizedAt(ekf.getFinalizedAt())
-                .periodStartDate(ekf.getKpiForm().getStartDate())
-                .periodEndDate(ekf.getKpiForm().getEndDate())
+                .earlyFinalizedReason(ekf.getEarlyFinalizedReason())
+                .finalizedBeforeEndDate(ekf.getFinalizedBeforeEndDate())
+                .periodStartDate(periodStartDate(ekf))
+                .periodEndDate(periodEndDate(ekf))
                 .lines(scoreLines(ekf))
                 .build();
     }
@@ -525,9 +725,12 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private void notifyEmployeesAndHrAfterFinalization(KpiForm form, List<EmployeeKpiForm> finalizedThisRun, boolean periodEndAuto) {
         for (EmployeeKpiForm ekf : finalizedThisRun) {
             String weighted = ekf.getTotalWeightedScore() != null ? String.format("%.2f", ekf.getTotalWeightedScore()) : "—";
+            String reason = ekf.getEarlyFinalizedReason() == null || ekf.getEarlyFinalizedReason().isBlank()
+                    ? ""
+                    : " Reason: " + ekf.getEarlyFinalizedReason().trim();
             String empDetail = periodEndAuto
                     ? ("KPI \"" + form.getTitle() + "\" was finalized after the scoring period ended. Weighted score: " + weighted + ".")
-                    : ("Your manager finalized KPI \"" + form.getTitle() + "\". Weighted score: " + weighted + ".");
+                    : ("Your manager finalized KPI \"" + form.getTitle() + "\". Weighted score: " + weighted + "." + reason);
             userRepository.findActiveByEmployeeId(ekf.getEmployee().getId()).ifPresent(u ->
                     notificationService.send(
                             u.getId(),
@@ -552,11 +755,23 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     ? ("KPI \"" + form.getTitle() + "\" auto-finalized after period end for "
                             + finalizedThisRun.size() + " employee(s): " + summary + ".")
                     : ("KPI \"" + form.getTitle() + "\" finalized for "
-                            + finalizedThisRun.size() + " employee(s): " + summary + ".");
+                            + finalizedThisRun.size() + " employee(s): " + summary + "."
+                            + firstReasonSummary(finalizedThisRun));
             for (User hr : hrUsers) {
                 notificationService.send(hr.getId(), "KPI finalized", hrMessage, TYPE_KPI_FINALIZED_HR, form.getId());
             }
         }
+    }
+
+    private String firstReasonSummary(List<EmployeeKpiForm> finalizedForms) {
+        return finalizedForms.stream()
+                .map(EmployeeKpiForm::getEarlyFinalizedReason)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .findFirst()
+                .map(reason -> " Reason: " + reason)
+                .orElse("");
     }
 
     @Override
@@ -589,6 +804,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .totalScore(ekf.getTotalScore())
                 .totalWeightedScore(ekf.getTotalWeightedScore())
                 .finalizedAt(ekf.getFinalizedAt())
+                .earlyFinalizedReason(ekf.getEarlyFinalizedReason())
+                .finalizedBeforeEndDate(ekf.getFinalizedBeforeEndDate())
                 .lines(scoreLines(ekf))
                 .build();
     }
@@ -598,13 +815,44 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .employeeKpiFormId(ekf.getId())
                 .employeeId(ekf.getEmployee().getId())
                 .employeeName(fullName(ekf.getEmployee()))
+                .positionTitle(ekf.getEmployee().getPosition() != null ? ekf.getEmployee().getPosition().getPositionTitle() : null)
+                .kpiFormId(ekf.getKpiForm().getId())
+                .kpiTitle(ekf.getKpiForm().getTitle())
                 .status(ekf.getStatus())
                 .totalScore(ekf.getTotalScore())
                 .totalWeightedScore(ekf.getTotalWeightedScore())
-                .periodStartDate(ekf.getKpiForm().getStartDate())
-                .periodEndDate(ekf.getKpiForm().getEndDate())
+                .finalizedAt(ekf.getFinalizedAt())
+                .earlyFinalizedReason(ekf.getEarlyFinalizedReason())
+                .finalizedBeforeEndDate(ekf.getFinalizedBeforeEndDate())
+                .periodStartDate(periodStartDate(ekf))
+                .periodEndDate(periodEndDate(ekf))
                 .lines(scoreLines(ekf))
                 .build();
+    }
+
+    private LocalDate periodStartDate(EmployeeKpiForm ekf) {
+        if (ekf.getKpiTemplateCycle() != null && ekf.getKpiTemplateCycle().getStartDate() != null) {
+            return ekf.getKpiTemplateCycle().getStartDate();
+        }
+        return ekf.getKpiForm() != null ? ekf.getKpiForm().getStartDate() : null;
+    }
+
+    private LocalDate periodEndDate(EmployeeKpiForm ekf) {
+        if (ekf.getKpiTemplateCycle() != null && ekf.getKpiTemplateCycle().getEndDate() != null) {
+            return ekf.getKpiTemplateCycle().getEndDate();
+        }
+        return ekf.getKpiForm() != null ? ekf.getKpiForm().getEndDate() : null;
+    }
+
+    private boolean isBeforeOrOnPeriodEnd(EmployeeKpiForm ekf) {
+        LocalDate endDate = periodEndDate(ekf);
+        return endDate != null && !LocalDate.now().isAfter(endDate);
+    }
+
+    private User currentUserEntity() {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        return userRepository.findById(principal.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found."));
     }
 
     private List<ManagerKpiScoreLineDto> scoreLines(EmployeeKpiForm ekf) {

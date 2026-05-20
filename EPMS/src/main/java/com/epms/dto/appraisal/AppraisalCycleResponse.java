@@ -26,6 +26,8 @@ public class AppraisalCycleResponse {
     private LocalDate startDate;
     private LocalDate endDate;
     private LocalDate submissionDeadline;
+    private LocalDate managerSubmissionDeadline;
+    private LocalDate deptHeadSubmissionDeadline;
     private AppraisalCycleStatus status;
     private Boolean locked;
     private List<Integer> departmentIds = new ArrayList<>();

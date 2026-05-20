@@ -10,7 +10,7 @@ public interface AppraisalTemplateService {
 
     AppraisalTemplateResponse createTemplate(AppraisalTemplateRequest request, Integer createdByUserId);
 
-    AppraisalTemplateResponse updateDraftTemplate(Integer templateId, AppraisalTemplateRequest request);
+    AppraisalTemplateResponse updateDraftTemplate(Integer templateId, AppraisalTemplateRequest request, Integer updatedByUserId);
 
     AppraisalTemplateResponse getTemplate(Integer templateId);
 
