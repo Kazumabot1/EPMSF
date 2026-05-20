@@ -3,11 +3,10 @@ import type { TeamEmployeeOption, TeamOption } from './oneOnOneService';
 
 export interface ContinuousFeedback {
   id: number;
-  teamId: number;
-  teamName: string;
+  teamId?: number | null;
+  teamName?: string | null;
   employeeId: number;
   employeeName: string;
-  employeeEmail?: string | null;
   giverUserId: number;
   giverName: string;
   giverEmail?: string | null;
@@ -19,7 +18,7 @@ export interface ContinuousFeedback {
 }
 
 export interface ContinuousFeedbackRequest {
-  teamId: number;
+  teamId?: number | null;
   employeeId: number;
   feedbackText: string;
   category: string;
@@ -39,10 +38,15 @@ export async function getContinuousFeedbackTeams(): Promise<TeamOption[]> {
   return unwrap<TeamOption[]>(response);
 }
 
-export async function getContinuousFeedbackTeamEmployees(
-  teamId: number,
-): Promise<TeamEmployeeOption[]> {
+export async function getContinuousFeedbackTeamEmployees(teamId: number): Promise<TeamEmployeeOption[]> {
   const response = await api.get(`/continuous-feedback/teams/${teamId}/employees`);
+  return unwrap<TeamEmployeeOption[]>(response);
+}
+
+export async function getContinuousFeedbackEmployees(teamId?: number | null): Promise<TeamEmployeeOption[]> {
+  const response = await api.get('/continuous-feedback/employees', {
+    params: teamId ? { teamId } : undefined,
+  });
   return unwrap<TeamEmployeeOption[]>(response);
 }
 

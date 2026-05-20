@@ -79,6 +79,18 @@ public class CustomUserDetailsService implements UserDetailsService {
                 : permissionRepository.findAllById(permissionIds);
 
         Set<String> roleNames = new LinkedHashSet<>();
+        String positionRoleName = null;
+
+        if (user.getPosition() != null
+                && user.getPosition().getRole() != null
+                && user.getPosition().getRole().getName() != null
+                && (user.getPosition().getRole().getActive() == null
+                || Boolean.TRUE.equals(user.getPosition().getRole().getActive()))) {
+            positionRoleName = normalizeRoleName(user.getPosition().getRole().getName());
+            if (!positionRoleName.isBlank()) {
+                roleNames.add(positionRoleName);
+            }
+        }
 
         roles.forEach(role -> {
             String normalized = normalizeRoleName(role.getName());
@@ -88,14 +100,11 @@ public class CustomUserDetailsService implements UserDetailsService {
             }
         });
 
-        String positionTitle = user.getPosition() != null
-                ? user.getPosition().getPositionTitle()
-                : null;
+        List<String> dashboardRoles = positionRoleName != null && !positionRoleName.isBlank()
+                ? List.of(positionRoleName)
+                : roleNames.stream().toList();
 
-        String dashboard = dashboardResolver.resolveDashboard(
-                roleNames.stream().toList(),
-                positionTitle
-        );
+        String dashboard = dashboardResolver.resolveDashboard(dashboardRoles);
 
         if (roleNames.isEmpty()) {
             roleNames.add(roleFromDashboard(dashboard));

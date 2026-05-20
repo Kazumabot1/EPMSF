@@ -12,6 +12,8 @@ public interface ContinuousFeedbackService {
 
     List<TeamEmployeeOptionResponseDto> getActiveEmployeesByTeam(Integer teamId);
 
+    List<TeamEmployeeOptionResponseDto> getEligibleEmployees(Integer teamId);
+
     ContinuousFeedbackResponseDto create(ContinuousFeedbackRequestDto request);
 
     List<ContinuousFeedbackResponseDto> getMyGivenFeedback();

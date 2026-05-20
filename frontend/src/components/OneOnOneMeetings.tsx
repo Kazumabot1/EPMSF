@@ -6,13 +6,11 @@ import type { Department } from '../services/departmentService';
 
 import {
   createMeeting,
-  finishMeeting,
   getActiveEmployeesByDepartment,
   getActiveEmployeesByTeam,
-  getMyOneOnOneTeams,
   getOngoingMeetings,
   getOneOnOneContext,
-  getPastMeetings,
+  getOneOnOneTeams,
   getUpcomingMeetings,
 } from '../services/oneOnOneService';
 import type {
@@ -24,8 +22,6 @@ import type {
 } from '../services/oneOnOneService';
 
 const pad = (n: number) => String(n).padStart(2, '0');
-
-type TabKey = 'create' | 'upcoming' | 'ongoing' | 'past';
 
 type SelectableEmployee = EmployeeOption | TeamEmployeeOption;
 
@@ -79,84 +75,7 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const meetingStatusLabel = (meeting: Meeting) => {
-  if (meeting.isFinalized) return 'Past';
-  if (meeting.followUp) return Boolean(meeting.followUpStatus) ? 'Ongoing Follow-up' : 'Upcoming Follow-up';
-  return Boolean(meeting.status) ? 'Ongoing' : 'Upcoming';
-};
-
-interface MeetingListProps {
-  meetings: Meeting[];
-  emptyText: string;
-  loading: boolean;
-  canFinish?: boolean;
-  onFinish?: (id: number) => void;
-  finishingId?: number | null;
-}
-
-function MeetingList({
-  meetings,
-  emptyText,
-  loading,
-  canFinish = false,
-  onFinish,
-  finishingId,
-}: MeetingListProps) {
-  if (loading) {
-    return <div className="oom-empty">Loading meetings...</div>;
-  }
-
-  if (meetings.length === 0) {
-    return <div className="oom-empty">{emptyText}</div>;
-  }
-
-  return (
-    <div className="oom-meeting-grid">
-      {meetings.map((meeting) => (
-        <article className="oom-meeting-card" key={meeting.id}>
-          <div className="oom-meeting-card__top">
-            <div>
-              <h3>{getEmployeeName(meeting)}</h3>
-              <p>With {getMeetingCreatorName(meeting)}</p>
-            </div>
-            <span className="oom-status-pill">{meetingStatusLabel(meeting)}</span>
-          </div>
-
-          <div className="oom-meeting-meta">
-            <span>
-              <strong>Date</strong>
-              {formatDateTime(getMeetingDate(meeting))}
-            </span>
-            <span>
-              <strong>Location</strong>
-              {meeting.followUp ? meeting.followUpLocation || '-' : meeting.location || '-'}
-            </span>
-          </div>
-
-          {(meeting.notes || meeting.followUpGoal || meeting.followUpNotes) && (
-            <p className="oom-meeting-note">
-              {meeting.followUp ? meeting.followUpGoal || meeting.followUpNotes : meeting.notes}
-            </p>
-          )}
-
-          {canFinish && onFinish && (
-            <button
-              type="button"
-              className="oom-secondary-btn"
-              disabled={finishingId === meeting.id}
-              onClick={() => onFinish(meeting.id)}
-            >
-              {finishingId === meeting.id ? 'Finishing...' : 'Finish Meeting'}
-            </button>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
-
 const OneOnOneMeetings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>('create');
   const [context, setContext] = useState<OneOnOneAccessContext | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
@@ -164,13 +83,11 @@ const OneOnOneMeetings: React.FC = () => {
 
   const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
   const [ongoingMeetings, setOngoingMeetings] = useState<Meeting[]>([]);
-  const [pastMeetings, setPastMeetings] = useState<Meeting[]>([]);
 
   const [loadingContext, setLoadingContext] = useState(true);
   const [loadingDepts, setLoadingDepts] = useState(false);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingEmps, setLoadingEmps] = useState(false);
-  const [loadingMeetings, setLoadingMeetings] = useState(false);
 
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('');
@@ -187,16 +104,17 @@ const OneOnOneMeetings: React.FC = () => {
   const [notes, setNotes] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [finishingId, setFinishingId] = useState<number | null>(null);
-
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const hiddenDateRef = useRef<HTMLInputElement>(null);
 
-  const isTeamMode = context?.accessMode === 'TEAM_MANAGER';
-  const isDepartmentHeadMode = context?.accessMode === 'DEPARTMENT_HEAD';
-  const isHrMode = context?.accessMode === 'HR';
+  const canCreate = context?.canCreate !== false;
+  const canSelectDepartment = Boolean(context?.canSelectDepartment);
+  const canSelectTeam = Boolean(context?.canSelectTeam);
+  const teamRequired = Boolean(context?.teamRequired);
+  const canUseDepartmentEmployeeScope = Boolean(context?.canUseDepartmentEmployeeScope);
+  const hasDefaultDepartment = Boolean(!canSelectDepartment && context?.departmentId);
 
   const selectedTeamOption = useMemo(
     () => teams.find((team) => String(team.id) === selectedTeam) ?? null,
@@ -217,26 +135,17 @@ const OneOnOneMeetings: React.FC = () => {
   }, [ongoingMeetings, selectedEmp, upcomingMeetings]);
 
   const selectedEmployeeWarning = selectedEmployeeMeeting
-    ? `This Employee already has a meeting with ${getMeetingCreatorName(selectedEmployeeMeeting)} at ${formatDateTime(getMeetingDate(selectedEmployeeMeeting))}.`
+    ? `This employee already has a meeting with ${getMeetingCreatorName(selectedEmployeeMeeting)} at ${formatDateTime(getMeetingDate(selectedEmployeeMeeting))}.`
     : '';
 
-  const loadMeetings = async () => {
-    setLoadingMeetings(true);
-
+  const loadActiveMeetingChecks = async () => {
     try {
-      const [upcoming, ongoing, past] = await Promise.all([
-        getUpcomingMeetings(),
-        getOngoingMeetings(),
-        getPastMeetings(),
-      ]);
-
+      const [upcoming, ongoing] = await Promise.all([getUpcomingMeetings(), getOngoingMeetings()]);
       setUpcomingMeetings(Array.isArray(upcoming) ? upcoming : []);
       setOngoingMeetings(Array.isArray(ongoing) ? ongoing : []);
-      setPastMeetings(Array.isArray(past) ? past : []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load meetings.');
-    } finally {
-      setLoadingMeetings(false);
+    } catch {
+      setUpcomingMeetings([]);
+      setOngoingMeetings([]);
     }
   };
 
@@ -254,7 +163,7 @@ const OneOnOneMeetings: React.FC = () => {
 
         setContext(data);
 
-        if (data.accessMode === 'DEPARTMENT_HEAD' && data.departmentId) {
+        if (!data.canSelectDepartment && data.departmentId) {
           setSelectedDept(String(data.departmentId));
         }
       } catch (err: any) {
@@ -269,7 +178,7 @@ const OneOnOneMeetings: React.FC = () => {
     };
 
     void loadContext();
-    void loadMeetings();
+    void loadActiveMeetingChecks();
 
     return () => {
       mounted = false;
@@ -280,7 +189,10 @@ const OneOnOneMeetings: React.FC = () => {
     let mounted = true;
 
     const loadDepartments = async () => {
-      if (!isHrMode) return;
+      if (!canSelectDepartment) {
+        setDepartments([]);
+        return;
+      }
 
       setLoadingDepts(true);
       setError('');
@@ -303,19 +215,25 @@ const OneOnOneMeetings: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [isHrMode]);
+  }, [canSelectDepartment]);
 
   useEffect(() => {
     let mounted = true;
 
     const loadTeams = async () => {
-      if (!isTeamMode) return;
+      setTeams([]);
+      setSelectedTeam('');
+
+      if (!canCreate || !canSelectTeam) return;
+      if (canSelectDepartment && !selectedDept) return;
+
+      const departmentId = selectedDept ? Number(selectedDept) : context?.departmentId ?? undefined;
 
       setLoadingTeams(true);
       setError('');
 
       try {
-        const data = await getMyOneOnOneTeams();
+        const data = await getOneOnOneTeams(teamRequired ? undefined : departmentId);
         if (mounted) setTeams(Array.isArray(data) ? data : []);
       } catch (err: any) {
         if (mounted) {
@@ -332,7 +250,7 @@ const OneOnOneMeetings: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [isTeamMode]);
+  }, [canCreate, canSelectTeam, canSelectDepartment, selectedDept, context?.departmentId, teamRequired]);
 
   useEffect(() => {
     let mounted = true;
@@ -343,13 +261,15 @@ const OneOnOneMeetings: React.FC = () => {
       setError('');
       setSuccess('');
 
-      if (isTeamMode) {
-        if (!selectedTeam) return;
+      if (!canCreate) return;
 
+      const departmentId = selectedDept ? Number(selectedDept) : context?.departmentId ?? undefined;
+
+      if (selectedTeam) {
         setLoadingEmps(true);
 
         try {
-          const data = await getActiveEmployeesByTeam(Number(selectedTeam));
+          const data = await getActiveEmployeesByTeam(Number(selectedTeam), teamRequired ? undefined : departmentId);
           if (mounted) setEmployees(Array.isArray(data) ? data : []);
         } catch (err: any) {
           if (mounted) setError(err?.response?.data?.message || 'Failed to load team employees.');
@@ -360,12 +280,12 @@ const OneOnOneMeetings: React.FC = () => {
         return;
       }
 
-      if (!selectedDept) return;
+      if (teamRequired || !canUseDepartmentEmployeeScope || !departmentId) return;
 
       setLoadingEmps(true);
 
       try {
-        const data = await getActiveEmployeesByDepartment(Number(selectedDept));
+        const data = await getActiveEmployeesByDepartment(departmentId);
         if (mounted) setEmployees(Array.isArray(data) ? data : []);
       } catch (err: any) {
         if (mounted) setError(err?.response?.data?.message || 'Failed to load employees.');
@@ -379,7 +299,7 @@ const OneOnOneMeetings: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [isTeamMode, selectedDept, selectedTeam]);
+  }, [canCreate, selectedDept, selectedTeam, context?.departmentId, teamRequired, canUseDepartmentEmployeeScope]);
 
   const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -446,8 +366,9 @@ const OneOnOneMeetings: React.FC = () => {
     setAmPm('AM');
     setLocation('');
     setNotes('');
+    setSelectedTeam('');
 
-    if (isHrMode) {
+    if (canSelectDepartment) {
       setSelectedDept('');
       setEmployees([]);
     }
@@ -459,13 +380,18 @@ const OneOnOneMeetings: React.FC = () => {
     setError('');
     setSuccess('');
 
-    if (isTeamMode && !selectedTeam) {
-      setError('Please select a team.');
+    if (!canCreate) {
+      setError('Your position does not have permission to create 1:1 meetings.');
       return;
     }
 
-    if (!isTeamMode && !selectedDept) {
+    if (canSelectDepartment && !selectedDept) {
       setError('Please select a department.');
+      return;
+    }
+
+    if (teamRequired && !selectedTeam) {
+      setError('Please select a team first.');
       return;
     }
 
@@ -515,8 +441,7 @@ const OneOnOneMeetings: React.FC = () => {
       );
 
       resetForm();
-      await loadMeetings();
-      setActiveTab('upcoming');
+      await loadActiveMeetingChecks();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to create meeting. Please try again.');
     } finally {
@@ -524,54 +449,71 @@ const OneOnOneMeetings: React.FC = () => {
     }
   };
 
-  const handleFinish = async (meetingId: number) => {
-    setFinishingId(meetingId);
-    setError('');
-    setSuccess('');
-
-    try {
-      await finishMeeting(meetingId);
-      setSuccess('Meeting finished successfully.');
-      await loadMeetings();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to finish meeting.');
-    } finally {
-      setFinishingId(null);
-    }
-  };
-
   const today = new Date().toISOString().split('T')[0];
+
+  const teamPlaceholder = loadingTeams
+    ? 'Loading teams...'
+    : canSelectDepartment && !selectedDept
+      ? '- Select department first -'
+      : teams.length === 0
+        ? teamRequired
+          ? 'No managed active teams found'
+          : 'No active teams found'
+        : teamRequired
+          ? '- Select Team -'
+          : 'Optional - Select Team';
+
+  const employeePlaceholder = selectedTeam
+    ? loadingEmps
+      ? 'Loading team employees...'
+      : employees.length === 0
+        ? 'No active employees found in this team'
+        : '- Select Employee -'
+    : teamRequired
+      ? '- Select team first -'
+      : canSelectDepartment && !selectedDept
+        ? '- Select department first -'
+        : loadingEmps
+          ? 'Loading department employees...'
+          : employees.length === 0
+            ? 'No active employees found in this department'
+            : '- Select Employee -';
+
+  if (!loadingContext && context && !canCreate) {
+    return (
+      <div className="oom-page">
+        <div className="oom-header">
+          <p className="oom-eyebrow">One-on-One Meetings</p>
+          <h1>Create 1:1 Meeting</h1>
+          <p>Your current position does not have permission to create one-on-one meetings.</p>
+        </div>
+
+        <div className="oom-card">
+          <div className="oom-card-header">
+            <div>
+              <h2>Creation Locked</h2>
+              <p>Ask an administrator to enable the 1:1 Meetings → Creation permission for your position.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="oom-page">
       <div className="oom-header">
         <p className="oom-eyebrow">One-on-One Meetings</p>
-        <h1>1:1 Meetings</h1>
+        <h1>Create 1:1 Meeting</h1>
         <p>
-          {isTeamMode
-            ? 'Project Managers and Team Leaders must select a team first, then select an active employee from that team.'
-            : isDepartmentHeadMode
-              ? 'Department Head department is auto-selected and cannot be changed.'
-              : 'Create and manage one-on-one meetings with employees.'}
+          {canSelectDepartment
+            ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
+            : teamRequired
+              ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
+              : hasDefaultDepartment
+                ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
+                : 'Create one-on-one meetings with employees.'}
         </p>
-      </div>
-
-      <div className="oom-tabs" role="tablist" aria-label="One-on-one meeting tabs">
-        {[
-          ['create', 'Create Meeting'],
-          ['upcoming', `Upcoming (${upcomingMeetings.length})`],
-          ['ongoing', `Ongoing (${ongoingMeetings.length})`],
-          ['past', `Past (${pastMeetings.length})`],
-        ].map(([tab, label]) => (
-          <button
-            key={tab}
-            type="button"
-            className={`oom-tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab as TabKey)}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       {(error || success) && (
@@ -581,303 +523,256 @@ const OneOnOneMeetings: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'create' && (
-        <div className="oom-card">
-          <div className="oom-card-header">
+      <div className="oom-card">
+        <div className="oom-card-header">
+          <div>
+            <h2>Schedule a New Meeting</h2>
+            <p>Action Items now owns Upcoming, Ongoing, and Past meeting views.</p>
+          </div>
+        </div>
+
+        <form className="oom-form" onSubmit={handleSubmit}>
+          <div className="oom-scope-card">
             <div>
-              <h2>Create Meeting</h2>
-              <p>Select the allowed scope first, then choose the employee and meeting time.</p>
+              <span className="oom-scope-pill">Scope</span>
+              <h3>
+                {canSelectDepartment
+                  ? 'Department selection enabled'
+                  : teamRequired
+                    ? 'Managed team scope'
+                    : 'Default department applied'}
+              </h3>
+              <p>
+                {canSelectDepartment
+                  ? 'Choose an allowed department. Team is optional and only narrows the employee list.'
+                  : teamRequired
+                    ? 'Select one of the teams you lead or manage before choosing an employee.'
+                    : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
+              </p>
             </div>
           </div>
 
-          <form className="oom-form" onSubmit={handleSubmit}>
-            {isTeamMode && (
-              <>
-                <div className="oom-field">
-                  <label className="oom-label">Team</label>
-                  <select
-                    className="oom-select"
-                    value={selectedTeam}
-                    onChange={(e) => setSelectedTeam(e.target.value)}
-                    required
-                    disabled={loadingContext || loadingTeams}
-                  >
-                    <option value="">
-                      {loadingTeams ? 'Loading teams...' : teams.length === 0 ? 'No teams found' : '- Select Team -'}
-                    </option>
-
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.teamName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="oom-field">
-                  <label className="oom-label">Department</label>
-                  <input
-                    className="oom-input"
-                    value={selectedTeamOption?.departmentName ?? ''}
-                    disabled
-                    placeholder="Auto selected by team"
-                  />
-                </div>
-              </>
-            )}
-
-            {!isTeamMode && (
-              <div className="oom-field">
-                <label className="oom-label">Department</label>
-
-                {isDepartmentHeadMode ? (
-                  <input
-                    className="oom-input"
-                    value={context?.departmentName || `Department #${context?.departmentId || ''}`}
-                    disabled
-                  />
-                ) : (
-                  <select
-                    className="oom-select"
-                    value={selectedDept}
-                    onChange={(e) => setSelectedDept(e.target.value)}
-                    required
-                    disabled={loadingDepts}
-                  >
-                    <option value="">
-                      {loadingDepts ? 'Loading departments...' : '- Select Department -'}
-                    </option>
-
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.departmentName}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
-
+          <div className="oom-two-col">
             <div className="oom-field">
-              <label className="oom-label">Employee</label>
+              <label className="oom-label">Department</label>
 
-              <select
-                className="oom-select"
-                value={selectedEmp}
-                onChange={(e) => setSelectedEmp(e.target.value)}
-                required
-                disabled={loadingEmps || (isTeamMode ? !selectedTeam : !selectedDept)}
-              >
-                <option value="">
-                  {isTeamMode && !selectedTeam
-                    ? '- Select a team first -'
-                    : !isTeamMode && !selectedDept
-                      ? '- Select a department first -'
-                      : loadingEmps
-                        ? 'Loading employees...'
-                        : employees.length === 0
-                          ? 'No active employees found'
-                          : '- Select Employee -'}
-                </option>
+              {canSelectDepartment ? (
+                <select
+                  className="oom-select"
+                  value={selectedDept}
+                  onChange={(e) => {
+                    setSelectedDept(e.target.value);
+                    setSelectedTeam('');
+                  }}
+                  required
+                  disabled={loadingDepts}
+                >
+                  <option value="">
+                    {loadingDepts ? 'Loading departments...' : '- Select Department -'}
+                  </option>
 
-                {employees.map((employee) => {
-                  const employeeId = getEmployeeId(employee);
-
-                  return (
-                    <option key={employeeId} value={employeeId}>
-                      {getEmployeeName(employee)}
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.departmentName}
                     </option>
-                  );
-                })}
-              </select>
-
-              {selectedEmployeeWarning && (
-                <div className="oom-warning-card">
-                  <strong>Warning</strong>
-                  <span>{selectedEmployeeWarning}</span>
-                </div>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="oom-input"
+                  value={context?.departmentName || `Department #${context?.departmentId || ''}`}
+                  disabled
+                  placeholder="Default department"
+                />
               )}
             </div>
 
-            <div className="oom-field">
-              <label className="oom-label">Meeting Date</label>
+            {canSelectTeam && (
+              <div className="oom-field">
+                <label className="oom-label">
+                  Team {!teamRequired && <span className="oom-optional">Optional</span>}
+                </label>
+                <select
+                  className="oom-select"
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  required={teamRequired}
+                  disabled={
+                    loadingContext ||
+                    loadingTeams ||
+                    teams.length === 0 ||
+                    (canSelectDepartment && !selectedDept)
+                  }
+                >
+                  <option value="">{teamPlaceholder}</option>
 
-              <div className="oom-date-row">
-                <div className="oom-date-part oom-date-part--dd">
-                  <label>Day</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    placeholder="DD"
-                    value={day}
-                    onChange={(e) => setDay(e.target.value.slice(0, 2))}
-                    required
-                  />
-                </div>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.teamName}
+                    </option>
+                  ))}
+                </select>
+                {selectedTeamOption?.departmentName && (
+                  <small>Department: {selectedTeamOption.departmentName}</small>
+                )}
+              </div>
+            )}
+          </div>
 
-                <span className="oom-date-sep">/</span>
+          <div className="oom-field">
+            <label className="oom-label">Employee</label>
 
-                <div className="oom-date-part oom-date-part--mm">
-                  <label>Month</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={12}
-                    placeholder="MM"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value.slice(0, 2))}
-                    required
-                  />
-                </div>
+            <select
+              className="oom-select"
+              value={selectedEmp}
+              onChange={(e) => setSelectedEmp(e.target.value)}
+              required
+              disabled={loadingEmps || (teamRequired ? !selectedTeam : !selectedTeam && !selectedDept)}
+            >
+              <option value="">{employeePlaceholder}</option>
 
-                <span className="oom-date-sep">/</span>
+              {employees.map((employee) => {
+                const employeeId = getEmployeeId(employee);
 
-                <div className="oom-date-part oom-date-part--yy">
-                  <label>Year</label>
-                  <input
-                    type="number"
-                    min={2024}
-                    max={2099}
-                    placeholder="YYYY"
-                    value={year}
-                    onChange={(e) => setYear(e.target.value.slice(0, 4))}
-                    required
-                  />
-                </div>
+                return (
+                  <option key={employeeId} value={employeeId}>
+                    {getEmployeeName(employee)}
+                  </option>
+                );
+              })}
+            </select>
 
-                <button type="button" className="oom-calendar-btn" onClick={openCalendar}>
-                  Calendar
-                </button>
+            {selectedEmployeeWarning && (
+              <div className="oom-warning-card">
+                <strong>Warning</strong>
+                <span>{selectedEmployeeWarning}</span>
+              </div>
+            )}
+          </div>
 
+          <div className="oom-field">
+            <label className="oom-label">Meeting Date</label>
+
+            <div className="oom-date-row">
+              <div className="oom-date-part oom-date-part--dd">
+                <label>Day</label>
                 <input
-                  ref={hiddenDateRef}
-                  type="date"
-                  min={today}
-                  onChange={handleCalendarChange}
-                  style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
-                  tabIndex={-1}
+                  type="number"
+                  min={1}
+                  max={31}
+                  placeholder="DD"
+                  value={day}
+                  onChange={(e) => setDay(e.target.value.slice(0, 2))}
+                  required
                 />
               </div>
-            </div>
 
-            <div className="oom-field">
-              <label className="oom-label">Meeting Time</label>
+              <span className="oom-date-sep">/</span>
 
-              <div className="oom-time-row">
+              <div className="oom-date-part oom-date-part--mm">
+                <label>Month</label>
                 <input
                   type="number"
                   min={1}
                   max={12}
-                  placeholder="HH"
-                  value={hour}
-                  onChange={(e) => setHour(e.target.value.slice(0, 2))}
+                  placeholder="MM"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value.slice(0, 2))}
                   required
                 />
-                <span>:</span>
+              </div>
+
+              <span className="oom-date-sep">/</span>
+
+              <div className="oom-date-part oom-date-part--yy">
+                <label>Year</label>
                 <input
                   type="number"
-                  min={0}
-                  max={59}
-                  placeholder="MM"
-                  value={minute}
-                  onChange={(e) => setMinute(e.target.value.slice(0, 2))}
+                  min={2024}
+                  max={2099}
+                  placeholder="YYYY"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value.slice(0, 4))}
                   required
                 />
-                <select value={ampm} onChange={(e) => setAmPm(e.target.value as 'AM' | 'PM')}>
-                  <option value="AM">AM</option>
-                  <option value="PM">PM</option>
-                </select>
               </div>
-            </div>
 
-            <div className="oom-field">
-              <label className="oom-label">Location</label>
+              <button type="button" className="oom-calendar-btn" onClick={openCalendar}>
+                Calendar
+              </button>
+
               <input
-                className="oom-input"
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Meeting room, online link, or office location"
-                maxLength={500}
+                ref={hiddenDateRef}
+                type="date"
+                min={today}
+                onChange={handleCalendarChange}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+                tabIndex={-1}
               />
-              <small>Optional. Cannot exceed 500 letters.</small>
             </div>
+          </div>
 
-            <div className="oom-field oom-field-full">
-              <label className="oom-label">Notes</label>
-              <textarea
-                className="oom-textarea"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Agenda or meeting notes"
-                rows={4}
-                maxLength={1000}
+          <div className="oom-field">
+            <label className="oom-label">Meeting Time</label>
+
+            <div className="oom-time-row">
+              <input
+                type="number"
+                min={1}
+                max={12}
+                placeholder="HH"
+                value={hour}
+                onChange={(e) => setHour(e.target.value.slice(0, 2))}
+                required
               />
-              <small>Cannot exceed 1000 letters.</small>
+              <span>:</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                placeholder="MM"
+                value={minute}
+                onChange={(e) => setMinute(e.target.value.slice(0, 2))}
+                required
+              />
+              <select value={ampm} onChange={(e) => setAmPm(e.target.value as 'AM' | 'PM')}>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
             </div>
-
-            <button type="submit" className="oom-submit" disabled={submitting || loadingContext}>
-              {submitting ? 'Scheduling...' : 'Schedule Meeting'}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {activeTab === 'upcoming' && (
-        <div className="oom-card">
-          <div className="oom-card-header">
-            <div>
-              <h2>Upcoming Meetings</h2>
-              <p>Meetings that are scheduled but not started yet.</p>
-            </div>
-            <button type="button" className="oom-refresh-btn" onClick={loadMeetings} disabled={loadingMeetings}>
-              Refresh
-            </button>
           </div>
 
-          <MeetingList meetings={upcomingMeetings} emptyText="No upcoming meetings." loading={loadingMeetings} />
-        </div>
-      )}
-
-      {activeTab === 'ongoing' && (
-        <div className="oom-card">
-          <div className="oom-card-header">
-            <div>
-              <h2>Ongoing Meetings</h2>
-              <p>Meetings that are currently active.</p>
-            </div>
-            <button type="button" className="oom-refresh-btn" onClick={loadMeetings} disabled={loadingMeetings}>
-              Refresh
-            </button>
+          <div className="oom-field">
+            <label className="oom-label">Location</label>
+            <input
+              className="oom-input"
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Meeting room, online link, or office location"
+              maxLength={500}
+            />
+            <small>Optional. Cannot exceed 500 letters.</small>
           </div>
 
-          <MeetingList
-            meetings={ongoingMeetings}
-            emptyText="No ongoing meetings."
-            loading={loadingMeetings}
-            canFinish
-            onFinish={handleFinish}
-            finishingId={finishingId}
-          />
-        </div>
-      )}
-
-      {activeTab === 'past' && (
-        <div className="oom-card">
-          <div className="oom-card-header">
-            <div>
-              <h2>Past Meetings</h2>
-              <p>Finished and finalized one-on-one meetings.</p>
-            </div>
-            <button type="button" className="oom-refresh-btn" onClick={loadMeetings} disabled={loadingMeetings}>
-              Refresh
-            </button>
+          <div className="oom-field oom-field-full">
+            <label className="oom-label">Notes</label>
+            <textarea
+              className="oom-textarea"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Agenda or meeting notes"
+              rows={4}
+              maxLength={1000}
+            />
+            <small>Cannot exceed 1000 letters.</small>
           </div>
 
-          <MeetingList meetings={pastMeetings} emptyText="No past meetings." loading={loadingMeetings} />
-        </div>
-      )}
+          <button type="submit" className="oom-submit" disabled={submitting || loadingContext}>
+            {submitting ? 'Scheduling...' : 'Schedule Meeting'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

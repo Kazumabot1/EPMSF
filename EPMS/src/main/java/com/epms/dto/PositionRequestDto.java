@@ -53,6 +53,15 @@ public class PositionRequestDto {
 
     private String createdBy;
 
+    /**
+     * FK to roles.id — which system role this position maps to.
+     * Determines the dashboard shown after login.
+     */
+    private Integer roleId;
+
+    /** Permission flags for this position. May be null on create (defaults to all false). */
+    private PositionPermissionDto permissions;
+
     @Size(max = 150, message = "Reason must not exceed 150 characters")
     private String reason;
 }
