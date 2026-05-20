@@ -7,12 +7,14 @@ import Register from './components/Register';
 import Permissions from './components/Permissions';
 import UserRoles from './components/UserRoles';
 import RolePermissions from './components/RolePermissions';
+import PositionPermissions from './pages/admin/PositionPermissions';
 import PipUpdates from './components/PipUpdates';
 import NotificationTemplates from './components/NotificationTemplates';
 import OneOnOneMeetings from './components/OneOnOneMeetings';
 import OneOnOneActionItems from './components/OneOnOneActionItems';
 
 import ProtectedRoute from './routes/ProtectedRoute';
+import PositionPermissionRoute from './routes/PositionPermissionRoute';
 import AppLayout from './layouts/AppLayout';
 
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
@@ -32,6 +34,7 @@ import DepartmentComparisonPage from './pages/department/DepartmentComparisonPag
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ManagerAssessmentReviewPage from './pages/manager/ManagerAssessmentReviewPage';
 import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
+import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import CeoDashboard from './pages/ceo/CeoDashboard';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
@@ -110,12 +113,24 @@ function App() {
               <Route path="/permissions" element={<Permissions />} />
               <Route path="/user-roles" element={<UserRoles />} />
               <Route path="/role-permissions" element={<RolePermissions />} />
+              <Route path="/position-permissions" element={<PositionPermissions />} />
             </Route>
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['Employee']} />}>
             <Route element={<AppLayout />}>
               <Route path="/employee/dashboard" element={<EmployeeMyDashboard />} />
+
+              <Route
+                element={
+                  <PositionPermissionRoute
+                    permission="teamView"
+                    fallbackPath="/employee/dashboard"
+                  />
+                }
+              >
+                <Route path="/employee/team-management" element={<TeamManagement />} />
+              </Route>
 
               <Route path="/employee/continuous-feedback" element={<ContinuousFeedbackPage />} />
               <Route path="/employee/kpis" element={<EmployeeKpiResultsPage />} />
@@ -157,7 +172,7 @@ function App() {
               <Route path="/manager/self-assessment-review" element={<ManagerAssessmentReviewPage />} />
 
               <Route path="/manager/kpi" element={<Navigate to="/manager/kpi-scoring" replace />} />
-              <Route path="/manager/kpi/history" element={<Navigate to="/manager/kpi-scoring" replace />} />
+              <Route path="/manager/kpi/history" element={<ManagerKpiHistoryPage />} />
               <Route path="/manager/kpi-scoring" element={<ManagerKpiScoringPage />} />
 
               <Route path="/manager/appraisals" element={<EmployeePerformanceReviewPage />} />
@@ -172,7 +187,9 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Executive']} />}>
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<CeoDashboard />} />
+              <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
               <Route path="/executive/reports" element={<ReportingDashboardPage />} />
+              <Route path="/ceo/reports" element={<Navigate to="/executive/reports" replace />} />
             </Route>
           </Route>
 

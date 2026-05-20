@@ -89,6 +89,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/user-roles', label: 'User Roles', icon: 'bi bi-person-gear' },
           { to: '/role-permissions', label: 'Role Permissions', icon: 'bi bi-shield-check' },
           { to: '/permissions', label: 'Permissions', icon: 'bi bi-key' },
+          { to: '/position-permissions', label: 'Position Permissions', icon: 'bi bi-sliders2-vertical' },
         ],
       },
       {
