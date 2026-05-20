@@ -32,7 +32,6 @@ import DepartmentComparisonPage from './pages/department/DepartmentComparisonPag
 import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ManagerAssessmentReviewPage from './pages/manager/ManagerAssessmentReviewPage';
 import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
-import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import CeoDashboard from './pages/ceo/CeoDashboard';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
@@ -158,7 +157,7 @@ function App() {
               <Route path="/manager/self-assessment-review" element={<ManagerAssessmentReviewPage />} />
 
               <Route path="/manager/kpi" element={<Navigate to="/manager/kpi-scoring" replace />} />
-              <Route path="/manager/kpi/history" element={<ManagerKpiHistoryPage />} />
+              <Route path="/manager/kpi/history" element={<Navigate to="/manager/kpi-scoring" replace />} />
               <Route path="/manager/kpi-scoring" element={<ManagerKpiScoringPage />} />
 
               <Route path="/manager/appraisals" element={<EmployeePerformanceReviewPage />} />
@@ -193,7 +192,7 @@ function App() {
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['HR', 'Admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['HR']} />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Home />} />

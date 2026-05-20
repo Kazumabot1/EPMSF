@@ -41,14 +41,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     normalizedRoles.includes('EMPLOYEE') ||
     normalizedDashboard === 'EMPLOYEE_DASHBOARD';
 
-  const isHrOnly =
+  const isHr =
     normalizedRoles.includes('HR') ||
-    normalizedDashboard === 'HR_DASHBOARD' ||
-    normalizedDashboard === 'ADMIN_DASHBOARD' ||
-    variant === 'hr' ||
-    variant === 'admin';
+    normalizedDashboard === 'HR_DASHBOARD';
 
-  const canCreatePip = !isHrOnly && !isEmployee;
+  const isHrOnly = variant === 'hr' || isHr;
+  const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
 
   const roleLabel =
     variant === 'admin'
@@ -79,6 +77,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
     const adminNavItems: NavItem[] = [
       { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
+      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
       { to: '/admin/employee/import', label: 'Import Accounts', icon: 'bi bi-upload' },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
@@ -98,23 +97,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard2-pulse',
         children: [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }],
       },
-      {
-        to: '/hr/performance-kpi/unit',
-        label: 'KPI Management',
-        icon: 'bi bi-speedometer2',
-        children: [
-          { to: '/hr/performance-kpi/unit', label: 'KPI Units', icon: 'bi bi-speedometer2' },
-          { to: '/hr/performance-kpi/category', label: 'KPI Categories', icon: 'bi bi-tags' },
-          { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
-          { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
-          { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
-          { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
-        ],
-      },
     ];
 
     const hrNavItems: NavItem[] = [
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
+      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       {
         to: '/hr/team',
         label: 'Teams',
@@ -155,6 +142,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/assessment-forms', label: 'Form Create', icon: 'bi bi-ui-checks-grid', end: true },
         ],
       },
+      { to: '/hr/reports', label: 'Reports', icon: 'bi bi-file-earmark-bar-graph' },
       {
         to: '/hr/appraisal',
         label: 'Appraisals',
@@ -164,7 +152,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/appraisal/template-forms', label: 'Template Forms', icon: 'bi bi-folder2-open' },
           { to: '/hr/appraisal/cycles', label: 'Appraisal Cycles', icon: 'bi bi-calendar2-week' },
           { to: '/hr/appraisal/review-check', label: 'Manager + Dept Review Check', icon: 'bi bi-shield-check' },
-          { to: '/hr/appraisal/employee-reviews', label: 'Employee Reviews', icon: 'bi bi-person-lines-fill' },
         ],
       },
       { to: '/hr/feedback/dashboard', label: '360 Feedback', icon: 'bi bi-chat-square-dots' },
@@ -204,13 +191,13 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
           { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
           { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
-          { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
         ],
       },
     ];
 
     const employeeNavItems: NavItem[] = [
       { to: '/employee/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
+      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       { to: '/employee/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
