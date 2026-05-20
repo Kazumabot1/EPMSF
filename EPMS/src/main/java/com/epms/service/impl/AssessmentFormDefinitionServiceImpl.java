@@ -1,4 +1,3 @@
-
 package com.epms.service.impl;
 
 import com.epms.dto.AssessmentFormDtos.AssessmentFormPayload;
@@ -24,15 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefinitionService {
 
-    private static final String RESPONSE_TYPE_RATING = "RATING";
-    private static final String RESPONSE_TYPE_TEXT = "TEXT";
-    private static final String RESPONSE_TYPE_YES_NO = "YES_NO";
     private static final String RESPONSE_TYPE_YES_NO_RATING = "YES_NO_RATING";
 
     private final AssessmentFormDefinitionRepository repository;
@@ -135,8 +132,6 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
                 if (question.getQuestionText() == null || question.getQuestionText().isBlank()) {
                     throw new BadRequestException("Every assessment subject needs text.");
                 }
-
-                resolveResponseType(question.getResponseType());
             }
         }
 
@@ -175,6 +170,8 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
         if (form.getTargetRoles() == null) {
             form.setTargetRoles(new ArrayList<>());
+        } else {
+            form.getTargetRoles().clear();
         }
 
         form.getTargetRoles().addAll(
@@ -186,8 +183,26 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
                         .toList()
         );
 
+        if (form.getTargetDepartmentIds() == null) {
+            form.setTargetDepartmentIds(new ArrayList<>());
+        } else {
+            form.getTargetDepartmentIds().clear();
+        }
+
+        if (payload.getTargetDepartmentIds() != null) {
+            form.getTargetDepartmentIds().addAll(
+                    payload.getTargetDepartmentIds()
+                            .stream()
+                            .filter(Objects::nonNull)
+                            .distinct()
+                            .toList()
+            );
+        }
+
         if (form.getSections() == null) {
             form.setSections(new ArrayList<>());
+        } else {
+            form.getSections().clear();
         }
 
         int sectionIndex = 1;
@@ -201,6 +216,8 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
             if (section.getQuestions() == null) {
                 section.setQuestions(new ArrayList<>());
+            } else {
+                section.getQuestions().clear();
             }
 
             for (AssessmentQuestionPayload questionPayload : sectionPayload.getQuestions()) {
@@ -208,7 +225,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
                 question.setSection(section);
                 question.setQuestionText(questionPayload.getQuestionText().trim());
-                question.setResponseType(resolveResponseType(questionPayload.getResponseType()));
+                question.setResponseType(RESPONSE_TYPE_YES_NO_RATING);
                 question.setRequired(questionPayload.getIsRequired() == null || questionPayload.getIsRequired());
                 question.setWeight(1.0);
 
@@ -221,37 +238,29 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
         if (form.getScoreBands() == null) {
             form.setScoreBands(new ArrayList<>());
+        } else {
+            form.getScoreBands().clear();
         }
 
         int bandIndex = 1;
+
         for (AssessmentScoreBandPayload bandPayload : scoreBandPayloadsOrDefaults(payload.getScoreBands())) {
             AssessmentFormScoreBandDefinition band = new AssessmentFormScoreBandDefinition();
+
             band.setForm(form);
             band.setMinScore(bandPayload.getMinScore());
             band.setMaxScore(bandPayload.getMaxScore());
             band.setLabel(bandPayload.getLabel().trim());
             band.setDescription(clean(bandPayload.getDescription()));
             band.setSortOrder(bandPayload.getSortOrder() == null ? bandIndex : bandPayload.getSortOrder());
+
             form.getScoreBands().add(band);
             bandIndex++;
         }
     }
 
     private String resolveResponseType(String responseType) {
-        if (responseType == null || responseType.isBlank()) {
-            return RESPONSE_TYPE_YES_NO_RATING;
-        }
-
-        String normalized = responseType.trim().toUpperCase();
-
-        if (!normalized.equals(RESPONSE_TYPE_RATING)
-                && !normalized.equals(RESPONSE_TYPE_TEXT)
-                && !normalized.equals(RESPONSE_TYPE_YES_NO)
-                && !normalized.equals(RESPONSE_TYPE_YES_NO_RATING)) {
-            throw new BadRequestException("Invalid response type: " + responseType);
-        }
-
-        return normalized;
+        return RESPONSE_TYPE_YES_NO_RATING;
     }
 
     private List<AssessmentScoreBandPayload> scoreBandPayloadsOrDefaults(List<AssessmentScoreBandPayload> payloads) {
@@ -260,21 +269,65 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         }
 
         List<AssessmentScoreBandPayload> defaults = new ArrayList<>();
-        defaults.add(defaultBand(86, 100, "Outstanding", "Performance exceptional and far exceeds expectations. Consistently demonstrates excellent standards in all job requirements.", 1));
-        defaults.add(defaultBand(71, 85, "Good", "Performance is consistent. Clearly meets essential requirements of job.", 2));
-        defaults.add(defaultBand(60, 70, "Meet Requirement", "Performance is satisfactory. Meets requirements of the job.", 3));
-        defaults.add(defaultBand(40, 59, "Need Improvement", "Performance is inconsistent. Meets requirements of the job occasionally. Supervision and training is required for most problem areas.", 4));
-        defaults.add(defaultBand(0, 39, "Unsatisfactory", "Performance does not meet the minimum requirement of the job.", 5));
+
+        defaults.add(defaultBand(
+                86,
+                100,
+                "Outstanding",
+                "Performance exceptional and far exceeds expectations. Consistently demonstrates excellent standards in all job requirements.",
+                1
+        ));
+
+        defaults.add(defaultBand(
+                71,
+                85,
+                "Good",
+                "Performance is consistent. Clearly meets essential requirements of job.",
+                2
+        ));
+
+        defaults.add(defaultBand(
+                60,
+                70,
+                "Meet Requirement",
+                "Performance is satisfactory. Meets requirements of the job.",
+                3
+        ));
+
+        defaults.add(defaultBand(
+                40,
+                59,
+                "Need Improvement",
+                "Performance is inconsistent. Meets requirements of the job occasionally. Supervision and training is required for most problem areas.",
+                4
+        ));
+
+        defaults.add(defaultBand(
+                0,
+                39,
+                "Unsatisfactory",
+                "Performance does not meet the minimum requirement of the job.",
+                5
+        ));
+
         return defaults;
     }
 
-    private AssessmentScoreBandPayload defaultBand(Integer min, Integer max, String label, String description, Integer sortOrder) {
+    private AssessmentScoreBandPayload defaultBand(
+            Integer min,
+            Integer max,
+            String label,
+            String description,
+            Integer sortOrder
+    ) {
         AssessmentScoreBandPayload band = new AssessmentScoreBandPayload();
+
         band.setMinScore(min);
         band.setMaxScore(max);
         band.setLabel(label);
         band.setDescription(description);
         band.setSortOrder(sortOrder);
+
         return band;
     }
 
@@ -289,6 +342,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         response.setEndDate(form.getEndDate());
         response.setIsActive(form.getActive());
         response.setTargetRoles(form.getTargetRoles() == null ? List.of() : form.getTargetRoles());
+        response.setTargetDepartmentIds(form.getTargetDepartmentIds() == null ? List.of() : form.getTargetDepartmentIds());
         response.setCreatedAt(form.getCreatedAt());
         response.setUpdatedAt(form.getUpdatedAt());
 
@@ -345,32 +399,36 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
         response.setId(question.getId());
         response.setQuestionText(question.getQuestionText());
-        response.setResponseType(question.getResponseType());
+        response.setResponseType(RESPONSE_TYPE_YES_NO_RATING);
         response.setIsRequired(question.getRequired());
-        response.setWeight(question.getWeight());
+        response.setWeight(1.0);
 
         return response;
     }
 
     private AssessmentScoreBandResponse toScoreBandResponse(AssessmentFormScoreBandDefinition band) {
         AssessmentScoreBandResponse response = new AssessmentScoreBandResponse();
+
         response.setId(band.getId());
         response.setMinScore(band.getMinScore());
         response.setMaxScore(band.getMaxScore());
         response.setLabel(band.getLabel());
         response.setDescription(band.getDescription());
         response.setSortOrder(band.getSortOrder());
+
         return response;
     }
 
     private AssessmentScoreBandResponse toScoreBandResponse(AssessmentScoreBandPayload band) {
         AssessmentScoreBandResponse response = new AssessmentScoreBandResponse();
+
         response.setId(band.getId());
         response.setMinScore(band.getMinScore());
         response.setMaxScore(band.getMaxScore());
         response.setLabel(band.getLabel());
         response.setDescription(band.getDescription());
         response.setSortOrder(band.getSortOrder());
+
         return response;
     }
 

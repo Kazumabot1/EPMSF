@@ -177,7 +177,7 @@ const ReviewModal = ({
 
   const items = flattenItems(assessment);
   const scoreBands = assessment.scoreBands?.length ? assessment.scoreBands : defaultScoreBands;
-  const canSaveRemark = ['PENDING_MANAGER', 'PENDING_DEPARTMENT_HEAD', 'SUBMITTED'].includes(assessment.status) && Boolean(assessment.id);
+  const canSaveRemark = ['PENDING_MANAGER', 'SUBMITTED'].includes(assessment.status) && Boolean(assessment.id);
 
   const handleSaveRemark = async () => {
     if (!assessment.id) return;
@@ -264,7 +264,6 @@ const ReviewModal = ({
                       <th rowSpan={2}>Yes</th>
                       <th rowSpan={2}>No</th>
                       <th colSpan={5}>Rating</th>
-                      <th rowSpan={2}>Comment</th>
                     </tr>
                     <tr>
                       {ratingOptions.map((rating) => (
@@ -283,8 +282,7 @@ const ReviewModal = ({
                         {ratingOptions.map((rating) => (
                           <td key={rating}>{item.rating === rating ? '●' : ''}</td>
                         ))}
-                        <td>{item.comment || '-'}</td>
-                      </tr>
+                       </tr>
                     ))}
                   </tbody>
                 </table>
@@ -402,7 +400,7 @@ const ManagerAssessmentReviewPage = () => {
   }, []);
 
   const remarkableRows = useMemo(
-    () => rows.filter((row) => ['PENDING_MANAGER', 'PENDING_DEPARTMENT_HEAD', 'SUBMITTED'].includes(row.status)),
+    () => rows.filter((row) => ['PENDING_MANAGER', 'SUBMITTED'].includes(row.status)),
     [rows],
   );
 
@@ -607,7 +605,7 @@ const ManagerAssessmentReviewPage = () => {
                         >
                           {detailLoadingId === row.id
                             ? 'Opening...'
-                            : ['PENDING_MANAGER', 'PENDING_DEPARTMENT_HEAD', 'SUBMITTED'].includes(row.status)
+                            : ['PENDING_MANAGER', 'SUBMITTED'].includes(row.status)
                               ? 'Review / Remarks'
                               : 'View Details'}
                         </button>

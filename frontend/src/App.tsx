@@ -81,6 +81,7 @@ function App() {
           <Route path="/change-password" element={<ForceChangePasswordPage />} />
 
           <Route element={<AppLayout />}>
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/employee/notifications" element={<Notifications />} />
             <Route path="/pip/past-plans" element={<PipPastPlansPage />} />
@@ -149,8 +150,8 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Manager']} />}>
             <Route element={<AppLayout />}>
               <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+              <Route path="/manager/self-assessment" element={<EmployeeSelfAssessmentPage />} />
 
-              {/* Self-assessment review: manager can view assigned forms and add remarks only. No manager signature required. */}
               <Route path="/manager/assessment-review" element={<ManagerAssessmentReviewPage />} />
               <Route path="/manager/self-assessment-review" element={<ManagerAssessmentReviewPage />} />
 
@@ -194,8 +195,8 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
             <Route element={<AppLayout />}>
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
+              <Route path="/department-head/self-assessment" element={<EmployeeSelfAssessmentPage />} />
 
-              {/* Self-assessment approval: Department Head signature is required before HR. */}
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
 
@@ -223,10 +224,7 @@ function App() {
               <Route path="/hr/department" element={<DepartmentManagement />} />
               <Route path="/hr/department-comparison" element={<DepartmentComparisonPage />} />
 
-              {/* Self-assessment HR side. HR can approve/decline completed workflow items. */}
               <Route path="/hr/assessment-scores" element={<AssessmentScoreTablePage />} />
-
-              {/* Form builder. Existing forms should be locked by the page/backend after creation. */}
               <Route path="/hr/assessment-forms" element={<AssessmentFormBuilderPage />} />
 
               <Route path="/hr/feedback/dashboard" element={<HrFeedbackDashboard />} />

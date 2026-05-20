@@ -1,5 +1,3 @@
-
-
 package com.epms.config;
 
 import com.epms.security.JwtAuthenticationFilter;
@@ -152,6 +150,11 @@ public class SecurityConfig {
                         ).authenticated()
 
                         .requestMatchers(
+                                "/api/profile",
+                                "/api/profile/**"
+                        ).authenticated()
+
+                        .requestMatchers(
                                 "/api/notifications",
                                 "/api/notifications/**"
                         ).authenticated()
@@ -179,10 +182,6 @@ public class SecurityConfig {
                                 "/api/one-on-one-action-items/**"
                         ).authenticated()
 
-                        /*
-                         * Admin user/access-control APIs.
-                         * This explicitly covers GET/POST/PUT/PATCH/DELETE for /api/users/**.
-                         */
                         .requestMatchers(
                                 "/api/users",
                                 "/api/users/**",
@@ -279,44 +278,52 @@ public class SecurityConfig {
                                 hasRoleDashboardOrPosition(authentication.get(), EXECUTIVE_ROLES, EXECUTIVE_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/template").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/my-latest-draft").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/my-scores").authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/employee-assessments/template",
+                                "/api/employee-assessments/me/current",
+                                "/api/employee-assessments/my-latest-draft",
+                                "/api/employee-assessments/me/latest-draft",
+                                "/api/employee-assessments/my-scores",
+                                "/api/employee-assessments/me/scores",
+                                "/api/employee-assessments/my-history",
+                                "/api/employee-assessments/me/history"
+                        ).authenticated()
+
                         .requestMatchers(HttpMethod.POST, "/api/employee-assessments").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/employee-assessments/{id}").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/{id}/submit").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/employee-assessments/*").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/submit").authenticated()
 
                         .requestMatchers(HttpMethod.GET, "/api/employee-assessments/score-table")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/{id}")
+                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/*")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/{id}/manager-remark")
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/manager-remark")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), MANAGER_ROLES, MANAGER_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/{id}/manager-sign")
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/manager-sign")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), MANAGER_ROLES, MANAGER_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/{id}/department-head-sign")
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/department-head-sign")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/{id}/hr-approve")
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/hr-approve")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/{id}/hr-decline")
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/hr-decline")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
                         )
@@ -537,10 +544,12 @@ public class SecurityConfig {
         return normalizedValue.equals("DEPARTMENT_HEAD")
                 || normalizedValue.equals("DEPARTMENTHEAD")
                 || normalizedValue.equals("DEPT_HEAD")
+                || normalizedValue.equals("DEPTHEAD")
                 || normalizedValue.equals("HEAD_OF_DEPARTMENT")
                 || normalizedValue.contains("DEPARTMENT_HEAD")
                 || normalizedValue.contains("DEPARTMENTHEAD")
                 || normalizedValue.contains("DEPT_HEAD")
+                || normalizedValue.contains("DEPTHEAD")
                 || normalizedValue.contains("HEAD_OF_DEPARTMENT");
     }
 
