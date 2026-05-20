@@ -108,6 +108,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
           { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
           { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
+          { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
         ],
       },
     ];
@@ -203,6 +204,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
           { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
           { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
+          { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
         ],
       },
     ];

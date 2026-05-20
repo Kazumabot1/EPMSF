@@ -3,6 +3,7 @@ package com.epms.repository;
 import com.epms.entity.KpiPosition;
 import com.epms.entity.enums.KpiPositionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,6 +28,7 @@ public interface KpiPositionRepository extends JpaRepository<KpiPosition, Intege
             JOIN FETCH kp.kpiForm
             JOIN FETCH kp.position
             WHERE kp.position.id = :positionId
+              AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             """)
     Optional<KpiPosition> findWithFormByPositionId(@Param("positionId") Integer positionId);
 
@@ -36,6 +38,7 @@ public interface KpiPositionRepository extends JpaRepository<KpiPosition, Intege
             JOIN FETCH kp.position
             WHERE kp.position.id = :positionId
               AND kp.kpiForm.id <> :excludeFormId
+              AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             """)
     Optional<KpiPosition> findWithFormByPositionIdExcludingForm(
             @Param("positionId") Integer positionId,
@@ -46,6 +49,7 @@ public interface KpiPositionRepository extends JpaRepository<KpiPosition, Intege
             SELECT kp FROM KpiPosition kp JOIN FETCH kp.kpiForm
             WHERE kp.position.id = :positionId
               AND kp.status = com.epms.entity.enums.KpiPositionStatus.ACTIVE
+              AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             """)
     Optional<KpiPosition> findActiveWithFormByPositionId(@Param("positionId") Integer positionId);
 
@@ -54,6 +58,7 @@ public interface KpiPositionRepository extends JpaRepository<KpiPosition, Intege
             WHERE kp.position.id = :positionId
               AND kp.status = com.epms.entity.enums.KpiPositionStatus.ACTIVE
               AND kp.kpiForm.id <> :excludeFormId
+              AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             """)
     Optional<KpiPosition> findActiveWithFormByPositionIdExcludingForm(
             @Param("positionId") Integer positionId,
@@ -66,6 +71,7 @@ public interface KpiPositionRepository extends JpaRepository<KpiPosition, Intege
     @Query("""
             SELECT kp.position.id FROM KpiPosition kp
             WHERE (:excludeFormId IS NULL OR kp.kpiForm.id <> :excludeFormId)
+              AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             """)
     List<Integer> findAssignedPositionIds(@Param("excludeFormId") Integer excludeFormId);
 
@@ -77,7 +83,19 @@ public interface KpiPositionRepository extends JpaRepository<KpiPosition, Intege
             JOIN FETCH kp.kpiForm
             JOIN FETCH kp.position
             WHERE (:excludeFormId IS NULL OR kp.kpiForm.id <> :excludeFormId)
+              AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
             ORDER BY kp.position.positionTitle ASC
             """)
     List<KpiPosition> findActiveAssignments(@Param("excludeFormId") Integer excludeFormId);
+
+    @Modifying
+    @Query("""
+            DELETE FROM KpiPosition kp
+            WHERE kp.position.id = :positionId
+              AND kp.kpiForm.id IN (
+                  SELECT f.id FROM KpiForm f
+                  WHERE f.status = com.epms.entity.enums.KpiFormStatus.ARCHIVED
+              )
+            """)
+    void deleteArchivedLinksByPositionId(@Param("positionId") Integer positionId);
 }

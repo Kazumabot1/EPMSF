@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../../components/ConfirmModal';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import {
   formatTemplatePositionLabels,
   kpiStatusBadgeClass,
-  sumTemplateItemWeights,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
 import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
@@ -16,6 +16,8 @@ const KpiTemplateListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [templateToArchive, setTemplateToArchive] = useState<KpiTemplateResponse | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   const load = async () => {
     try {
@@ -48,17 +50,28 @@ const KpiTemplateListPage = () => {
     });
   }, [query, templates]);
 
-  const handleDelete = async (id: number, title: string) => {
-    if (!window.confirm(`Delete KPI template "${title}"?`)) {
+  const handleArchiveConfirm = async () => {
+    if (!templateToArchive) {
       return;
     }
     try {
-      await kpiTemplateService.deleteTemplate(id);
-      toast.success('Template deleted.');
+      setArchiving(true);
+      await kpiTemplateService.deleteTemplate(templateToArchive.id);
+      toast.success('Template archived.');
+      setTemplateToArchive(null);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed.');
+    } finally {
+      setArchiving(false);
     }
+  };
+
+  const handleArchiveCancel = () => {
+    if (archiving) {
+      return;
+    }
+    setTemplateToArchive(null);
   };
 
   return (
@@ -169,20 +182,17 @@ const KpiTemplateListPage = () => {
             <div className="kpi-tpl-card overflow-hidden p-0">
               <div className="kpi-tpl-table-wrap">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[900px] w-full border-collapse text-left text-sm">
+                  <table className="min-w-[720px] w-full border-collapse text-left text-sm">
                     <thead className="kpi-tpl-thead">
                       <tr className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                         <th className="px-5 py-4">Template</th>
                         <th className="px-5 py-4">Position</th>
-                        <th className="px-5 py-4 text-center">KPIs</th>
-                        <th className="px-5 py-4 text-right">Weight</th>
                         <th className="px-5 py-4">Status</th>
                         <th className="px-5 py-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {filtered.map((template) => {
-                        const totalWeight = sumTemplateItemWeights(template.items);
                         return (
                           <tr key={template.id} className="transition-colors hover:bg-violet-50/50">
                             <td className="px-5 py-4">
@@ -191,18 +201,6 @@ const KpiTemplateListPage = () => {
                             </td>
                             <td className="max-w-[220px] px-5 py-4 text-gray-700">
                               {formatTemplatePositionLabels(template.positions)}
-                            </td>
-                            <td className="px-5 py-4 text-center tabular-nums text-gray-800">
-                              {template.items.length}
-                            </td>
-                            <td className="px-5 py-4 text-right">
-                              <span
-                                className={`tabular-nums font-semibold ${
-                                  totalWeight !== 100 ? 'text-amber-700' : 'text-gray-900'
-                                }`}
-                              >
-                                {totalWeight}%
-                              </span>
                             </td>
                             <td className="px-5 py-4">
                               <span className={kpiStatusBadgeClass(template.status)}>{template.status}</span>
@@ -229,7 +227,7 @@ const KpiTemplateListPage = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => void handleDelete(template.id, template.title)}
+                                  onClick={() => setTemplateToArchive(template)}
                                   className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
                                   title="Delete"
                                   aria-label="Delete"
@@ -249,6 +247,16 @@ const KpiTemplateListPage = () => {
           )}
         </section>
       </div>
+      <ConfirmModal
+        open={templateToArchive !== null}
+        title="Archive KPI template"
+        message={`This will soft delete "${templateToArchive?.title ?? ''}" by marking it as archived. It will remain in records but cannot be used in KPI template cycles.`}
+        confirmText="Archive"
+        cancelText="Cancel"
+        loading={archiving}
+        onConfirm={() => void handleArchiveConfirm()}
+        onCancel={handleArchiveCancel}
+      />
     </div>
   );
 };

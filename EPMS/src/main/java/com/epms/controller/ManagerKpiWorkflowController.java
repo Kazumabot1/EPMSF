@@ -33,6 +33,11 @@ public class ManagerKpiWorkflowController {
         return ResponseEntity.ok(employeeKpiWorkflowService.listDepartmentAssignmentsForManager(kpiFormId));
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<List<ManagerKpiAssignmentDto>> history() {
+        return ResponseEntity.ok(employeeKpiWorkflowService.listFinalizedHistoryForManagerDepartment());
+    }
+
     @PutMapping("/assignments/{employeeKpiFormId}/scores")
     public ResponseEntity<ManagerKpiAssignmentDto> updateScores(
             @PathVariable Integer employeeKpiFormId,
@@ -44,5 +49,13 @@ public class ManagerKpiWorkflowController {
     @PostMapping("/finalize")
     public ResponseEntity<UseKpiTemplateResultDto> finalizeDepartment(@Valid @RequestBody FinalizeDepartmentKpiRequest request) {
         return ResponseEntity.ok(employeeKpiWorkflowService.finalizeDepartmentKpi(request.getKpiFormId()));
+    }
+
+    @PostMapping("/assignments/{employeeKpiFormId}/finalize")
+    public ResponseEntity<ManagerKpiAssignmentDto> finalizeEmployee(
+            @PathVariable Integer employeeKpiFormId,
+            @Valid @RequestBody FinalizeEmployeeKpiRequest request
+    ) {
+        return ResponseEntity.ok(employeeKpiWorkflowService.finalizeEmployeeKpi(employeeKpiFormId, request));
     }
 }

@@ -6,12 +6,14 @@ import com.epms.entity.KpiForm;
 import com.epms.entity.KpiTemplateCycle;
 import com.epms.entity.KpiTemplateCycleForm;
 import com.epms.entity.User;
+import com.epms.entity.enums.KpiFormStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.KpiFormRepository;
 import com.epms.repository.KpiTemplateCycleFormRepository;
 import com.epms.repository.KpiTemplateCycleRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
+import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.KpiTemplateCycleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,6 +37,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiTemplateCycleFormRepository cycleFormRepository;
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
+    private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @Override
     @Transactional
@@ -122,6 +125,10 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
         cycle.setUpdatedByUser(currentUser());
         cycleRepository.save(cycle);
+        cycleRepository.flush();
+        if (active) {
+            employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+        }
         return getById(id);
     }
 
@@ -152,6 +159,12 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                             HttpStatus.BAD_REQUEST,
                             "KPI form not found: " + formId
                     ));
+            if (form.getStatus() != KpiFormStatus.ACTIVE) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "KPI template cycles can only use active KPI forms: " + form.getTitle()
+                );
+            }
             formsById.put(formId, form);
         }
         for (KpiForm form : formsById.values()) {

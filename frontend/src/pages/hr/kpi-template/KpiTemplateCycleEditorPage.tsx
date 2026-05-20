@@ -113,6 +113,11 @@ const KpiTemplateCycleEditorPage = () => {
     if (!cycleName.trim()) return 'Cycle name is required.';
     if (!startDate || !endDate) return 'Start date is required.';
     if (selectedFormIds.length === 0) return 'Select at least one KPI form.';
+    const selectedTemplates = templates.filter((template) => selectedFormIds.includes(template.id));
+    const inactiveTemplate = selectedTemplates.find((template) => template.status !== 'ACTIVE');
+    if (inactiveTemplate) {
+      return `Remove "${inactiveTemplate.title}" before saving. KPI template cycles can only use active forms.`;
+    }
     return null;
   };
 
@@ -168,8 +173,7 @@ const KpiTemplateCycleEditorPage = () => {
             </p>
             <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">KPI template cycle</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Pick draft KPI forms saved with &quot;Use Form&quot;. The cycle stays draft until you activate it from the
-              list.
+              Pick active KPI forms saved with &quot;Use Form&quot;. The cycle stays draft until you activate it from the list.
             </p>
           </div>
           <Link to="/hr/kpi-template-cycle" className="kpi-tpl-btn-secondary inline-flex shrink-0 no-underline">
@@ -224,22 +228,27 @@ const KpiTemplateCycleEditorPage = () => {
           <div>
             <FieldLabel>KPI forms</FieldLabel>
             <p className="mt-1 mb-3 text-sm text-gray-500">
-              Select one or more <strong>draft</strong> KPI forms (saved via Use Form on the template screen).
+              Select one or more <strong>active</strong> KPI forms (saved via Use Form on the template screen).
             </p>
             {selectableTemplates.length === 0 ? (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                No draft KPI forms yet. Create a template and click <strong>Use Form</strong> to save a draft, then
+                No active KPI forms yet. Create a template and click <strong>Use Form</strong> to activate it, then
                 return here.
               </p>
             ) : (
               <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
                 {selectableTemplates.map((template) => {
                   const checked = selectedFormIds.includes(template.id);
+                  const invalidSelection = checked && template.status !== 'ACTIVE';
                   return (
                     <label
                       key={template.id}
                       className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
-                        checked ? 'border-violet-300 bg-violet-50/80' : 'border-transparent hover:bg-gray-50'
+                        invalidSelection
+                          ? 'border-red-300 bg-red-50/80'
+                          : checked
+                            ? 'border-violet-300 bg-violet-50/80'
+                            : 'border-transparent hover:bg-gray-50'
                       }`}
                     >
                       <input
@@ -250,6 +259,11 @@ const KpiTemplateCycleEditorPage = () => {
                       />
                       <span className="min-w-0 flex-1 text-sm font-medium text-gray-900">
                         {formatKpiFormCycleOptionLabel(template)}
+                        {invalidSelection && (
+                          <span className="mt-1 block text-xs font-semibold text-red-700">
+                            Remove before saving. Only active forms can be used.
+                          </span>
+                        )}
                       </span>
                       <span className={kpiStatusBadgeClass(template.status)}>{template.status}</span>
                     </label>

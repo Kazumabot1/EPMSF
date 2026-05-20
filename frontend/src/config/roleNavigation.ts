@@ -23,6 +23,7 @@ export interface NavItem {
 export interface UserLike {
   roles?: string[];
   dashboard?: string;
+  position?: string;
 }
 
 export const roleNavigation: Record<UserRole, NavItem[]> = {
@@ -142,6 +143,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Items', path: '/hr/performance-kpi/item', icon: 'bi-card-checklist' },
         { label: 'KPI Templates', path: '/hr/kpi-template', icon: 'bi-ui-checks-grid' },
         { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
+        { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
       ],
     },
   ],
@@ -200,6 +202,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       children: [
         { label: 'Employee Performance Review', path: '/manager/appraisals', icon: 'bi-pencil-square', end: true },
         { label: 'Review History List', path: '/manager/appraisals/history', icon: 'bi-clock-history' },
+      ],
+    },
+    {
+      label: 'KPI Management',
+      path: '/manager/kpi-scoring',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'Employee KPI Form', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'Employee KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
       ],
     },
     {

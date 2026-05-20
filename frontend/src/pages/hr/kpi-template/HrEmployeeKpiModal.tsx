@@ -140,6 +140,11 @@ const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
               Finalized: <strong style={{ color: '#0f172a' }}>{formatDate(row.finalizedAt)}</strong>
             </span>
           )}
+          {row.earlyFinalizedReason && (
+            <span>
+              Reason: <strong style={{ color: '#0f172a' }}>{row.earlyFinalizedReason}</strong>
+            </span>
+          )}
         </div>
 
         {/* KPI lines table */}

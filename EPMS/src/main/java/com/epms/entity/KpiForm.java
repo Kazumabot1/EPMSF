@@ -23,7 +23,7 @@ public class KpiForm {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, length = 255)
+    @Column(name = "title", nullable = false, length = 255)
     private String title;
 
     @Column(name = "start_date")
@@ -33,7 +33,12 @@ public class KpiForm {
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(
+            name = "status",
+            nullable = false,
+            columnDefinition = "ENUM('DRAFT','ACTIVE','FINALIZED','SENT','ARCHIVED')"
+    )
+    @Builder.Default
     private KpiFormStatus status = KpiFormStatus.DRAFT;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -42,7 +47,7 @@ public class KpiForm {
     @EqualsAndHashCode.Exclude
     private User createdByUser;
 
-    @Column(name = "created_by_string")
+    @Column(name = "created_by_string", length = 255)
     private String createdBy;
 
     @Column(name = "created_at")
@@ -63,7 +68,8 @@ public class KpiForm {
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
-    @Column(nullable = false)
+    @Column(name = "version", nullable = false)
+    @Builder.Default
     private Integer version = 1;
 
     @Builder.Default

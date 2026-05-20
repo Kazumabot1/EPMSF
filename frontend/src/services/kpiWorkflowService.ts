@@ -31,6 +31,15 @@ export const kpiWorkflowService = {
     }
   },
 
+  async managerHistory(): Promise<ManagerKpiAssignment[]> {
+    try {
+      const response = await api.get<ManagerKpiAssignment[]>(`${M_BASE}/history`);
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load KPI history.'));
+    }
+  },
+
   async updateScores(
     employeeKpiFormId: number,
     scores: { kpiFormItemId: number; actualValue?: number | null; score?: number | null }[],
@@ -52,6 +61,18 @@ export const kpiWorkflowService = {
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to finalize KPI.'));
+    }
+  },
+
+  async finalizeEmployee(employeeKpiFormId: number, reason: string): Promise<ManagerKpiAssignment> {
+    try {
+      const response = await api.post<ManagerKpiAssignment>(
+        `${M_BASE}/assignments/${employeeKpiFormId}/finalize`,
+        { reason },
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to finalize employee KPI.'));
     }
   },
 
