@@ -1,4 +1,3 @@
-
 package com.epms.service.impl;
 
 import com.epms.dto.CandidateResponseDto;
@@ -90,7 +89,7 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional
     public TeamResponseDto createTeam(TeamRequestDto request) {
-        positionPermissionService.assertCurrentUserHasPermission("teamCreate");
+        assertCurrentUserCanCreateTeams();
         validateCreateRequest(request);
 
         Department department = getDepartmentOrThrow(request.getDepartmentId());
@@ -149,11 +148,10 @@ public class TeamServiceImpl implements TeamService {
         return toDto(saved);
     }
 
-
     @Override
     @Transactional
     public TeamResponseDto updateTeam(Integer id, TeamRequestDto request) {
-        positionPermissionService.assertCurrentUserHasPermission("teamEdit");
+        assertCurrentUserCanEditTeams();
         Team team = getTeamOrThrow(id);
         validateUpdateRequest(request);
 
@@ -340,15 +338,10 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional
     public void deleteTeam(Integer id) {
-        positionPermissionService.assertCurrentUserHasPermission("teamEdit");
+        assertCurrentUserCanEditTeams();
         Team team = getTeamOrThrow(id);
         teamRepository.delete(team);
     }
-
-
-
-
-
 
     @Override
     @Transactional(readOnly = true)
@@ -431,7 +424,7 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional(readOnly = true)
     public List<TeamHistoryResponseDto> getTeamHistory(Integer teamId) {
-        positionPermissionService.assertCurrentUserHasPermission("teamHistory");
+        assertCurrentUserCanViewTeamHistory();
         Team team = getTeamOrThrow(teamId);
 
         return teamHistoryRepository.findByTeamIdOrderByChangedAtDesc(team.getId())
@@ -439,7 +432,6 @@ public class TeamServiceImpl implements TeamService {
                 .map(this::toHistoryDto)
                 .toList();
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -476,7 +468,6 @@ public class TeamServiceImpl implements TeamService {
                 .map(this::toDto)
                 .toList();
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -702,13 +693,67 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private void assertCurrentUserCanManageTeams() {
+        if (currentUserIsHrOrAdmin()) {
+            return;
+        }
+
         if (positionPermissionService.currentUserHasPermission("teamCreate")
                 || positionPermissionService.currentUserHasPermission("teamEdit")
-                || positionPermissionService.currentUserHasPermission("teamHistory")) {
+                || positionPermissionService.currentUserHasPermission("teamHistory")
+                || positionPermissionService.currentUserHasPermission("teamView")) {
             return;
         }
 
         throw new AccessDeniedException("Your position does not have permission to manage teams.");
+    }
+
+    private void assertCurrentUserCanCreateTeams() {
+        if (currentUserIsHrOrAdmin()) {
+            return;
+        }
+
+        if (positionPermissionService.currentUserHasPermission("teamCreate")) {
+            return;
+        }
+
+        throw new AccessDeniedException("Your position does not have permission to create teams.");
+    }
+
+    private void assertCurrentUserCanEditTeams() {
+        if (currentUserIsHrOrAdmin()) {
+            return;
+        }
+
+        if (positionPermissionService.currentUserHasPermission("teamEdit")) {
+            return;
+        }
+
+        throw new AccessDeniedException("Your position does not have permission to edit teams.");
+    }
+
+    private void assertCurrentUserCanViewTeamHistory() {
+        if (currentUserIsHrOrAdmin()) {
+            return;
+        }
+
+        if (positionPermissionService.currentUserHasPermission("teamHistory")) {
+            return;
+        }
+
+        throw new AccessDeniedException("Your position does not have permission to view team history.");
+    }
+
+    private boolean currentUserIsHrOrAdmin() {
+        User currentUser = getCurrentUserOrNull();
+
+        if (currentUser == null) {
+            return false;
+        }
+
+        return hasRole(currentUser, "HR")
+                || hasRole(currentUser, "ADMIN")
+                || hasRole(currentUser, "HUMAN_RESOURCE")
+                || hasRole(currentUser, "HUMAN_RESOURCES");
     }
 
     private void applyMemberChanges(Team team, Set<Integer> oldMemberIds, Set<Integer> newMemberIds) {
@@ -786,35 +831,89 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private boolean isTeamLeaderCandidate(User user) {
-        return hasPositionPermission(user, "teamAssignAsLeader");
-    }
-
-    private boolean isProjectManagerCandidate(User user) {
-        // New rule: Project Manager dropdown is driven by the MANAGER role, not by
-        // the old teamAssignAsPm position flag. Role can come from position.role or user_roles.
-        return hasRole(user, "MANAGER");
-    }
-
-    private boolean isTeamMemberCandidate(User user) {
-        // New rule: normal members are active EMPLOYEE-role users who are not Team Leader candidates
-        // and not MANAGER-role users. Active-team availability is checked separately.
-        return hasRole(user, "EMPLOYEE")
-                && !hasPositionPermission(user, "teamAssignAsLeader")
-                && !hasRole(user, "MANAGER");
-    }
-
-    private boolean hasPositionPermission(User user, String permissionField) {
-        if (!isActiveUser(user) || user.getPosition() == null || user.getPosition().getPermissions() == null) {
+        if (!isActiveUser(user)) {
             return false;
         }
 
-        PositionPermission permissions = user.getPosition().getPermissions();
+        PositionPermission permissions = getPositionPermissions(user);
+
+        if (permissions != null) {
+            return "teamAssignAsLeader".equals(resolveTeamAssignmentPermission(permissions));
+        }
+
+        return !hasRole(user, "MANAGER")
+                && !hasRole(user, "PROJECT_MANAGER")
+                && !hasRole(user, "PM")
+                && !hasRole(user, "HR")
+                && !hasRole(user, "ADMIN");
+    }
+
+    private boolean isProjectManagerCandidate(User user) {
+        if (!isActiveUser(user)) {
+            return false;
+        }
+
+        PositionPermission permissions = getPositionPermissions(user);
+
+        if (permissions != null) {
+            String assignment = resolveTeamAssignmentPermission(permissions);
+
+            if ("teamAssignAsPm".equals(assignment)) {
+                return true;
+            }
+        }
+
+        return hasRole(user, "MANAGER")
+                || hasRole(user, "PROJECT_MANAGER")
+                || hasRole(user, "PM");
+    }
+
+    private boolean isTeamMemberCandidate(User user) {
+        if (!isActiveUser(user)) {
+            return false;
+        }
+
+        PositionPermission permissions = getPositionPermissions(user);
+
+        if (permissions != null) {
+            return "teamAssignAsMember".equals(resolveTeamAssignmentPermission(permissions));
+        }
+
+        return !hasRole(user, "MANAGER")
+                && !hasRole(user, "PROJECT_MANAGER")
+                && !hasRole(user, "PM")
+                && !hasRole(user, "HR")
+                && !hasRole(user, "ADMIN");
+    }
+
+    private boolean hasPositionPermission(User user, String permissionField) {
+        if (!isActiveUser(user)) {
+            return false;
+        }
+
+        PositionPermission permissions = getPositionPermissions(user);
+
+        if (permissions == null) {
+            return false;
+        }
 
         return switch (permissionField) {
             case "teamAssignAsLeader", "teamAssignAsPm", "teamAssignAsMember" ->
                     permissionField.equals(resolveTeamAssignmentPermission(permissions));
             default -> false;
         };
+    }
+
+    private PositionPermission getPositionPermissions(User user) {
+        if (user == null || user.getPosition() == null) {
+            return null;
+        }
+
+        try {
+            return user.getPosition().getPermissions();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private String resolveTeamAssignmentPermission(PositionPermission permissions) {
@@ -871,8 +970,6 @@ public class TeamServiceImpl implements TeamService {
 
         return false;
     }
-
-
 
     private void recordHistory(
             Team team,

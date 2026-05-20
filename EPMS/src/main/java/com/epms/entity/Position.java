@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -35,6 +36,22 @@ public class Position {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id")
     private Role role;
+
+    /*
+     * Compatibility for older merged services:
+     * Some services call user.getPosition().getPermissions().
+     *
+     * The position_permissions table stores position_id, while this entity's id is positions.id.
+     * This read-only relation lets Position expose getPermissions() without changing those services.
+     */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "id",
+            referencedColumnName = "position_id",
+            insertable = false,
+            updatable = false
+    )
+    private PositionPermission permissions;
 
     @Column(columnDefinition = "TEXT")
     private String description;
