@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { appraisalTemplateService } from '../../services/appraisalService';
+import { appraisalAuditService, appraisalTemplateService, type AppraisalAuditLog } from '../../services/appraisalService';
 import { signatureService } from '../../services/signatureService';
 import { extractApiErrorMessage } from '../../services/apiError';
 import type {
@@ -69,103 +69,6 @@ const makeCriteria = (criteriaText: string, sortOrder: number): AppraisalCriteri
   active: true,
 });
 
-const defaultSections = (): AppraisalSectionRequest[] => [
-  {
-    sectionName: 'Job Knowledge / Technical Skills',
-    description: '',
-    sortOrder: 1,
-    active: true,
-    criteria: [
-      makeCriteria('Process relevant knowledge of work.', 1),
-      makeCriteria('Knowledge / technical competence / skill in the area of specialization.', 2),
-    ],
-  },
-  {
-    sectionName: 'Accountability',
-    description: '',
-    sortOrder: 2,
-    active: true,
-    criteria: [
-      makeCriteria('Accomplish the Personal Business Objectives.', 1),
-      makeCriteria('Committed to work.', 2),
-      makeCriteria('Plans and organizes work effectively.', 3),
-      makeCriteria('Proactive and takes initiative.', 4),
-      makeCriteria('Has a sense of urgency in acting on work matters.', 5),
-      makeCriteria('Willing to learn.', 6),
-    ],
-  },
-  {
-    sectionName: 'Problem Solving & Supervision',
-    description: '',
-    sortOrder: 3,
-    active: true,
-    criteria: [
-      makeCriteria('Helps resolve staff problems related to work.', 1),
-      makeCriteria('Handles problem situations effectively.', 2),
-      makeCriteria('Is a positive role model for other staff.', 3),
-      makeCriteria('Effectively supervises the work of subordinates.', 4),
-    ],
-  },
-  {
-    sectionName: 'Innovation',
-    description: '',
-    sortOrder: 4,
-    active: true,
-    criteria: [
-      makeCriteria('Develops team members.', 1),
-      makeCriteria('Shows originality and creativity in thinking.', 2),
-      makeCriteria('Meets challenges with resourcefulness.', 3),
-      makeCriteria('Generates suggestions for improving work.', 4),
-      makeCriteria('Develops innovative approaches and ideas.', 5),
-    ],
-  },
-  {
-    sectionName: 'Team Work',
-    description: '',
-    sortOrder: 5,
-    active: true,
-    criteria: [
-      makeCriteria('Able to work independently.', 1),
-      makeCriteria('Willing to work with others in a team.', 2),
-      makeCriteria('Share information and/or skills with colleague.', 3),
-    ],
-  },
-  {
-    sectionName: 'Quality Work',
-    description: '',
-    sortOrder: 6,
-    active: true,
-    criteria: [
-      makeCriteria("Understands the company's norms.", 1),
-      makeCriteria('Is accurate, thorough and careful with work performed.', 2),
-      makeCriteria("Sustain the company's quality.", 3),
-      makeCriteria('Seeks to continually improve processes and work methods.', 4),
-    ],
-  },
-  {
-    sectionName: 'Loyalty',
-    description: '',
-    sortOrder: 7,
-    active: true,
-    criteria: [
-      makeCriteria('Able to work with minimum supervision.', 1),
-      makeCriteria('Is trustworthy, responsible, and reliable.', 2),
-      makeCriteria('Is willing to accept new responsibilities.', 3),
-    ],
-  },
-  {
-    sectionName: 'Attendance / Office Rules & Regulation Compliance',
-    description: '',
-    sortOrder: 8,
-    active: true,
-    criteria: [
-      makeCriteria('Has good attendance.', 1),
-      makeCriteria("Observation of office's rules and regulation.", 2),
-      makeCriteria('Meets all compliance requirements without deductions.', 3),
-    ],
-  },
-];
-
 const emptyTemplate = (): AppraisalTemplateRequest => ({
   templateName: '',
   description: '',
@@ -176,7 +79,7 @@ const emptyTemplate = (): AppraisalTemplateRequest => ({
   formType: 'ANNUAL',
   targetAllDepartments: true,
   departmentIds: [],
-  sections: defaultSections(),
+  sections: [],
   scoreBands: defaultScoreBands(),
 });
 
@@ -328,14 +231,44 @@ const AppraisalTemplateRecordsPage = () => {
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [signatureLoading, setSignatureLoading] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [templateYearFilter, setTemplateYearFilter] = useState('');
+  const [editRecordsTitle, setEditRecordsTitle] = useState('');
+  const [editRecords, setEditRecords] = useState<AppraisalAuditLog[]>([]);
+  const [editRecordsLoading, setEditRecordsLoading] = useState(false);
 
   const formTotalCriteria = useMemo(() => form.sections.reduce((sum, section) => sum + section.criteria.length, 0), [form.sections]);
-  const selectedTotalCriteria = useMemo(() => selectedTemplate?.sections.reduce((sum, section) => sum + section.criteria.length, 0) ?? 0, [selectedTemplate]);
   const signatureById = useMemo(() => {
     const map = new Map<number, Signature>();
     signatures.forEach((item) => map.set(item.id, item));
     return map;
   }, [signatures]);
+
+  const templateYearOptions = useMemo(() => {
+    const years = new Set<number>();
+    templates.forEach((template) => {
+      if (!template.createdAt) return;
+      const year = new Date(template.createdAt).getFullYear();
+      if (!Number.isNaN(year)) years.add(year);
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [templates]);
+
+  const filteredTemplates = useMemo(() => {
+    const searchText = templateSearch.trim().toLowerCase();
+    const selectedYear = templateYearFilter ? Number(templateYearFilter) : null;
+    return templates.filter((template) => {
+      const nameMatches = !searchText || template.templateName.toLowerCase().includes(searchText);
+      const createdYear = template.createdAt ? new Date(template.createdAt).getFullYear() : null;
+      const yearMatches = selectedYear === null || createdYear === selectedYear;
+      return nameMatches && yearMatches;
+    });
+  }, [templateSearch, templateYearFilter, templates]);
+
+  const clearTemplateFilters = () => {
+    setTemplateSearch('');
+    setTemplateYearFilter('');
+  };
 
   const setAlert = (text: string, type: 'success' | 'error' | 'info' = 'info', onOk?: () => void | Promise<void>) => {
     setPopup({
@@ -439,6 +372,27 @@ const AppraisalTemplateRecordsPage = () => {
     }
   };
 
+  const openEditRecords = async (template: AppraisalTemplateResponse) => {
+    setEditRecordsTitle(template.templateName);
+    setEditRecords([]);
+    setEditRecordsLoading(true);
+    try {
+      const records = await appraisalAuditService.list('APPRAISAL_TEMPLATE', template.id);
+      setEditRecords(records);
+    } catch (error) {
+      setAlert(extractApiErrorMessage(error, 'Edit records could not be loaded.'), 'error');
+      setEditRecordsTitle('');
+    } finally {
+      setEditRecordsLoading(false);
+    }
+  };
+
+  const closeEditRecords = () => {
+    setEditRecordsTitle('');
+    setEditRecords([]);
+    setEditRecordsLoading(false);
+  };
+
   const useThisTemplate = (templateId: number) => {
     navigate(`/hr/appraisal/cycles?templateId=${templateId}&openCreate=1`);
   };
@@ -494,7 +448,7 @@ const AppraisalTemplateRecordsPage = () => {
     setLoading(true);
     try {
       const updated = await appraisalTemplateService.updateDraft(editingTemplate.id, normalizeForm(form));
-      setAlert(`Template form "${updated.templateName}" updated successfully to v${updated.versionNo ?? (editingTemplate.versionNo ?? 1) + 1}.`, 'success', async () => {
+      setAlert(`Template form "${updated.templateName}" updated successfully.`, 'success', async () => {
         closeModal();
         await loadTemplates();
       });
@@ -535,7 +489,7 @@ const AppraisalTemplateRecordsPage = () => {
           description: '',
           sortOrder: previous.sections.length + 1,
           active: true,
-          criteria: [makeCriteria('', 1)],
+          criteria: [],
         },
       ],
     }));
@@ -625,7 +579,6 @@ const AppraisalTemplateRecordsPage = () => {
     return (
       <div className="appraisal-form-block">
         <h3>Signature Section</h3>
-        {!readOnly && <p className="appraisal-muted">Signature fields are display-only in this template and cannot be edited here.</p>}
         {!readOnly && (
           <div className="appraisal-inline-grid two appraisal-signature-controls">
             <label className="appraisal-field">
@@ -734,14 +687,12 @@ const AppraisalTemplateRecordsPage = () => {
               <input value={form.description ?? ''} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Enter template purpose" />
             </label>
           </div>
-          <p className="appraisal-muted">This template stores only reusable form structure. Employee data, dates, ratings, and actual total points are filled later in the appraisal cycle review flow.</p>
         </div>
 
         <div className="appraisal-form-block">
           <div className="appraisal-form-block-header">
             <div>
               <h3>Evaluations</h3>
-              <p className="appraisal-muted">Add sections and criteria. Rating circles are shown for design only and are disabled in template setup.</p>
             </div>
           </div>
 
@@ -824,19 +775,16 @@ const AppraisalTemplateRecordsPage = () => {
                 </tr>
               </tbody>
             </table>
-            <p className="appraisal-muted">Total criteria: {formTotalCriteria}. Actual Total Points and Score are shown only after PM gives ratings.</p>
           </div>
         </div>
 
         <div className="appraisal-form-block">
           <h3>Score Guide</h3>
-          <p className="appraisal-muted">Customize score ranges only. Rating labels and explanations stay as the standard appraisal guide.</p>
           {renderScoreBandEditor(uniqueScoreBands(form.scoreBands?.length ? form.scoreBands : defaultScoreBands()))}
         </div>
 
         <div className="appraisal-form-block">
           <h3>Other Remarks</h3>
-          <p className="appraisal-muted">Appraiser's comment for discussion, recommendation, or promotion notes. This section is printed in the template and filled during the appraisal review flow.</p>
           <textarea
             className="appraisal-other-remarks-textarea"
             rows={4}
@@ -861,7 +809,6 @@ const AppraisalTemplateRecordsPage = () => {
         <div className="appraisal-template-summary-card">
           <div><strong>Template Name</strong><span>{selectedTemplate.templateName}</span></div>
           <div><strong>Description</strong><span>{selectedTemplate.description || '-'}</span></div>
-          <div><strong>Version</strong><span>v{selectedTemplate.versionNo ?? 1}</span></div>
           <div><strong>Created At</strong><span>{displayDateTime(selectedTemplate.createdAt)}</span></div>
         </div>
 
@@ -930,7 +877,6 @@ const AppraisalTemplateRecordsPage = () => {
                 </tr>
               </tbody>
             </table>
-            <p className="appraisal-muted">Total criteria: {selectedTotalCriteria}. Score will be calculated on employee appraisal forms after PM ratings.</p>
           </div>
         </div>
 
@@ -941,7 +887,6 @@ const AppraisalTemplateRecordsPage = () => {
 
         <div className="appraisal-form-block">
           <h3>Other Remarks</h3>
-          <p className="appraisal-muted">Appraiser's comment for discussion, recommendation, or promotion notes will be filled during the appraisal review flow.</p>
           <div className="appraisal-other-remarks-preview">
             <span>Appraiser's Comment for Discussion</span>
           </div>
@@ -949,6 +894,49 @@ const AppraisalTemplateRecordsPage = () => {
 
         {renderTemplateSignaturePreview()}
       </>
+    );
+  };
+
+  const renderEditRecordsModal = () => {
+    if (!editRecordsTitle) return null;
+    return (
+      <div className="appraisal-modal-backdrop" onMouseDown={closeEditRecords}>
+        <div className="appraisal-modal-box appraisal-modal-box-xl appraisal-edit-records-modal" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="appraisal-modal-header">
+            <div>
+              <h2>Template Edit Records</h2>
+              <p>{editRecordsTitle}</p>
+            </div>
+            <button className="appraisal-modal-close" type="button" onClick={closeEditRecords}><i className="bi bi-x-lg" /></button>
+          </div>
+          <div className="appraisal-modal-body">
+            {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
+            {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
+            {!editRecordsLoading && editRecords.length > 0 && (
+              <div className="appraisal-edit-record-list">
+                {editRecords.map((record) => (
+                  <div className="appraisal-edit-record-card" key={record.id}>
+                    <div className="appraisal-edit-record-card-head">
+                      <div>
+                        <strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong>
+                        <span>{displayDateTime(record.timestamp)}</span>
+                      </div>
+                      <span className="appraisal-status status-active">{record.action}</span>
+                    </div>
+                    <div className="appraisal-edit-record-values">
+                      <div><strong>Before</strong><p>{record.oldValue || '-'}</p></div>
+                      <div><strong>After</strong><p>{record.newValue || '-'}</p></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="appraisal-modal-footer">
+            <button className="appraisal-button secondary" type="button" onClick={closeEditRecords}>Close</button>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -969,7 +957,27 @@ const AppraisalTemplateRecordsPage = () => {
         <div className="appraisal-form-block-header">
           <div>
             <h2>Template Forms</h2>
-            <p className="appraisal-muted">Template forms are reusable masters. They remain as records and cannot be deleted.</p>
+          </div>
+        </div>
+        <div className="appraisal-filter-bar">
+          <label className="appraisal-filter-field">
+            <span>Search Template Name</span>
+            <input
+              value={templateSearch}
+              onChange={(event) => setTemplateSearch(event.target.value)}
+              placeholder="Search by template name"
+            />
+          </label>
+          <label className="appraisal-filter-field">
+            <span>Year</span>
+            <select value={templateYearFilter} onChange={(event) => setTemplateYearFilter(event.target.value)}>
+              <option value="">All Years</option>
+              {templateYearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+          <div className="appraisal-filter-actions">
+            <button className="appraisal-button ghost" type="button" onClick={clearTemplateFilters}>Clear Filters</button>
+            <span className="appraisal-filter-result">Showing {filteredTemplates.length} of {templates.length}</span>
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -980,7 +988,6 @@ const AppraisalTemplateRecordsPage = () => {
                 <th>Description</th>
                 <th>Sections</th>
                 <th>Criteria</th>
-                <th>Version</th>
                 <th>Created By</th>
                 <th>Created At</th>
                 <th>Actions</th>
@@ -988,23 +995,26 @@ const AppraisalTemplateRecordsPage = () => {
             </thead>
             <tbody>
               {templates.length === 0 && (
-                <tr><td colSpan={8}><div className="appraisal-empty">No template forms yet.</div></td></tr>
+                <tr><td colSpan={7}><div className="appraisal-empty">No template forms yet.</div></td></tr>
               )}
-              {templates.map((template) => {
+              {templates.length > 0 && filteredTemplates.length === 0 && (
+                <tr><td colSpan={7}><div className="appraisal-empty">No template forms match the selected search/filter.</div></td></tr>
+              )}
+              {filteredTemplates.map((template) => {
                 const criteriaCount = template.sections.reduce((sum, section) => sum + section.criteria.length, 0);
                 return (
                   <tr key={template.id}>
-                    <td><strong>{template.templateName}</strong><br /><span className="appraisal-muted">Reusable appraisal form template</span></td>
+                    <td><strong>{template.templateName}</strong></td>
                     <td>{template.description || '-'}</td>
                     <td>{template.sections.length}</td>
                     <td>{criteriaCount}</td>
-                    <td>v{template.versionNo ?? 1}</td>
                     <td>{template.createdByEmployeeId || '-'}</td>
                     <td>{displayDateTime(template.createdAt)}</td>
                     <td>
                       <div className="appraisal-button-row record-actions">
                         <button className="appraisal-button ghost" type="button" onClick={() => void openView(template.id)}>View Form</button>
                         <button className="appraisal-button secondary" type="button" onClick={() => void openEdit(template.id)}>Edit</button>
+                        <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(template)}>Edit Records</button>
                       </div>
                     </td>
                   </tr>
@@ -1015,6 +1025,8 @@ const AppraisalTemplateRecordsPage = () => {
         </div>
       </div>
 
+
+      {renderEditRecordsModal()}
 
       {popup && (
         <div className="appraisal-popup-backdrop">

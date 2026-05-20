@@ -16,4 +16,10 @@ public class AppraisalCycleAutoLockScheduler {
     public void autoLockExpiredActiveCycles() {
         appraisalCycleService.autoLockExpiredActiveCycles();
     }
+
+    @Scheduled(cron = "0 15 8 * * *")
+    @Scheduled(fixedDelay = 3600000, initialDelay = 120000)
+    public void sendUpcomingDeadlineNotifications() {
+        appraisalCycleService.sendUpcomingDeadlineNotifications();
+    }
 }

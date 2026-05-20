@@ -23,12 +23,38 @@ type ApiEnvelope<T> = {
   timestamp?: string;
 };
 
+export type AppraisalAuditEntityType = 'APPRAISAL_TEMPLATE' | 'APPRAISAL_CYCLE';
+
+export type AppraisalAuditLog = {
+  id: number;
+  userId?: number | null;
+  changedByName?: string | null;
+  action: string;
+  entityType: AppraisalAuditEntityType;
+  entityId: number;
+  changedColumn?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  reason?: string | null;
+  timestamp?: string | null;
+};
+
 const unwrap = <T>(response: { data: ApiEnvelope<T> | T }): T => {
   const body = response.data as ApiEnvelope<T> | T;
   if (body && typeof body === 'object' && 'data' in body) {
     return (body as ApiEnvelope<T>).data;
   }
   return body as T;
+};
+
+
+export const appraisalAuditService = {
+  list: async (entityType: AppraisalAuditEntityType, entityId: number) => {
+    const response = await api.get<ApiEnvelope<AppraisalAuditLog[]>>('/audit-logs', {
+      params: { entityType, entityId },
+    });
+    return unwrap<AppraisalAuditLog[]>(response);
+  },
 };
 
 export const appraisalTemplateService = {
@@ -141,6 +167,14 @@ export const appraisalWorkflowService = {
     return unwrap<EmployeeAppraisalFormResponse>(response);
   },
 
+  savePmDraft: async (formId: number, payload: PmAppraisalSubmitRequest) => {
+    const response = await api.post<ApiEnvelope<EmployeeAppraisalFormResponse>>(
+      `/appraisal/workflow/pm/forms/${formId}/draft`,
+      payload,
+    );
+    return unwrap<EmployeeAppraisalFormResponse>(response);
+  },
+
   submitPmReview: async (formId: number, payload: PmAppraisalSubmitRequest) => {
     const response = await api.post<ApiEnvelope<EmployeeAppraisalFormResponse>>(
       `/appraisal/workflow/pm/forms/${formId}/submit`,
@@ -164,6 +198,14 @@ export const appraisalWorkflowService = {
     return unwrap<EmployeeAppraisalFormResponse[]>(response);
   },
 
+  saveDeptHeadDraft: async (formId: number, payload: AppraisalReviewSubmitRequest) => {
+    const response = await api.post<ApiEnvelope<EmployeeAppraisalFormResponse>>(
+      `/appraisal/workflow/dept-head/forms/${formId}/draft`,
+      payload,
+    );
+    return unwrap<EmployeeAppraisalFormResponse>(response);
+  },
+
   submitDeptHeadReview: async (formId: number, payload: AppraisalReviewSubmitRequest) => {
     const response = await api.post<ApiEnvelope<EmployeeAppraisalFormResponse>>(
       `/appraisal/workflow/dept-head/forms/${formId}/submit`,
@@ -175,6 +217,19 @@ export const appraisalWorkflowService = {
   getHrQueue: async () => {
     const response = await api.get<ApiEnvelope<EmployeeAppraisalFormResponse[]>>('/appraisal/workflow/hr/queue');
     return unwrap<EmployeeAppraisalFormResponse[]>(response);
+  },
+
+  getHrReviewedRecords: async () => {
+    const response = await api.get<ApiEnvelope<EmployeeAppraisalFormResponse[]>>('/appraisal/workflow/hr/reviews');
+    return unwrap<EmployeeAppraisalFormResponse[]>(response);
+  },
+
+  saveHrDraft: async (formId: number, payload: AppraisalReviewSubmitRequest) => {
+    const response = await api.post<ApiEnvelope<EmployeeAppraisalFormResponse>>(
+      `/appraisal/workflow/hr/forms/${formId}/draft`,
+      payload,
+    );
+    return unwrap<EmployeeAppraisalFormResponse>(response);
   },
 
   approveByHr: async (formId: number, payload: AppraisalReviewSubmitRequest) => {

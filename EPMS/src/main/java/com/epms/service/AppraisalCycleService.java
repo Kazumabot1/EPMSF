@@ -15,7 +15,7 @@ public interface AppraisalCycleService {
 
     AppraisalCycleResponse getCycle(Integer cycleId);
 
-    AppraisalCycleResponse updateDraftCycle(Integer cycleId, AppraisalCycleRequest request);
+    AppraisalCycleResponse updateDraftCycle(Integer cycleId, AppraisalCycleRequest request, Integer updatedByUserId);
 
     List<AppraisalCycleResponse> getCycles(AppraisalCycleStatus status);
 
@@ -28,5 +28,7 @@ public interface AppraisalCycleService {
     AppraisalCycleResponse reuseCycle(Integer cycleId, AppraisalCycleRequest overrideRequest, Integer createdByUserId);
 
     int autoLockExpiredActiveCycles();
+
+    int sendUpcomingDeadlineNotifications();
 
 }

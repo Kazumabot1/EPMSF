@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { appraisalWorkflowService } from '../../services/appraisalService';
 import type { EmployeeAppraisalFormResponse } from '../../types/appraisal';
 import AppraisalFormView from '../../components/appraisal/AppraisalFormView';
+import { formatDisplayDateTime } from '../../utils/appraisalDateFormat';
 import './appraisal.css';
 
 interface AppraisalHistoryListPageProps {
@@ -24,6 +25,9 @@ const AppraisalHistoryListPage = ({ role }: AppraisalHistoryListPageProps) => {
   const [forms, setForms] = useState<EmployeeAppraisalFormResponse[]>([]);
   const [selected, setSelected] = useState<EmployeeAppraisalFormResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState('');
+
+  const closeFormModal = () => setSelected(null);
 
   useEffect(() => {
     const load = async () => {
@@ -43,9 +47,30 @@ const AppraisalHistoryListPage = ({ role }: AppraisalHistoryListPageProps) => {
     void load();
   }, [role]);
 
+  const showDepartmentFilter = role === 'pm' || role === 'dept-head';
+
+  const departmentOptions = useMemo(() => {
+    const options = new Map<number, string>();
+    forms.forEach((form) => {
+      if (form.departmentId) {
+        options.set(form.departmentId, form.departmentName || `Department #${form.departmentId}`);
+      }
+    });
+    return Array.from(options.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [forms]);
+
+  const filteredForms = useMemo(() => {
+    const selectedDepartmentId = departmentFilter ? Number(departmentFilter) : null;
+    return forms.filter((form) => selectedDepartmentId === null || form.departmentId === selectedDepartmentId);
+  }, [departmentFilter, forms]);
+
   const stats = useMemo(() => ({
-    total: forms.length,
-  }), [forms]);
+    total: filteredForms.length,
+  }), [filteredForms]);
+
+  const clearHistoryFilters = () => {
+    setDepartmentFilter('');
+  };
 
   return (
     <div className="appraisal-page appraisal-dashboard-page">
@@ -68,10 +93,27 @@ const AppraisalHistoryListPage = ({ role }: AppraisalHistoryListPageProps) => {
         <div className="appraisal-form-block-header">
           <div>
             <h2>{role === 'pm' ? 'Manager Reviewed Employee Records' : role === 'dept-head' ? 'Dept Head Checked Records' : 'Completed Appraisal Records'}</h2>
-            <p className="appraisal-muted">Click any record row to view the full appraisal cycle form in a modern box.</p>
           </div>
           {loading && <span className="appraisal-muted">Loading...</span>}
         </div>
+
+        {showDepartmentFilter && (
+          <div className="appraisal-filter-bar">
+            <label className="appraisal-filter-field">
+              <span>Department</span>
+              <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
+                <option value="">All Departments</option>
+                {departmentOptions.map(([departmentId, departmentName]) => (
+                  <option key={departmentId} value={departmentId}>{departmentName}</option>
+                ))}
+              </select>
+            </label>
+            <div className="appraisal-filter-actions">
+              <button className="appraisal-button ghost" type="button" onClick={clearHistoryFilters}>Clear Filters</button>
+              <span className="appraisal-filter-result">Showing {filteredForms.length} of {forms.length}</span>
+            </div>
+          </div>
+        )}
 
         <div className="appraisal-template-table-wrap">
           <table className="appraisal-template-table appraisal-cycle-record-table appraisal-modern-record-table">
@@ -86,19 +128,19 @@ const AppraisalHistoryListPage = ({ role }: AppraisalHistoryListPageProps) => {
               </tr>
             </thead>
             <tbody>
-              {forms.length === 0 && !loading ? (
+              {filteredForms.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={6}><div className="appraisal-empty">No records found.</div></td>
+                  <td colSpan={6}><div className="appraisal-empty">{forms.length === 0 ? 'No records found.' : 'No records match the selected department.'}</div></td>
                 </tr>
-              ) : forms.map((form) => (
+              ) : filteredForms.map((form) => (
                 <tr
                   key={form.id}
                   className={`appraisal-clickable-row ${selected?.id === form.id ? 'appraisal-selected-row' : ''}`}
                   onClick={() => setSelected(form)}
                   title="Open appraisal form"
                 >
-                  <td><strong>{form.cycleName}</strong><p className="appraisal-muted">Form #{form.id}</p></td>
-                  <td><strong>{form.employeeName}</strong><p className="appraisal-muted">{form.employeeCode || '-'}</p></td>
+                  <td><strong>{form.cycleName}</strong></td>
+                  <td><strong>{form.employeeName}</strong></td>
                   <td>{form.positionName || '-'}</td>
                   <td>{form.departmentName}</td>
                   <td>{formatDateTime(reviewDateTime(role, form))}</td>
@@ -110,10 +152,32 @@ const AppraisalHistoryListPage = ({ role }: AppraisalHistoryListPageProps) => {
         </div>
       </div>
 
-      {selected ? (
-        <AppraisalFormView form={selected} mode={role === 'employee' ? 'employee' : 'readonly'} />
-      ) : (
-        <div className="appraisal-empty">Open a record to view the full appraisal cycle form.</div>
+
+      {selected && (
+        <div className="appraisal-modal-backdrop" onClick={closeFormModal}>
+          <div
+            className="appraisal-modal-box appraisal-modal-box-xl appraisal-full-form-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="appraisal-history-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="appraisal-modal-header">
+              <div>
+                <h2 id="appraisal-history-modal-title">{selected.cycleName}</h2>
+              </div>
+              <button className="appraisal-modal-close" type="button" onClick={closeFormModal} aria-label="Close appraisal record">
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+            <div className="appraisal-modal-body template-form-modal-body">
+              <AppraisalFormView form={selected} mode={role === 'employee' ? 'employee' : 'readonly'} />
+            </div>
+            <div className="appraisal-modal-footer">
+              <button className="appraisal-button secondary" type="button" onClick={closeFormModal}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -125,12 +189,7 @@ const reviewDateTime = (role: AppraisalHistoryListPageProps['role'], form: Emplo
   return form.hrApprovedAt;
 };
 
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-};
+const formatDateTime = formatDisplayDateTime;
 
 const formatPercent = (value?: number | null) => {
   if (value === undefined || value === null || Number.isNaN(value)) return '-';

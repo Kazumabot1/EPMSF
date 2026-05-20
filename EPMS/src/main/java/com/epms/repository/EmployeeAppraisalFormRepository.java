@@ -22,6 +22,8 @@ public interface EmployeeAppraisalFormRepository extends JpaRepository<EmployeeA
 
     List<EmployeeAppraisalForm> findByStatus(EmployeeAppraisalStatus status);
 
+    List<EmployeeAppraisalForm> findByStatusOrderByHrApprovedAtDesc(EmployeeAppraisalStatus status);
+
     List<EmployeeAppraisalForm> findByDepartmentIdAndStatus(Integer departmentId, EmployeeAppraisalStatus status);
 
     List<EmployeeAppraisalForm> findByProjectManagerIdOrderByUpdatedAtDesc(Integer projectManagerId);

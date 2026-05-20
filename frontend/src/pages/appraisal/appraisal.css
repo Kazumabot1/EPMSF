@@ -994,6 +994,78 @@ button.appraisal-rating-dot:not(:disabled) {
   padding-right: 6px;
 }
 
+/* Full appraisal form records need to use the same large modal feel as
+   template/cycle forms, but with a real scrollable body so the whole form
+   can be viewed instead of being clipped above the footer. */
+.appraisal-full-form-modal {
+  width: min(1480px, calc(100vw - 32px));
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.appraisal-full-form-modal .appraisal-modal-header,
+.appraisal-full-form-modal .appraisal-modal-footer {
+  flex: 0 0 auto;
+}
+
+.appraisal-full-form-modal .appraisal-modal-body,
+.appraisal-full-form-modal .template-form-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px;
+}
+
+.appraisal-full-form-modal .appraisal-form-sheet {
+  overflow: visible;
+  box-shadow: none;
+}
+
+.appraisal-full-form-modal .appraisal-template-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+@media (max-width: 720px) {
+  .appraisal-full-form-modal {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .appraisal-full-form-modal .appraisal-modal-body,
+  .appraisal-full-form-modal .template-form-modal-body {
+    padding: 12px;
+  }
+}
+
+
+.appraisal-form-view-modal-backdrop {
+  align-items: flex-start;
+}
+
+.appraisal-form-view-modal {
+  margin: 10px 0 28px;
+}
+
+.appraisal-form-view-modal-body {
+  gap: 0;
+  max-height: calc(100vh - 170px);
+  padding: 18px;
+}
+
+.appraisal-form-view-modal-body .appraisal-page {
+  padding: 0;
+}
+
+.appraisal-form-view-modal-body .appraisal-form-card {
+  box-shadow: none;
+}
+
 .appraisal-score-band-editor {
   border: 1px solid #e5e7eb;
   border-radius: 14px;
@@ -1675,4 +1747,133 @@ button.appraisal-rating-dot:not(:disabled) {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #1f2a44;
+}
+
+.appraisal-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 12px 0 16px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.appraisal-cycle-filter-bar {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.appraisal-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.appraisal-filter-field span {
+  font-weight: 700;
+  color: #374151;
+  font-size: 13px;
+}
+
+.appraisal-filter-field input,
+.appraisal-filter-field select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+}
+
+.appraisal-filter-field input:focus,
+.appraisal-filter-field select:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+
+.appraisal-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.appraisal-filter-result {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.appraisal-edit-records-modal .appraisal-modal-body {
+  max-height: calc(100vh - 210px);
+}
+
+.appraisal-edit-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.appraisal-edit-record-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.appraisal-edit-record-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.appraisal-edit-record-card-head strong,
+.appraisal-edit-record-card-head span {
+  display: block;
+}
+
+.appraisal-edit-record-card-head span:not(.appraisal-status) {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.appraisal-edit-record-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.appraisal-edit-record-values div {
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.appraisal-edit-record-values strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #334155;
+}
+
+.appraisal-edit-record-values p {
+  margin: 0;
+  color: #475569;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .appraisal-edit-record-values {
+    grid-template-columns: 1fr;
+  }
 }

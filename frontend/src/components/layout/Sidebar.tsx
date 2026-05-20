@@ -150,6 +150,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/appraisal/template-forms', label: 'Template Forms', icon: 'bi bi-folder2-open' },
           { to: '/hr/appraisal/cycles', label: 'Appraisal Cycles', icon: 'bi bi-calendar2-week' },
           { to: '/hr/appraisal/review-check', label: 'Manager + Dept Review Check', icon: 'bi bi-shield-check' },
+          { to: '/hr/appraisal/employee-reviews', label: 'Employee Reviews', icon: 'bi bi-person-lines-fill' },
         ],
       },
       { to: '/hr/feedback/dashboard', label: '360 Feedback', icon: 'bi bi-chat-square-dots' },

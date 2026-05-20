@@ -165,8 +165,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuditLogController {
 
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE");
-    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION");
+    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of("APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
 
     private final AuditLogService auditLogService;
     private final UserRepository userRepository;
@@ -310,8 +311,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuditLogController {
 
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE");
-    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION");
+    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of("APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
 
     private final AuditLogService auditLogService;
     private final UserRepository userRepository;
@@ -331,7 +333,7 @@ public class AuditLogController {
 
         Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
         String normalizedEntityType = normalizeEntityType(entityType);
-        Integer effectiveUserId = resolveEffectiveUserId(admin, userId);
+        Integer effectiveUserId = resolveEffectiveUserId(admin, userId, normalizedEntityType);
 
         List<AuditLog> logs;
         if (normalizedEntityType != null) {
@@ -411,8 +413,12 @@ public class AuditLogController {
         return ResponseEntity.ok(GenericApiResponse.success("Audit log editors retrieved successfully", response));
     }
 
-    private Integer resolveEffectiveUserId(boolean admin, Integer requestedUserId) {
+    private Integer resolveEffectiveUserId(boolean admin, Integer requestedUserId, String normalizedEntityType) {
         if (admin) {
+            return requestedUserId;
+        }
+
+        if (normalizedEntityType != null && SHARED_HR_ENTITY_TYPES.contains(normalizedEntityType)) {
             return requestedUserId;
         }
 

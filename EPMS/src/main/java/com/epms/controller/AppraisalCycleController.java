@@ -54,7 +54,7 @@ public class AppraisalCycleController {
             @PathVariable Integer cycleId,
             @Valid @RequestBody AppraisalCycleRequest request
     ) {
-        AppraisalCycleResponse response = appraisalCycleService.updateDraftCycle(cycleId, request);
+        AppraisalCycleResponse response = appraisalCycleService.updateDraftCycle(cycleId, request, SecurityUtils.currentUserId());
 
         return ResponseEntity.ok(
                 GenericApiResponse.success("Draft appraisal cycle updated", response)

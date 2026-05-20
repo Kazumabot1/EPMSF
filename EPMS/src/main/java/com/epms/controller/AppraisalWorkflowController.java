@@ -23,6 +23,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -59,13 +62,21 @@ public class AppraisalWorkflowController {
         reviewCycles.addAll(appraisalCycleService.getCycles(AppraisalCycleStatus.LOCKED));
         UserPrincipal currentUser = SecurityUtils.currentUser();
 
-        List<AppraisalCycleResponse> response = shouldFilterForManager(currentUser)
+        List<AppraisalCycleResponse> filteredCycles = shouldFilterForManager(currentUser)
                 ? reviewCycles.stream()
                 .filter(cycle -> currentUser.getDepartmentId() != null
                         && cycle.getDepartmentIds() != null
                         && cycle.getDepartmentIds().contains(currentUser.getDepartmentId()))
                 .toList()
                 : reviewCycles;
+
+        List<AppraisalCycleResponse> response = filteredCycles.stream()
+                .filter(this::shouldShowInManagerCycleList)
+                .sorted(Comparator.comparing(
+                        AppraisalCycleResponse::getCreatedAt,
+                        Comparator.nullsLast(Date::compareTo)
+                ).reversed())
+                .toList();
 
         return ResponseEntity.ok(GenericApiResponse.success("Active appraisal cycles fetched", response));
     }
@@ -118,6 +129,23 @@ public class AppraisalWorkflowController {
         EmployeeAppraisalFormResponse response = workflowService.createPmDraft(cycleId, employeeId, SecurityUtils.currentUserId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GenericApiResponse.success("Manager appraisal draft ready", response));
+    }
+
+    @PostMapping("/pm/forms/{formId}/draft")
+    @PreAuthorize(
+            "hasRole('MANAGER') "
+                    + "or hasAuthority('ROLE_MANAGER') "
+                    + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
+                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
+                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
+    public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> savePmDraft(
+            @PathVariable Integer formId,
+            @Valid @RequestBody PmAppraisalSubmitRequest request
+    ) {
+        EmployeeAppraisalFormResponse response = workflowService.savePmDraft(formId, request, SecurityUtils.currentUserId());
+        return ResponseEntity.ok(GenericApiResponse.success("Manager review draft saved", response));
     }
 
     @PostMapping("/pm/forms/{formId}/submit")
@@ -173,6 +201,25 @@ public class AppraisalWorkflowController {
         return ResponseEntity.ok(GenericApiResponse.success("Dept Head appraisal review queue fetched", response));
     }
 
+    @PostMapping("/dept-head/forms/{formId}/draft")
+    @PreAuthorize(
+            "hasRole('DEPARTMENT_HEAD') "
+                    + "or hasRole('DEPARTMENTHEAD') "
+                    + "or hasAuthority('ROLE_DEPARTMENT_HEAD') "
+                    + "or hasAuthority('ROLE_DEPARTMENTHEAD') "
+                    + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
+                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
+                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
+    public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> saveDeptHeadDraft(
+            @PathVariable Integer formId,
+            @Valid @RequestBody AppraisalReviewSubmitRequest request
+    ) {
+        EmployeeAppraisalFormResponse response = workflowService.saveDeptHeadDraft(formId, request, SecurityUtils.currentUserId());
+        return ResponseEntity.ok(GenericApiResponse.success("Dept Head review draft saved", response));
+    }
+
     @PostMapping("/dept-head/forms/{formId}/submit")
     @PreAuthorize(
             "hasRole('DEPARTMENT_HEAD') "
@@ -218,6 +265,31 @@ public class AppraisalWorkflowController {
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getHrReviewQueue() {
         List<EmployeeAppraisalFormResponse> response = workflowService.getHrReviewQueue();
         return ResponseEntity.ok(GenericApiResponse.success("HR appraisal review queue fetched", response));
+    }
+
+    @GetMapping("/hr/reviews")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
+                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
+    public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getHrReviewedRecords() {
+        List<EmployeeAppraisalFormResponse> response = workflowService.getHrReviewedRecords();
+        return ResponseEntity.ok(GenericApiResponse.success("HR reviewed appraisal records fetched", response));
+    }
+
+    @PostMapping("/hr/forms/{formId}/draft")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
+                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
+    public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> saveHrDraft(
+            @PathVariable Integer formId,
+            @Valid @RequestBody AppraisalReviewSubmitRequest request
+    ) {
+        EmployeeAppraisalFormResponse response = workflowService.saveHrDraft(formId, request, SecurityUtils.currentUserId());
+        return ResponseEntity.ok(GenericApiResponse.success("HR review draft saved", response));
     }
 
     @PostMapping("/hr/forms/{formId}/approve")
@@ -280,6 +352,16 @@ public class AppraisalWorkflowController {
         }
         List<EmployeeAppraisalFormResponse> response = workflowService.getEmployeeVisibleForms(employeeId);
         return ResponseEntity.ok(GenericApiResponse.success("Employee completed appraisal forms fetched", response));
+    }
+
+
+    private boolean shouldShowInManagerCycleList(AppraisalCycleResponse cycle) {
+        if (cycle == null || cycle.getEndDate() == null) {
+            return true;
+        }
+        // Manager side rule: on the end date the cycle is still visible as LOCKED;
+        // after the end date the appraisal cycle form is removed from the Manager list.
+        return !cycle.getEndDate().isBefore(LocalDate.now());
     }
 
     private boolean shouldFilterForManager(UserPrincipal user) {
