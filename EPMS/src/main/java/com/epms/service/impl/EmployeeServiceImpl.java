@@ -7,20 +7,25 @@ import com.epms.dto.EmployeeRequestDto;
 import com.epms.dto.EmployeeResponseDto;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
+import com.epms.entity.EmployeeAuditHistory;
 import com.epms.entity.EmployeeDepartment;
 import com.epms.entity.Position;
 import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
+import com.epms.entity.UserRole;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.DepartmentRepository;
+import com.epms.repository.EmployeeAuditHistoryRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.PositionRepository;
+import com.epms.repository.RoleRepository;
 import com.epms.repository.TeamMemberRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
+import com.epms.repository.UserRoleRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeService;
@@ -47,8 +52,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final PositionRepository positionRepository;
     private final DepartmentRepository departmentRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
+    private final EmployeeAuditHistoryRepository employeeAuditHistoryRepository;
     private final UserAccountProvisioningService userAccountProvisioningService;
     private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final RoleRepository roleRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
@@ -259,7 +267,18 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee employee = employeeRepository.findWithDepartmentsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
 
+        Position oldPosition = employee.getPosition();
+        String oldPositionTitle = oldPosition != null ? oldPosition.getPositionTitle() : null;
+        String oldPositionLevelCode = oldPosition != null && oldPosition.getLevel() != null
+                ? oldPosition.getLevel().getLevelCode()
+                : null;
+        String oldRoleName = oldPosition != null && oldPosition.getRole() != null
+                ? oldPosition.getRole().getName()
+                : null;
+
         EmployeeDepartment oldAssignment = getActiveAssignment(employee).orElse(null);
+        Department oldCurrentDepartment = oldAssignment != null ? oldAssignment.getCurrentDepartment() : null;
+        Department oldParentDepartment = oldAssignment != null ? oldAssignment.getParentDepartment() : null;
         Department oldWorkingDepartment = getWorkingDepartment(oldAssignment);
 
         Department currentDepartment = requireDepartment(
@@ -332,6 +351,18 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
 
         syncLinkedUserFromEmployee(saved, newWorkingDepartment != null ? newWorkingDepartment.getId() : null);
+        recordEmployeeAuditChanges(
+                saved,
+                oldPositionTitle,
+                oldPositionLevelCode,
+                oldRoleName,
+                oldCurrentDepartment,
+                oldParentDepartment,
+                oldWorkingDepartment,
+                currentDepartment,
+                parentDepartment,
+                newWorkingDepartment
+        );
 
         if (workingDepartmentChanged && linkedUserOpt.isPresent()) {
             applyTeamTransfer(linkedUserOpt.get(), oldTeam, newTeam);
@@ -397,6 +428,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             user.setUpdatedAt(new Date());
 
             userRepository.save(user);
+            syncUserRoleFromPosition(user, employee.getPosition());
         });
     }
 
@@ -809,20 +841,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     private boolean isImportantTeamRole(User user) {
-        if (user == null || user.getPosition() == null || user.getPosition().getPositionTitle() == null) {
-            return false;
-        }
-
-        String normalized = user.getPosition()
-                .getPositionTitle()
-                .trim()
-                .toLowerCase()
-                .replace(" ", "")
-                .replace("-", "")
-                .replace("_", "");
-
-        return normalized.contains("teamleader")
-                || normalized.contains("projectmanager");
+        return hasPositionPermission(user, "teamAssignAsLeader")
+                || hasPositionPermission(user, "teamAssignAsPm");
     }
 
     private boolean isActiveTeam(Team team) {
@@ -1026,6 +1046,112 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
 
         return "Employee #" + employee.getId();
+    }
+
+    private void syncUserRoleFromPosition(User user, Position position) {
+        if (user == null || user.getId() == null) {
+            return;
+        }
+
+        Integer roleId = position != null && position.getRole() != null
+                ? position.getRole().getId()
+                : roleRepository.findByNameIgnoreCase("EMPLOYEE").map(com.epms.entity.Role::getId).orElse(null);
+
+        if (roleId == null) {
+            return;
+        }
+
+        userRoleRepository.deleteAll(userRoleRepository.findByUserId(user.getId()));
+
+        UserRole userRole = new UserRole();
+        userRole.setUserId(user.getId());
+        userRole.setRoleId(roleId);
+        userRoleRepository.save(userRole);
+    }
+
+    private boolean hasPositionPermission(User user, String permissionField) {
+        if (user == null || user.getPosition() == null || user.getPosition().getPermissions() == null) {
+            return false;
+        }
+
+        return switch (permissionField) {
+            case "teamAssignAsLeader" -> Boolean.TRUE.equals(user.getPosition().getPermissions().getTeamAssignAsLeader());
+            case "teamAssignAsPm" -> Boolean.TRUE.equals(user.getPosition().getPermissions().getTeamAssignAsPm());
+            default -> false;
+        };
+    }
+
+    private void recordEmployeeAuditChanges(
+            Employee employee,
+            String oldPositionTitle,
+            String oldPositionLevelCode,
+            String oldRoleName,
+            Department oldCurrentDepartment,
+            Department oldParentDepartment,
+            Department oldWorkingDepartment,
+            Department newCurrentDepartment,
+            Department newParentDepartment,
+            Department newWorkingDepartment
+    ) {
+        String newPositionTitle = employee.getPosition() != null ? employee.getPosition().getPositionTitle() : null;
+        String newPositionLevelCode = employee.getPosition() != null && employee.getPosition().getLevel() != null
+                ? employee.getPosition().getLevel().getLevelCode()
+                : null;
+        String newRoleName = employee.getPosition() != null && employee.getPosition().getRole() != null
+                ? employee.getPosition().getRole().getName()
+                : "EMPLOYEE";
+
+        Integer editorId = safeCurrentUserId();
+
+        saveEmployeeAudit(employee, "position", oldPositionTitle, newPositionTitle, editorId);
+        saveEmployeeAudit(employee, "position_level", oldPositionLevelCode, newPositionLevelCode, editorId);
+        saveEmployeeAudit(employee, "role", oldRoleName, newRoleName, editorId);
+        saveEmployeeAudit(employee, "current_department",
+                oldCurrentDepartment != null ? oldCurrentDepartment.getDepartmentName() : null,
+                newCurrentDepartment != null ? newCurrentDepartment.getDepartmentName() : null,
+                editorId);
+        saveEmployeeAudit(employee, "parent_department",
+                oldParentDepartment != null ? oldParentDepartment.getDepartmentName() : null,
+                newParentDepartment != null ? newParentDepartment.getDepartmentName() : null,
+                editorId);
+        saveEmployeeAudit(employee, "working_department",
+                oldWorkingDepartment != null ? oldWorkingDepartment.getDepartmentName() : null,
+                newWorkingDepartment != null ? newWorkingDepartment.getDepartmentName() : null,
+                editorId);
+    }
+
+    private void saveEmployeeAudit(
+            Employee employee,
+            String fieldName,
+            String oldValue,
+            String newValue,
+            Integer editorId
+    ) {
+        if (employee == null || employee.getId() == null || Objects.equals(nullToBlank(oldValue), nullToBlank(newValue))) {
+            return;
+        }
+
+        EmployeeAuditHistory history = new EmployeeAuditHistory();
+        history.setEmployeeId(employee.getId());
+        history.setFieldName(fieldName);
+        history.setOldValue(oldValue);
+        history.setNewValue(newValue);
+        history.setEditedBy(editorId);
+        history.setEditedAt(new Date());
+        history.setReason("Employee profile updated");
+        employeeAuditHistoryRepository.save(history);
+    }
+
+    private Integer safeCurrentUserId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String nullToBlank(String value) {
+        return value == null ? "" : value;
     }
 
     private String trimToNull(String value) {

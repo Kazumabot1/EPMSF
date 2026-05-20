@@ -213,6 +213,29 @@
   font-weight: 600;
 }
 
+.hr-submenu-link.is-disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.9;
+  border: 1px dashed #dbe2ea;
+}
+
+.hr-submenu-link.is-disabled i {
+  color: #cbd5e1;
+}
+
+.hr-submenu-link.is-disabled:hover {
+  background: #f8fafc;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.hr-submenu-lock {
+  margin-left: auto;
+  font-size: 0.72rem;
+}
+
 .hr-nav-item.active i {
   color: #4f46e5;
 }

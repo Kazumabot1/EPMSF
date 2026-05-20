@@ -20,7 +20,7 @@ function Home() {
       });
 
     // Load total active employee count from the employees endpoint
-    api.get('/employees')
+   /*  api.get('/employees')
       .then((res) => {
         const list: any[] = res.data?.data ?? res.data ?? [];
         // Count only active employees
@@ -31,7 +31,26 @@ function Home() {
       })
       .catch(() => {
         setTotalEmployees(null); // fallback: will show directReports
+      }); */
+  const dashboard = String(data?.user?.dashboard ?? '').toUpperCase();
+
+  if (dashboard === 'HR_DASHBOARD' || dashboard === 'ADMIN_DASHBOARD') {
+    api.get('/employees')
+      .then((res) => {
+        const list: any[] = res.data?.data ?? res.data ?? [];
+        const active = Array.isArray(list)
+          ? list.filter((e: any) => e.active !== false && e.status !== 'INACTIVE').length
+          : 0;
+        setTotalEmployees(active);
+      })
+      .catch(() => {
+        setTotalEmployees(null);
       });
+  }
+
+
+
+
   }, []);
 
   return (

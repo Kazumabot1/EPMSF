@@ -47,6 +47,23 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     @Query("SELECT e FROM Employee e WHERE e.id = :id")
     Optional<Employee> findWithDepartmentsById(@Param("id") Integer id);
 
+
+    @EntityGraph(attributePaths = {
+            "employeeDepartments",
+            "employeeDepartments.currentDepartment",
+            "employeeDepartments.parentDepartment",
+            "position",
+            "position.level"
+    })
+    @Query("""
+       SELECT DISTINCT e
+       FROM Employee e
+       LEFT JOIN e.position p
+       WHERE p.id = :positionId
+       ORDER BY e.firstName ASC, e.lastName ASC, e.id ASC
+       """)
+    List<Employee> findByPositionIdForPositionDetails(@Param("positionId") Integer positionId);
+
     Optional<Employee> findByEmail(String email);
 
     /**

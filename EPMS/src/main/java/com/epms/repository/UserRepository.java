@@ -1,6 +1,7 @@
 package com.epms.repository;
 
 import com.epms.entity.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -36,6 +37,17 @@ public interface UserRepository extends JpaRepository<User, Integer> {
               AND (u.active IS NULL OR u.active = true)
             """)
     Optional<User> findActiveByEmployeeId(@Param("employeeId") Integer employeeId);
+
+
+    @EntityGraph(attributePaths = {"position", "position.level"})
+    @Query("""
+            SELECT u
+            FROM User u
+            LEFT JOIN u.position p
+            WHERE p.id = :positionId
+            ORDER BY u.fullName ASC, u.email ASC, u.id ASC
+            """)
+    List<User> findByPositionIdForPositionDetails(@Param("positionId") Integer positionId);
 
     boolean existsByEmailIgnoreCase(String email);
 

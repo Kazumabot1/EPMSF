@@ -37,6 +37,16 @@ public class ContinuousFeedbackController {
         );
     }
 
+
+    @GetMapping("/employees")
+    public ResponseEntity<GenericApiResponse<List<TeamEmployeeOptionResponseDto>>> getEligibleEmployees(
+            @RequestParam(required = false) Integer teamId
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Eligible employees retrieved", continuousFeedbackService.getEligibleEmployees(teamId))
+        );
+    }
+
     @PostMapping
     public ResponseEntity<GenericApiResponse<ContinuousFeedbackResponseDto>> create(
             @RequestBody ContinuousFeedbackRequestDto request

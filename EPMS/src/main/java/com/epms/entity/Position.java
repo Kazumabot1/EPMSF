@@ -1,22 +1,27 @@
 package com.epms.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Entity
 @Table(name = "positions")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Position {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Integer id;
 
     @Column(name = "position_title", nullable = false, length = 150)
@@ -28,6 +33,23 @@ public class Position {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "level_id", nullable = false)
     private PositionLevel level;
+
+    /**
+     * Links this position to one of the 6 system roles (from the existing roles table).
+     * Determines which dashboard users with this position will land on after login.
+     * Set by HR when creating/editing a position.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "role_id")
+    private Role role;
+
+    /**
+     * Feature-level permission flags for this position.
+     * Created automatically when the position is first saved.
+     */
+    @OneToOne(mappedBy = "position", cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY, orphanRemoval = true)
+    private PositionPermission permissions;
 
     @Column(nullable = false)
     private Boolean status = true;

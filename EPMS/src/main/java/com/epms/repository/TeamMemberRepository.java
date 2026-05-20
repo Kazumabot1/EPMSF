@@ -1,3 +1,4 @@
+
 package com.epms.repository;
 
 import com.epms.entity.TeamMember;
@@ -15,4 +16,9 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Integer>
 
     @EntityGraph(attributePaths = {"team", "team.department", "memberUser"})
     List<TeamMember> findByMemberUserId(Integer userId);
+
+    @EntityGraph(attributePaths = {"team", "team.department", "memberUser"})
+    List<TeamMember> findByMemberUserIdAndEndedDateIsNull(Integer userId);
+
+    boolean existsByMemberUserIdAndEndedDateIsNull(Integer userId);
 }

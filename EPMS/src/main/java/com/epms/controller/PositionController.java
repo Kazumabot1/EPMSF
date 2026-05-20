@@ -1,5 +1,6 @@
 package com.epms.controller;
 
+import com.epms.dto.PositionDetailResponseDto;
 import com.epms.dto.PositionRequestDto;
 import com.epms.dto.PositionResponseDto;
 import com.epms.service.PositionService;
@@ -37,8 +38,13 @@ public class PositionController {
     }
 
     @GetMapping("/{id}")
-        public ResponseEntity<PositionResponseDto> getPositionById(@PathVariable Integer id) {
+    public ResponseEntity<PositionResponseDto> getPositionById(@PathVariable Integer id) {
         return ResponseEntity.ok(positionService.getById(id));
+    }
+
+    @GetMapping("/{id}/details")
+    public ResponseEntity<PositionDetailResponseDto> getPositionDetails(@PathVariable Integer id) {
+        return ResponseEntity.ok(positionService.getDetails(id));
     }
 
     @PutMapping("/{id}")

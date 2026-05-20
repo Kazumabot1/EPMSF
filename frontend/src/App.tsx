@@ -7,12 +7,14 @@ import Register from './components/Register';
 import Permissions from './components/Permissions';
 import UserRoles from './components/UserRoles';
 import RolePermissions from './components/RolePermissions';
+import PositionPermissions from './pages/admin/PositionPermissions';
 import PipUpdates from './components/PipUpdates';
 import NotificationTemplates from './components/NotificationTemplates';
 import OneOnOneMeetings from './components/OneOnOneMeetings';
 import OneOnOneActionItems from './components/OneOnOneActionItems';
 
 import ProtectedRoute from './routes/ProtectedRoute';
+import PositionPermissionRoute from './routes/PositionPermissionRoute';
 import AppLayout from './layouts/AppLayout';
 
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
@@ -84,16 +86,23 @@ function App() {
             <Route path="/pip/past-plans" element={<PipPastPlansPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['HR', 'DepartmentHead', 'Manager']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['HR', 'DepartmentHead', 'Manager', 'Employee']} />}>
             <Route element={<AppLayout />}>
-              <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
+              <Route element={<PositionPermissionRoute permission="oneOnOneCreate" fallbackPath="/one-on-one-action-items" />}>
+                <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
+              </Route>
               <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead', 'Employee']} />}>
             <Route element={<AppLayout />}>
-              <Route path="/continuous-feedback" element={<ContinuousFeedbackPage />} />
+              <Route element={<PositionPermissionRoute permission="continuousFeedbackGive" fallbackPath="/employee/continuous-feedback" />}>
+                <Route path="/continuous-feedback" element={<ContinuousFeedbackPage />} />
+              </Route>
+              <Route element={<PositionPermissionRoute permission="pipCreate" fallbackPath="/pip/past-plans" />}>
+                <Route path="/pip/create" element={<PipCreatePage />} />
+              </Route>
             </Route>
           </Route>
 
@@ -106,12 +115,16 @@ function App() {
               <Route path="/permissions" element={<Permissions />} />
               <Route path="/user-roles" element={<UserRoles />} />
               <Route path="/role-permissions" element={<RolePermissions />} />
+              <Route path="/position-permissions" element={<PositionPermissions />} />
             </Route>
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['Employee']} />}>
             <Route element={<AppLayout />}>
               <Route path="/employee/dashboard" element={<EmployeeMyDashboard />} />
+              <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/employee/dashboard" />}>
+                <Route path="/employee/team-management" element={<TeamManagement />} />
+              </Route>
 
               <Route path="/employee/continuous-feedback" element={<ContinuousFeedbackPage />} />
               <Route path="/employee/kpis" element={<EmployeeKpiResultsPage />} />
@@ -168,17 +181,16 @@ function App() {
                   />
                 }
               />
-
-              <Route path="/pip/create" element={<PipCreatePage />} />
             </Route>
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['Executive']} />}>
             <Route element={<AppLayout />}>
-              <Route path="/executive/dashboard" element={<CeoDashboard />} />
+              <Route path="/ceo/dashboard" element={<CeoDashboard />} />
+              <Route path="/executive/dashboard" element={<Navigate to="/ceo/dashboard" replace />} />
 
               <Route
-                path="/executive/reports"
+                path="/ceo/reports"
                 element={
                   <EmployeeRoutePlaceholder
                     title="Executive Reports"
@@ -193,6 +205,14 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
 
+              <Route path="/department-head/teams" element={<TeamManagement />} />
+              <Route element={<PositionPermissionRoute permission="teamCreate" fallbackPath="/department-head/teams" />}>
+                <Route path="/department-head/teams/create" element={<TeamCreate />} />
+              </Route>
+              <Route element={<PositionPermissionRoute permission="teamHistory" fallbackPath="/department-head/teams" />}>
+                <Route path="/department-head/team-history" element={<TeamHistoryPage />} />
+              </Route>
+
               {/* Self-assessment approval: Department Head signature is required before HR. */}
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
@@ -200,7 +220,6 @@ function App() {
               <Route path="/department-head/appraisals/review" element={<AppraisalReviewQueuePage mode="dept-head" />} />
               <Route path="/department-head/appraisals/history" element={<AppraisalHistoryListPage role="dept-head" />} />
 
-              <Route path="/pip/create" element={<PipCreatePage />} />
             </Route>
           </Route>
 
@@ -214,9 +233,6 @@ function App() {
               <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
               <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
 
-              <Route path="/hr/team" element={<TeamManagement />} />
-              <Route path="/hr/team/create" element={<TeamCreate />} />
-              <Route path="/hr/team/history" element={<TeamHistoryPage />} />
 
               <Route path="/hr/department" element={<DepartmentManagement />} />
               <Route path="/hr/department-comparison" element={<DepartmentComparisonPage />} />

@@ -1,388 +1,12 @@
-// KHN new file
-// (Component to display and manage teams)
-//
-// import { useEffect, useState } from 'react';
-// import { fetchTeams, type TeamResponse } from '../../services/teamService';
-// import TeamEditModal from './TeamEditModal'; // KHN added part
-// import TeamCreate from './TeamCreate';
-// import './team-ui.css';
-//
-// const TeamManagement = () => {
-//     const [teams, setTeams] = useState<TeamResponse[]>([]);
-//     const [loading, setLoading] = useState(true);
-//     const [error, setError] = useState('');
-//     const [selectedTeam, setSelectedTeam] = useState<TeamResponse | null>(null); // KHN added part
-//     const [showCreateModal, setShowCreateModal] = useState(false);
-//
-//     const loadTeams = async () => {
-//         try {
-//             setLoading(true);
-//             const data = await fetchTeams();
-//             setTeams(data);
-//         } catch (err) {
-//             setError('Failed to load teams. Please try again later.');
-//             console.error(err);
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
-//
-//     useEffect(() => {
-//         loadTeams();
-//     }, []);
-//
-//     // KHN added part
-//     const handleModalUpdate = () => {
-//         setSelectedTeam(null);
-//         loadTeams();
-//     };
-//
-//     return (
-//         <div className="team-page">
-//             <div className="team-hero">
-//                 <span className="team-hero-badge">
-//                     <i className="bi bi-people" />
-//                     Collaboration Hub
-//                 </span>
-//                 <h1>Team Management</h1>
-//                 <p>Manage your organizational units, assign leaders, and track team performance across departments.</p>
-//             </div>
-//
-//             <div className="team-surface">
-//                 <div className="team-surface-inner">
-//                     <div className="team-table-toolbar">
-//                         <button
-//                             className="team-btn primary"
-//                             onClick={() => setShowCreateModal(true)}
-//                         >
-//                             <i className="bi bi-plus-lg" />
-//                             Create New Team
-//                         </button>
-//                     </div>
-//
-//                     {loading ? (
-//                         <div className="team-state">
-//                             <i className="bi bi-hourglass-split animate-pulse" />
-//                             Loading teams...
-//                         </div>
-//                     ) : error ? (
-//                         <div className="team-state">
-//                             <i className="bi bi-exclamation-triangle" />
-//                             <div className="team-alert error">{error}</div>
-//                             <button className="team-btn secondary" onClick={loadTeams} style={{marginTop: '16px'}}>Retry</button>
-//                         </div>
-//                     ) : teams.length === 0 ? (
-//                         <div className="team-state">
-//                             <i className="bi bi-person-plus" />
-//                             <h3>No Teams Yet</h3>
-//                             <p>Start by creating your first team to organize members.</p>
-//                         </div>
-//                     ) : (
-//                         <div className="team-table-wrap">
-//                             <table className="team-table">
-//                                 <thead>
-//                                     <tr>
-//                                         <th>Team Name</th>
-//                                         <th>Department</th>
-//                                         <th>Team Leader</th>
-//                                         <th>Created Date</th>
-//                                         <th>Status</th>
-//                                         <th>Members</th>
-//                                         <th>Actions</th>
-//                                     </tr>
-//                                 </thead>
-//                                 <tbody>
-//                                     {teams.map(team => (
-//                                         <tr key={team.id}>
-//                                             <td><strong>{team.teamName}</strong></td>
-//                                             <td>{team.departmentName}</td>
-//                                             <td>
-//                                                 <div className="flex items-center gap-2">
-//                                                     <i className="bi bi-person-badge text-indigo-500" />
-//                                                     {team.teamLeaderName}
-//                                                 </div>
-//                                             </td>
-//                                             <td>{new Date(team.createdDate).toLocaleDateString()}</td>
-//                                             <td>
-//                                                 <span className={`team-pill ${team.status?.toLowerCase() === 'active' ? 'active' : 'inactive'}`}>
-//                                                     {team.status}
-//                                                 </span>
-//                                             </td>
-//                                             <td>{team.members?.length || 0} Members</td>
-//                                             <td>
-//                                                 {/* KHN modified part: Open modal instead of navigate */}
-//                                                 <button className="team-btn ghost" onClick={() => setSelectedTeam(team)}>
-//                                                     <i className="bi bi-pencil-square" />
-//                                                     Edit
-//                                                 </button>
-//                                             </td>
-//                                         </tr>
-//                                     ))}
-//                                 </tbody>
-//                             </table>
-//                         </div>
-//                     )}
-//                 </div>
-//             </div>
-//
-//             {/* KHN added part: Render Modal */}
-//             {selectedTeam && (
-//                 <TeamEditModal
-//                     team={selectedTeam}
-//                     onClose={() => setSelectedTeam(null)}
-//                     onUpdate={handleModalUpdate}
-//                 />
-//             )}
-//
-//             {showCreateModal && (
-//                 <div className="team-modal-overlay">
-//                     <div className="team-modal-content">
-//                         <div className="team-modal-header">
-//                             <h2>Create Team</h2>
-//                             <button className="team-btn ghost" onClick={() => setShowCreateModal(false)}>
-//                                 <i className="bi bi-x-lg" />
-//                             </button>
-//                         </div>
-//                         <div className="team-modal-body">
-//                             <TeamCreate
-//                                 embedded
-//                                 onCancel={() => setShowCreateModal(false)}
-//                                 onCreated={() => {
-//                                     setShowCreateModal(false);
-//                                     loadTeams();
-//                                 }}
-//                             />
-//                         </div>
-//                     </div>
-//                 </div>
-//             )}
-//         </div>
-//     );
-// };
-// export default TeamManagement;
-
-
-
-
-
-
-
-/*
-import { useEffect, useState } from "react";
-import { fetchTeams, type TeamResponse } from "../../services/teamService";
-import TeamEditModal from "./TeamEditModal";
-import TeamCreate from "./TeamCreate";
-import "./team-ui.css";
-
-const TeamManagement = () => {
-  const [teams, setTeams] = useState<TeamResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [selectedTeam, setSelectedTeam] = useState<TeamResponse | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const loadTeams = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await fetchTeams();
-      setTeams(data);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load teams. Please try again later.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTeams();
-  }, []);
-
-  const handleModalUpdate = () => {
-    setSelectedTeam(null);
-    loadTeams();
-  };
-
-  return (
-    <div className="team-page">
-      <div className="team-hero">
-        <span className="team-hero-badge">
-          <i className="bi bi-people" />
-          Collaboration Hub
-        </span>
-
-        <h1>Team Management</h1>
-
-        <p>
-          Manage your organizational units, assign leaders, and track team
-          performance across departments.
-        </p>
-      </div>
-
-      <div className="team-surface">
-        <div className="team-surface-inner">
-          <div className="team-table-toolbar">
-            <button
-              type="button"
-              className="team-btn primary"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <i className="bi bi-plus-lg" />
-              Create New Team
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="team-state">
-              <i className="bi bi-hourglass-split animate-pulse" />
-              Loading teams...
-            </div>
-          ) : error ? (
-            <div className="team-state">
-              <i className="bi bi-exclamation-triangle" />
-              <div className="team-alert error">{error}</div>
-              <button
-                type="button"
-                className="team-btn secondary"
-                onClick={loadTeams}
-                style={{ marginTop: "16px" }}
-              >
-                Retry
-              </button>
-            </div>
-          ) : teams.length === 0 ? (
-            <div className="team-state">
-              <i className="bi bi-person-plus" />
-              <h3>No Teams Yet</h3>
-              <p>Start by creating your first team to organize members.</p>
-            </div>
-          ) : (
-            <div className="team-table-wrap">
-              <table className="team-table">
-                <thead>
-                  <tr>
-                    <th>Team Name</th>
-                    <th>Department</th>
-                    <th>Team Leader</th>
-                    <th>Created Date</th>
-                    <th>Status</th>
-                    <th>Members</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {teams.map((team) => (
-                    <tr key={team.id}>
-                      <td>
-                        <strong>{team.teamName}</strong>
-                      </td>
-
-                      <td>{team.departmentName}</td>
-
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <i className="bi bi-person-badge text-indigo-500" />
-                          {team.teamLeaderName}
-                        </div>
-                      </td>
-
-                      <td>
-                        {team.createdDate
-                          ? new Date(team.createdDate).toLocaleDateString()
-                          : "-"}
-                      </td>
-
-                      <td>
-                        <span
-                          className={`team-pill ${
-                            team.status?.toLowerCase() === "active"
-                              ? "active"
-                              : "inactive"
-                          }`}
-                        >
-                          {team.status}
-                        </span>
-                      </td>
-
-                      <td>{team.members?.length || 0} Members</td>
-
-                      <td>
-                        <button
-                          type="button"
-                          className="team-btn ghost"
-                          onClick={() => setSelectedTeam(team)}
-                        >
-                          <i className="bi bi-pencil-square" />
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {selectedTeam && (
-        <TeamEditModal
-          team={selectedTeam}
-          onClose={() => setSelectedTeam(null)}
-          onUpdate={handleModalUpdate}
-        />
-      )}
-
-      {showCreateModal && (
-        <div className="team-modal-overlay">
-          <div className="team-modal-content">
-            <div className="team-modal-header">
-              <h2>Create Team</h2>
-
-              <button
-                type="button"
-                className="team-btn ghost"
-                onClick={() => setShowCreateModal(false)}
-              >
-                <i className="bi bi-x-lg" />
-              </button>
-            </div>
-
-            <div className="team-modal-body">
-              <TeamCreate
-                embedded
-                onCancel={() => setShowCreateModal(false)}
-                onCreated={() => {
-                  setShowCreateModal(false);
-                  loadTeams();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default TeamManagement; */
-
-
-
-
-
-
-
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { positionPermissionService } from '../../services/positionPermissionService';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteTeam,
   fetchDepartments,
   fetchMyDepartmentTeams,
+  fetchMyTeams,
   fetchTeams,
   type Department,
   type TeamResponse,
@@ -396,6 +20,15 @@ const normalizeRole = (role?: string | null) =>
     .replace(/^ROLE_/i, '')
     .replace(/[\s_-]+/g, '')
     .toUpperCase();
+
+const isEmployeeUser = (user: any) => {
+  const dashboard = String(user?.dashboard ?? '').toUpperCase();
+  if (dashboard === 'EMPLOYEE_DASHBOARD') {
+    return true;
+  }
+
+  return (user?.roles ?? []).some((role: string) => normalizeRole(role) === 'EMPLOYEE');
+};
 
 const isDepartmentHeadUser = (user: any) => {
   const dashboard = String(user?.dashboard ?? '').toUpperCase();
@@ -442,6 +75,7 @@ const TeamManagement: React.FC = () => {
   const { user } = useAuth();
 
   const isDepartmentHead = isDepartmentHeadUser(user);
+  const isEmployee = isEmployeeUser(user);
 
   const [teams, setTeams] = useState<TeamResponse[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -459,7 +93,7 @@ const TeamManagement: React.FC = () => {
     setError('');
 
     try {
-      const data = isDepartmentHead ? await fetchMyDepartmentTeams() : await fetchTeams();
+      const data = isEmployee ? await fetchMyTeams() : isDepartmentHead ? await fetchMyDepartmentTeams() : await fetchTeams();
       setTeams(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setTeams([]);
@@ -467,10 +101,10 @@ const TeamManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [isDepartmentHead]);
+  }, [isDepartmentHead, isEmployee]);
 
   const loadDepartments = useCallback(async () => {
-    if (isDepartmentHead) {
+    if (isDepartmentHead || isEmployee) {
       setDepartments([]);
       return;
     }
@@ -481,12 +115,38 @@ const TeamManagement: React.FC = () => {
     } catch {
       setDepartments([]);
     }
-  }, [isDepartmentHead]);
+  }, [isDepartmentHead, isEmployee]);
 
   useEffect(() => {
     loadTeams();
     loadDepartments();
   }, [loadTeams, loadDepartments]);
+
+
+useEffect(() => {
+  let cancelled = false;
+
+  positionPermissionService
+    .getMyPermissions()
+    .then((permissions) => {
+      if (!cancelled) {
+        setCanCreateTeam(Boolean(permissions.teamCreate));
+        setCanEditTeam(Boolean(permissions.teamEdit));
+        setCanHistoryTeam(Boolean(permissions.teamHistory));
+      }
+    })
+    .catch(() => {
+      if (!cancelled) {
+        setCanCreateTeam(false);
+        setCanEditTeam(false);
+        setCanHistoryTeam(false);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const filteredTeams = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
@@ -501,12 +161,13 @@ const TeamManagement: React.FC = () => {
 
       const matchesDepartment =
         isDepartmentHead ||
+        isEmployee ||
         !selectedDepartmentId ||
         Number(team.departmentId) === Number(selectedDepartmentId);
 
       return matchesSearch && matchesDepartment;
     });
-  }, [teams, search, selectedDepartmentId, isDepartmentHead]);
+  }, [teams, search, selectedDepartmentId, isDepartmentHead, isEmployee]);
 
   const activeCount = useMemo(
     () => teams.filter((team) => team.status?.toLowerCase() === 'active').length,
@@ -539,6 +200,11 @@ const TeamManagement: React.FC = () => {
     }
   };
 
+const [canCreateTeam, setCanCreateTeam] = useState(false);
+const [canEditTeam, setCanEditTeam] = useState(false);
+const [canHistoryTeam, setCanHistoryTeam] = useState(false);
+const disabledMessage = `Your position (${user?.position || 'your position'}) has this feature disabled!`;
+
 
 
 
@@ -558,23 +224,45 @@ const TeamManagement: React.FC = () => {
           </p>
         </div>
 
+        {!isEmployee && (
         <div className="team-header-actions">
-          <button
-            type="button"
-            className="team-btn team-btn-secondary"
-            onClick={() => navigate(historyPath)}
-          >
-            Team History
-          </button>
+  <button
+    type="button"
+    className="team-btn team-btn-secondary"
+    disabled={!canHistoryTeam}
+    title={canHistoryTeam ? undefined : disabledMessage}
+    onClick={() => {
+      if (!canHistoryTeam) {
+        setError(disabledMessage);
+        return;
+      }
 
-          <button
-            type="button"
-            className="team-btn team-btn-primary"
-            onClick={() => navigate(createPath)}
-          >
-            Create Team
-          </button>
+      navigate(historyPath);
+    }}
+  >
+    Team History
+  </button>
+
+  <button
+    type="button"
+    className="team-btn team-btn-primary"
+    disabled={!canCreateTeam}
+    title={canCreateTeam ? undefined : disabledMessage}
+    onClick={() => {
+      if (!canCreateTeam) {
+        setError(disabledMessage);
+        return;
+      }
+
+      navigate(createPath);
+    }}
+  >
+    Create Team
+  </button>
+
+
         </div>
+        )}
       </div>
 
       <div className="team-stat-grid">
@@ -602,7 +290,7 @@ const TeamManagement: React.FC = () => {
           placeholder="Search team, department, leader, or project manager..."
         />
 
-        {!isDepartmentHead && (
+        {!isDepartmentHead && !isEmployee && (
           <select
             value={selectedDepartmentId}
             onChange={(event) => setSelectedDepartmentId(event.target.value)}
@@ -688,25 +376,45 @@ const TeamManagement: React.FC = () => {
                     <td>{formatDate(team.createdDate)}</td>
 
                     <td>
+                      {isEmployee ? (
+                        <span className="team-muted">View only</span>
+                      ) : (
                       <div className="team-row-actions">
                         <button
                           type="button"
                           className="team-action-btn"
-                          onClick={() => setEditingTeam(team)}
+                          disabled={!canEditTeam}
+                          title={canEditTeam ? undefined : disabledMessage}
+                          onClick={() => {
+                            if (!canEditTeam) {
+                              setError(disabledMessage);
+                              return;
+                            }
+                            setEditingTeam(team);
+                          }}
                         >
                           Edit
                         </button>
 
-                        {!isDepartmentHead && (
+                        {!isDepartmentHead && !isEmployee && (
                           <button
                             type="button"
                             className="team-action-btn danger"
-                            onClick={() => setShowDeleteConfirm(team)}
+                            disabled={!canEditTeam}
+                            title={canEditTeam ? undefined : disabledMessage}
+                            onClick={() => {
+                              if (!canEditTeam) {
+                                setError(disabledMessage);
+                                return;
+                              }
+                              setShowDeleteConfirm(team);
+                            }}
                           >
                             Delete
                           </button>
                         )}
                       </div>
+                      )}
                     </td>
                   </tr>
                 ))}

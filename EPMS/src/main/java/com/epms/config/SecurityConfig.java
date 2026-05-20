@@ -172,6 +172,17 @@ public class SecurityConfig {
                                 "/api/employees/active-by-department/**"
                         ).authenticated()
 
+                        /*
+                         * Employee APIs are protected again at controller level with explicit HR/Admin
+                         * + dashboard fallback checks. Keep the filter-chain requirement here simple so
+                         * HR users who land on the HR dashboard via position-role mapping do not get
+                         * blocked before controller-level auth runs.
+                         */
+                        .requestMatchers(
+                                "/api/employees",
+                                "/api/employees/**"
+                        ).authenticated()
+
                         .requestMatchers(
                                 "/api/one-on-one-meetings",
                                 "/api/one-on-one-meetings/**",
@@ -198,11 +209,9 @@ public class SecurityConfig {
                                 hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )
 
-                        .requestMatchers(
+                        /*.requestMatchers(
                                 "/api/dashboard",
                                 "/api/dashboard/**",
-                                "/api/employees",
-                                "/api/employees/**",
                                 "/api/hr/employee-accounts",
                                 "/api/hr/employee-accounts/**",
 
@@ -240,6 +249,57 @@ public class SecurityConfig {
                                 "/api/departments/**",
                                 "/api/teams",
                                 "/api/teams/**",
+
+                                "/api/notification-templates",
+                                "/api/notification-templates/**",
+                                "/api/pip-updates",
+                                "/api/pip-updates/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
+                        )*/
+                        .requestMatchers(
+                                "/api/teams",
+                                "/api/teams/**"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                "/api/dashboard",
+                                "/api/dashboard/**",
+                                "/api/hr/employee-accounts",
+                                "/api/hr/employee-accounts/**",
+
+                                "/api/assessment-forms",
+                                "/api/assessment-forms/**",
+
+                                "/api/appraisal/templates",
+                                "/api/appraisal/templates/**",
+                                "/api/hr/appraisal/templates",
+                                "/api/hr/appraisal/templates/**",
+                                "/api/appraisal/cycles",
+                                "/api/appraisal/cycles/**",
+                                "/api/hr/appraisal/cycles",
+                                "/api/hr/appraisal/cycles/**",
+                                "/api/hr/appraisal/score-bands",
+                                "/api/hr/appraisal/score-bands/**",
+
+                                "/api/kpis",
+                                "/api/kpis/**",
+                                "/api/kpi-units",
+                                "/api/kpi-units/**",
+                                "/api/kpi-categories",
+                                "/api/kpi-categories/**",
+                                "/api/kpi-items",
+                                "/api/kpi-items/**",
+                                "/api/hr/kpi-templates",
+                                "/api/hr/kpi-templates/**",
+
+                                "/api/positions",
+                                "/api/positions/**",
+                                "/api/position-levels",
+                                "/api/position-levels/**",
+
+                                "/api/departments",
+                                "/api/departments/**",
 
                                 "/api/notification-templates",
                                 "/api/notification-templates/**",

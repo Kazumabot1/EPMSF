@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { positionService } from '../../services/positionService';
+import api from '../../services/api';
 import type { PositionLevelResponse } from '../../types/position';
 import './position-ui.css';
+
+type RoleOption = {
+  id: number;
+  name: string;
+  description?: string | null;
+  active?: boolean | null;
+};
 
 type PositionFormState = {
   positionTitle: string;
   levelId: string;
+  roleId: string;
   description: string;
   status: boolean;
   createdBy: string;
@@ -14,6 +23,7 @@ type PositionFormState = {
 const initialForm: PositionFormState = {
   positionTitle: '',
   levelId: '',
+  roleId: '',
   description: '',
   status: true,
   createdBy: '',
@@ -25,6 +35,9 @@ const PositionCreate = () => {
     createdBy: localStorage.getItem('epmsUserEmail') ?? '',
   });
   const [levels, setLevels] = useState<PositionLevelResponse[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState('');
   const [levelsLoading, setLevelsLoading] = useState(false);
   const [levelsError, setLevelsError] = useState('');
   const [formError, setFormError] = useState('');
@@ -47,10 +60,29 @@ const PositionCreate = () => {
       }
     };
 
-    loadLevels();
+    const loadRoles = async () => {
+      try {
+        setRolesLoading(true);
+        setRolesError('');
+        const response = await api.get<RoleOption[]>('/roles');
+        const fixedRoles = (response.data ?? []).filter((role) =>
+          ['HR', 'ADMIN', 'CEO', 'EMPLOYEE', 'DEPARTMENTHEAD', 'MANAGER'].includes(String(role.name).toUpperCase()),
+        );
+        setRoles(fixedRoles);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load roles.';
+        setRolesError(message);
+      } finally {
+        setRolesLoading(false);
+      }
+    };
+
+    void loadLevels();
+    void loadRoles();
   }, []);
 
   const isLevelSelectable = useMemo(() => !levelsLoading && levels.length > 0, [levels, levelsLoading]);
+  const isRoleSelectable = useMemo(() => !rolesLoading && roles.length > 0, [roles, rolesLoading]);
 
   const validate = (): string => {
     if (form.positionTitle.trim().length === 0) {
@@ -63,6 +95,14 @@ const PositionCreate = () => {
 
     if (Number.isNaN(Number(form.levelId))) {
       return 'Position level selection is invalid.';
+    }
+
+    if (form.roleId.trim().length === 0) {
+      return 'Role is required. Every position must connect to a dashboard role.';
+    }
+
+    if (Number.isNaN(Number(form.roleId))) {
+      return 'Role selection is invalid.';
     }
 
     if (form.createdBy.trim().length === 0) {
@@ -89,6 +129,7 @@ const PositionCreate = () => {
       const createdPosition = await positionService.createPosition({
         positionTitle: form.positionTitle.trim(),
         levelId: Number(form.levelId),
+        roleId: Number(form.roleId),
         description: form.description.trim(),
         status: form.status,
         createdBy: form.createdBy.trim(),
@@ -158,6 +199,29 @@ const PositionCreate = () => {
                   ))}
                 </select>
                 {levelsError && <div className="position-alert error">{levelsError}</div>}
+              </div>
+
+              <div className="position-field">
+                <label htmlFor="roleId">
+                  Dashboard Role <span className="position-required">*</span>
+                </label>
+                <select
+                  id="roleId"
+                  value={form.roleId}
+                  onChange={(event) => setForm((prev) => ({ ...prev, roleId: event.target.value }))}
+                  className="position-select"
+                  disabled={!isRoleSelectable}
+                >
+                  <option value="">
+                    {rolesLoading ? 'Loading roles...' : roles.length === 0 ? 'No fixed roles available' : 'Select role'}
+                  </option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+                {rolesError && <div className="position-alert error">{rolesError}</div>}
               </div>
             </div>
 
