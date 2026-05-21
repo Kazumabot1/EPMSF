@@ -135,7 +135,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Action Items', path: '/one-on-one-action-items', icon: 'bi-list-check' },
       ],
     },
-    { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
+    {
+      label: 'Notifications',
+      path: '/notifications',
+      icon: 'bi-bell',
+      children: [
+        { label: 'Notification Template', path: '/notification-templates', icon: 'bi-file-earmark-text' },
+        { label: 'System Notification', path: '/notifications', icon: 'bi-bell' },
+      ],
+    },
     {
       label: 'PIP',
       path: '/pip',
@@ -162,6 +170,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Categories', path: '/hr/performance-kpi/category', icon: 'bi-tags' },
         { label: 'KPI Items', path: '/hr/performance-kpi/item', icon: 'bi-card-checklist' },
         { label: 'KPI Templates', path: '/hr/kpi-template', icon: 'bi-ui-checks-grid' },
+        { label: 'KPI Version History', path: '/hr/kpi-version-history', icon: 'bi-clock-history' },
         { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
         { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
       ],

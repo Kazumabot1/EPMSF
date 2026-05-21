@@ -1,3 +1,4 @@
+import { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import HrEmployeeAccountImport from './pages/employee/HrEmployeeAccountImport';
@@ -57,6 +58,7 @@ import KpiTemplateEditorPage from './pages/hr/kpi-template/KpiTemplateEditorPage
 import KpiTemplateListPage from './pages/hr/kpi-template/KpiTemplateListPage';
 import KpiTemplateCycleListPage from './pages/hr/kpi-template/KpiTemplateCycleListPage';
 import KpiTemplateCycleEditorPage from './pages/hr/kpi-template/KpiTemplateCycleEditorPage';
+import KpiVersionHistoryPage from './pages/hr/kpi-template/KpiVersionHistoryPage';
 import HrEmployeeKpiListPage from './pages/hr/kpi-template/HrEmployeeKpiListPage';
 
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
@@ -77,6 +79,7 @@ import { appraisalRoutes } from './routes/appraisalRoutes';
 function App() {
   return (
     <BrowserRouter>
+      <Toaster toastOptions={{ duration: 4000 }} />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -258,6 +261,7 @@ function App() {
               <Route path="/hr/kpi-template/:id/edit" element={<KpiTemplateEditorPage />} />
               <Route path="/hr/kpi-template/:id" element={<KpiTemplateDetailPage />} />
               <Route path="/hr/kpi-template" element={<KpiTemplateListPage />} />
+              <Route path="/hr/kpi-version-history" element={<KpiVersionHistoryPage />} />
               <Route path="/hr/kpi-template-cycle/new" element={<KpiTemplateCycleEditorPage />} />
               <Route path="/hr/kpi-template-cycle/:id/edit" element={<KpiTemplateCycleEditorPage />} />
               <Route path="/hr/kpi-template-cycle" element={<KpiTemplateCycleListPage />} />

@@ -4,6 +4,8 @@ import com.epms.dto.KpiFormRequestDTO;
 import com.epms.dto.KpiFormResponseDTO;
 import com.epms.dto.KpiPositionAssignmentDto;
 import com.epms.dto.KpiPositionAvailabilityDto;
+import com.epms.dto.KpiVersionHistoryDetailDTO;
+import com.epms.dto.KpiVersionHistorySummaryDTO;
 import com.epms.dto.PositionResponseDto;
 import com.epms.dto.UseKpiDepartmentRequest;
 import com.epms.dto.UseKpiTemplateResultDto;
@@ -48,6 +50,11 @@ public class KpiTemplateController {
         return ResponseEntity.ok(kpiFormService.getAllTemplates());
     }
 
+    @GetMapping("/version-history")
+    public ResponseEntity<List<KpiVersionHistorySummaryDTO>> versionHistory() {
+        return ResponseEntity.ok(kpiFormService.getVersionHistory());
+    }
+
     /**
      * Without {@code checkPositionId}: active position → KPI template links.
      * With {@code checkPositionId}: whether that position can receive a new form (pre-create check).
@@ -82,6 +89,19 @@ public class KpiTemplateController {
     @GetMapping("/{id}")
     public ResponseEntity<KpiFormResponseDTO> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(kpiFormService.getTemplateById(id));
+    }
+
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<List<KpiVersionHistorySummaryDTO>> getVersions(@PathVariable Integer id) {
+        return ResponseEntity.ok(kpiFormService.getTemplateVersions(id));
+    }
+
+    @GetMapping("/{id}/versions/{versionNumber}")
+    public ResponseEntity<KpiVersionHistoryDetailDTO> getVersionDetail(
+            @PathVariable Integer id,
+            @PathVariable Integer versionNumber
+    ) {
+        return ResponseEntity.ok(kpiFormService.getTemplateVersionDetail(id, versionNumber));
     }
 
     @DeleteMapping("/delete/{id}")

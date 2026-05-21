@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import KpiNotificationMessageBody from '../notifications/KpiNotificationMessageBody';
 import SignatureModal from '../signature/SignatureModal';
 import ProfileHeaderAvatar from '../ProfileHeaderAvatar';
+import { useNotificationsWebSocket } from '../../hooks/useNotificationsWebSocket';
 
 type HeaderProps = {
   collapsed: boolean;
@@ -71,12 +72,17 @@ function notifIconClass(type?: string | null) {
   return 'bi bi-bell';
 }
 
-const cleanRole = (role?: string | null) => {
-  return String(role || 'User')
-    .replace(/^ROLE_/i, '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-};
+function mergeByLatest(prev: NotifItem[], incoming: NotifItem) {
+  const ix = prev.findIndex((item) => item.id === incoming.id);
+
+  if (ix >= 0) {
+    const next = [...prev];
+    next[ix] = { ...next[ix], ...incoming };
+    return next;
+  }
+
+  return [incoming, ...prev];
+}
 
 const Header = ({ collapsed }: HeaderProps) => {
   const navigate = useNavigate();
@@ -93,7 +99,7 @@ const Header = ({ collapsed }: HeaderProps) => {
 
   const email = user?.email ?? 'user@company.com';
   const userName = user?.fullName ?? 'User';
-  const primaryRole = cleanRole(user?.roles?.[0] ?? user?.dashboard ?? 'User');
+  const primaryRole = user?.roles?.[0] ?? 'User';
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeNotif = useCallback(() => setNotifOpen(false), []);
@@ -117,9 +123,42 @@ const Header = ({ collapsed }: HeaderProps) => {
   }, []);
 
   useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadNotifications]);
+
+  useEffect(() => {
     if (!notifOpen) return;
     void loadNotifications();
   }, [notifOpen, loadNotifications]);
+
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      void loadNotifications();
+    };
+
+    window.addEventListener('epms:notifications-updated', onNotificationsUpdated);
+
+    return () => {
+      window.removeEventListener('epms:notifications-updated', onNotificationsUpdated);
+    };
+  }, [loadNotifications]);
+
+  const onWsNotification = useCallback((payload: NotifItem) => {
+    setNotifItems((prev) => mergeByLatest(prev, payload).slice(0, 5));
+    setUnreadCount((prev) => prev + 1);
+  }, []);
+
+  useNotificationsWebSocket(onWsNotification);
 
   useEffect(() => {
     if (!menuOpen && !notifOpen) return;

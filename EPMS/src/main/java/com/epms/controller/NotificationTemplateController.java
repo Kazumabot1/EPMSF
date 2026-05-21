@@ -1,5 +1,6 @@
 package com.epms.controller;
 
+import com.epms.dto.NotificationTemplateDeliveryResultDto;
 import com.epms.dto.NotificationTemplateRequestDto;
 import com.epms.dto.NotificationTemplateResponseDto;
 import com.epms.service.NotificationTemplateService;
@@ -53,5 +54,15 @@ public class NotificationTemplateController {
     public ResponseEntity<Void> deleteNotificationTemplate(@PathVariable Integer id) {
         notificationTemplateService.deleteNotificationTemplate(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/send-email")
+    public ResponseEntity<NotificationTemplateDeliveryResultDto> sendTemplateEmail(@PathVariable Integer id) {
+        return ResponseEntity.ok(notificationTemplateService.sendTemplateEmail(id));
+    }
+
+    @PostMapping("/{id}/send-in-app")
+    public ResponseEntity<NotificationTemplateDeliveryResultDto> sendTemplateInApp(@PathVariable Integer id) {
+        return ResponseEntity.ok(notificationTemplateService.sendTemplateInApp(id));
     }
 }

@@ -8,13 +8,14 @@ import {
   sumTemplateItemWeights,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
-import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
+import type { KpiTemplateItem, KpiTemplateResponse, KpiVersionDetail } from '../../../types/kpiTemplate';
 
 const KpiTemplateDetailPage = () => {
   const { id } = useParams();
   const templateId = id ? Number(id) : NaN;
 
   const [template, setTemplate] = useState<KpiTemplateResponse | null>(null);
+  const [versionDetail, setVersionDetail] = useState<KpiVersionDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +27,9 @@ const KpiTemplateDetailPage = () => {
       try {
         const data = await kpiTemplateService.getTemplateById(templateId);
         setTemplate(data);
+        setVersionDetail((data.version ?? 1) > 1
+          ? await kpiTemplateService.getTemplateVersionDetail(templateId, data.version ?? 1)
+          : null);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to load.');
       } finally {
@@ -68,6 +72,19 @@ const KpiTemplateDetailPage = () => {
   const sortedItems = [...template.items].sort(
     (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
   );
+  const addedChanges = versionDetail?.changes.filter((change) => change.changeType === 'CREATED') ?? [];
+  const removedChanges = versionDetail?.changes.filter((change) => change.changeType === 'DELETED') ?? [];
+  const isAddedLine = (line: KpiTemplateItem) =>
+    addedChanges.some((change) => {
+      const row = change.row;
+      const name = line.kpiItemName ?? line.kpiLabel ?? null;
+      return row != null
+        && row.kpiName === name
+        && row.kpiCategoryId === line.kpiCategoryId
+        && row.kpiUnitId === line.kpiUnitId
+        && row.target === line.target
+        && row.weight === line.weight;
+    });
   const totalWeight = sumTemplateItemWeights(sortedItems);
 
   return (
@@ -141,9 +158,15 @@ const KpiTemplateDetailPage = () => {
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {sortedItems.map((line) => {
                       const kpiName = line.kpiItemName ?? line.kpiLabel ?? '—';
+                      const added = isAddedLine(line);
                       return (
-                        <tr key={line.id ?? `${kpiName}-${line.sortOrder}`} className="hover:bg-violet-50/25">
-                          <td className="px-4 py-3.5 font-semibold text-gray-900">{kpiName}</td>
+                        <tr key={line.id ?? `${kpiName}-${line.sortOrder}`} className={added ? 'kpi-tpl-row-added' : 'hover:bg-violet-50/25'}>
+                          <td className="px-4 py-3.5 font-semibold text-gray-900">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span>{kpiName}</span>
+                              {added && <span className="kpi-tpl-change-pill added">Added</span>}
+                            </div>
+                          </td>
                           <td className="px-4 py-3.5 text-gray-700">{line.kpiCategoryName ?? '—'}</td>
                           <td className="px-4 py-3.5 tabular-nums text-gray-800">{line.target ?? '—'}</td>
                           <td className="px-4 py-3.5 text-gray-700">{line.kpiUnitName ?? '—'}</td>
@@ -157,6 +180,27 @@ const KpiTemplateDetailPage = () => {
                           <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">
                             —
                           </td>
+                        </tr>
+                      );
+                    })}
+                    {removedChanges.map((change) => {
+                      const row = change.row;
+                      if (!row) return null;
+                      return (
+                        <tr key={`removed-${change.historyId}`} className="kpi-tpl-row-removed">
+                          <td className="px-4 py-3.5 font-semibold text-gray-900">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span>{row.kpiName ?? 'Removed KPI row'}</span>
+                              <span className="kpi-tpl-change-pill removed">Removed</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-700">{row.kpiCategoryName ?? 'â€”'}</td>
+                          <td className="px-4 py-3.5 tabular-nums text-gray-800">{row.target ?? 'â€”'}</td>
+                          <td className="px-4 py-3.5 text-gray-700">{row.kpiUnitName ?? 'â€”'}</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">â€”</td>
+                          <td className="px-4 py-3.5 font-bold tabular-nums text-gray-900">{row.weight ?? 'â€”'}</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">â€”</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">â€”</td>
                         </tr>
                       );
                     })}

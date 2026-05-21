@@ -148,6 +148,16 @@ const EmployeeHeader = ({
   }, [loadNotifications]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadNotifications]);
+
+  useEffect(() => {
     if (!notifOpen) return;
     void loadNotifications();
   }, [notifOpen, loadNotifications]);

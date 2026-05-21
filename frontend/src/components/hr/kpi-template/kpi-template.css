@@ -349,6 +349,116 @@
   box-shadow: 0 24px 70px -26px rgb(2 6 23 / 0.6);
 }
 
+.kpi-tpl-reason-modal {
+  width: min(520px, 100vw);
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(226 232 240 / 0.95);
+  background: #fff;
+  box-shadow: 0 24px 70px -26px rgb(2 6 23 / 0.6);
+}
+
+.kpi-tpl-reason-field {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.kpi-tpl-reason-field textarea {
+  resize: vertical;
+}
+
+.kpi-tpl-reason-row {
+  margin: 0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  padding: 0.75rem 0.85rem;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.kpi-tpl-reason-error {
+  margin: -0.4rem 0 0;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.kpi-tpl-reason-footer {
+  padding: 0.85rem 1.25rem;
+  justify-content: flex-end;
+}
+
+.kpi-tpl-row-added {
+  background: #ecfdf5 !important;
+  box-shadow: inset 4px 0 0 #10b981;
+}
+
+.kpi-tpl-row-removed {
+  background: #fef2f2 !important;
+  box-shadow: inset 4px 0 0 #ef4444;
+}
+
+.kpi-tpl-change-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.kpi-tpl-change-pill.added {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.kpi-tpl-change-pill.removed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.kpi-tpl-change-pill.initial {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.kpi-tpl-change-pill.unchanged {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.kpi-tpl-edit-muted {
+  position: relative;
+  cursor: not-allowed;
+}
+
+.kpi-tpl-edit-muted:hover,
+.kpi-tpl-edit-muted:focus-visible {
+  border-color: rgb(203 213 225 / 0.95);
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.kpi-tpl-delete-muted {
+  position: relative;
+  cursor: not-allowed;
+}
+
+.kpi-tpl-delete-muted:hover,
+.kpi-tpl-delete-muted:focus-visible {
+  border-color: rgb(203 213 225 / 0.95);
+  color: #64748b;
+  background: #f8fafc;
+}
+
+
+
 .kpi-tpl-modal-header {
   position: sticky;
   top: 0;

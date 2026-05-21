@@ -8,6 +8,7 @@ import {
   kpiStatusBadgeClass,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
+import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
 import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
 
 const KpiTemplateListPage = () => {
@@ -18,6 +19,7 @@ const KpiTemplateListPage = () => {
   const [query, setQuery] = useState('');
   const [templateToArchive, setTemplateToArchive] = useState<KpiTemplateResponse | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const [activeCycleTemplateIds, setActiveCycleTemplateIds] = useState<Set<number>>(new Set());
 
   const load = async () => {
     try {
@@ -25,6 +27,17 @@ const KpiTemplateListPage = () => {
       setError('');
       const data = await kpiTemplateService.getAllTemplates();
       setTemplates(data);
+      try {
+        const cycles = await kpiTemplateCycleService.list();
+        setActiveCycleTemplateIds(new Set(
+          cycles
+            .filter((cycle) => cycle.status === 'ACTIVE')
+            .flatMap((cycle) => cycle.kpiForms.map((form) => form.id)),
+        ));
+      } catch {
+        setActiveCycleTemplateIds(new Set());
+        toast.error('Could not load active KPI Template Cycle status.');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load templates.';
       setError(message);
@@ -193,6 +206,7 @@ const KpiTemplateListPage = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {filtered.map((template) => {
+                        const lockedByActiveCycle = activeCycleTemplateIds.has(template.id);
                         return (
                           <tr key={template.id} className="transition-colors hover:bg-violet-50/50">
                             <td className="px-5 py-4">
@@ -218,19 +232,31 @@ const KpiTemplateListPage = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => navigate(`/hr/kpi-template/${template.id}/edit`)}
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm"
-                                  title="Edit"
-                                  aria-label="Edit"
+                                  onClick={() => {
+                                    if (!lockedByActiveCycle) {
+                                      navigate(`/hr/kpi-template/${template.id}/edit`);
+                                    }
+                                  }}
+                                  className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-500 transition hover:border-gray-200 hover:bg-white hover:text-violet-700 hover:shadow-sm ${
+                                    lockedByActiveCycle ? 'kpi-tpl-edit-muted' : ''
+                                  }`}
+                                  title={lockedByActiveCycle ? 'Template is active in a KPI Template Cycle' : 'Edit'}
+                                  aria-label={lockedByActiveCycle ? 'Editing muted because template is active in a KPI Template Cycle' : 'Edit'}
                                 >
                                   <i className="bi bi-pencil-square text-lg" />
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setTemplateToArchive(template)}
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                                  title="Delete"
-                                  aria-label="Delete"
+                                  onClick={() => {
+                                    if (!lockedByActiveCycle) {
+                                      setTemplateToArchive(template);
+                                    }
+                                  }}
+                                  className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 ${
+                                    lockedByActiveCycle ? 'kpi-tpl-delete-muted' : ''
+                                  }`}
+                                  title={lockedByActiveCycle ? 'Template is active in a KPI Template Cycle' : 'Delete'}
+                                  aria-label={lockedByActiveCycle ? 'Delete muted because template is active in a KPI Template Cycle' : 'Delete'}
                                 >
                                   <i className="bi bi-trash text-lg" />
                                 </button>
