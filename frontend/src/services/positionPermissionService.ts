@@ -14,11 +14,59 @@ type ApiEnvelope<T> = {
 
 const POSITION_PERMISSION_ENDPOINT = '/position-permissions';
 
+export const POSITION_PERMISSION_FIELDS: Array<keyof PositionPermission> = [
+  'oneOnOneCreate',
+  'oneOnOneDeptSelection',
+  'oneOnOneTeamSelection',
+
+  'teamCreate',
+  'teamEdit',
+  'teamHistory',
+  'teamView',
+  'teamAssignAsLeader',
+  'teamAssignAsPm',
+  'teamAssignAsMember',
+
+  'pipCreate',
+  'pipEdit',
+  'pipViewAll',
+
+  'appraisalReview',
+  'appraisalApprove',
+  'appraisalView',
+  'appraisalScoreInput',
+  'appraisalSign',
+
+  'kpiCreate',
+  'kpiEdit',
+  'kpiScore',
+  'kpiView',
+  'kpiInput',
+
+  'selfAssessmentView',
+  'selfAssessmentInput',
+  'selfAssessmentLock',
+  'selfAssessmentSign',
+
+  'feedbackFormCreate',
+  'feedbackSend',
+  'continuousFeedbackView',
+  'continuousFeedbackGive',
+
+  'departmentCrud',
+  'departmentComparisonView',
+  'positionCrud',
+  'employeeCrud',
+  'employeeExcelImport',
+];
+
 const unwrap = <T>(response: { data: ApiEnvelope<T> | T }): T => {
   const body = response.data as ApiEnvelope<T>;
+
   if (body && typeof body === 'object' && 'data' in body) {
     return body.data;
   }
+
   return response.data as T;
 };
 
@@ -32,11 +80,13 @@ const extractApiErrorMessage = (error: unknown, fallback: string): string => {
 
     if (data && typeof data === 'object') {
       const maybeMessage = (data as { message?: unknown; error?: unknown }).message;
+
       if (typeof maybeMessage === 'string' && maybeMessage.trim().length > 0) {
         return maybeMessage;
       }
 
       const maybeError = (data as { error?: unknown }).error;
+
       if (typeof maybeError === 'string' && maybeError.trim().length > 0) {
         return maybeError;
       }
@@ -50,6 +100,7 @@ export const emptyPositionPermission = (): PositionPermission => ({
   oneOnOneCreate: false,
   oneOnOneDeptSelection: false,
   oneOnOneTeamSelection: false,
+
   teamCreate: false,
   teamEdit: false,
   teamHistory: false,
@@ -57,33 +108,50 @@ export const emptyPositionPermission = (): PositionPermission => ({
   teamAssignAsLeader: false,
   teamAssignAsPm: false,
   teamAssignAsMember: false,
+
   pipCreate: false,
   pipEdit: false,
   pipViewAll: false,
+
   appraisalReview: false,
   appraisalApprove: false,
   appraisalView: false,
   appraisalScoreInput: false,
   appraisalSign: false,
+
   kpiCreate: false,
   kpiEdit: false,
   kpiScore: false,
   kpiView: false,
   kpiInput: false,
+
   selfAssessmentView: false,
   selfAssessmentInput: false,
   selfAssessmentLock: false,
   selfAssessmentSign: false,
+
   feedbackFormCreate: false,
   feedbackSend: false,
   continuousFeedbackView: false,
   continuousFeedbackGive: false,
+
   departmentCrud: false,
   departmentComparisonView: false,
   positionCrud: false,
   employeeCrud: false,
   employeeExcelImport: false,
 });
+
+export const sanitizePositionPermission = (payload: unknown): PositionPermission => {
+  const source = (payload ?? {}) as Record<string, unknown>;
+  const clean = emptyPositionPermission();
+
+  POSITION_PERMISSION_FIELDS.forEach((field) => {
+    clean[field] = Boolean(source[field]);
+  });
+
+  return clean;
+};
 
 export const emptyTeamPermissionImpactPreview = (): TeamPermissionImpactPreview => ({
   positionId: 0,
@@ -101,9 +169,12 @@ export const positionPermissionService = {
       const response = await api.get<ApiEnvelope<PositionPermission>>(
         `${POSITION_PERMISSION_ENDPOINT}/me`,
       );
-      return { ...emptyPositionPermission(), ...unwrap(response) };
+
+      return sanitizePositionPermission(unwrap(response));
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to load current position permissions.'));
+      throw new Error(
+        extractApiErrorMessage(error, 'Failed to load current position permissions.'),
+      );
     }
   },
 
@@ -112,9 +183,12 @@ export const positionPermissionService = {
       const response = await api.get<ApiEnvelope<PositionPermission>>(
         `${POSITION_PERMISSION_ENDPOINT}/position/${positionId}`,
       );
-      return { ...emptyPositionPermission(), ...unwrap(response) };
+
+      return sanitizePositionPermission(unwrap(response));
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to load position permissions.'));
+      throw new Error(
+        extractApiErrorMessage(error, 'Failed to load position permissions.'),
+      );
     }
   },
 
@@ -125,11 +199,17 @@ export const positionPermissionService = {
     try {
       const response = await api.post<ApiEnvelope<TeamPermissionImpactPreview>>(
         `${POSITION_PERMISSION_ENDPOINT}/position/${positionId}/impact-preview`,
-        payload,
+        sanitizePositionPermission(payload),
       );
-      return { ...emptyTeamPermissionImpactPreview(), ...unwrap(response) };
+
+      return {
+        ...emptyTeamPermissionImpactPreview(),
+        ...unwrap(response),
+      };
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to preview position permission impact.'));
+      throw new Error(
+        extractApiErrorMessage(error, 'Failed to preview position permission impact.'),
+      );
     }
   },
 
@@ -137,11 +217,14 @@ export const positionPermissionService = {
     try {
       const response = await api.put<ApiEnvelope<PositionPermission>>(
         `${POSITION_PERMISSION_ENDPOINT}/position/${positionId}`,
-        payload,
+        sanitizePositionPermission(payload),
       );
-      return { ...emptyPositionPermission(), ...unwrap(response) };
+
+      return sanitizePositionPermission(unwrap(response));
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to save position permissions.'));
+      throw new Error(
+        extractApiErrorMessage(error, 'Failed to save position permissions.'),
+      );
     }
   },
 
@@ -150,9 +233,12 @@ export const positionPermissionService = {
       const response = await api.get<ApiEnvelope<PositionPermissionAudit[]>>(
         `${POSITION_PERMISSION_ENDPOINT}/position/${positionId}/audit`,
       );
+
       return unwrap(response) ?? [];
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to load position permission audit history.'));
+      throw new Error(
+        extractApiErrorMessage(error, 'Failed to load position permission audit history.'),
+      );
     }
   },
 };

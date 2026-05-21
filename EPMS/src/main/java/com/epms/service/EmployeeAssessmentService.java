@@ -25,6 +25,7 @@ import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.AssessmentFormDefinitionRepository;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeAssessmentRepository;
+import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.SignatureRepository;
 import com.epms.repository.UserRepository;
@@ -46,7 +47,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -93,6 +93,8 @@ public class EmployeeAssessmentService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final SignatureRepository signatureRepository;
+    private final EmployeeDepartmentRepository employeeDepartmentRepository;
+    private final PositionPermissionService positionPermissionService;
 
     @Transactional(readOnly = true)
     public AssessmentResponse getTemplateForCurrentUser() {
@@ -267,20 +269,24 @@ public class EmployeeAssessmentService {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
 
-        if (!roles.contains("DEPARTMENT_HEAD")) {
+        if (!isDepartmentHeadRole(roles)) {
             throw new UnauthorizedActionException("Only department head can sign this self-assessment.");
         }
 
-        if (principal.getDepartmentId() == null || assessment.getDepartmentId() == null) {
-            throw new BadRequestException("Department information is missing.");
+        if (!positionPermissionService.currentUserHasPermission("selfAssessmentSign")) {
+            throw new UnauthorizedActionException("Your position does not have permission to sign and forward self-assessments.");
         }
 
-        if (!Objects.equals(principal.getDepartmentId(), assessment.getDepartmentId())) {
+        if (assessment.getDepartmentId() == null) {
+            throw new BadRequestException("Assessment department information is missing.");
+        }
+
+        if (!currentUserDepartmentIds(principal).contains(assessment.getDepartmentId())) {
             throw new UnauthorizedActionException("Only the department head of this employee's department can sign this self-assessment.");
         }
 
-        if (!AssessmentStatus.PENDING_DEPARTMENT_HEAD.equals(assessment.getStatus())) {
-            throw new BadRequestException("This assessment is not waiting for department head signature.");
+        if (!isDepartmentHeadSignableStatus(assessment)) {
+            throw new BadRequestException("This assessment is not ready for department head signature.");
         }
 
         User currentUser = currentUserEntity();
@@ -297,6 +303,16 @@ public class EmployeeAssessmentService {
         assessment.setStatus(AssessmentStatus.PENDING_HR);
 
         return toResponse(assessmentRepository.save(assessment));
+    }
+
+    private boolean isDepartmentHeadSignableStatus(EmployeeAssessment assessment) {
+        if (assessment == null || assessment.getStatus() == null) {
+            return false;
+        }
+
+        return AssessmentStatus.SUBMITTED.equals(assessment.getStatus())
+                || AssessmentStatus.PENDING_MANAGER.equals(assessment.getStatus())
+                || AssessmentStatus.PENDING_DEPARTMENT_HEAD.equals(assessment.getStatus());
     }
 
     @Transactional
@@ -414,14 +430,18 @@ public class EmployeeAssessmentService {
                     .toList();
         }
 
-        if (roles.contains("DEPARTMENT_HEAD")) {
+        if (isDepartmentHeadRole(roles)) {
+            if (!positionPermissionService.currentUserHasPermission("selfAssessmentView")) {
+                throw new UnauthorizedActionException("Your position does not have permission to view self-assessments.");
+            }
+
             Map<Long, EmployeeAssessment> visible = new LinkedHashMap<>();
 
-            if (principal.getDepartmentId() != null) {
+            for (Integer departmentId : currentUserDepartmentIds(principal)) {
                 assessmentRepository
                         .findByStatusInAndDepartmentIdOrderBySubmittedAtDesc(
                                 REVIEW_TABLE_STATUSES,
-                                principal.getDepartmentId()
+                                departmentId
                         )
                         .forEach(assessment -> visible.put(assessment.getId(), assessment));
             }
@@ -443,41 +463,7 @@ public class EmployeeAssessmentService {
                     .toList();
         }
 
-        throw new UnauthorizedActionException("You do not have permission to view this score table.");
-    }
-
-    private AssessmentResponse toTemplateResponse(User user, EmployeeProfile profile, AssessmentFormDefinition form) {
-        return AssessmentResponse.builder()
-                .id(null)
-                .formId(form.getId())
-                .assessmentFormId(form.getId())
-                .formName(form.getFormName())
-                .companyName(form.getCompanyName())
-                .userId(user.getId())
-                .employeeId(profile.employeeId())
-                .employeeName(profile.employeeName())
-                .employeeCode(profile.employeeCode())
-                .currentPosition(profile.currentPosition())
-                .departmentId(profile.departmentId())
-                .departmentName(profile.departmentName())
-                .managerUserId(profile.managerUserId())
-                .managerName(profile.managerName())
-                .departmentHeadUserId(null)
-                .departmentHeadName(null)
-                .assessmentDate(LocalDate.now())
-                .period(String.valueOf(LocalDateTime.now().getYear()))
-                .status(AssessmentStatus.DRAFT.name())
-                .totalScore(0.0)
-                .maxScore(0.0)
-                .scorePercent(0.0)
-                .performanceLabel("Not scored")
-                .remarks("")
-                .managerComment("")
-                .hrComment("")
-                .declineReason("")
-                .sections(templateSectionsFromForm(form))
-                .scoreBands(scoreBandsFromForm(form))
-                .build();
+        return getMyScores();
     }
 
     private EmployeeAssessment createNewAssessment(User user, AssessmentFormDefinition form) {
@@ -493,12 +479,16 @@ public class EmployeeAssessmentService {
                 .departmentName(profile.departmentName())
                 .managerUserId(profile.managerUserId())
                 .managerName(profile.managerName())
+                .departmentHeadUserId(null)
+                .departmentHeadName(null)
                 .assessmentFormId(form.getId())
                 .formName(form.getFormName())
-                .companyName(form.getCompanyName())
+                .companyName(form.getCompanyName() == null || form.getCompanyName().isBlank()
+                        ? "ACE Data Systems Ltd."
+                        : form.getCompanyName())
                 .assessmentDate(LocalDate.now())
+                .period(String.valueOf(LocalDate.now().getYear()))
                 .status(AssessmentStatus.DRAFT)
-                .period(String.valueOf(LocalDateTime.now().getYear()))
                 .totalScore(0.0)
                 .maxScore(0.0)
                 .scorePercent(0.0)
@@ -517,165 +507,182 @@ public class EmployeeAssessmentService {
             throw new BadRequestException("Assessment request body is required.");
         }
 
-        String period = normalizeOptional(request.getPeriod());
-
         assessment.setAssessmentFormId(form.getId());
         assessment.setFormName(form.getFormName());
-        assessment.setCompanyName(form.getCompanyName());
-        assessment.setPeriod(period == null ? String.valueOf(LocalDateTime.now().getYear()) : period);
-        assessment.setRemarks(normalizeOptional(request.getRemarks()));
+        assessment.setCompanyName(form.getCompanyName() == null || form.getCompanyName().isBlank()
+                ? "ACE Data Systems Ltd."
+                : form.getCompanyName());
+        assessment.setPeriod(normalizeOptional(request.getPeriod()) == null
+                ? String.valueOf(LocalDate.now().getYear())
+                : normalizeOptional(request.getPeriod()));
+        assessment.setRemarks(clean(request.getRemarks()));
         assessment.setStatus(status);
+        assessment.setAssessmentDate(LocalDate.now());
 
-        Map<Integer, AssessmentItemRequest> itemsByQuestionId = request.getItems() == null
+        Map<String, AssessmentItemRequest> requestByKey = request.getItems() == null
                 ? Map.of()
                 : request.getItems()
                 .stream()
-                .filter(Objects::nonNull)
-                .filter(item -> item.getQuestionId() != null)
-                .collect(Collectors.toMap(
-                        AssessmentItemRequest::getQuestionId,
-                        Function.identity(),
-                        (first, ignored) -> first
-                ));
-
-        Map<String, AssessmentItemRequest> itemsByStableKey = request.getItems() == null
-                ? Map.of()
-                : request.getItems()
-                .stream()
-                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(
                         item -> stableItemKey(item.getSectionTitle(), item.getQuestionText(), item.getItemOrder()),
-                        Function.identity(),
-                        (first, ignored) -> first
+                        item -> item,
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
                 ));
 
         assessment.getAnswers().clear();
 
-        int order = 1;
+        int itemOrder = 1;
 
         for (AssessmentFormSectionDefinition section : sortedSections(form)) {
-            String sectionTitle = normalizeRequired(section.getTitle(), "Section title is required.");
-
             for (AssessmentFormQuestionDefinition question : safeQuestions(section)) {
-                String questionText = normalizeRequired(question.getQuestionText(), "Question text is required.");
-                AssessmentItemRequest submittedItem = itemsByQuestionId.get(question.getId());
+                AssessmentItemRequest incoming = requestByKey.get(stableItemKey(
+                        section.getTitle(),
+                        question.getQuestionText(),
+                        itemOrder
+                ));
 
-                if (submittedItem == null) {
-                    submittedItem = itemsByStableKey.get(stableItemKey(sectionTitle, questionText, order));
-                }
+                Integer rating = incoming == null ? null : incoming.getRating();
+                Boolean yesNoAnswer = incoming == null ? null : incoming.getYesNoAnswer();
 
-                assessment.addAnswer(
-                        buildAnswer(sectionTitle, question, questionText, submittedItem, order)
-                );
+                EmployeeAssessmentAnswer answer = EmployeeAssessmentAnswer.builder()
+                        .assessment(assessment)
+                        .questionId(question.getId())
+                        .sectionTitle(normalizeRequired(section.getTitle(), "Section title is required."))
+                        .questionText(normalizeRequired(question.getQuestionText(), "Question text is required."))
+                        .itemOrder(itemOrder)
+                        .responseType(RESPONSE_TYPE_YES_NO_RATING)
+                        .required(question.getRequired() == null || question.getRequired())
+                        .weight(1.0)
+                        .rating(rating)
+                        .maxRating(MAX_RATING)
+                        .comment("")
+                        .yesNoAnswer(yesNoAnswer)
+                        .build();
 
-                order++;
+                assessment.addAnswer(answer);
+                itemOrder++;
             }
         }
-
-        if (assessment.getAnswers().isEmpty()) {
-            throw new BadRequestException("The selected HR assessment form has no assessment subjects.");
-        }
-    }
-
-    private EmployeeAssessmentAnswer buildAnswer(
-            String sectionTitle,
-            AssessmentFormQuestionDefinition question,
-            String questionText,
-            AssessmentItemRequest submittedItem,
-            int order
-    ) {
-        Integer rating = null;
-        Boolean yesNoAnswer = null;
-
-        if (submittedItem != null) {
-            rating = submittedItem.getRating();
-
-            if (rating != null && (rating < 1 || rating > MAX_RATING)) {
-                throw new BadRequestException("Ratings must be between 1 and 5.");
-            }
-
-            yesNoAnswer = submittedItem.getYesNoAnswer();
-        }
-
-        return EmployeeAssessmentAnswer.builder()
-                .questionId(question.getId())
-                .sectionTitle(sectionTitle)
-                .questionText(questionText)
-                .itemOrder(order)
-                .responseType(RESPONSE_TYPE_YES_NO_RATING)
-                .required(question.getRequired() == null || question.getRequired())
-                .weight(1.0)
-                .rating(rating)
-                .maxRating(MAX_RATING)
-                .comment(null)
-                .yesNoAnswer(yesNoAnswer)
-                .build();
     }
 
     private void validateComplete(EmployeeAssessment assessment) {
-        for (EmployeeAssessmentAnswer answer : assessment.getAnswers()) {
-            if (!Boolean.TRUE.equals(answer.getRequired())) {
+        List<EmployeeAssessmentAnswer> answers = assessment.getAnswers() == null
+                ? List.of()
+                : assessment.getAnswers();
+
+        if (answers.isEmpty()) {
+            throw new BadRequestException("This assessment form has no questions.");
+        }
+
+        for (EmployeeAssessmentAnswer answer : answers) {
+            boolean required = answer.getRequired() == null || answer.getRequired();
+
+            if (!required) {
                 continue;
             }
 
-            if (answer.getYesNoAnswer() == null) {
-                throw new BadRequestException("Please choose Yes or No for every required assessment subject.");
+            if (answer.getYesNoAnswer() == null || answer.getRating() == null) {
+                throw new BadRequestException("Please answer Yes/No and Rating for all required subjects.");
             }
 
-            if (answer.getRating() == null) {
-                throw new BadRequestException("Please rate every required assessment subject before submitting.");
+            if (answer.getRating() < 1 || answer.getRating() > MAX_RATING) {
+                throw new BadRequestException("Rating must be between 1 and 5.");
             }
         }
     }
 
     private void calculateScores(EmployeeAssessment assessment, AssessmentFormDefinition form) {
-        List<EmployeeAssessmentAnswer> scoredAnswers = assessment.getAnswers()
-                .stream()
-                .filter(answer -> answer.getRating() != null)
-                .toList();
+        double total = 0.0;
+        double max = 0.0;
 
-        double total = scoredAnswers.stream()
-                .mapToDouble(EmployeeAssessmentAnswer::getRating)
-                .sum();
+        if (assessment.getAnswers() != null) {
+            for (EmployeeAssessmentAnswer answer : assessment.getAnswers()) {
+                if (answer.getRating() == null) {
+                    continue;
+                }
 
-        double max = scoredAnswers.stream()
-                .mapToDouble(answer -> MAX_RATING)
-                .sum();
+                double weight = answer.getWeight() == null ? 1.0 : answer.getWeight();
+                total += answer.getRating() * weight;
+                max += MAX_RATING * weight;
+            }
+        }
 
-        double percent = max == 0 ? 0.0 : round2((total * 100.0) / max);
+        double percent = max <= 0 ? 0.0 : round2((total / max) * 100.0);
 
         assessment.setTotalScore(round2(total));
         assessment.setMaxScore(round2(max));
         assessment.setScorePercent(percent);
-        assessment.setPerformanceLabel(resolvePerformanceLabel(percent, form));
+        assessment.setPerformanceLabel(scoreLabel(percent, form));
     }
 
-    private String resolvePerformanceLabel(double percent, AssessmentFormDefinition form) {
-        List<AssessmentFormScoreBandDefinition> bands = form.getScoreBands();
+    private String scoreLabel(double scorePercent, AssessmentFormDefinition form) {
+        List<AssessmentScoreBandResponse> bands = form == null
+                ? defaultScoreBands()
+                : scoreBandsFromForm(form);
 
-        if (bands != null && !bands.isEmpty()) {
-            return bands.stream()
-                    .filter(band -> percent >= band.getMinScore() && percent <= band.getMaxScore())
-                    .sorted(Comparator.comparing(
-                            AssessmentFormScoreBandDefinition::getSortOrder,
-                            Comparator.nullsLast(Integer::compareTo)
-                    ))
-                    .map(AssessmentFormScoreBandDefinition::getLabel)
-                    .findFirst()
-                    .orElse("Not scored");
-        }
+        return bands.stream()
+                .filter(band -> scorePercent >= band.getMinScore() && scorePercent <= band.getMaxScore())
+                .findFirst()
+                .map(AssessmentScoreBandResponse::getLabel)
+                .orElse("Not scored");
+    }
 
-        if (percent >= 86) return "Outstanding";
-        if (percent >= 71) return "Good";
-        if (percent >= 60) return "Meet Requirement";
-        if (percent >= 40) return "Need Improvement";
-        return "Unsatisfactory";
+    private AssessmentResponse toTemplateResponse(User user, EmployeeProfile profile, AssessmentFormDefinition form) {
+        return AssessmentResponse.builder()
+                .id(null)
+                .formId(form.getId())
+                .assessmentFormId(form.getId())
+                .formName(form.getFormName())
+                .companyName(form.getCompanyName() == null || form.getCompanyName().isBlank()
+                        ? "ACE Data Systems Ltd."
+                        : form.getCompanyName())
+                .userId(user.getId())
+                .employeeId(profile.employeeId())
+                .employeeName(profile.employeeName())
+                .employeeCode(profile.employeeCode())
+                .currentPosition(profile.currentPosition())
+                .departmentId(profile.departmentId())
+                .departmentName(profile.departmentName())
+                .managerUserId(profile.managerUserId())
+                .managerName(profile.managerName())
+                .departmentHeadUserId(null)
+                .departmentHeadName(null)
+                .assessmentDate(LocalDate.now())
+                .period(String.valueOf(LocalDate.now().getYear()))
+                .status(AssessmentStatus.DRAFT.name())
+                .totalScore(0.0)
+                .maxScore(0.0)
+                .scorePercent(0.0)
+                .performanceLabel("Not scored")
+                .remarks("")
+                .managerComment(null)
+                .departmentHeadComment(null)
+                .hrComment(null)
+                .declineReason(null)
+                .sections(templateSectionsFromForm(form))
+                .scoreBands(scoreBandsFromForm(form))
+                .build();
     }
 
     private AssessmentResponse toResponse(EmployeeAssessment assessment) {
         AssessmentFormDefinition form = assessment.getAssessmentFormId() == null
                 ? null
                 : formRepository.findById(assessment.getAssessmentFormId()).orElse(null);
+
+        EmployeeProfile profile = userRepository
+                .findById(assessment.getUserId())
+                .map(this::resolveProfile)
+                .orElse(new EmployeeProfile(
+                        assessment.getEmployeeId(),
+                        assessment.getEmployeeName(),
+                        assessment.getEmployeeCode(),
+                        assessment.getCurrentPosition(),
+                        assessment.getDepartmentId(),
+                        assessment.getDepartmentName(),
+                        assessment.getManagerUserId(),
+                        assessment.getManagerName()
+                ));
 
         return AssessmentResponse.builder()
                 .id(assessment.getId())
@@ -684,7 +691,7 @@ public class EmployeeAssessmentService {
                 .formName(assessment.getFormName())
                 .companyName(assessment.getCompanyName())
                 .userId(assessment.getUserId())
-                .employeeId(assessment.getEmployeeId())
+                .employeeId(profile.employeeId())
                 .employeeName(assessment.getEmployeeName())
                 .employeeCode(assessment.getEmployeeCode())
                 .currentPosition(assessment.getCurrentPosition())
@@ -759,7 +766,7 @@ public class EmployeeAssessmentService {
                 .approvedAt(assessment.getApprovedAt())
                 .declinedAt(assessment.getDeclinedAt())
                 .employeeSigned(assessment.getEmployeeSignatureId() != null)
-                .managerSigned(assessment.getManagerSignatureId() != null)
+                .managerSigned(false)
                 .departmentHeadSigned(assessment.getDepartmentHeadSignatureId() != null)
                 .hrSigned(assessment.getHrSignatureId() != null)
                 .build();
@@ -811,6 +818,10 @@ public class EmployeeAssessmentService {
 
     private List<AssessmentSectionResponse> groupSections(List<EmployeeAssessmentAnswer> answers) {
         Map<String, List<AssessmentItemResponse>> grouped = new LinkedHashMap<>();
+
+        if (answers == null) {
+            return List.of();
+        }
 
         answers.stream()
                 .sorted(Comparator.comparing(
@@ -972,14 +983,16 @@ public class EmployeeAssessmentService {
         }
     }
 
-    private boolean isCurrentUserDepartmentHead() {
-        UserPrincipal principal = SecurityUtils.currentUser();
-        Set<String> roles = currentUserTargetRoles(principal);
-
+    private boolean isDepartmentHeadRole(Set<String> roles) {
         return roles.contains("DEPARTMENT_HEAD")
                 || roles.contains("DEPARTMENTHEAD")
                 || roles.contains("DEPT_HEAD")
                 || roles.contains("HEAD_OF_DEPARTMENT");
+    }
+
+    private boolean isCurrentUserDepartmentHead() {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        return isDepartmentHeadRole(currentUserTargetRoles(principal));
     }
 
     private Signature currentDefaultSignature() {
@@ -1029,11 +1042,21 @@ public class EmployeeAssessmentService {
     }
 
     private List<AssessmentFormQuestionDefinition> safeQuestions(AssessmentFormSectionDefinition section) {
-        return section.getQuestions() == null ? List.of() : section.getQuestions();
+        if (section.getQuestions() == null) {
+            return List.of();
+        }
+
+        return section.getQuestions()
+                .stream()
+                .sorted(Comparator.comparing(
+                        AssessmentFormQuestionDefinition::getId,
+                        Comparator.nullsLast(Integer::compareTo)
+                ))
+                .toList();
     }
 
     private List<AssessmentScoreBandResponse> scoreBandsFromForm(AssessmentFormDefinition form) {
-        if (form.getScoreBands() == null || form.getScoreBands().isEmpty()) {
+        if (form == null || form.getScoreBands() == null || form.getScoreBands().isEmpty()) {
             return defaultScoreBands();
         }
 
@@ -1060,35 +1083,35 @@ public class EmployeeAssessmentService {
                         .minScore(86)
                         .maxScore(100)
                         .label("Outstanding")
-                        .description("Performance exceptional and far exceeds expectations.")
+                        .description("Performance exceptional and far exceeds expectations. Consistently demonstrates excellent standards in all job requirements.")
                         .sortOrder(1)
                         .build(),
                 AssessmentScoreBandResponse.builder()
                         .minScore(71)
                         .maxScore(85)
                         .label("Good")
-                        .description("Performance is consistent.")
+                        .description("Performance is consistent. Clearly meets essential requirements of job.")
                         .sortOrder(2)
                         .build(),
                 AssessmentScoreBandResponse.builder()
                         .minScore(60)
                         .maxScore(70)
                         .label("Meet Requirement")
-                        .description("Performance is satisfactory.")
+                        .description("Performance is satisfactory. Meets requirements of the job.")
                         .sortOrder(3)
                         .build(),
                 AssessmentScoreBandResponse.builder()
                         .minScore(40)
                         .maxScore(59)
                         .label("Need Improvement")
-                        .description("Performance is inconsistent.")
+                        .description("Performance is inconsistent. Meets requirements of the job occasionally. Supervision and training is required for most problem areas.")
                         .sortOrder(4)
                         .build(),
                 AssessmentScoreBandResponse.builder()
                         .minScore(0)
                         .maxScore(39)
                         .label("Unsatisfactory")
-                        .description("Performance does not meet the minimum requirement.")
+                        .description("Performance does not meet the minimum requirement of the job.")
                         .sortOrder(5)
                         .build()
         );
@@ -1140,7 +1163,24 @@ public class EmployeeAssessmentService {
         Integer departmentId = user.getDepartmentId();
         String departmentName = null;
 
-        if (departmentId != null) {
+        if (user.getEmployeeId() != null) {
+            Optional<Department> workingDepartment = employeeDepartmentRepository
+                    .findActiveAssignmentsForEmployeeId(user.getEmployeeId())
+                    .stream()
+                    .map(assignment -> assignment.getParentDepartment() != null
+                            ? assignment.getParentDepartment()
+                            : assignment.getCurrentDepartment())
+                    .filter(Objects::nonNull)
+                    .filter(department -> department.getId() != null)
+                    .findFirst();
+
+            if (workingDepartment.isPresent()) {
+                departmentId = workingDepartment.get().getId();
+                departmentName = workingDepartment.get().getDepartmentName();
+            }
+        }
+
+        if (departmentId != null && departmentName == null) {
             departmentName = departmentRepository
                     .findById(departmentId)
                     .map(Department::getDepartmentName)
@@ -1169,6 +1209,43 @@ public class EmployeeAssessmentService {
         );
     }
 
+    private Set<Integer> currentUserDepartmentIds(UserPrincipal principal) {
+        Set<Integer> departmentIds = new LinkedHashSet<>();
+
+        if (principal != null && principal.getDepartmentId() != null) {
+            departmentIds.add(principal.getDepartmentId());
+        }
+
+        Integer currentUserId = principal == null ? null : principal.getId();
+
+        if (currentUserId != null) {
+            userRepository.findById(currentUserId).ifPresent(user -> {
+                if (user.getDepartmentId() != null) {
+                    departmentIds.add(user.getDepartmentId());
+                }
+
+                if (user.getEmployeeId() != null) {
+                    employeeDepartmentRepository
+                            .findActiveAssignmentsForEmployeeId(user.getEmployeeId())
+                            .forEach(assignment -> {
+                                Department parent = assignment.getParentDepartment();
+                                Department current = assignment.getCurrentDepartment();
+
+                                if (parent != null && parent.getId() != null) {
+                                    departmentIds.add(parent.getId());
+                                }
+
+                                if (current != null && current.getId() != null) {
+                                    departmentIds.add(current.getId());
+                                }
+                            });
+                }
+            });
+        }
+
+        return departmentIds;
+    }
+
     private void assertCanView(EmployeeAssessment assessment) {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
@@ -1185,7 +1262,9 @@ public class EmployeeAssessmentService {
             return;
         }
 
-        if (roles.contains("DEPARTMENT_HEAD") && Objects.equals(assessment.getDepartmentId(), principal.getDepartmentId())) {
+        if (isDepartmentHeadRole(roles)
+                && currentUserDepartmentIds(principal).contains(assessment.getDepartmentId())
+                && positionPermissionService.currentUserHasPermission("selfAssessmentView")) {
             return;
         }
 
@@ -1269,18 +1348,6 @@ public class EmployeeAssessmentService {
         if (!Objects.equals(assessment.getAssessmentFormId(), form.getId())) {
             throw new BadRequestException("This draft does not belong to the active HR self-assessment form assigned to your role.");
         }
-    }
-
-    private String resolveResponseType(String responseType) {
-        return RESPONSE_TYPE_YES_NO_RATING;
-    }
-
-    private Double normalizeWeight(Double weight) {
-        if (weight == null || weight < 1) {
-            return 1.0;
-        }
-
-        return weight;
     }
 
     private String normalizeRequired(String value, String message) {

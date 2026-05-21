@@ -1,156 +1,675 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import ProfileNameCell from '../../components/ProfileNameCell';
-import { authStorage } from '../../services/authStorage';
-import {
-  emptyPositionPermission,
-  positionPermissionService,
-} from '../../services/positionPermissionService';
-import type { PositionPermission } from '../../types/positionPermission';
 
-type Section = {
-  icon: string;
-  label: string;
-  description: string;
-  live: boolean;
-  to?: string;
-  permissionField?: keyof PositionPermission;
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ProfileNameCell from '../../components/ProfileNameCell';
+import {
+  createDepartmentHeadTeam,
+  fetchDepartmentHeadCandidateMembers,
+  fetchDepartmentHeadCandidateUsers,
+  fetchDepartmentHeadDashboard,
+  updateDepartmentHeadTeam,
+  type CandidateUser,
+  type EmployeeResponse,
+  type TeamResponse,
+} from '../../services/departmentHeadService';
+import '../team/team-ui.css';
+import '../employee/employee-ui.css';
+
+const getEmployeeName = (employee: EmployeeResponse) =>
+  employee.fullName ||
+  `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() ||
+  '-';
+
+const getCandidateAvailable = (candidate: CandidateUser) =>
+  candidate.available ?? candidate.isAvailable ?? true;
+
+const getExistingMemberIds = (team: TeamResponse | null): number[] => {
+  return (
+    team?.members
+      ?.map((member) => member.userId ?? member.employeeId)
+      .filter((id): id is number => id !== undefined && id !== null) ?? []
+  );
 };
 
 const DepartmentHeadDashboard = () => {
-  const user = authStorage.getUser();
-  const [permissions, setPermissions] = useState(() => emptyPositionPermission());
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    let cancelled = false;
+  const [departmentName, setDepartmentName] = useState('');
+  const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
+  const [teams, setTeams] = useState<TeamResponse[]>([]);
+  const [leaders, setLeaders] = useState<CandidateUser[]>([]);
+  const [members, setMembers] = useState<CandidateUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-    positionPermissionService
-      .getMyPermissions()
-      .then((data) => {
-        if (!cancelled) setPermissions({ ...emptyPositionPermission(), ...data });
-      })
-      .catch(() => {
-        if (!cancelled) setPermissions(emptyPositionPermission());
-      });
+  const [showTeamForm, setShowTeamForm] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
+  const [teamName, setTeamName] = useState('');
+  const [teamLeaderId, setTeamLeaderId] = useState<number | ''>('');
+  const [teamGoal, setTeamGoal] = useState('');
+  const [status, setStatus] = useState('Active');
+  const [memberUserIds, setMemberUserIds] = useState<number[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [formMessage, setFormMessage] = useState('');
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const person = {
-    userId: user?.id || user?.userId,
-    fullName: user?.fullName || user?.name,
-    email: user?.email,
-    employeeCode: user?.employeeCode,
-    departmentName: user?.department,
-    positionName: user?.position,
-    roleName: 'Department Head',
-    profileImageData: user?.profileImageData,
-    profileImageType: user?.profileImageType,
-  };
-
-  const sections: Section[] = useMemo(
-    () => [
-      {
-        icon: 'bi-pencil-square',
-        label: 'Self-Assessment',
-        description: 'Complete your own self-assessment form.',
-        live: true,
-        to: '/department-head/self-assessment',
-      },
-      {
-        icon: 'bi-clipboard-data',
-        label: 'Assessment Review',
-        description: 'Review employee assessment scores and signatures.',
-        live: true,
-        to: '/department-head/assessment-scores',
-        permissionField: 'selfAssessmentView',
-      },
-      {
-        icon: 'bi-shield-check',
-        label: 'Appraisal Review',
-        description: 'Check manager appraisal review submissions.',
-        live: true,
-        to: '/department-head/appraisals/review',
-        permissionField: 'appraisalApprove',
-      },
-      {
-        icon: 'bi-clock-history',
-        label: 'Review History',
-        description: 'View department appraisal review history.',
-        live: true,
-        to: '/department-head/appraisals/history',
-      },
-      {
-        icon: 'bi-chat-dots',
-        label: 'Continuous Feedback',
-        description: 'Give continuous feedback inside your department.',
-        live: true,
-        to: '/continuous-feedback',
-        permissionField: 'continuousFeedbackGive',
-      },
-      {
-        icon: 'bi-calendar-check',
-        label: 'One-on-One',
-        description: 'Manage one-on-one meetings and action items.',
-        live: true,
-        to: '/one-on-one-meetings',
-        permissionField: 'oneOnOneCreate',
-      },
-      {
-        icon: 'bi-file-earmark-bar-graph',
-        label: 'Performance Reports',
-        description: 'View department-level performance reports.',
-        live: true,
-        to: '/department-head/reports',
-      },
-      {
-        icon: 'bi-clipboard2-pulse',
-        label: 'PIP',
-        description: 'Create and track performance improvement plans.',
-        live: true,
-        to: '/pip/create',
-        permissionField: 'pipCreate',
-      },
-    ],
-    [],
+  const activeEmployees = useMemo(
+    () => employees.filter((employee) => employee.active !== false).length,
+    [employees],
   );
 
-  const visibleSections = sections.filter((section) => {
-    if (!section.permissionField) return true;
-    return Boolean(permissions[section.permissionField]);
-  });
+  const loadPage = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const [dashboard, leaderData, memberData] = await Promise.all([
+        fetchDepartmentHeadDashboard(false),
+        fetchDepartmentHeadCandidateUsers(),
+        fetchDepartmentHeadCandidateMembers(),
+      ]);
+
+      setDepartmentName(dashboard.departmentName ?? '');
+      setEmployees(dashboard.employees ?? []);
+      setTeams(dashboard.teams ?? []);
+      setLeaders(leaderData ?? []);
+      setMembers(memberData ?? []);
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          'Failed to load department dashboard.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadPage();
+  }, []);
+
+  const resetForm = () => {
+    setEditingTeam(null);
+    setTeamName('');
+    setTeamLeaderId('');
+    setTeamGoal('');
+    setStatus('Active');
+    setMemberUserIds([]);
+    setFormMessage('');
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowTeamForm(true);
+  };
+
+  const openEdit = (team: TeamResponse) => {
+    setEditingTeam(team);
+    setTeamName(team.teamName ?? '');
+    setTeamLeaderId(team.teamLeaderId ?? '');
+    setTeamGoal(team.teamGoal ?? '');
+    setStatus(team.status ?? 'Active');
+    setMemberUserIds(getExistingMemberIds(team));
+    setFormMessage('');
+    setShowTeamForm(true);
+  };
+
+  const closeForm = () => {
+    resetForm();
+    setShowTeamForm(false);
+  };
+
+  const toggleMember = (id: number) => {
+    const member = members.find((item) => item.id === id);
+
+    if (!member) return;
+
+    const existingIds = getExistingMemberIds(editingTeam);
+    const isExisting = existingIds.includes(id);
+    const available = getCandidateAvailable(member);
+
+    if (!available && !isExisting) {
+      setFormMessage(
+        `${member.name} is already in a team: ${member.currentTeamName || 'Unknown Team'}`,
+      );
+      return;
+    }
+
+    if (Number(teamLeaderId) === id) {
+      setFormMessage('Team leader cannot also be a member.');
+      return;
+    }
+
+    setMemberUserIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((memberId) => memberId !== id)
+        : [...prev, id],
+    );
+  };
+
+  const handleSubmitTeam = async (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!teamName.trim() || teamLeaderId === '') {
+      setFormMessage('Team name and team leader are required.');
+      return;
+    }
+
+    const selectedLeader = leaders.find(
+      (leader) => leader.id === Number(teamLeaderId),
+    );
+
+    const isCurrentLeader =
+      editingTeam && editingTeam.teamLeaderId === Number(teamLeaderId);
+
+    if (selectedLeader && !getCandidateAvailable(selectedLeader) && !isCurrentLeader) {
+      setFormMessage(
+        `${selectedLeader.name} is already in a team: ${
+          selectedLeader.currentTeamName || 'Unknown Team'
+        }`,
+      );
+      return;
+    }
+
+    const existingIds = getExistingMemberIds(editingTeam);
+
+    const unavailableMember = members.find((member) => {
+      const selected = memberUserIds.includes(member.id);
+      const alreadyInTeam = !getCandidateAvailable(member);
+      const isExisting = existingIds.includes(member.id);
+
+      return selected && alreadyInTeam && !isExisting;
+    });
+
+    if (unavailableMember) {
+      setFormMessage(
+        `${unavailableMember.name} is already in a team: ${
+          unavailableMember.currentTeamName || 'Unknown Team'
+        }`,
+      );
+      return;
+    }
+
+    if (memberUserIds.includes(Number(teamLeaderId))) {
+      setFormMessage('Team leader cannot also be a member.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setFormMessage('');
+
+      const payload = {
+        teamName: teamName.trim(),
+        teamLeaderId: Number(teamLeaderId),
+        teamGoal,
+        status,
+        memberUserIds,
+        memberEmployeeIds: memberUserIds,
+      };
+
+      if (editingTeam) {
+        await updateDepartmentHeadTeam(editingTeam.id, payload);
+      } else {
+        await createDepartmentHeadTeam(payload);
+      }
+
+      await loadPage();
+      closeForm();
+    } catch (err: any) {
+      setFormMessage(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          'Failed to save team.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="team-page">
+        <div className="team-state">
+          <i className="bi bi-hourglass-split" />
+          Loading department dashboard...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="employee-dashboard-page">
-      <section className="employee-dashboard-hero">
-        <div>
-          <p className="employee-dashboard-kicker">Department Head Dashboard</p>
-          <h1>Department performance workspace</h1>
-          <p>Review assessments, appraisals, reports, feedback, and department performance tasks.</p>
-        </div>
+    <div className="team-page">
+      <div className="team-hero">
+        <span className="team-hero-badge">
+          <i className="bi bi-building-check" />
+          Department Head
+        </span>
 
-        <div className="employee-dashboard-profile-card">
-          <ProfileNameCell
-            person={person}
-            size="lg"
-            subtitle={user?.department || user?.position || user?.email || 'Department Head'}
-          />
-        </div>
-      </section>
+        <h1>{departmentName || 'My Department'}</h1>
+        <p>
+          Manage teams, employees, self-assessment reviews, and department performance reports.
+        </p>
 
-      <section className="employee-dashboard-grid">
-        {visibleSections.map((section) => (
-          <Link key={section.label} to={section.to || '#'} className="employee-dashboard-action-card">
-            <span className="employee-dashboard-action-icon">
-              <i className={`bi ${section.icon}`} />
-            </span>
-            <strong>{section.label}</strong>
-            <p>{section.description}</p>
-          </Link>
-        ))}
-      </section>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
+          <button
+            className="team-btn primary"
+            type="button"
+            onClick={() => navigate('/department-head/assessment-scores')}
+          >
+            <i className="bi bi-clipboard-check" />
+            Self-Assessment Review
+          </button>
+
+          <button
+            className="team-btn primary"
+            type="button"
+            onClick={() => navigate('/department-head/reports')}
+          >
+            <i className="bi bi-file-earmark-bar-graph" />
+            Department Reports
+          </button>
+
+          <button className="team-btn secondary" type="button" onClick={loadPage}>
+            <i className="bi bi-arrow-clockwise" />
+            Refresh Dashboard
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="team-alert error">
+          {error}
+          <button
+            className="team-btn secondary"
+            onClick={loadPage}
+            style={{ marginLeft: 12 }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      <div className="team-surface">
+        <div className="team-surface-inner">
+          <div className="team-table-toolbar">
+            <div>
+              <h2>Overview</h2>
+              <p className="text-muted">Your department summary</p>
+            </div>
+
+            <button className="team-btn primary" onClick={openCreate}>
+              <i className="bi bi-plus-lg" />
+              Create Team
+            </button>
+          </div>
+
+          <div className="row g-3 mb-4">
+            <div className="col-md-3">
+              <div className="team-card">
+                <strong>{activeEmployees}</strong>
+                <span>Active Employees</span>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <div className="team-card">
+                <strong>{teams.length}</strong>
+                <span>Teams</span>
+              </div>
+            </div>
+
+            <div className="col-md-3">
+              <button
+                type="button"
+                className="team-card"
+                onClick={() => navigate('/department-head/reports')}
+                style={{
+                  width: '100%',
+                  cursor: 'pointer',
+                  border: 'none',
+                  textAlign: 'left',
+                }}
+              >
+                <strong>
+                  <i className="bi bi-file-earmark-bar-graph" /> Reports
+                </strong>
+                <span>Department Analytics</span>
+              </button>
+            </div>
+
+            <div className="col-md-3">
+              <button
+                type="button"
+                className="team-card"
+                onClick={() => navigate('/department-head/assessment-scores')}
+                style={{
+                  width: '100%',
+                  cursor: 'pointer',
+                  border: 'none',
+                  textAlign: 'left',
+                }}
+              >
+                <strong>
+                  <i className="bi bi-clipboard-check" /> Review
+                </strong>
+                <span>Self-Assessments</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="team-alert" style={{ marginBottom: 24 }}>
+            <strong>Reporting:</strong>{' '}
+            Department reports show employee performance summaries, department score
+            comparison, PIP status, feedback completion, and performance recommendations.
+            <button
+              type="button"
+              className="team-btn ghost"
+              onClick={() => navigate('/department-head/reports')}
+              style={{ marginLeft: 8 }}
+            >
+              Open Reports
+            </button>
+          </div>
+
+          <div className="team-alert" style={{ marginBottom: 24 }}>
+            <strong>Self-assessment approval flow:</strong>{' '}
+            Employee submits → Manager signs → Department Head signs → HR approves or declines.
+            Department Head signing is available from{' '}
+            <button
+              type="button"
+              className="team-btn ghost"
+              onClick={() => navigate('/department-head/assessment-scores')}
+              style={{ marginLeft: 8 }}
+            >
+              Assessment Review
+            </button>
+          </div>
+
+          <h3>Teams</h3>
+
+          {teams.length === 0 ? (
+            <div className="team-state">
+              <i className="bi bi-people" />
+              <p>No teams found in your department.</p>
+            </div>
+          ) : (
+            <div className="team-table-wrap">
+              <table className="team-table">
+                <thead>
+                  <tr>
+                    <th>Team Name</th>
+                    <th>Leader</th>
+                    <th>Status</th>
+                    <th>Members</th>
+                    <th>Goal</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {teams.map((team) => (
+                    <tr key={team.id}>
+                      <td>
+                        <strong>{team.teamName}</strong>
+                      </td>
+                      <td>
+                        {team.teamLeaderId ? (
+                          <ProfileNameCell
+                            person={{
+                              userId: team.teamLeaderId,
+                              fullName: team.teamLeaderName,
+                            }}
+                            subtitle="Team Leader"
+                          />
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`team-pill ${
+                            team.status?.toLowerCase() === 'active'
+                              ? 'active'
+                              : 'inactive'
+                          }`}
+                        >
+                          {team.status || '-'}
+                        </span>
+                      </td>
+                      <td>{team.members?.length ?? 0}</td>
+                      <td>{team.teamGoal || '-'}</td>
+                      <td>
+                        <button className="team-btn ghost" onClick={() => openEdit(team)}>
+                          <i className="bi bi-pencil-square" />
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <h3 className="mt-5">Employees</h3>
+
+          {employees.length === 0 ? (
+            <div className="team-state">
+              <i className="bi bi-person" />
+              <p>No employees found in your department.</p>
+              <small className="text-muted">
+                If the employee exists in Admin but does not appear here, check that the
+                employee is assigned to this department and that the linked login user has
+                the same department.
+              </small>
+            </div>
+          ) : (
+            <div className="team-table-wrap">
+              <table className="team-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Position</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {employees.map((employee) => (
+                    <tr key={employee.id}>
+                      <td>
+                        <ProfileNameCell
+                          person={{
+                            ...employee,
+                            userId: employee.userId ?? employee.id,
+                            fullName: getEmployeeName(employee),
+                          }}
+                          subtitle={employee.email || employee.positionTitle || employee.positionName || undefined}
+                        />
+                      </td>
+                      <td>{employee.email || '-'}</td>
+                      <td>{employee.positionTitle || employee.positionName || '-'}</td>
+                      <td>
+                        <span
+                          className={`team-pill ${
+                            employee.active === false ? 'inactive' : 'active'
+                          }`}
+                        >
+                          {employee.active === false ? 'Inactive' : 'Active'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showTeamForm && (
+        <div className="team-modal-overlay">
+          <div className="team-modal-content">
+            <div className="team-modal-header">
+              <h2>{editingTeam ? `Edit Team: ${editingTeam.teamName}` : 'Create Team'}</h2>
+
+              <button className="team-btn ghost" onClick={closeForm}>
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+
+            <div className="team-modal-body">
+              {formMessage && <div className="team-alert error">{formMessage}</div>}
+
+              <form
+                id="department-head-team-form"
+                className="team-form"
+                onSubmit={handleSubmitTeam}
+              >
+                <div className="team-field">
+                  <label>
+                    Team Name <span className="team-required">*</span>
+                  </label>
+                  <input
+                    className="team-input"
+                    value={teamName}
+                    onChange={(event) => setTeamName(event.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="team-field">
+                  <label>Department</label>
+                  <input className="team-input" value={departmentName} disabled />
+                </div>
+
+                <div className="team-field">
+                  <label>
+                    Team Leader <span className="team-required">*</span>
+                  </label>
+                  <select
+                    className="team-select"
+                    value={teamLeaderId}
+                    onChange={(event) =>
+                      setTeamLeaderId(event.target.value ? Number(event.target.value) : '')
+                    }
+                    required
+                  >
+                    <option value="">Select leader</option>
+                    {leaders.map((leader) => {
+                      const isCurrentLeader = editingTeam?.teamLeaderId === leader.id;
+                      const available = getCandidateAvailable(leader);
+                      const disabled = !available && !isCurrentLeader;
+
+                      return (
+                        <option key={leader.id} value={leader.id} disabled={disabled}>
+                          {leader.name}
+                          {disabled
+                            ? ` ⚠️ (already in a team: ${
+                                leader.currentTeamName || 'Unknown Team'
+                              })`
+                            : isCurrentLeader
+                              ? ' (Current)'
+                              : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="team-field">
+                  <label>Team Goal</label>
+                  <textarea
+                    className="team-textarea"
+                    rows={3}
+                    value={teamGoal}
+                    onChange={(event) => setTeamGoal(event.target.value)}
+                  />
+                </div>
+
+                <div className="team-field">
+                  <label>Status</label>
+                  <select
+                    className="team-select"
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value)}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="team-field">
+                  <label>Members</label>
+                  <div className="team-members-list">
+                    {members.map((member) => {
+                      const existingIds = getExistingMemberIds(editingTeam);
+                      const isExisting = existingIds.includes(member.id);
+                      const selected = memberUserIds.includes(member.id);
+                      const isLeader = Number(teamLeaderId) === member.id;
+                      const available = getCandidateAvailable(member);
+                      const alreadyInTeam = !available && !isExisting;
+                      const disabled = isLeader || alreadyInTeam;
+
+                      return (
+                        <label
+                          key={member.id}
+                          className={`team-member-item ${disabled ? 'disabled' : ''}`}
+                          title={
+                            isLeader
+                              ? 'Team leader cannot also be a member'
+                              : alreadyInTeam
+                                ? `Already in a team: ${
+                                    member.currentTeamName || 'Unknown Team'
+                                  }`
+                                : ''
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={disabled}
+                            onChange={() => toggleMember(member.id)}
+                          />
+                          <span>
+                            {member.name}
+                            {alreadyInTeam
+                              ? ` ⚠️ (already in a team: ${
+                                  member.currentTeamName || 'Unknown Team'
+                                })`
+                              : isExisting
+                                ? ' (Current member)'
+                                : ''}
+                            {isLeader ? ' (selected as team leader)' : ''}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="team-modal-footer">
+              <button className="team-btn secondary" onClick={closeForm} disabled={saving}>
+                Cancel
+              </button>
+
+              <button
+                className="team-btn primary"
+                type="submit"
+                form="department-head-team-form"
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : editingTeam ? 'Save Changes' : 'Create Team'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

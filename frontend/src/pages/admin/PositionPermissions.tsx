@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from 'react';
 import { positionService } from '../../services/positionService';
 import {
@@ -125,7 +126,7 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'oneOnOneCreate', 'oneOnOneDeptSelection',
     'pipCreate', 'pipViewAll',
     'appraisalReview', 'appraisalView', 'appraisalSign',
-    'kpiView', 'selfAssessmentView', 'continuousFeedbackGive', 'feedbackSend',
+    'kpiView', 'selfAssessmentView', 'selfAssessmentSign', 'continuousFeedbackGive', 'feedbackSend',
   ],
   MANAGER: [
     'oneOnOneCreate', 'oneOnOneTeamSelection',

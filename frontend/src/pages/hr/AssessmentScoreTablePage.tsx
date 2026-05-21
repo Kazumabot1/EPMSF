@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from 'react';
 import { authStorage } from '../../services/authStorage';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
@@ -15,6 +14,7 @@ import './assessment-score-table.css';
 type RoleFlags = {
   isHr: boolean;
   isDepartmentHead: boolean;
+  isDepartmentHeadRoute: boolean;
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -47,23 +47,68 @@ const getCurrentRoleFlags = (): RoleFlags => {
   const user = authStorage.getUser();
   const roles = (user?.roles ?? []).map((role: string) => normalizeRoleName(role));
   const dashboard = normalizeRoleName(String(user?.dashboard ?? ''));
+  const currentRole = normalizeRoleName(String(user?.currentRole ?? user?.role ?? ''));
+  const position = normalizeRoleName(String(user?.position ?? user?.positionName ?? ''));
+  const pathname = window.location.pathname.toLowerCase();
+
+  const isDepartmentHeadRoute =
+    pathname.includes('/department-head/') ||
+    pathname.endsWith('/department-head') ||
+    pathname.includes('/dept-head/') ||
+    pathname.endsWith('/dept-head');
+
+  const isHrRoute =
+    pathname.includes('/hr/') ||
+    pathname.endsWith('/hr') ||
+    pathname === '/dashboard';
+
+  const isDepartmentHead =
+    isDepartmentHeadRoute ||
+    roles.includes('DEPARTMENT_HEAD') ||
+    roles.includes('DEPARTMENTHEAD') ||
+    roles.includes('DEPT_HEAD') ||
+    roles.includes('HEAD_OF_DEPARTMENT') ||
+    dashboard.includes('DEPARTMENT_HEAD') ||
+    dashboard.includes('DEPARTMENTHEAD') ||
+    dashboard.includes('DEPT_HEAD') ||
+    currentRole.includes('DEPARTMENT_HEAD') ||
+    currentRole.includes('DEPARTMENTHEAD') ||
+    currentRole.includes('DEPT_HEAD') ||
+    currentRole.includes('HEAD_OF_DEPARTMENT') ||
+    position.includes('DEPARTMENT_HEAD') ||
+    position.includes('DEPARTMENTHEAD') ||
+    position.includes('DEPT_HEAD') ||
+    position.includes('HEAD_OF_DEPARTMENT');
 
   return {
     isHr:
-      roles.includes('HR') ||
-      roles.includes('ADMIN') ||
-      dashboard.includes('HR') ||
-      dashboard.includes('ADMIN'),
-
-    isDepartmentHead:
-      roles.includes('DEPARTMENT_HEAD') ||
-      roles.includes('DEPARTMENTHEAD') ||
-      roles.includes('DEPT_HEAD') ||
-      roles.includes('HEAD_OF_DEPARTMENT') ||
-      dashboard.includes('DEPARTMENT_HEAD') ||
-      dashboard.includes('DEPARTMENTHEAD') ||
-      dashboard.includes('DEPT_HEAD'),
+      !isDepartmentHeadRoute &&
+      (roles.includes('HR') ||
+        roles.includes('ADMIN') ||
+        dashboard.includes('HR') ||
+        dashboard.includes('ADMIN') ||
+        currentRole.includes('HR') ||
+        currentRole.includes('ADMIN') ||
+        isHrRoute),
+    isDepartmentHead,
+    isDepartmentHeadRoute,
   };
+};
+
+const normalizeStatusValue = (status?: string | null) =>
+  String(status ?? '')
+    .replace(/[\s-]+/g, '_')
+    .trim()
+    .toUpperCase();
+
+const isDeptHeadForwardableStatus = (status?: string | null) => {
+  const normalized = normalizeStatusValue(status);
+
+  return (
+    normalized === 'SUBMITTED' ||
+    normalized === 'PENDING_MANAGER' ||
+    normalized === 'PENDING_DEPARTMENT_HEAD'
+  );
 };
 
 const scoreBadgeClass = (label?: string) => {
@@ -84,7 +129,7 @@ const scoreBadgeClass = (label?: string) => {
 };
 
 const statusBadgeClass = (status?: string) => {
-  switch (status) {
+  switch (normalizeStatusValue(status)) {
     case 'DRAFT':
       return 'ast-status-draft';
     case 'SUBMITTED':
@@ -123,6 +168,7 @@ const formatDate = (value?: string | null) => {
 
 const signatureSrc = (imageData?: string | null, imageType?: string | null) => {
   if (!imageData) return '';
+
   return imageData.startsWith('data:')
     ? imageData
     : `data:${imageType || 'image/png'};base64,${imageData}`;
@@ -178,7 +224,7 @@ const defaultScoreBands: AssessmentScoreBand[] = [
     maxScore: 59,
     label: 'Need Improvement',
     description:
-      'Performance is inconsistent. Meets requirements of the job occasionally. Supervision and training is required for most problem areas.',
+      'Performance is inconsistent. Meets requirements of job occasionally. Supervision and training is required for most problem areas.',
     sortOrder: 4,
   },
   {
@@ -263,9 +309,11 @@ const AssessmentDetailModal = ({
 
   const canDeptHeadSign =
     roleFlags.isDepartmentHead &&
-    assessment.status === 'PENDING_DEPARTMENT_HEAD';
+    isDeptHeadForwardableStatus(assessment.status) &&
+    !assessment.departmentHeadSignatureId &&
+    !assessment.departmentHeadSignedAt;
 
-  const canHrAct = roleFlags.isHr && assessment.status === 'PENDING_HR';
+  const canHrAct = roleFlags.isHr && normalizeStatusValue(assessment.status) === 'PENDING_HR';
 
   const [deptHeadComment, setDeptHeadComment] = useState('');
   const [hrComment, setHrComment] = useState('');
@@ -291,7 +339,7 @@ const AssessmentDetailModal = ({
       setActionMessage('Assessment signed and forwarded to HR.');
       onChanged(updated);
     } catch (err) {
-      setActionError(getErrorMessage(err, 'Unable to sign assessment.'));
+      setActionError(getErrorMessage(err, 'Unable to sign and forward assessment to HR.'));
     } finally {
       setSubmittingAction(null);
     }
@@ -390,7 +438,8 @@ const AssessmentDetailModal = ({
                   </span>
                 </p>
                 <p>
-                  <strong>Score:</strong> {assessment.scorePercent ?? 0}% ({assessment.totalScore ?? 0}/{assessment.maxScore ?? 0})
+                  <strong>Score:</strong> {assessment.scorePercent ?? 0}% (
+                  {assessment.totalScore ?? 0}/{assessment.maxScore ?? 0})
                 </p>
                 <p><strong>Performance:</strong> {assessment.performanceLabel || '-'}</p>
               </div>
@@ -431,7 +480,6 @@ const AssessmentDetailModal = ({
                         {ratingOptions.map((rating) => (
                           <td key={rating}>{item.rating === rating ? '●' : ''}</td>
                         ))}
-
                       </tr>
                     ))}
                   </tbody>
@@ -452,7 +500,9 @@ const AssessmentDetailModal = ({
                   <tbody>
                     {scoreBands.map((band) => (
                       <tr key={`${band.minScore}-${band.maxScore}-${band.label}`}>
-                        <td><strong>{String(band.minScore).padStart(2, '0')}-{band.maxScore}</strong></td>
+                        <td>
+                          <strong>{String(band.minScore).padStart(2, '0')}-{band.maxScore}</strong>
+                        </td>
                         <td>
                           <strong>{band.label}</strong>
                           <br />
@@ -535,9 +585,9 @@ const AssessmentDetailModal = ({
                       type="button"
                       disabled={submittingAction !== null}
                       onClick={() => void handleDeptHeadSign()}
-                      className="ast-btn ast-btn-primary"
+                      className="ast-btn ast-btn-success"
                     >
-                      {submittingAction === 'dept-head' ? 'Signing...' : 'Sign & Forward to HR'}
+                      {submittingAction === 'dept-head' ? 'Forwarding...' : 'Sign & Forward to HR'}
                     </button>
                   </div>
                 )}
@@ -597,8 +647,8 @@ const AssessmentDetailModal = ({
 
             {!canDeptHeadSign && !canHrAct && (
               <div className="appraisal-review-block">
-                <h4>Review by</h4>
-                <p>HR Department</p>
+                <h4>Review Status</h4>
+                <p>No action is available for this assessment in the current status.</p>
               </div>
             )}
           </div>
@@ -612,6 +662,7 @@ const AssessmentScoreTablePage = () => {
   const [rows, setRows] = useState<AssessmentScoreRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoadingId, setDetailLoadingId] = useState<number | null>(null);
+  const [forwardingId, setForwardingId] = useState<number | null>(null);
   const [selectedAssessment, setSelectedAssessment] = useState<EmployeeAssessment | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -619,7 +670,8 @@ const AssessmentScoreTablePage = () => {
 
   const roleFlags = useMemo(() => getCurrentRoleFlags(), []);
 
-  const pageLabel = roleFlags.isDepartmentHead && !roleFlags.isHr ? 'Department Head view' : 'HR view';
+  const pageLabel =
+    roleFlags.isDepartmentHead && !roleFlags.isHr ? 'Department Head view' : 'HR view';
 
   const loadScoreTable = async () => {
     try {
@@ -643,7 +695,9 @@ const AssessmentScoreTablePage = () => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return rows.filter((row) => {
-      const matchesStatus = statusFilter === 'ALL' || row.status === statusFilter;
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        normalizeStatusValue(row.status) === normalizeStatusValue(statusFilter);
 
       const matchesSearch =
         !normalizedSearch ||
@@ -660,23 +714,20 @@ const AssessmentScoreTablePage = () => {
   }, [rows, search, statusFilter]);
 
   const activeRows = useMemo(
-    () => rows.filter((row) => row.status !== 'DRAFT'),
+    () => rows.filter((row) => normalizeStatusValue(row.status) !== 'DRAFT'),
     [rows],
   );
 
   const averageScore = useMemo(() => {
     if (!activeRows.length) return 0;
 
-    const total = activeRows.reduce(
-      (sum, row) => sum + Number(row.scorePercent || 0),
-      0,
-    );
+    const total = activeRows.reduce((sum, row) => sum + Number(row.scorePercent || 0), 0);
 
     return Number((total / activeRows.length).toFixed(2));
   }, [activeRows]);
 
   const pendingHrRows = useMemo(
-    () => rows.filter((row) => row.status === 'PENDING_HR'),
+    () => rows.filter((row) => normalizeStatusValue(row.status) === 'PENDING_HR'),
     [rows],
   );
 
@@ -697,6 +748,28 @@ const AssessmentScoreTablePage = () => {
       setError(getErrorMessage(err, 'Unable to open assessment details.'));
     } finally {
       setDetailLoadingId(null);
+    }
+  };
+
+  const canDeptHeadForwardRow = (row: AssessmentScoreRow) =>
+    roleFlags.isDepartmentHead &&
+    isDeptHeadForwardableStatus(row.status) &&
+    !row.departmentHeadSigned;
+
+  const handleDeptHeadForwardFromRow = async (row: AssessmentScoreRow) => {
+    if (!row.id) return;
+
+    try {
+      setForwardingId(row.id);
+      setError('');
+
+      const updated = await employeeAssessmentService.departmentHeadSign(row.id);
+      setSelectedAssessment((current) => (current?.id === row.id ? updated : current));
+      await loadScoreTable();
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to sign and forward assessment to HR.'));
+    } finally {
+      setForwardingId(null);
     }
   };
 
@@ -775,7 +848,9 @@ const AssessmentScoreTablePage = () => {
             onChange={(event) => setStatusFilter(event.target.value as 'ALL' | AssessmentStatus)}
           >
             {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
 
@@ -881,14 +956,34 @@ const AssessmentScoreTablePage = () => {
                       <td className="muted-small">{formatDateTime(row.submittedAt)}</td>
 
                       <td className="right">
-                        <button
-                          type="button"
-                          disabled={detailLoadingId === row.id}
-                          onClick={() => void openDetails(row)}
-                          className="ast-btn ast-btn-primary ast-btn-small"
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            justifyContent: 'flex-end',
+                            gap: 8,
+                            flexWrap: 'wrap',
+                          }}
                         >
-                          {detailLoadingId === row.id ? 'Opening...' : 'View Details'}
-                        </button>
+                          <button
+                            type="button"
+                            disabled={detailLoadingId === row.id}
+                            onClick={() => void openDetails(row)}
+                            className="ast-btn ast-btn-primary ast-btn-small"
+                          >
+                            {detailLoadingId === row.id ? 'Opening...' : 'View Details'}
+                          </button>
+
+                          {canDeptHeadForwardRow(row) && (
+                            <button
+                              type="button"
+                              disabled={forwardingId === row.id}
+                              onClick={() => void handleDeptHeadForwardFromRow(row)}
+                              className="ast-btn ast-btn-success ast-btn-small"
+                            >
+                              {forwardingId === row.id ? 'Forwarding...' : 'Sign & Forward'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
