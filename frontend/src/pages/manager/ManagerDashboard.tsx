@@ -1,4 +1,7 @@
+
 import { Link } from 'react-router-dom';
+import ProfileNameCell from '../../components/ProfileNameCell';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Section = {
   icon: string;
@@ -9,6 +12,8 @@ type Section = {
 };
 
 const ManagerDashboard = () => {
+  const { user } = useAuth();
+
   const sections: Section[] = [
     {
       icon: 'bi-person-check',
@@ -67,7 +72,8 @@ const ManagerDashboard = () => {
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
+        <div>
         <span
           style={{
             display: 'inline-flex',
@@ -101,6 +107,17 @@ const ManagerDashboard = () => {
         <p style={{ color: '#64748b', margin: 0 }}>
           Manage your team&apos;s performance workflow and review tasks.
         </p>
+        </div>
+
+        {user && (
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 18, padding: '1rem', minWidth: 260 }}>
+            <ProfileNameCell
+              person={user}
+              size="md"
+              subtitle={user.position || user.email || 'Manager'}
+            />
+          </div>
+        )}
       </div>
 
       <div

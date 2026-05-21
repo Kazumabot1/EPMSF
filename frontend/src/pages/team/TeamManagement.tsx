@@ -13,6 +13,7 @@ import {
 } from '../../services/teamService';
 import { useAuth } from '../../contexts/AuthContext';
 import TeamEditModal from './TeamEditModal';
+import ProfileNameCell from '../../components/ProfileNameCell';
 import './team-ui.css';
 
 const normalizeRole = (role?: string | null) =>
@@ -344,16 +345,31 @@ const disabledMessage = `Your position (${user?.position || 'your position'}) ha
 
                     <td>{team.departmentName || '—'}</td>
 
-                    <td>{team.teamLeaderName || '—'}</td>
+                    <td>
+                      {team.teamLeaderName ? (
+                        <ProfileNameCell
+                          person={{
+                            userId: team.teamLeaderId,
+                            fullName: team.teamLeaderName,
+                            departmentName: team.departmentName,
+                          }}
+                          subtitle={team.departmentName || 'Team Leader'}
+                        />
+                      ) : (
+                        '—'
+                      )}
+                    </td>
 
                     <td>
                       {team.projectManagerName ? (
-                        <div className="team-name-cell">
-                          <strong>{team.projectManagerName}</strong>
-                          {team.projectManagerTeams && (
-                            <small>Also PM in {team.projectManagerTeams}</small>
-                          )}
-                        </div>
+                        <ProfileNameCell
+                          person={{
+                            userId: team.projectManagerId,
+                            fullName: team.projectManagerName,
+                            departmentName: team.departmentName,
+                          }}
+                          subtitle={team.projectManagerTeams ? `Also PM in ${team.projectManagerTeams}` : 'Project Manager'}
+                        />
                       ) : (
                         '—'
                       )}

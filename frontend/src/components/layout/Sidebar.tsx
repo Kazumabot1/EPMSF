@@ -92,12 +92,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/position-permissions', label: 'Position Permissions', icon: 'bi bi-sliders2-vertical' },
         ],
       },
-      {
-        to: '/pip',
-        label: 'PIP',
-        icon: 'bi bi-clipboard2-pulse',
-        children: [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }],
-      },
     ];
 
     const hrNavItems: NavItem[] = [

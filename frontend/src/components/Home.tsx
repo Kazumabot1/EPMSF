@@ -1,6 +1,8 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import ProfileNameCell from './ProfileNameCell';
 
 function Home() {
   const navigate = useNavigate();
@@ -182,11 +184,14 @@ function Home() {
                 <i className="bi bi-person-badge" /> Logged in as
               </h4>
               <div className="hr-list-item">
-                <strong>{data.user?.fullName ?? 'Unknown User'}</strong>
-                <span className="active">{data.user?.position ?? '-'}</span>
-              </div>
-              <div className="hr-list-item">
-                <strong>{data.user?.email ?? '-'}</strong>
+                <ProfileNameCell
+                  person={{
+                    ...data.user,
+                    userId: data.user?.userId ?? data.user?.id,
+                  }}
+                  size="md"
+                  subtitle={data.user?.position ?? data.user?.email ?? 'HR'}
+                />
                 <span className="review">{data.user?.employeeCode ?? 'No code'}</span>
               </div>
             </article>

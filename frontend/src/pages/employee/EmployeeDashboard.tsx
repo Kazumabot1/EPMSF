@@ -1,5 +1,7 @@
+
 import { useEffect, useMemo, useState } from 'react';
 import { fetchEmployees, type EmployeeResponse } from '../../services/employeeService';
+import ProfileNameCell from '../../components/ProfileNameCell';
 import './employee-ui.css';
 
 const formatDate = (value?: string | null) => {
@@ -170,10 +172,10 @@ const EmployeeDashboard = () => {
                     {filteredEmployees.map((employee) => (
                       <tr key={employee.id}>
                         <td>
-                          <div className="employee-name-cell">
-                            <strong>{employee.fullName || '-'}</strong>
-                            <span>{employee.staffNrc || 'No NRC'}</span>
-                          </div>
+                          <ProfileNameCell
+                            person={employee}
+                            subtitle={employee.staffNrc || employee.currentDepartment || 'No NRC'}
+                          />
                         </td>
                         <td>{employee.gender || '-'}</td>
                         <td>{employee.phoneNumber || '-'}</td>
@@ -213,14 +215,11 @@ const EmployeeDashboard = () => {
           ) : (
             <div className="employee-detail-body">
               <div className="employee-profile">
-                <div className="employee-avatar">
-                  {(selectedEmployee.firstName?.[0] || '')}
-                  {(selectedEmployee.lastName?.[0] || '')}
-                </div>
-                <div>
-                  <h4>{selectedEmployee.fullName || '-'}</h4>
-                  <p>{selectedEmployee.currentDepartment || 'No department assigned'}</p>
-                </div>
+                <ProfileNameCell
+                  person={selectedEmployee}
+                  size="lg"
+                  subtitle={selectedEmployee.currentDepartment || 'No department assigned'}
+                />
               </div>
 
               <div className="employee-detail-grid">

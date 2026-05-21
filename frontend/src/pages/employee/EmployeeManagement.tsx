@@ -1,9 +1,11 @@
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import EmployeeFormModal from '../../components/employee/EmployeeFormModal';
 import EmployeeViewModal from '../../components/employee/EmployeeViewModal';
 import EmployeeDeactivateDialog from '../../components/employee/EmployeeDeactivateDialog';
+import ProfileNameCell from '../../components/ProfileNameCell';
 import '../../components/employee/employee-crud.css';
 import { exportToExcel, todayStr } from '../../utils/exportExcel';
 import {
@@ -400,18 +402,10 @@ const EmployeeManagement = () => {
                       <tr key={emp.id}>
                         <td>
                           <div className="epms-emp-name-cell">
-                            <span
-                              className={`epms-emp-avatar ${
-                                !active ? 'epms-emp-avatar--inactive' : ''
-                              }`}
-                              aria-hidden
-                            >
-                              {initials(emp)}
-                            </span>
-
-                            <span className="epms-emp-name-text" title={name}>
-                              {name}
-                            </span>
+                            <ProfileNameCell
+                          person={emp}
+                          subtitle={emp.staffNrc || emp.email || 'No NRC'}
+                        />
                           </div>
                         </td>
 
