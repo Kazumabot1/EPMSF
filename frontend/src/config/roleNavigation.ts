@@ -115,7 +115,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Action Items', path: '/one-on-one-action-items', icon: 'bi-list-check' },
       ],
     },
-    { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
+    {
+      label: 'Notifications',
+      path: '/notifications',
+      icon: 'bi-bell',
+      children: [
+        { label: 'Notification Template', path: '/notification-templates', icon: 'bi-file-earmark-text' },
+        { label: 'System Notification', path: '/notifications', icon: 'bi-bell' },
+      ],
+    },
     {
       label: 'PIP',
       path: '/pip',

@@ -147,6 +147,16 @@ export default function Notifications() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      load();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [load]);
+
   const onWsNotification = useCallback((payload) => {
     setNotifications((prev) => mergeByLatest(prev, payload));
   }, []);

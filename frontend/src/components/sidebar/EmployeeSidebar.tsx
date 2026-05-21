@@ -437,11 +437,13 @@ export default EmployeeSidebar; */
 
 
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { roleNavigation } from '../../config/roleNavigation';
 import type { NavItem, UserRole } from '../../config/roleNavigation';
 import SidebarCompanyLogo from '../layout/SidebarCompanyLogo';
+import api from '../../services/api';
+import { useNotificationsWebSocket } from '../../hooks/useNotificationsWebSocket';
 
 interface EmployeeSidebarProps {
   role?: UserRole;
@@ -462,6 +464,7 @@ const EmployeeSidebar = ({
   const location = useLocation();
   const navigation = roleNavigation[role] ?? roleNavigation.Employee;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const hasActiveChild = (item: NavItem) =>
     item.children?.some((child) => location.pathname === child.path || location.pathname.startsWith(`${child.path}/`)) ??
@@ -488,6 +491,51 @@ const EmployeeSidebar = ({
       return next;
     });
   }, [location.pathname, navigation]);
+
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const response = await api.get('/notifications/unread-count');
+      const body = response.data as { data?: number } | number;
+      const count = typeof body === 'number' ? body : body?.data;
+      setUnreadCount(typeof count === 'number' ? count : 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUnreadCount();
+  }, [loadUnreadCount, location.pathname]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadUnreadCount();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadUnreadCount]);
+
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      void loadUnreadCount();
+    };
+
+    window.addEventListener('epms:notifications-updated', onNotificationsUpdated);
+
+    return () => {
+      window.removeEventListener('epms:notifications-updated', onNotificationsUpdated);
+    };
+  }, [loadUnreadCount]);
+
+  useNotificationsWebSocket(() => {
+    setUnreadCount((prev) => prev + 1);
+  });
+
+  const notificationBadge = unreadCount > 0 ? (
+    <span className="employee-nav-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+  ) : null;
 
   const toggleDropdown = (path: string) => {
     setExpanded((previous) => {
@@ -545,6 +593,7 @@ const EmployeeSidebar = ({
                   <span className="employee-nav-link-main">
                     <i className={`bi ${item.icon}`} />
                     {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && item.path.includes('notifications') && notificationBadge}
                   </span>
 
                   {!collapsed && (
@@ -565,6 +614,7 @@ const EmployeeSidebar = ({
                       >
                         <i className={`bi ${child.icon}`} />
                         <span>{child.label}</span>
+                        {child.path.includes('notifications') && notificationBadge}
                       </NavLink>
                     ))}
                   </div>
@@ -585,6 +635,7 @@ const EmployeeSidebar = ({
             >
               <i className={`bi ${item.icon}`} />
               {!collapsed && <span>{item.label}</span>}
+              {!collapsed && item.path.includes('notifications') && notificationBadge}
             </NavLink>
           );
         })}

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
+import api from '../../services/api';
+import { useNotificationsWebSocket } from '../../hooks/useNotificationsWebSocket';
 import SidebarCompanyLogo from './SidebarCompanyLogo';
 
 type SidebarProps = {
@@ -28,6 +30,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = authStorage.getUser();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const dashboard = user?.dashboard ?? '';
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
@@ -183,7 +186,15 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard2-pulse',
         children: pipChildren,
       },
-      { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
+      {
+        to: '/notifications',
+        label: 'Notifications',
+        icon: 'bi bi-bell',
+        children: [
+          { to: '/notification-templates', label: 'Notification Template', icon: 'bi bi-file-earmark-text' },
+          { to: '/notifications', label: 'System Notification', icon: 'bi bi-bell' },
+        ],
+      },
       {
         to: '/hr/position/create',
         label: 'Positions',
@@ -233,6 +244,51 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
     return hrNavItems;
   }, [variant, isAdmin, isEmployee, canCreatePip]);
+
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const response = await api.get('/notifications/unread-count');
+      const body = response.data as { data?: number } | number;
+      const count = typeof body === 'number' ? body : body?.data;
+      setUnreadCount(typeof count === 'number' ? count : 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUnreadCount();
+  }, [loadUnreadCount, location.pathname]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadUnreadCount();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadUnreadCount]);
+
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      void loadUnreadCount();
+    };
+
+    window.addEventListener('epms:notifications-updated', onNotificationsUpdated);
+
+    return () => {
+      window.removeEventListener('epms:notifications-updated', onNotificationsUpdated);
+    };
+  }, [loadUnreadCount]);
+
+  useNotificationsWebSocket(() => {
+    setUnreadCount((prev) => prev + 1);
+  });
+
+  const notificationBadge = unreadCount > 0 ? (
+    <span className="hr-nav-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+  ) : null;
 
   const hasActiveChild = (item: NavItem) =>
     item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false;
@@ -319,6 +375,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
               >
                 <i className={item.icon} />
                 {!collapsed && <span>{item.label}</span>}
+                {item.to.includes('notifications') && notificationBadge}
               </NavLink>
             );
           }
@@ -336,6 +393,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
                 {!collapsed && (
                   <>
                     <span>{item.label}</span>
+                    {item.to.includes('notifications') && notificationBadge}
                     <i
                       className={`bi ${
                         isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'
@@ -358,6 +416,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
                     >
                       <i className={child.icon} />
                       <span>{child.label}</span>
+                      {child.to.includes('notifications') && notificationBadge}
                     </NavLink>
                   ))}
                 </div>

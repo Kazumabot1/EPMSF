@@ -1,5 +1,6 @@
 package com.epms.service;
 
+import com.epms.dto.NotificationTemplateDeliveryResultDto;
 import com.epms.dto.NotificationTemplateRequestDto;
 import com.epms.dto.NotificationTemplateResponseDto;
 
@@ -16,4 +17,8 @@ public interface NotificationTemplateService {
     NotificationTemplateResponseDto updateNotificationTemplate(Integer id, NotificationTemplateRequestDto requestDto);
 
     void deleteNotificationTemplate(Integer id);
+
+    NotificationTemplateDeliveryResultDto sendTemplateEmail(Integer id);
+
+    NotificationTemplateDeliveryResultDto sendTemplateInApp(Integer id);
 }

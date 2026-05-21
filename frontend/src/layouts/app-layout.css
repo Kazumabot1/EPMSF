@@ -141,6 +141,21 @@ q.app-shell {
   text-align: center;
 }
 
+.employee-nav-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 .employee-nav-link:hover,
 .employee-nav-link.active {
   background: #e9ecfb;

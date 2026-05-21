@@ -100,6 +100,16 @@ const EmployeeHeader = ({
   }, [loadNotifications]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadNotifications]);
+
+  useEffect(() => {
     if (!menuOpen && !notificationOpen) return;
 
     const onDocMouseDown = (event: MouseEvent) => {
@@ -583,6 +593,16 @@ const EmployeeHeader = ({
 
   useEffect(() => {
     void loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [loadNotifications]);
 
   useEffect(() => {
