@@ -14,6 +14,23 @@ type Props = {
   onSave: (assignment: ManagerKpiAssignment) => void | Promise<void>;
 };
 
+const blockedNumberKeys = new Set(['-', '+', 'e', 'E']);
+
+function isAllowedActualText(value: string) {
+  if (value === '') {
+    return true;
+  }
+  return /^\d+(\.\d*)?$/.test(value) && Number.isFinite(Number(value));
+}
+
+function isInvalidActualText(value: string) {
+  if (value.trim() === '') {
+    return false;
+  }
+  const numericValue = Number(value);
+  return !Number.isFinite(numericValue) || numericValue < 1 || numericValue > 100;
+}
+
 const ManagerEmployeeKpiScoreModal = ({
   open,
   assignment,
@@ -137,6 +154,8 @@ const ManagerEmployeeKpiScoreModal = ({
               <tbody>
                 {assignment.lines.map((line) => {
                   const rawDraft = drafts[assignment.employeeKpiFormId]?.[line.kpiFormItemId]?.trim() ?? '';
+                  const actualDraft = drafts[assignment.employeeKpiFormId]?.[line.kpiFormItemId] ?? '';
+                  const actualInvalid = isInvalidActualText(actualDraft);
                   const draftNum = rawDraft === '' ? null : Number(rawDraft);
                   const tgt = line.target != null && line.target > 0 ? line.target : null;
                   const previewPct =
@@ -158,18 +177,35 @@ const ManagerEmployeeKpiScoreModal = ({
                       <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9' }}>
                         <input
                           type="number"
-                          min={0}
+                          min={1}
+                          max={100}
                           step={0.01}
                           disabled={isFinal}
                           value={drafts[assignment.employeeKpiFormId]?.[line.kpiFormItemId] ?? ''}
-                          onChange={(e) =>
-                            onDraftChange(assignment.employeeKpiFormId, line.kpiFormItemId, e.target.value)
-                          }
+                          onKeyDown={(e) => {
+                            if (blockedNumberKeys.has(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onPaste={(e) => {
+                            const pasted = e.clipboardData.getData('text');
+                            if (!isAllowedActualText(pasted)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            if (isAllowedActualText(e.target.value)) {
+                              onDraftChange(assignment.employeeKpiFormId, line.kpiFormItemId, e.target.value);
+                            }
+                          }}
                           style={{
                             width: '100px',
                             padding: '.35rem .5rem',
                             borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
+                            border: actualInvalid ? '1px solid #ef4444' : '1px solid #cbd5e1',
+                            background: actualInvalid ? '#fff7f7' : '#fff',
+                            color: actualInvalid ? '#991b1b' : '#0f172a',
+                            outlineColor: actualInvalid ? '#ef4444' : undefined,
                           }}
                         />
                       </td>

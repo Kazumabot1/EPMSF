@@ -28,7 +28,7 @@ function lineEffectivelyScored(
   const raw = draftRaw?.trim() ?? '';
   if (raw !== '') {
     const n = Number(raw);
-    return Number.isFinite(n) && !Number.isNaN(n) && n >= 0;
+    return Number.isFinite(n) && !Number.isNaN(n) && n >= 1 && n <= 100;
   }
   return line.score != null;
 }
@@ -133,8 +133,8 @@ const ManagerKpiScoringPage = () => {
     });
     for (const row of scores) {
       const av = 'actualValue' in row ? row.actualValue : undefined;
-      if (av != null && (Number.isNaN(av) || av < 0 || !Number.isFinite(av))) {
-        toast.error('Actual values must be non‑negative numbers.');
+      if (av != null && (Number.isNaN(av) || av < 1 || av > 100 || !Number.isFinite(av))) {
+        toast.error('Actual values must be between 1 and 100.');
         return;
       }
     }

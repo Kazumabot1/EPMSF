@@ -1001,6 +1001,14 @@ public class KpiFormServiceImpl implements KpiFormService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Row " + (i + 1) + ": category, unit, target, and weight are required.");
             }
+            if (!Double.isFinite(row.getTarget()) || row.getTarget() < 1 || row.getTarget() > 100) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": target must be between 1 and 100.");
+            }
+            if (row.getWeight() < 1 || row.getWeight() > 100) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": weight must be between 1 and 100.");
+            }
         }
     }
 

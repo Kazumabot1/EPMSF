@@ -219,6 +219,12 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
       if (row.kpiCategoryId === null || row.kpiUnitId === null || row.target === null || row.weight === null) {
         return `Row ${i + 1}: category, unit, target, and weight are required.`;
       }
+      if (!Number.isFinite(row.target) || row.target < 1 || row.target > 100) {
+        return `Row ${i + 1}: target must be between 1 and 100.`;
+      }
+      if (!Number.isFinite(row.weight) || row.weight < 1 || row.weight > 100) {
+        return `Row ${i + 1}: weight must be between 1 and 100.`;
+      }
     }
     if ((submitStatus === 'ACTIVE' || submitStatus === 'FINALIZED') && totalWeight !== 100) {
       return 'Total weight must equal 100% for ACTIVE or FINALIZED templates.';

@@ -464,8 +464,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             KpiFormItem item = sc.getKpiFormItem();
             if (row.getActualValue() != null) {
                 double actual = row.getActualValue();
-                if (actual < 0 || Double.isNaN(actual) || Double.isInfinite(actual)) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Actual value must be a non‑negative number.");
+                if (actual < 1 || actual > 100 || Double.isNaN(actual) || Double.isInfinite(actual)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Actual value must be between 1 and 100.");
                 }
                 Double target = item != null ? item.getTarget() : null;
                 if (target == null || target <= 0) {
