@@ -5,12 +5,14 @@ type EmployeeAvatarProps = {
   email?: string | null;
   profileImageData?: string | null;
   profileImageType?: string | null;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showName?: boolean;
   subtitle?: string | null;
+  className?: string;
 };
 
 const sizeClass = {
+  xs: 'employee-avatar-xs',
   sm: 'employee-avatar-sm',
   md: 'employee-avatar-md',
   lg: 'employee-avatar-lg',
@@ -25,25 +27,27 @@ const getDisplayName = ({
 }: Pick<EmployeeAvatarProps, 'fullName' | 'firstName' | 'lastName' | 'email'>) => {
   const joinedName = `${firstName ?? ''} ${lastName ?? ''}`.trim();
 
-  return fullName?.trim() || joinedName || email?.trim() || 'Employee';
+  return fullName?.trim() || joinedName || email?.trim() || 'User';
 };
 
 const getInitials = (name?: string | null, email?: string | null) => {
-  const source = name?.trim() || email?.trim() || 'Employee';
+  const source = name?.trim() || email?.trim() || 'User';
 
-  return source
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('') || 'E';
+  return (
+    source
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('') || 'U'
+  );
 };
 
 const getImageSrc = (
   profileImageData?: string | null,
   profileImageType?: string | null,
 ) => {
-  if (!profileImageData || !profileImageType) {
+  if (!profileImageData) {
     return '';
   }
 
@@ -51,7 +55,7 @@ const getImageSrc = (
     return profileImageData;
   }
 
-  return `data:${profileImageType};base64,${profileImageData}`;
+  return `data:${profileImageType || 'image/png'};base64,${profileImageData}`;
 };
 
 const EmployeeAvatar = ({
@@ -64,12 +68,13 @@ const EmployeeAvatar = ({
   size = 'md',
   showName = false,
   subtitle,
+  className = '',
 }: EmployeeAvatarProps) => {
   const name = getDisplayName({ fullName, firstName, lastName, email });
   const src = getImageSrc(profileImageData, profileImageType);
 
   return (
-    <div className="employee-avatar-wrap">
+    <div className={`employee-avatar-wrap ${className}`.trim()}>
       {src ? (
         <img
           src={src}
@@ -84,8 +89,8 @@ const EmployeeAvatar = ({
 
       {showName && (
         <span className="employee-avatar-text">
-          <strong>{name}</strong>
-          {subtitle && <small>{subtitle}</small>}
+          <strong title={name}>{name}</strong>
+          {subtitle && <small title={subtitle}>{subtitle}</small>}
         </span>
       )}
     </div>

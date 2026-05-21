@@ -26,21 +26,30 @@ public interface PositionRepository extends JpaRepository<Position, Integer> {
 
     boolean existsByPositionTitleIgnoreCase(String positionTitle);
 
-    @Query(
-            value = """
-                    SELECT p.*
-                    FROM positions p
-                    WHERE (p.status IS NULL OR p.status = 1)
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM kpi_positions kp
-                          WHERE kp.position_id = p.id
-                            AND kp.status = 'ACTIVE'
-                            AND (:templateId IS NULL OR kp.kpi_form_id <> :templateId)
-                      )
-                    ORDER BY p.position_title ASC
-                    """,
-            nativeQuery = true
-    )
+    /*
+     * Used by KPI Template Create/Edit:
+     *
+     * Do NOT use native SQL here.
+     * Do NOT check kp.status here.
+     *
+     * Why:
+     * - Your merged DB may not have the same kpi_positions.status schema yet.
+     * - The old working KPI logic only needs to exclude positions already linked
+     *   to a non-archived KPI template.
+     * - When editing, the current template's own positions must stay selectable.
+     */
+    @Query("""
+            SELECT p
+            FROM Position p
+            WHERE (p.status IS NULL OR p.status = true)
+              AND NOT EXISTS (
+                  SELECT kp.id
+                  FROM KpiPosition kp
+                  WHERE kp.position.id = p.id
+                    AND (:templateId IS NULL OR kp.kpiForm.id <> :templateId)
+                    AND kp.kpiForm.status <> com.epms.entity.enums.KpiFormStatus.ARCHIVED
+              )
+            ORDER BY p.positionTitle ASC
+            """)
     List<Position> findAvailableForKpiTemplate(@Param("templateId") Integer templateId);
 }

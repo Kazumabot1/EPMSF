@@ -1,6 +1,6 @@
-
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import api from '../../services/api';
+import EmployeeAvatar from '../../components/EmployeeAvatar';
 import { exportToExcel, todayStr } from '../../utils/exportExcel';
 import './admin-dashboard.css';
 
@@ -43,6 +43,8 @@ interface AdminUserAccount {
   temporaryPasswordEmailSent?: boolean;
   message?: string;
   smtpErrorDetail?: string | null;
+  profileImageData?: string | null;
+  profileImageType?: string | null;
 }
 
 const unwrap = <T,>(payload: any, fallback: T): T =>
@@ -392,6 +394,7 @@ const AdminDashboard = () => {
             <i className="bi bi-person-plus" />{' '}
             {editingUserId ? 'Edit Login Account' : 'Login Account User'}
           </h2>
+
           <button
             className="adm-btn"
             type="button"
@@ -719,7 +722,17 @@ const AdminDashboard = () => {
                 users.map((user, index) => (
                   <tr key={user.userId ?? user.email ?? index}>
                     <td>{index + 1}</td>
-                    <td>{user.fullName ?? '—'}</td>
+                    <td>
+                      <EmployeeAvatar
+                        fullName={user.fullName}
+                        email={user.email}
+                        profileImageData={user.profileImageData}
+                        profileImageType={user.profileImageType}
+                        size="sm"
+                        showName
+                        subtitle={user.email || user.employeeCode || undefined}
+                      />
+                    </td>
                     <td>{user.email ?? '—'}</td>
                     <td>{user.employeeCode ?? '—'}</td>
                     <td>{user.departmentName ?? '—'}</td>

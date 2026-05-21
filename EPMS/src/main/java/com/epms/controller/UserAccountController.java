@@ -1,4 +1,3 @@
-
 package com.epms.controller;
 
 import com.epms.dto.AccountProvisionResult;
@@ -7,10 +6,12 @@ import com.epms.dto.HrEmployeeAccountCreateRequest;
 import com.epms.entity.Department;
 import com.epms.entity.Role;
 import com.epms.entity.User;
+import com.epms.entity.UserProfile;
 import com.epms.entity.UserRole;
 import com.epms.exception.BadRequestException;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.RoleRepository;
+import com.epms.repository.UserProfileRepository;
 import com.epms.repository.UserRepository;
 import com.epms.repository.UserRoleRepository;
 import com.epms.service.HrEmployeeAccountService;
@@ -39,6 +40,7 @@ public class UserAccountController {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final DepartmentRepository departmentRepository;
+    private final UserProfileRepository userProfileRepository;
 
     @GetMapping
     public ResponseEntity<GenericApiResponse<List<AdminUserAccountResponse>>> getUsers() {
@@ -132,12 +134,6 @@ public class UserAccountController {
         return ResponseEntity.ok(GenericApiResponse.success(summary, result));
     }
 
-    /**
-     * Admin-only repair endpoint for old records.
-     *
-     * It syncs users -> employee -> employee_department for all existing users.
-     * SecurityConfig already protects /api/users/** as Admin-only.
-     */
     @PostMapping("/resync-employee-links")
     public ResponseEntity<GenericApiResponse<Integer>> resyncEmployeeLinks() {
         int synced = hrEmployeeAccountService.resyncAllUserEmployeeLinks();
@@ -159,6 +155,12 @@ public class UserAccountController {
         response.setActive(user.getActive() == null || user.getActive());
         response.setAccountStatus(user.getAccountStatus());
         response.setMustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()));
+
+        userProfileRepository.findByUserId(user.getId()).ifPresent(profile -> {
+            response.setPhoneNumber(profile.getPhoneNumber());
+            response.setProfileImageData(profile.getProfileImageData());
+            response.setProfileImageType(profile.getProfileImageType());
+        });
 
         if (user.getDepartmentId() != null) {
             departmentRepository.findById(user.getDepartmentId())
@@ -268,6 +270,10 @@ public class UserAccountController {
         private Boolean active;
         private String accountStatus;
         private Boolean mustChangePassword;
+
+        private String phoneNumber;
+        private String profileImageData;
+        private String profileImageType;
 
         private Boolean temporaryPasswordEmailSent;
         private String message;
