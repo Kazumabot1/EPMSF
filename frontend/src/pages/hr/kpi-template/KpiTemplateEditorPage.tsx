@@ -60,6 +60,7 @@ const KpiTemplateEditorPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [savingAction, setSavingAction] = useState<'draft' | 'use-in-cycle' | null>(null);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
   const applyLookups = useCallback((lookups: Awaited<ReturnType<typeof loadKpiTemplateEditorLookups>>) => {
     setCategories(lookups.categories);
@@ -204,6 +205,11 @@ const KpiTemplateEditorPage = () => {
     setReasonAction(null);
   };
 
+  const showSaveError = (message: string) => {
+    setValidationMessage(message);
+    toast.error(message);
+  };
+
   const saveTemplate = async (action: 'draft' | 'use-in-cycle'): Promise<number | null> => {
     if (saveInFlightRef.current || savingAction !== null) {
       return null;
@@ -212,15 +218,16 @@ const KpiTemplateEditorPage = () => {
     const submitStatus: KpiFormStatus = action === 'use-in-cycle' ? 'ACTIVE' : 'DRAFT';
     const message = validate(submitStatus);
     if (message) {
-      toast.error(message);
+      showSaveError(message);
       return null;
     }
     if (positionId == null) {
-      toast.error('Select a position.');
+      showSaveError('Select a position.');
       return null;
     }
 
     const payload = buildPayload(submitStatus);
+    setValidationMessage(null);
     saveInFlightRef.current = true;
     setSavingAction(action);
 
@@ -255,7 +262,7 @@ const KpiTemplateEditorPage = () => {
     } catch (err) {
       const apiError = toApiRequestError(err, 'Could not save the KPI template.');
       if (isEdit && apiError.status === 409) {
-        toast.error(apiError.message);
+        showSaveError(apiError.message);
         return null;
       }
       if (
@@ -263,7 +270,7 @@ const KpiTemplateEditorPage = () => {
           onConflict: refreshAfterConflict,
         }))
       ) {
-        toast.error(apiError.message);
+        showSaveError(apiError.message);
       }
       return null;
     } finally {
@@ -322,6 +329,16 @@ const KpiTemplateEditorPage = () => {
           className="space-y-8"
           onSubmit={handleUseFormSubmit}
         >
+          {validationMessage && (
+            <div
+              className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm"
+              role="alert"
+            >
+              <i className="bi bi-exclamation-triangle-fill mt-0.5 text-red-500" aria-hidden />
+              <span>{validationMessage}</span>
+            </div>
+          )}
+
           <section className="kpi-tpl-card overflow-hidden p-0">
             <div className="p-6 sm:p-8">
               <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
@@ -340,7 +357,10 @@ const KpiTemplateEditorPage = () => {
                   <input
                     required
                     value={title}
-                    onChange={(event) => setTitle(event.target.value)}
+                    onChange={(event) => {
+                      setTitle(event.target.value);
+                      setValidationMessage(null);
+                    }}
                     placeholder="e.g. Sales Manager KPIs"
                     className={fieldClass}
                   />
@@ -356,6 +376,7 @@ const KpiTemplateEditorPage = () => {
                     disabled={savingAction !== null}
                     onChange={(event) => {
                       const next = event.target.value ? Number(event.target.value) : null;
+                      setValidationMessage(null);
                       void handlePositionChange(next != null && Number.isNaN(next) ? null : next);
                     }}
                     className={`${fieldClass} cursor-pointer appearance-none pr-10`}
@@ -439,9 +460,10 @@ const KpiTemplateEditorPage = () => {
                     setReasonAction({ type: 'remove', row });
                   }
                 }}
-                onRowChange={(rowId, patch) =>
-                  setRows((prev) => prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row)))
-                }
+                onRowChange={(rowId, patch) => {
+                  setValidationMessage(null);
+                  setRows((prev) => prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row)));
+                }}
               />
             </div>
           </section>

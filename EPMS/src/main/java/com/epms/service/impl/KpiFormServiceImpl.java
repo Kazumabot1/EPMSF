@@ -50,6 +50,7 @@ public class KpiFormServiceImpl implements KpiFormService {
     private final KpiCategoryRepository kpiCategoryRepository;
     private final KpiUnitRepository kpiUnitRepository;
     private final KpiItemRepository kpiItemRepository;
+    private final KpiFormItemRepository kpiFormItemRepository;
     private final UserRepository userRepository;
     private final KpiVersionHistoryRepository kpiVersionHistoryRepository;
     private final KpiTemplateVersionRowRepository kpiTemplateVersionRowRepository;
@@ -145,7 +146,6 @@ public class KpiFormServiceImpl implements KpiFormService {
             recordRowVersionHistory(form, rowDiff, editor, versionNumber);
         }
 
-        form.getItems().clear();
         if (positionChanged) {
             form.getKpiPositions().clear();
         }
@@ -156,7 +156,7 @@ public class KpiFormServiceImpl implements KpiFormService {
         if (positionChanged) {
             applyPositions(form, dto.getPositionIds());
         }
-        applyItems(form, dto.getItems());
+        syncItems(form, dto.getItems());
 
         kpiFormRepository.save(form);
         if (rowDiff.hasChanges()) {
@@ -1103,31 +1103,66 @@ public class KpiFormServiceImpl implements KpiFormService {
         for (int i = 0; i < rows.size(); i++) {
             KpiFormItemDTO row = rows.get(i);
 
-            KpiCategory category = kpiCategoryRepository.findById(row.getKpiCategoryId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI category not found."));
-            KpiUnit unit = kpiUnitRepository.findById(row.getKpiUnitId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI unit not found."));
-
-            KpiItem masterItem = null;
-            if (row.getKpiItemId() != null) {
-                masterItem = kpiItemRepository.findById(row.getKpiItemId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI item not found."));
-            }
-
-            String label = row.getKpiLabel() != null ? row.getKpiLabel().trim() : null;
-
             KpiFormItem entity = KpiFormItem.builder()
                     .kpiForm(form)
-                    .kpiCategory(category)
-                    .kpiUnit(unit)
-                    .kpiItem(masterItem)
-                    .kpiLabel(masterItem == null ? label : null)
-                    .target(row.getTarget())
-                    .weight(row.getWeight())
-                    .sortOrder(row.getSortOrder() != null ? row.getSortOrder() : i)
                     .build();
-
+            applyItemFields(entity, row, i);
             form.addItem(entity);
         }
+    }
+
+    private void syncItems(KpiForm form, List<KpiFormItemDTO> rows) {
+        Map<Integer, KpiFormItem> existingById = form.getItems().stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(KpiFormItem::getId, Function.identity()));
+        Set<Integer> submittedIds = rows.stream()
+                .map(KpiFormItemDTO::getId)
+                .filter(id -> id != null && existingById.containsKey(id))
+                .collect(Collectors.toSet());
+
+        List<KpiFormItem> removedItems = form.getItems().stream()
+                .filter(item -> item.getId() != null && !submittedIds.contains(item.getId()))
+                .toList();
+        for (KpiFormItem removed : removedItems) {
+            if (kpiFormItemRepository.isReferencedByEmployeeScores(removed.getId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "This KPI row is already used in employee KPI records and cannot be removed."
+                );
+            }
+            form.removeItem(removed);
+        }
+
+        for (int i = 0; i < rows.size(); i++) {
+            KpiFormItemDTO row = rows.get(i);
+            KpiFormItem entity = row.getId() == null ? null : existingById.get(row.getId());
+            if (entity == null) {
+                entity = KpiFormItem.builder().kpiForm(form).build();
+                form.addItem(entity);
+            }
+            applyItemFields(entity, row, i);
+        }
+    }
+
+    private void applyItemFields(KpiFormItem entity, KpiFormItemDTO row, int index) {
+        KpiCategory category = kpiCategoryRepository.findById(row.getKpiCategoryId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI category not found."));
+        KpiUnit unit = kpiUnitRepository.findById(row.getKpiUnitId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI unit not found."));
+
+        KpiItem masterItem = null;
+        if (row.getKpiItemId() != null) {
+            masterItem = kpiItemRepository.findById(row.getKpiItemId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI item not found."));
+        }
+
+        String label = row.getKpiLabel() != null ? row.getKpiLabel().trim() : null;
+        entity.setKpiCategory(category);
+        entity.setKpiUnit(unit);
+        entity.setKpiItem(masterItem);
+        entity.setKpiLabel(masterItem == null ? label : null);
+        entity.setTarget(row.getTarget());
+        entity.setWeight(row.getWeight());
+        entity.setSortOrder(row.getSortOrder() != null ? row.getSortOrder() : index);
     }
 }
