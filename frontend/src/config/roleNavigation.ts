@@ -33,7 +33,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'My KPIs', path: '/employee/kpis', icon: 'bi-bullseye' },
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
-    { label: 'My Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
+    { label: '360 Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
     { label: 'One-on-Ones', path: '/employee/one-on-ones', icon: 'bi-calendar-check' },
     {
       label: 'PIP',
@@ -126,6 +126,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       end: true,
     },
     { label: 'Assessment Scores', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data' },
+    { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
     {
       label: 'Appraisals',
       path: '/department-head/appraisals',
@@ -158,6 +159,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
+    { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
 
     {
       label: 'Assessment Review',
@@ -1254,6 +1256,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
+    { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
 
     {
       label: 'Team Appraisals',
@@ -1277,7 +1280,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
     { label: 'Continuous Feedback', path: '/continuous-feedback', icon: 'bi-chat-left-heart' },
     { label: 'Team Reports', path: '/manager/reports', icon: 'bi-file-earmark-bar-graph' },
-    { label: 'Feedback', path: '/feedback', icon: 'bi-chat-square-text' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
 
     {
@@ -1294,6 +1296,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Assessment Scores', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data' },
+    { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
 
     {
       label: 'Appraisals',
@@ -1315,7 +1318,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       ],
     },
 
-    { label: 'Feedback', path: '/feedback', icon: 'bi-chat-square-text' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
 
     {
@@ -1335,7 +1337,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
     { label: 'Assessment Scores', path: '/employee/assessment-scores', icon: 'bi-table' },
-    { label: 'My Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
+    { label: '360 Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
     { label: 'Continuous Feedback', path: '/employee/continuous-feedback', icon: 'bi-chat-left-heart' },
     { label: 'One-on-Ones', path: '/employee/one-on-ones', icon: 'bi-calendar-check' },
     { label: 'PIP', path: '/employee/pip', icon: 'bi-clipboard-data' },
@@ -1363,10 +1365,10 @@ export const dashboardRouteByRole = dashboardPathByRole;
 const toText = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 const normalizeRoleName = (role: unknown): string =>
-  toText(role)
-    .replace(/^ROLE_/i, '')
-    .replace(/[\s-]+/g, '_')
-    .toUpperCase();
+    toText(role)
+        .replace(/^ROLE_/i, '')
+        .replace(/[\s-]+/g, '_')
+        .toUpperCase();
 
 const getRolesArray = (roles: unknown): string[] => {
   if (Array.isArray(roles)) {
@@ -1381,8 +1383,8 @@ const getRolesArray = (roles: unknown): string[] => {
 };
 
 export const resolveRoleKey = (
-  dashboardOrUser?: unknown,
-  rolesArg: unknown = [],
+    dashboardOrUser?: unknown,
+    rolesArg: unknown = [],
 ): UserRole => {
   let dashboard = '';
   let roles: string[] = [];
@@ -1414,23 +1416,23 @@ export const resolveRoleKey = (
   if (normalizedRoles.includes('ADMIN')) return 'Admin';
 
   if (
-    normalizedRoles.some(
-      (role) =>
-        role === 'HR' ||
-        role.includes('HR') ||
-        role.includes('HUMAN_RESOURCE') ||
-        role.includes('HUMAN_RESOURCES'),
-    )
+      normalizedRoles.some(
+          (role) =>
+              role === 'HR' ||
+              role.includes('HR') ||
+              role.includes('HUMAN_RESOURCE') ||
+              role.includes('HUMAN_RESOURCES'),
+      )
   ) {
     return 'HR';
   }
 
   if (
-    normalizedRoles.includes('MANAGER') ||
-    normalizedRoles.includes('PROJECTMANAGER') ||
-    normalizedRoles.includes('PROJECT_MANAGER') ||
-    normalizedRoles.includes('TEAMLEADER') ||
-    normalizedRoles.includes('TEAM_LEADER')
+      normalizedRoles.includes('MANAGER') ||
+      normalizedRoles.includes('PROJECTMANAGER') ||
+      normalizedRoles.includes('PROJECT_MANAGER') ||
+      normalizedRoles.includes('TEAMLEADER') ||
+      normalizedRoles.includes('TEAM_LEADER')
   ) {
     return 'Manager';
   }

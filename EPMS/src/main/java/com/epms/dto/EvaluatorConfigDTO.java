@@ -1,29 +1,54 @@
 package com.epms.dto;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 @Data
 public class EvaluatorConfigDTO {
 
-    @NotNull(message = "Manager inclusion flag is required.")
-    private Boolean includeManager;
+    private Boolean includeManager = true;
 
-    @NotNull(message = "Team peer inclusion flag is required.")
-    private Boolean includeTeamPeers;
+    /**
+     * New simplified peer switch for the redesigned 360 setup. When enabled, the
+     * service resolves peers from active team first, then current department fallback.
+     */
+    private Boolean includePeers = true;
 
-    private Boolean includeDepartmentPeers;
+    private Boolean includeSubordinates = true;
 
-    @NotNull(message = "Project peer inclusion flag is required.")
-    private Boolean includeProjectPeers;
+    private Boolean includeSelf = true;
 
-    @NotNull(message = "Cross-team peer inclusion flag is required.")
-    private Boolean includeCrossTeamPeers;
+    @Min(value = 0, message = "Minimum peer count cannot be negative.")
+    private Integer peerMinCount = 2;
 
-    private Boolean includeSubordinates = false;
+    @Positive(message = "Maximum peer count must be greater than zero.")
+    private Integer peerMaxCount = 5;
 
-    private Boolean includeSelf = false;
+    @Min(value = 0, message = "Minimum subordinate count cannot be negative.")
+    private Integer subordinateMinCount = 0;
+
+    @Min(value = 0, message = "Maximum subordinate count cannot be negative.")
+    private Integer subordinateMaxCount = 5;
+
+    /**
+     * True means insufficient peer/subordinate counts produce warnings but do not
+     * prevent preview/generation. This is the safer first production behavior for
+     * small departments, junior employees, and imperfect org data.
+     */
+    private Boolean flexibleMode = true;
+
+    /**
+     * Legacy fields kept so older callers do not break while the new Campaign Setup
+     * UI moves to role-based rules. They are mapped into includePeers internally.
+     */
+    private Boolean includeTeamPeers = true;
+
+    private Boolean includeDepartmentPeers = true;
+
+    private Boolean includeProjectPeers = false;
+
+    private Boolean includeCrossTeamPeers = false;
 
     @Positive(message = "Peer count must be greater than zero.")
     private Integer peerCount;

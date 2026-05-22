@@ -12,7 +12,6 @@ import type {
 
 export const feedbackCampaignKeys = {
   all: ['feedback-campaign-setup'] as const,
-  forms: () => [...feedbackCampaignKeys.all, 'forms'] as const,
   employees: () => [...feedbackCampaignKeys.all, 'employees'] as const,
   departments: () => [...feedbackCampaignKeys.all, 'departments'] as const,
   teams: () => [...feedbackCampaignKeys.all, 'teams'] as const,
@@ -20,11 +19,6 @@ export const feedbackCampaignKeys = {
 };
 
 export const useFeedbackCampaignReferenceData = () => {
-  const formsQuery = useQuery({
-    queryKey: feedbackCampaignKeys.forms(),
-    queryFn: feedbackCampaignApi.getActiveForms,
-  });
-
   const employeesQuery = useQuery({
     queryKey: feedbackCampaignKeys.employees(),
     queryFn: feedbackCampaignApi.getEmployees,
@@ -41,7 +35,6 @@ export const useFeedbackCampaignReferenceData = () => {
   });
 
   return {
-    formsQuery,
     employeesQuery,
     departmentsQuery,
     teamsQuery,
@@ -49,11 +42,11 @@ export const useFeedbackCampaignReferenceData = () => {
 };
 
 export const useFeedbackCampaign = (campaignId: number | null) =>
-  useQuery({
-    queryKey: campaignId ? feedbackCampaignKeys.campaign(campaignId) : feedbackCampaignKeys.all,
-    queryFn: () => feedbackCampaignApi.getCampaign(campaignId as number),
-    enabled: campaignId != null,
-  });
+    useQuery({
+      queryKey: campaignId ? feedbackCampaignKeys.campaign(campaignId) : feedbackCampaignKeys.all,
+      queryFn: () => feedbackCampaignApi.getCampaign(campaignId as number),
+      enabled: campaignId != null,
+    });
 
 export const useCreateFeedbackCampaign = () => {
   const queryClient = useQueryClient();
@@ -71,9 +64,9 @@ export const useAssignFeedbackTargets = () => {
 
   return useMutation({
     mutationFn: ({
-      campaignId,
-      payload,
-    }: {
+                   campaignId,
+                   payload,
+                 }: {
       campaignId: number;
       payload: FeedbackCampaignTargetsInput;
     }) => feedbackCampaignApi.assignTargets(campaignId, payload),
@@ -83,13 +76,24 @@ export const useAssignFeedbackTargets = () => {
   });
 };
 
+export const usePreviewFeedbackAssignments = () =>
+    useMutation({
+      mutationFn: ({
+                     campaignId,
+                     payload,
+                   }: {
+        campaignId: number;
+        payload: EvaluatorConfigInput;
+      }) => feedbackCampaignApi.previewAssignments(campaignId, payload),
+    });
+
 export const useGenerateFeedbackAssignments = () =>
-  useMutation({
-    mutationFn: ({
-      campaignId,
-      payload,
-    }: {
-      campaignId: number;
-      payload: EvaluatorConfigInput;
-    }) => feedbackCampaignApi.generateAssignments(campaignId, payload),
-  });
+    useMutation({
+      mutationFn: ({
+                     campaignId,
+                     payload,
+                   }: {
+        campaignId: number;
+        payload: EvaluatorConfigInput;
+      }) => feedbackCampaignApi.generateAssignments(campaignId, payload),
+    });

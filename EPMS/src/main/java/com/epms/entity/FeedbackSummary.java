@@ -54,9 +54,6 @@ public class FeedbackSummary {
     @Column(name = "self_responses", nullable = false)
     private Long selfResponses;
 
-    @Column(name = "project_stakeholder_responses", nullable = false)
-    private Long projectStakeholderResponses;
-
     @Column(name = "assigned_evaluator_count", nullable = false)
     private Long assignedEvaluatorCount;
 
@@ -106,9 +103,6 @@ public class FeedbackSummary {
     @Column(name = "self_average_score")
     private Double selfAverageScore;
 
-    @Column(name = "project_stakeholder_average_score")
-    private Double projectStakeholderAverageScore;
-
     @Column(name = "summarized_at", nullable = false)
     private LocalDateTime summarizedAt;
 
@@ -137,7 +131,6 @@ public class FeedbackSummary {
         if (peerResponses == null) peerResponses = 0L;
         if (subordinateResponses == null) subordinateResponses = 0L;
         if (selfResponses == null) selfResponses = 0L;
-        if (projectStakeholderResponses == null) projectStakeholderResponses = 0L;
         if (assignedEvaluatorCount == null) assignedEvaluatorCount = 0L;
         if (submittedEvaluatorCount == null) submittedEvaluatorCount = 0L;
         if (pendingEvaluatorCount == null) pendingEvaluatorCount = 0L;

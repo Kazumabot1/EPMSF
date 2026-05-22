@@ -77,7 +77,7 @@ export default function TargetEvaluatorTab({
     }, [campaign, campaigns, selectedCampaignId]);
 
     const openCampaigns = useMemo(
-        () => campaigns.filter(item => item.status !== 'CANCELLED'),
+        () => campaigns,
         [campaigns],
     );
 

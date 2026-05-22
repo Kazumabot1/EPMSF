@@ -31,12 +31,10 @@ public class FeedbackIntegrationScoreResponse {
     Double peerAverageScore;
     Double subordinateAverageScore;
     Double selfAverageScore;
-    Double projectStakeholderAverageScore;
     Long managerResponses;
     Long peerResponses;
     Long subordinateResponses;
     Long selfResponses;
-    Long projectStakeholderResponses;
     String scoreCalculationMethod;
     String scoreCalculationNote;
     String visibilityStatus;

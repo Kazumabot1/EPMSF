@@ -95,44 +95,6 @@ export const RESPONSE_TYPE_OPTIONS = [
     },
 ];
 
-export const SECTION_OPTIONS = [
-    {
-        code: 'CORE_BEHAVIOR',
-        title: 'Core Behavior',
-        order: 1,
-        description: 'Company-wide behavior questions such as communication, teamwork, and professionalism.',
-    },
-    {
-        code: 'JOB_PERFORMANCE',
-        title: 'Job Performance',
-        order: 2,
-        description: 'Work quality, accountability, execution, and delivery-related questions.',
-    },
-    {
-        code: 'LEADERSHIP',
-        title: 'Leadership & People Management',
-        order: 3,
-        description: 'Questions for employees who lead people, teams, or projects.',
-    },
-    {
-        code: 'TECHNICAL_CAPABILITY',
-        title: 'Technical Capability',
-        order: 4,
-        description: 'Role-specific technical or professional capability questions.',
-    },
-    {
-        code: 'COMPLIANCE_RELIABILITY',
-        title: 'Compliance & Reliability',
-        order: 5,
-        description: 'Attendance, reliability, safety, and compliance-oriented questions.',
-    },
-    {
-        code: 'OPEN_FEEDBACK',
-        title: 'Open Feedback',
-        order: 6,
-        description: 'Written-answer questions for strengths, improvement areas, and support needed.',
-    },
-];
 
 export const isRatingResponseType = (responseType?: string | null) =>
     responseType === 'RATING' || responseType === 'RATING_WITH_COMMENT';
@@ -169,37 +131,13 @@ export const getCompetencyLabel = (competency?: string | null) =>
         ?? toTitleCaseFromCode(competency)
     ) || 'General';
 
-export const getSectionLabel = (sectionCode?: string | null, sectionTitle?: string | null) =>
-    SECTION_OPTIONS.find(section => section.code === sectionCode)?.title
-    ?? sectionTitle
-    ?? toTitleCaseFromCode(sectionCode)
-    ?? 'Unassigned';
+export const getRoleLabel = (value?: string | null) =>
+    EVALUATOR_ROLE_OPTIONS.find(option => option.value === value)?.label
+    ?? toTitleCaseFromCode(value)
+    ?? 'Unknown';
 
-export const getRoleLabel = (value?: string | null) => {
-    if (value === 'ANY') {
-        return 'Legacy all roles';
-    }
-
-    if (value === 'PROJECT_STAKEHOLDER') {
-        return 'Project Stakeholder';
-    }
-
-    return EVALUATOR_ROLE_OPTIONS.find(option => option.value === value)?.label
-        ?? toTitleCaseFromCode(value)
-        ?? 'Unknown';
-};
-
-export const getRoleShort = (value?: string | null) => {
-    if (value === 'ANY') {
-        return 'ALL';
-    }
-
-    if (value === 'PROJECT_STAKEHOLDER') {
-        return 'PS';
-    }
-
-    return EVALUATOR_ROLE_OPTIONS.find(option => option.value === value)?.short ?? '—';
-};
+export const getRoleShort = (value?: string | null) =>
+    EVALUATOR_ROLE_OPTIONS.find(option => option.value === value)?.short ?? '—';
 
 export type ScoringKind = 'SCORED' | 'NON_SCORED' | 'HR_REVIEW';
 
@@ -277,14 +215,6 @@ export const generateQuestionCode = (competencyCode: string, questions: Question
     return `${prefix}${String(nextSequence).padStart(3, '0')}`;
 };
 
-export const getNextDisplayOrder = (rules: QuestionRuleItem[], sectionCode: string) => {
-    const currentMax = rules
-        .filter(rule => rule.sectionCode === sectionCode)
-        .reduce((max, rule) => Math.max(max, Number(rule.displayOrder) || 0), 0);
-
-    return currentMax + 10;
-};
-
 const rangesOverlap = (aMin: number, aMax: number, bMin: number, bMax: number) =>
     aMin <= bMax && bMin <= aMax;
 
@@ -293,14 +223,11 @@ const nullableScopeOverlaps = (a?: number | null, b?: number | null) =>
 
 export const findRuleConflictIds = (rules: QuestionRuleItem[]) => {
     const conflicts = new Set<number>();
-
-    const activeRules = rules.filter(rule =>
-        rule.active && rule.evaluatorRelationshipType !== 'ANY',
-    );
+    const activeRules = rules.filter(rule => rule.active);
 
     activeRules.forEach((rule, index) => {
         activeRules.slice(index + 1).forEach(other => {
-            const sameQuestion = rule.questionVersionId === other.questionVersionId;
+            const sameQuestion = rule.questionBankId === other.questionBankId;
             const sameRole = rule.evaluatorRelationshipType === other.evaluatorRelationshipType;
             const levelsOverlap = rangesOverlap(
                 rule.targetLevelMinRank,
@@ -308,14 +235,8 @@ export const findRuleConflictIds = (rules: QuestionRuleItem[]) => {
                 other.targetLevelMinRank,
                 other.targetLevelMaxRank,
             );
-            const departmentsOverlap = nullableScopeOverlaps(
-                rule.targetDepartmentId,
-                other.targetDepartmentId,
-            );
-            const positionsOverlap = nullableScopeOverlaps(
-                rule.targetPositionId,
-                other.targetPositionId,
-            );
+            const departmentsOverlap = nullableScopeOverlaps(rule.targetDepartmentId, other.targetDepartmentId);
+            const positionsOverlap = nullableScopeOverlaps(rule.targetPositionId, other.targetPositionId);
 
             if (sameQuestion && sameRole && levelsOverlap && departmentsOverlap && positionsOverlap) {
                 conflicts.add(rule.id);

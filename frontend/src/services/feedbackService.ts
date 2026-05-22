@@ -32,8 +32,14 @@ export const feedbackService = {
     }
   },
 
-  async updateCampaign(_campaignId: number, _payload: FeedbackCampaignPayload): Promise<FeedbackCampaign> {
-    throw new Error('Editing an existing 360 campaign is not supported by the backend yet. Create the campaign in DRAFT, then use target assignment and lifecycle actions.');
+  async updateCampaign(campaignId: number, payload: FeedbackCampaignPayload): Promise<FeedbackCampaign> {
+    try {
+      const { status: _status, ...updatePayload } = payload;
+      const response = await api.put<ApiEnvelope<FeedbackCampaign>>(`${FEEDBACK_BASE}/campaigns/${campaignId}`, updatePayload);
+      return response.data.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to update feedback campaign draft.'));
+    }
   },
 
   async activateCampaign(campaignId: number): Promise<FeedbackCampaign> {
@@ -54,12 +60,11 @@ export const feedbackService = {
     }
   },
 
-  async cancelCampaign(campaignId: number): Promise<FeedbackCampaign> {
+  async deleteDraftCampaign(campaignId: number): Promise<void> {
     try {
-      const response = await api.post<ApiEnvelope<FeedbackCampaign>>(`${FEEDBACK_BASE}/campaigns/${campaignId}/cancel`);
-      return response.data.data;
+      await api.delete(`${FEEDBACK_BASE}/campaigns/${campaignId}`);
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to cancel feedback campaign.'));
+      throw new Error(extractApiErrorMessage(error, 'Failed to delete draft feedback campaign.'));
     }
   },
 

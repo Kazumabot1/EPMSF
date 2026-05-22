@@ -17,6 +17,10 @@ public interface FeedbackAssignmentQuestionRepository extends JpaRepository<Feed
 
     List<FeedbackAssignmentQuestion> findByAssignmentIdOrderBySectionOrderAscDisplayOrderAscIdAsc(Long assignmentId);
 
+    long countByAssignmentFeedbackRequestCampaignId(Long campaignId);
+
+    void deleteByAssignmentFeedbackRequestCampaignId(Long campaignId);
+
     @Query("""
         SELECT aq
         FROM FeedbackAssignmentQuestion aq

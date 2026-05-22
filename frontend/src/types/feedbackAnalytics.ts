@@ -18,7 +18,6 @@ export interface FeedbackResultItem {
   peerResponses: number;
   subordinateResponses: number;
   selfResponses?: number;
-  projectStakeholderResponses?: number;
   assignedEvaluatorCount?: number;
   submittedEvaluatorCount?: number;
   pendingEvaluatorCount?: number;
@@ -29,14 +28,47 @@ export interface FeedbackResultItem {
   peerAverageScore?: number | null;
   subordinateAverageScore?: number | null;
   selfAverageScore?: number | null;
-  projectStakeholderAverageScore?: number | null;
   scoreCalculationMethod?: string;
   scoreCalculationNote?: string;
   visibilityStatus?: 'HIDDEN' | 'READY_TO_PUBLISH' | 'PUBLISHED' | string;
+  includeOverallScore?: boolean;
+  includeCompetencyBreakdown?: boolean;
+  includeSelfVsOthers?: boolean;
+  includeComments?: boolean;
+  includeScoreExplanation?: boolean;
   publishedAt?: string | null;
   publishedByUserId?: number | null;
   publishNote?: string | null;
   summarizedAt: string;
+}
+
+export interface FeedbackScoreDistribution {
+  band: string;
+  label: string;
+  minScore: number;
+  maxScore: number;
+  count: number;
+}
+
+export interface FeedbackRelationshipAverage {
+  relationshipType: string;
+  label?: string | null;
+  averageScore?: number | null;
+  responseCount: number;
+}
+
+export interface FeedbackCompetencyAverage {
+  competencyCode: string;
+  competencyName: string;
+  averageScore?: number | null;
+  responseCount: number;
+  questionCount: number;
+}
+
+export interface FeedbackConfidenceBreakdown {
+  level: string;
+  label: string;
+  count: number;
 }
 
 export interface FeedbackCampaignSummary {
@@ -53,11 +85,31 @@ export interface FeedbackCampaignSummary {
   completionRate?: number;
   insufficientFeedbackCount?: number;
   visibilityStatus?: 'HIDDEN' | 'READY_TO_PUBLISH' | 'PUBLISHED' | string;
+  includeOverallScore?: boolean;
+  includeCompetencyBreakdown?: boolean;
+  includeSelfVsOthers?: boolean;
+  includeComments?: boolean;
+  includeScoreExplanation?: boolean;
   publishedAt?: string | null;
   publishedByUserId?: number | null;
   publishNote?: string | null;
   summarizedAt: string;
+  scoreDistribution?: FeedbackScoreDistribution[];
+  relationshipAverages?: FeedbackRelationshipAverage[];
+  competencyAverages?: FeedbackCompetencyAverage[];
+  confidenceBreakdown?: FeedbackConfidenceBreakdown[];
   items: FeedbackResultItem[];
+}
+
+export interface FeedbackSummaryPublishRequest {
+  scope: 'ALL_READY' | 'SELECTED_EMPLOYEES';
+  targetEmployeeIds?: number[];
+  includeOverallScore: boolean;
+  includeCompetencyBreakdown: boolean;
+  includeSelfVsOthers: boolean;
+  includeComments: boolean;
+  includeScoreExplanation: boolean;
+  notifyEmployees: boolean;
 }
 
 export interface FeedbackMyResult {
@@ -92,15 +144,18 @@ export interface FeedbackIntegrationScore {
   peerAverageScore?: number | null;
   subordinateAverageScore?: number | null;
   selfAverageScore?: number | null;
-  projectStakeholderAverageScore?: number | null;
   managerResponses: number;
   peerResponses: number;
   subordinateResponses: number;
   selfResponses: number;
-  projectStakeholderResponses: number;
   scoreCalculationMethod: string;
   scoreCalculationNote?: string;
   visibilityStatus?: 'HIDDEN' | 'READY_TO_PUBLISH' | 'PUBLISHED' | string;
+  includeOverallScore?: boolean;
+  includeCompetencyBreakdown?: boolean;
+  includeSelfVsOthers?: boolean;
+  includeComments?: boolean;
+  includeScoreExplanation?: boolean;
   publishedAt?: string | null;
   publishedByUserId?: number | null;
   publishNote?: string | null;

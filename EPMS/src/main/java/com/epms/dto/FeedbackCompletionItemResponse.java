@@ -29,7 +29,6 @@ public class FeedbackCompletionItemResponse {
     private Long peerEvaluators;
     private Long subordinateEvaluators;
     private Long selfEvaluators;
-    private Long projectStakeholderEvaluators;
 
     private Double completionPercent;
     private Double averageScore;

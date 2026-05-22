@@ -18,4 +18,11 @@ public class FeedbackResponseSubmitRequest {
     private List<FeedbackResponseItemRequest> responses;
 
     private String comments;
+
+    /**
+     * Client RD form labels are intentionally kept as free-text until HR finalizes their date semantics.
+     */
+    private String assessmentDateText;
+
+    private String effectiveDateText;
 }

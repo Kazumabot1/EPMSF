@@ -51,8 +51,6 @@ const relationshipLabel = (type: FeedbackRelationshipType) => {
       return 'Subordinate feedback';
     case 'SELF':
       return 'Self review';
-    case 'PROJECT_STAKEHOLDER':
-      return 'Project stakeholder feedback';
     default:
       return type;
   }

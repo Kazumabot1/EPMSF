@@ -1,0 +1,35 @@
+CREATE TABLE IF NOT EXISTS feedback_campaign_question_selections (
+                                                                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                                                     campaign_id BIGINT NOT NULL,
+                                                                     question_version_id BIGINT NULL,
+                                                                     question_bank_id BIGINT NULL,
+                                                                     source_rule_id BIGINT NULL,
+                                                                     relationship_type VARCHAR(40) NOT NULL,
+                                                                     target_level_code VARCHAR(80) NOT NULL DEFAULT 'UNSPECIFIED',
+                                                                     target_level_rank INT NULL,
+                                                                     target_position_id BIGINT NULL,
+                                                                     target_department_id BIGINT NULL,
+                                                                     target_count INT NOT NULL DEFAULT 0,
+                                                                     assignment_count INT NOT NULL DEFAULT 0,
+                                                                     question_code VARCHAR(80) NOT NULL,
+                                                                     competency_code VARCHAR(80) NULL,
+                                                                     question_text_snapshot TEXT NOT NULL,
+                                                                     response_type VARCHAR(40) NOT NULL DEFAULT 'RATING_WITH_COMMENT',
+                                                                     scoring_behavior VARCHAR(30) NOT NULL DEFAULT 'SCORED',
+                                                                     rating_scale_id INT NULL,
+                                                                     is_required BOOLEAN NOT NULL DEFAULT TRUE,
+                                                                     is_included BOOLEAN NOT NULL DEFAULT TRUE,
+                                                                     weight DOUBLE NOT NULL DEFAULT 1,
+                                                                     section_code VARCHAR(80) NOT NULL DEFAULT 'GENERAL',
+                                                                     section_title VARCHAR(150) NOT NULL DEFAULT 'General Feedback',
+                                                                     section_order INT NOT NULL DEFAULT 1,
+                                                                     display_order INT NOT NULL DEFAULT 1,
+                                                                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                                                     updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                                                     CONSTRAINT fk_campaign_question_selection_campaign FOREIGN KEY (campaign_id) REFERENCES feedback_campaigns(id) ON DELETE CASCADE,
+                                                                     CONSTRAINT fk_campaign_question_selection_version FOREIGN KEY (question_version_id) REFERENCES feedback_question_versions(id),
+                                                                     CONSTRAINT uk_campaign_question_selection UNIQUE (campaign_id, relationship_type, target_level_code, question_code)
+);
+
+CREATE INDEX idx_campaign_question_selection_campaign ON feedback_campaign_question_selections(campaign_id);
+CREATE INDEX idx_campaign_question_selection_group ON feedback_campaign_question_selections(campaign_id, relationship_type, target_level_code, is_included);

@@ -22,4 +22,8 @@ public class FeedbackManualAssignmentRequest {
      * Optional HR override. When omitted, anonymity is derived from relationship type.
      */
     private Boolean anonymous;
+
+    /** Required in the new campaign wizard so manual overrides remain auditable. */
+    private String reason;
 }
+

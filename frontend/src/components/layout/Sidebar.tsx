@@ -17,11 +17,11 @@ type NavItem = {
 };
 
 const normalizeRoleName = (role: string) =>
-  String(role ?? '')
-    .replace(/^ROLE_/i, '')
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .replace(/[\s-]+/g, '_')
-    .toUpperCase();
+    String(role ?? '')
+        .replace(/^ROLE_/i, '')
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        .replace(/[\s-]+/g, '_')
+        .toUpperCase();
 
 const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const navigate = useNavigate();
@@ -33,48 +33,48 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const normalizedDashboard = normalizeRoleName(dashboard);
 
   const isAdmin =
-    normalizedRoles.includes('ADMIN') ||
-    normalizedDashboard === 'ADMIN_DASHBOARD';
+      normalizedRoles.includes('ADMIN') ||
+      normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isEmployee =
-    normalizedRoles.includes('EMPLOYEE') ||
-    normalizedDashboard === 'EMPLOYEE_DASHBOARD';
+      normalizedRoles.includes('EMPLOYEE') ||
+      normalizedDashboard === 'EMPLOYEE_DASHBOARD';
 
   const isHrOnly =
-    normalizedRoles.includes('HR') ||
-    normalizedDashboard === 'HR_DASHBOARD' ||
-    normalizedDashboard === 'ADMIN_DASHBOARD' ||
-    variant === 'hr' ||
-    variant === 'admin';
+      normalizedRoles.includes('HR') ||
+      normalizedDashboard === 'HR_DASHBOARD' ||
+      normalizedDashboard === 'ADMIN_DASHBOARD' ||
+      variant === 'hr' ||
+      variant === 'admin';
 
   const canCreatePip = !isHrOnly && !isEmployee;
 
   const roleLabel =
-    variant === 'admin'
-      ? 'Admin'
-      : variant === 'hr'
-        ? 'HR'
-        : isAdmin
+      variant === 'admin'
           ? 'Admin'
-          : normalizedDashboard === 'EMPLOYEE_DASHBOARD'
-            ? 'Employee'
-            : normalizedDashboard === 'HR_DASHBOARD'
+          : variant === 'hr'
               ? 'HR'
-              : normalizedDashboard === 'MANAGER_DASHBOARD'
-                ? 'Manager'
-                : normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD'
-                  ? 'Department Head'
-                  : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
-                    ? 'Executive'
-                    : 'User';
+              : isAdmin
+                  ? 'Admin'
+                  : normalizedDashboard === 'EMPLOYEE_DASHBOARD'
+                      ? 'Employee'
+                      : normalizedDashboard === 'HR_DASHBOARD'
+                          ? 'HR'
+                          : normalizedDashboard === 'MANAGER_DASHBOARD'
+                              ? 'Manager'
+                              : normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD'
+                                  ? 'Department Head'
+                                  : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
+                                      ? 'Executive'
+                                      : 'User';
 
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
-      ? [
+        ? [
           { to: '/pip/create', label: 'Create', icon: 'bi bi-plus-square' },
           { to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' },
         ]
-      : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
+        : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
     const adminNavItems: NavItem[] = [
       { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
@@ -154,7 +154,20 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/appraisal/review-check', label: 'Manager + Dept Review Check', icon: 'bi bi-shield-check' },
         ],
       },
-      { to: '/hr/feedback/dashboard', label: '360 Feedback', icon: 'bi bi-chat-square-dots' },
+      {
+        to: '/hr/feedback/questions',
+        label: '360 Feedback',
+        icon: 'bi bi-chat-square-dots',
+        children: [
+          { to: '/hr/feedback/questions', label: 'Question Bank', icon: 'bi bi-collection', end: true },
+          { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
+          { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
+          { to: '/hr/feedback/campaigns', label: 'Campaigns', icon: 'bi bi-megaphone' },
+          { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
+          { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
+          { to: '/hr/feedback/audit', label: 'Audit Trail', icon: 'bi bi-shield-check' },
+        ],
+      },
       {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
@@ -219,7 +232,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   }, [variant, isAdmin, isEmployee, canCreatePip]);
 
   const hasActiveChild = (item: NavItem) =>
-    item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false;
+      item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false;
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -242,7 +255,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   }, [location.pathname, navItems]);
 
   const isParentActive = (item: NavItem) =>
-    location.pathname.startsWith(item.to) || hasActiveChild(item);
+      location.pathname.startsWith(item.to) || hasActiveChild(item);
 
   const toggleParent = (item: NavItem) => {
     if (!item.children?.length) {
@@ -264,105 +277,105 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   };
 
   return (
-    <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
-      <div className="hr-sidebar-top">
-        <div className="hr-brand">
-          <div className="hr-brand-mark">E</div>
+      <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <div className="hr-sidebar-top">
+          <div className="hr-brand">
+            <div className="hr-brand-mark">E</div>
 
-          {!collapsed && (
-            <div className="hr-brand-copy">
-              <h2>EPMS</h2>
-              <p>Performance System</p>
-            </div>
-          )}
-        </div>
-
-        {!collapsed && <div className="hr-sidebar-top-divider" />}
-      </div>
-
-      {!collapsed && (
-        <div className="hr-role-chip">
-          <small>CURRENT ROLE</small>
-          <strong>{roleLabel}</strong>
-        </div>
-      )}
-
-      <nav className="hr-nav">
-        {navItems.map((item) => {
-          const isExpanded = expanded.has(item.to);
-          const parentActive = isParentActive(item);
-
-          if (!item.children?.length) {
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) => `hr-nav-link ${isActive ? 'active' : ''}`}
-                title={collapsed ? item.label : undefined}
-              >
-                <i className={item.icon} />
-                {!collapsed && <span>{item.label}</span>}
-              </NavLink>
-            );
-          }
-
-          return (
-            <div key={item.to} className="hr-nav-group">
-              <button
-                type="button"
-                className={`hr-nav-link hr-nav-group-toggle ${parentActive ? 'active' : ''}`}
-                onClick={() => toggleParent(item)}
-                title={collapsed ? item.label : undefined}
-              >
-                <i className={item.icon} />
-
-                {!collapsed && (
-                  <>
-                    <span>{item.label}</span>
-                    <i
-                      className={`bi ${
-                        isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'
-                      } hr-submenu-caret`}
-                    />
-                  </>
-                )}
-              </button>
-
-              {!collapsed && isExpanded && (
-                <div className="hr-submenu">
-                  {item.children.map((child) => (
-                    <NavLink
-                      key={child.to}
-                      to={child.to}
-                      end={child.end}
-                      className={({ isActive }) =>
-                        `hr-submenu-link ${isActive ? 'active' : ''}`
-                      }
-                    >
-                      <i className={child.icon} />
-                      <span>{child.label}</span>
-                    </NavLink>
-                  ))}
+            {!collapsed && (
+                <div className="hr-brand-copy">
+                  <h2>EPMS</h2>
+                  <p>Performance System</p>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
+            )}
+          </div>
 
-      <div className="hr-sidebar-footer">
-        <button
-          type="button"
-          className="hr-sidebar-collapse"
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
-          {!collapsed && <span>Collapse</span>}
-        </button>
-      </div>
-    </aside>
+          {!collapsed && <div className="hr-sidebar-top-divider" />}
+        </div>
+
+        {!collapsed && (
+            <div className="hr-role-chip">
+              <small>CURRENT ROLE</small>
+              <strong>{roleLabel}</strong>
+            </div>
+        )}
+
+        <nav className="hr-nav">
+          {navItems.map((item) => {
+            const isExpanded = expanded.has(item.to);
+            const parentActive = isParentActive(item);
+
+            if (!item.children?.length) {
+              return (
+                  <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) => `hr-nav-link ${isActive ? 'active' : ''}`}
+                      title={collapsed ? item.label : undefined}
+                  >
+                    <i className={item.icon} />
+                    {!collapsed && <span>{item.label}</span>}
+                  </NavLink>
+              );
+            }
+
+            return (
+                <div key={item.to} className="hr-nav-group">
+                  <button
+                      type="button"
+                      className={`hr-nav-link hr-nav-group-toggle ${parentActive ? 'active' : ''}`}
+                      onClick={() => toggleParent(item)}
+                      title={collapsed ? item.label : undefined}
+                  >
+                    <i className={item.icon} />
+
+                    {!collapsed && (
+                        <>
+                          <span>{item.label}</span>
+                          <i
+                              className={`bi ${
+                                  isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'
+                              } hr-submenu-caret`}
+                          />
+                        </>
+                    )}
+                  </button>
+
+                  {!collapsed && isExpanded && (
+                      <div className="hr-submenu">
+                        {item.children.map((child) => (
+                            <NavLink
+                                key={child.to}
+                                to={child.to}
+                                end={child.end}
+                                className={({ isActive }) =>
+                                    `hr-submenu-link ${isActive ? 'active' : ''}`
+                                }
+                            >
+                              <i className={child.icon} />
+                              <span>{child.label}</span>
+                            </NavLink>
+                        ))}
+                      </div>
+                  )}
+                </div>
+            );
+          })}
+        </nav>
+
+        <div className="hr-sidebar-footer">
+          <button
+              type="button"
+              className="hr-sidebar-collapse"
+              onClick={onToggle}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
+            {!collapsed && <span>Collapse</span>}
+          </button>
+        </div>
+      </aside>
   );
 };
 

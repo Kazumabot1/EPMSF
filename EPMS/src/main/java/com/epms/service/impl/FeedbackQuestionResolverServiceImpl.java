@@ -3,6 +3,7 @@ package com.epms.service.impl;
 import com.epms.entity.Employee;
 import com.epms.entity.FeedbackAssignmentQuestion;
 import com.epms.entity.FeedbackEvaluatorAssignment;
+import com.epms.entity.FeedbackCampaignQuestionSelection;
 import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackQuestionApplicabilityRule;
 import com.epms.entity.FeedbackQuestionBank;
@@ -11,9 +12,11 @@ import com.epms.entity.FeedbackSection;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.FeedbackAssignmentQuestionRepository;
+import com.epms.repository.FeedbackCampaignQuestionSelectionRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackFormRepository;
 import com.epms.repository.FeedbackQuestionApplicabilityRuleRepository;
+import com.epms.repository.FeedbackQuestionVersionRepository;
 import com.epms.service.FeedbackQuestionResolverService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,7 +45,9 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
     private static final String SCORING_HR_REVIEW = "HR_REVIEW";
 
     private final FeedbackAssignmentQuestionRepository assignmentQuestionRepository;
+    private final FeedbackCampaignQuestionSelectionRepository campaignQuestionSelectionRepository;
     private final FeedbackQuestionApplicabilityRuleRepository ruleRepository;
+    private final FeedbackQuestionVersionRepository questionVersionRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackFormRepository feedbackFormRepository;
     private final EmployeeRepository employeeRepository;
@@ -90,6 +95,21 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
                 ? targetEmployee.getPosition().getId().longValue()
                 : null;
         Long departmentId = resolveDepartmentId(targetEmployee);
+        String targetLevelCode = resolveLevelCode(assignment, targetEmployee);
+
+        if (assignment.getFeedbackRequest() != null && assignment.getFeedbackRequest().getCampaign() != null) {
+            Long campaignId = assignment.getFeedbackRequest().getCampaign().getId();
+            List<FeedbackCampaignQuestionSelection> selections = campaignQuestionSelectionRepository.findIncludedForAssignmentGroup(
+                    campaignId,
+                    assignment.getRelationshipType(),
+                    targetLevelCode,
+                    positionId,
+                    departmentId
+            );
+            if (!selections.isEmpty()) {
+                return snapshotCampaignSelectionQuestions(assignment, selections);
+            }
+        }
 
         List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findApplicableRules(
                 levelRank,
@@ -106,6 +126,49 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         return snapshotLegacyFormQuestions(assignment);
     }
 
+
+    private List<FeedbackAssignmentQuestion> snapshotCampaignSelectionQuestions(
+            FeedbackEvaluatorAssignment assignment,
+            List<FeedbackCampaignQuestionSelection> selections
+    ) {
+        Map<String, FeedbackAssignmentQuestion> byQuestionCode = new LinkedHashMap<>();
+        for (FeedbackCampaignQuestionSelection selection : selections) {
+            if (selection == null || selection.getQuestionCode() == null || !Boolean.TRUE.equals(selection.getIncluded())) {
+                continue;
+            }
+            byQuestionCode.putIfAbsent(selection.getQuestionCode(), fromCampaignSelection(assignment, selection));
+        }
+
+        return byQuestionCode.values().stream()
+                .sorted(Comparator.comparing(FeedbackAssignmentQuestion::getSectionOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(FeedbackAssignmentQuestion::getDisplayOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(FeedbackAssignmentQuestion::getQuestionCode, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    private FeedbackAssignmentQuestion fromCampaignSelection(
+            FeedbackEvaluatorAssignment assignment,
+            FeedbackCampaignQuestionSelection selection
+    ) {
+        FeedbackAssignmentQuestion snapshot = new FeedbackAssignmentQuestion();
+        snapshot.setAssignment(assignment);
+        snapshot.setQuestionVersion(selection.getQuestionVersion());
+        snapshot.setQuestionBankId(selection.getQuestionBankId());
+        snapshot.setQuestionCode(normalizeCode(selection.getQuestionCode(), "CAMPAIGN-Q-" + selection.getId()));
+        snapshot.setCompetencyCode(selection.getCompetencyCode());
+        snapshot.setQuestionTextSnapshot(firstNonBlank(selection.getQuestionTextSnapshot(), "Untitled feedback question"));
+        snapshot.setResponseType(firstNonBlank(selection.getResponseType(), DEFAULT_RESPONSE_TYPE));
+        snapshot.setScoringBehavior(firstNonBlank(selection.getScoringBehavior(), SCORING_SCORED));
+        snapshot.setRatingScaleId(selection.getRatingScaleId());
+        snapshot.setRequired(selection.getRequired() == null ? true : selection.getRequired());
+        snapshot.setWeight(selection.getWeight() == null || selection.getWeight() <= 0 ? 1.0 : selection.getWeight());
+        snapshot.setSectionCode(normalizeCode(firstNonBlank(selection.getCompetencyCode(), selection.getSectionCode()), "GENERAL"));
+        snapshot.setSectionTitle(firstNonBlank(selection.getSectionTitle(), selection.getCompetencyCode(), "General Feedback"));
+        snapshot.setSectionOrder(selection.getSectionOrder());
+        snapshot.setDisplayOrder(selection.getDisplayOrder());
+        return snapshot;
+    }
+
     private List<FeedbackAssignmentQuestion> snapshotRuleQuestions(
             FeedbackEvaluatorAssignment assignment,
             List<FeedbackQuestionApplicabilityRule> rules
@@ -113,20 +176,19 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         Map<String, FeedbackAssignmentQuestion> byQuestionCode = new LinkedHashMap<>();
 
         for (FeedbackQuestionApplicabilityRule rule : rules) {
-            FeedbackQuestionVersion version = rule.getQuestionVersion();
-            if (version == null || version.getQuestionBank() == null) {
+            FeedbackQuestionBank bank = rule.getQuestionBank();
+            FeedbackQuestionVersion version = findActiveVersion(bank);
+            if (bank == null || version == null) {
                 continue;
             }
 
-            FeedbackQuestionBank bank = version.getQuestionBank();
-            String questionCode = normalizeCode(bank.getQuestionCode(), "BANK-Q-" + version.getId());
+            String questionCode = normalizeCode(bank.getQuestionCode(), "BANK-Q-" + bank.getId());
             byQuestionCode.putIfAbsent(questionCode, fromRule(assignment, rule, version, bank, questionCode));
         }
 
         return byQuestionCode.values().stream()
-                .sorted(Comparator.comparing(FeedbackAssignmentQuestion::getSectionOrder, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(FeedbackAssignmentQuestion::getDisplayOrder, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(FeedbackAssignmentQuestion::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparing(FeedbackAssignmentQuestion::getDisplayOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(FeedbackAssignmentQuestion::getQuestionCode, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
     }
 
@@ -148,17 +210,27 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         String scoringBehavior = resolveScoringBehavior(version, bank, responseType);
         snapshot.setResponseType(responseType);
         snapshot.setScoringBehavior(scoringBehavior);
-        snapshot.setRatingScaleId(isRatingResponseType(responseType) ? version.getRatingScaleId() != null ? version.getRatingScaleId() : bank.getDefaultRatingScaleId() : null);
-        snapshot.setRequired(rule.getRequiredOverride() != null ? rule.getRequiredOverride() : Boolean.TRUE.equals(bank.getDefaultRequired()));
-        snapshot.setWeight(isScored(responseType, scoringBehavior) ? resolveWeight(rule.getWeightOverride(), bank.getDefaultWeight()) : 1.0);
-        snapshot.setSectionCode(normalizeCode(rule.getSectionCode(), "GENERAL"));
-        snapshot.setSectionTitle(firstNonBlank(rule.getSectionTitle(), "General Feedback"));
-        snapshot.setSectionOrder(rule.getSectionOrder());
+        snapshot.setRatingScaleId(isRatingResponseType(responseType) ? firstNonNull(version.getRatingScaleId(), bank.getDefaultRatingScaleId()) : null);
+        snapshot.setRequired(bank.getDefaultRequired() == null ? true : bank.getDefaultRequired());
+        snapshot.setWeight(isScored(responseType, scoringBehavior) ? resolveWeight(bank.getDefaultWeight(), 1.0) : 1.0);
+        snapshot.setSectionCode(normalizeCode(bank.getCompetencyCode(), "GENERAL"));
+        snapshot.setSectionTitle(firstNonBlank(bank.getCompetencyCode(), "General Feedback"));
+        snapshot.setSectionOrder(1);
         snapshot.setDisplayOrder(rule.getDisplayOrder());
         return snapshot;
     }
 
+    private FeedbackQuestionVersion findActiveVersion(FeedbackQuestionBank bank) {
+        if (bank == null || bank.getId() == null) {
+            return null;
+        }
+        return questionVersionRepository.findTopByQuestionBank_IdAndActiveTrueOrderByVersionNumberDesc(bank.getId()).orElse(null);
+    }
+
     private List<FeedbackAssignmentQuestion> snapshotLegacyFormQuestions(FeedbackEvaluatorAssignment assignment) {
+        if (assignment.getFeedbackRequest() == null || assignment.getFeedbackRequest().getForm() == null) {
+            return List.of();
+        }
         Long formId = assignment.getFeedbackRequest().getForm().getId();
         List<FeedbackSection> sections = feedbackFormRepository.findSectionsWithQuestionsByFormId(formId);
         if (sections == null || sections.isEmpty()) {
@@ -194,6 +266,7 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         }
         return snapshots;
     }
+
 
 
     private String normalizeResponseType(String responseType) {
@@ -252,6 +325,15 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         return isRatingResponseType(responseType) && SCORING_SCORED.equals(scoringBehavior);
     }
 
+    private Double resolveWeight(Double primary, Double fallback) {
+        if (primary != null && primary > 0) {
+            return primary;
+        }
+        if (fallback != null && fallback > 0) {
+            return fallback;
+        }
+        return 1.0;
+    }
 
     private Long resolveDepartmentId(Employee employee) {
         if (employee == null || employee.getEmployeeDepartments() == null) {
@@ -261,10 +343,25 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
                 .filter(Objects::nonNull)
                 .filter(assignment -> assignment.getEnddate() == null)
                 .findFirst()
-                .map(assignment -> assignment.getParentDepartment() != null ? assignment.getParentDepartment() : assignment.getCurrentDepartment())
+                .map(assignment -> assignment.getCurrentDepartment() != null ? assignment.getCurrentDepartment() : assignment.getParentDepartment())
                 .filter(Objects::nonNull)
                 .map(department -> department.getId() == null ? null : department.getId().longValue())
                 .orElse(null);
+    }
+
+    private String resolveLevelCode(FeedbackEvaluatorAssignment assignment, Employee employee) {
+        String snapshotLevel = assignment != null && assignment.getFeedbackRequest() != null
+                ? assignment.getFeedbackRequest().getTargetLevelCode()
+                : null;
+        if (snapshotLevel != null && !snapshotLevel.isBlank()) {
+            return snapshotLevel.trim().replaceAll("\\s+", "_").toUpperCase();
+        }
+        if (employee == null || employee.getPosition() == null || employee.getPosition().getLevel() == null
+                || employee.getPosition().getLevel().getLevelCode() == null
+                || employee.getPosition().getLevel().getLevelCode().isBlank()) {
+            return "UNSPECIFIED";
+        }
+        return employee.getPosition().getLevel().getLevelCode().trim().replaceAll("\\s+", "_").toUpperCase();
     }
 
     private int resolveLevelRank(Employee employee) {
@@ -287,19 +384,19 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         }
     }
 
-    private Double resolveWeight(Double primary, Double fallback) {
-        if (primary != null && primary > 0) {
-            return primary;
-        }
-        if (fallback != null && fallback > 0) {
-            return fallback;
-        }
-        return 1.0;
-    }
-
     private String normalizeCode(String value, String fallback) {
         String normalized = firstNonBlank(value, fallback);
         return normalized.trim().replaceAll("\\s+", "_").toUpperCase();
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String firstNonBlank(String... values) {
