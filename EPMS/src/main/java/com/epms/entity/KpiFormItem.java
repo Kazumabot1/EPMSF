@@ -22,9 +22,15 @@ public class KpiFormItem {
     private KpiForm kpiForm;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kpi_category_id", nullable = false)
+    @JoinColumn(name = "kpi_category_id")
     @EqualsAndHashCode.Exclude
     private KpiCategory kpiCategory;
+
+    /**
+     * Free-text KPI category when no {@link #kpiCategory} is selected.
+     */
+    @Column(name = "kpi_category_label", length = 100)
+    private String kpiCategoryLabel;
 
     /**
      * Optional master-data KPI item; use {@link #kpiLabel} when entering a free-text KPI name instead.
@@ -41,9 +47,15 @@ public class KpiFormItem {
     private String kpiLabel;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kpi_unit_id", nullable = false)
+    @JoinColumn(name = "kpi_unit_id")
     @EqualsAndHashCode.Exclude
     private KpiUnit kpiUnit;
+
+    /**
+     * Free-text KPI unit when no {@link #kpiUnit} is selected.
+     */
+    @Column(name = "kpi_unit_label", length = 100)
+    private String kpiUnitLabel;
 
     @Column(nullable = false)
     private Double target;

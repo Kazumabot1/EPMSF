@@ -81,7 +81,9 @@ const KpiTemplateDetailPage = () => {
       return row != null
         && row.kpiName === name
         && row.kpiCategoryId === line.kpiCategoryId
+        && row.kpiCategoryName === line.kpiCategoryName
         && row.kpiUnitId === line.kpiUnitId
+        && row.kpiUnitName === line.kpiUnitName
         && row.target === line.target
         && row.weight === line.weight;
     });

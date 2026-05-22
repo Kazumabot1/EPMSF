@@ -13,8 +13,10 @@ export interface KpiTemplateItem {
   kpiItemName: string | null;
   kpiCategoryId: number | null;
   kpiCategoryName: string | null;
+  kpiCategoryLabel?: string | null;
   kpiUnitId: number | null;
   kpiUnitName: string | null;
+  kpiUnitLabel?: string | null;
   target: number | null;
   weight: number | null;
   sortOrder: number | null;
@@ -58,7 +60,9 @@ export interface KpiTemplateRowDraft {
   kpiItemId: number | null;
   kpiLabel: string;
   kpiCategoryId: number | null;
+  kpiCategoryLabel: string;
   kpiUnitId: number | null;
+  kpiUnitLabel: string;
   target: number | null;
   weight: number | null;
   changeReason?: string | null;
@@ -73,8 +77,10 @@ export interface KpiVersionRowSnapshot {
   kpiItemId: number | null;
   kpiCategoryId: number | null;
   kpiCategoryName: string | null;
+  kpiCategoryLabel?: string | null;
   kpiUnitId: number | null;
   kpiUnitName: string | null;
+  kpiUnitLabel?: string | null;
   target: number | null;
   weight: number | null;
   sortOrder: number | null;

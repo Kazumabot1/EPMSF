@@ -863,7 +863,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .map(sc -> {
                     KpiFormItem item = sc.getKpiFormItem();
                     String label = item.getKpiItem() != null ? item.getKpiItem().getName() : item.getKpiLabel();
-                    String unit = item.getKpiUnit() != null ? item.getKpiUnit().getName() : null;
+                    String unit = item.getKpiUnit() != null ? item.getKpiUnit().getName() : item.getKpiUnitLabel();
                     return ManagerKpiScoreLineDto.builder()
                             .kpiFormItemId(item.getId())
                             .kpiLabel(label)

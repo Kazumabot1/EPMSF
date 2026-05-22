@@ -16,8 +16,10 @@ public class KpiVersionRowSnapshotDTO {
     private Integer kpiItemId;
     private Integer kpiCategoryId;
     private String kpiCategoryName;
+    private String kpiCategoryLabel;
     private Integer kpiUnitId;
     private String kpiUnitName;
+    private String kpiUnitLabel;
     private Double target;
     private Integer weight;
     private Integer sortOrder;

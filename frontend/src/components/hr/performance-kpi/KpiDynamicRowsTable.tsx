@@ -69,9 +69,9 @@ const KpiDynamicRowsTable = ({
               return (
                 <tr key={row.rowId}>
                   <td>{labelFor(row.kpiItemId, items, '—')}</td>
-                  <td>{labelFor(row.kpiCategoryId, categories, '—')}</td>
+                  <td>{row.kpiCategoryLabel?.trim() || labelFor(row.kpiCategoryId, categories, '—')}</td>
                   <td>{row.target ?? '—'}</td>
-                  <td>{labelFor(row.kpiUnitId, units, '—')}</td>
+                  <td>{row.kpiUnitLabel?.trim() || labelFor(row.kpiUnitId, units, '—')}</td>
                   <td>{row.actual ?? '—'}</td>
                   <td>{row.weight ?? '—'}</td>
                   <td>{row.score ?? '—'}</td>
@@ -90,6 +90,7 @@ const KpiDynamicRowsTable = ({
                       onRowChange(row.rowId, {
                         kpiItemId: value,
                         kpiCategoryId: selectedItem?.kpiCategoryId ?? row.kpiCategoryId,
+                        kpiCategoryLabel: selectedItem != null ? '' : row.kpiCategoryLabel,
                       });
                     }}
                     className="kpi-select-sm"

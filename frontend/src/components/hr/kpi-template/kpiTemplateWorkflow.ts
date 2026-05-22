@@ -32,7 +32,9 @@ export const newKpiTemplateRow = (): KpiTemplateRowDraft => ({
   kpiItemId: null,
   kpiLabel: '',
   kpiCategoryId: null,
+  kpiCategoryLabel: '',
   kpiUnitId: null,
+  kpiUnitLabel: '',
   target: null,
   weight: null,
 });
@@ -50,7 +52,9 @@ export function mapTemplateToFormFields(tmpl: KpiTemplateResponse): KpiTemplateF
             kpiItemId: line.kpiItemId,
             kpiLabel: line.kpiLabel ?? '',
             kpiCategoryId: line.kpiCategoryId,
+            kpiCategoryLabel: line.kpiCategoryLabel ?? (line.kpiCategoryId == null ? line.kpiCategoryName ?? '' : ''),
             kpiUnitId: line.kpiUnitId,
+            kpiUnitLabel: line.kpiUnitLabel ?? (line.kpiUnitId == null ? line.kpiUnitName ?? '' : ''),
             target: line.target,
             weight: line.weight,
           }))

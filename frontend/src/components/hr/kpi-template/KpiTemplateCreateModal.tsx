@@ -49,7 +49,7 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   const isCreate = workflowMode === 'create';
 
   const [title, setTitle] = useState('');
-  const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
+  const [, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [positionId, setPositionId] = useState<number | null>(null);
   const [positions, setPositions] = useState<PositionResponse[]>([]);
   const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
@@ -180,7 +180,9 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
       kpiLabel: row.kpiItemId !== null ? null : row.kpiLabel.trim() || null,
       kpiItemId: row.kpiItemId,
       kpiCategoryId: row.kpiCategoryId,
+      kpiCategoryLabel: row.kpiCategoryId !== null ? null : row.kpiCategoryLabel.trim() || null,
       kpiUnitId: row.kpiUnitId,
+      kpiUnitLabel: row.kpiUnitId !== null ? null : row.kpiUnitLabel.trim() || null,
       target: row.target,
       weight: row.weight,
       sortOrder: index,
@@ -191,7 +193,7 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
       score: null,
       weightedScore: null,
       id: row.id ?? null,
-      changeReason: row.id == null ? row.changeReason ?? null : null,
+      changeReason: isEdit && row.id == null ? row.changeReason ?? null : null,
     })),
     removedItemReasons,
   });
@@ -216,7 +218,9 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
       if (!hasCatalog && !hasLabel) {
         return `Row ${i + 1}: choose a catalog KPI or enter a KPI label.`;
       }
-      if (row.kpiCategoryId === null || row.kpiUnitId === null || row.target === null || row.weight === null) {
+      const hasCategory = row.kpiCategoryId !== null || row.kpiCategoryLabel.trim().length > 0;
+      const hasUnit = row.kpiUnitId !== null || row.kpiUnitLabel.trim().length > 0;
+      if (!hasCategory || !hasUnit || row.target === null || row.weight === null) {
         return `Row ${i + 1}: category, unit, target, and weight are required.`;
       }
       if (!Number.isFinite(row.target) || row.target < 1 || row.target > 100) {
@@ -340,7 +344,6 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
         positionId={positionId}
         onPositionChange={handlePositionChange}
         existingTemplate={existingTemplate}
-        onClearExistingTemplate={() => setExistingTemplate(null)}
         onOpenExistingTemplate={(existing, nextMode) => {
           void (async () => {
             try {
@@ -360,7 +363,13 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
         }}
         rows={rows}
         setRows={setRows}
-        onRequestAddRow={() => setReasonAction({ type: 'add' })}
+        onRequestAddRow={() => {
+          if (isEdit) {
+            setReasonAction({ type: 'add' });
+            return;
+          }
+          setRows((prev) => [...prev, newKpiTemplateRow()]);
+        }}
         onRequestRemoveRow={(row) => setReasonAction({ type: 'remove', row })}
         categories={categories}
         units={units}
@@ -415,7 +424,6 @@ type ShellProps = {
   positionId: number | null;
   onPositionChange: (id: number | null) => void;
   existingTemplate: ExistingKpiForPosition | null;
-  onClearExistingTemplate: () => void;
   onOpenExistingTemplate: (existing: ExistingKpiForPosition, mode: 'edit' | 'view') => void;
   rows: KpiTemplateRowDraft[];
   setRows: React.Dispatch<React.SetStateAction<KpiTemplateRowDraft[]>>;
@@ -447,7 +455,6 @@ function MotionlessModalShell(props: ShellProps) {
     positionId,
     onPositionChange,
     existingTemplate,
-    onClearExistingTemplate,
     onOpenExistingTemplate,
     rows,
     setRows,
