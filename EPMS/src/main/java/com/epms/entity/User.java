@@ -50,6 +50,20 @@ public class User {
 
     private Integer departmentId;
 
+    /*
+     * Admin-selected dashboard override.
+     *
+     * Supported values:
+     * ADMIN_DASHBOARD
+     * HR_DASHBOARD
+     * EXECUTIVE_DASHBOARD
+     * DEPARTMENT_HEAD_DASHBOARD
+     * MANAGER_DASHBOARD
+     * EMPLOYEE_DASHBOARD
+     */
+    @Column(length = 64)
+    private String dashboard;
+
     private Boolean active = true;
 
     @Temporal(TemporalType.DATE)

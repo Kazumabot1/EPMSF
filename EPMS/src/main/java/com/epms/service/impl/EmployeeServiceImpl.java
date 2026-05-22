@@ -1,4 +1,3 @@
-
 package com.epms.service.impl;
 
 import com.epms.dto.AccountProvisionResult;
@@ -246,11 +245,16 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (Boolean.TRUE.equals(request.getCreateLoginAccount())) {
             provision = userAccountProvisioningService.provisionFromEmployee(
                     saved,
-                    "EMPLOYEE",
-                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+                    roleNameFromPosition(saved.getPosition()),
+                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail()),
+                    request.getDashboard()
             );
 
-            syncLinkedUserFromEmployee(saved, workingDepartment != null ? workingDepartment.getId() : null);
+            syncLinkedUserFromEmployee(
+                    saved,
+                    workingDepartment != null ? workingDepartment.getId() : null,
+                    request.getDashboard()
+            );
         }
 
         EmployeeResponseDto dto = getEmployeeById(saved.getId());
@@ -345,12 +349,18 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (Boolean.TRUE.equals(request.getCreateLoginAccount())) {
             provision = userAccountProvisioningService.provisionFromEmployee(
                     saved,
-                    "EMPLOYEE",
-                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+                    roleNameFromPosition(saved.getPosition()),
+                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail()),
+                    request.getDashboard()
             );
         }
 
-        syncLinkedUserFromEmployee(saved, newWorkingDepartment != null ? newWorkingDepartment.getId() : null);
+        syncLinkedUserFromEmployee(
+                saved,
+                newWorkingDepartment != null ? newWorkingDepartment.getId() : null,
+                request.getDashboard()
+        );
+
         recordEmployeeAuditChanges(
                 saved,
                 oldPositionTitle,
@@ -405,7 +415,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         return getEmployeeById(id);
     }
 
-    private void syncLinkedUserFromEmployee(Employee employee, Integer workingDepartmentId) {
+    private void syncLinkedUserFromEmployee(
+            Employee employee,
+            Integer workingDepartmentId,
+            String requestedDashboard
+    ) {
         findLinkedUserByEmployeeOrEmail(employee).ifPresent(user -> {
             String firstName = employee.getFirstName() != null ? employee.getFirstName().trim() : "";
             String lastName = employee.getLastName() != null ? employee.getLastName().trim() : "";
@@ -423,6 +437,14 @@ public class EmployeeServiceImpl implements EmployeeService {
              * parentDepartment if present, otherwise currentDepartment.
              */
             user.setDepartmentId(workingDepartmentId);
+
+            user.setDashboard(
+                    userAccountProvisioningService.resolveDashboardForEmployee(
+                            employee.getPosition(),
+                            roleNameFromPosition(employee.getPosition()),
+                            requestedDashboard
+                    )
+            );
 
             user.setActive(employee.getActive() == null || employee.getActive());
             user.setUpdatedAt(new Date());
@@ -652,69 +674,6 @@ public class EmployeeServiceImpl implements EmployeeService {
         teamMemberRepository.save(newMember);
     }
 
-    /*
-    private void sendDepartmentTransferNotifications(
-            Employee employee,
-            User employeeUser,
-            Department oldDepartment,
-            Department newDepartment,
-            Team oldTeam,
-            Team newTeam
-    ) {
-        String employeeName = employeeName(employee);
-        String oldDepartmentName = oldDepartment != null ? oldDepartment.getDepartmentName() : "No department";
-        String newDepartmentName = newDepartment != null ? newDepartment.getDepartmentName() : "No department";
-        String oldTeamName = oldTeam != null ? oldTeam.getTeamName() : "No active team";
-        String newTeamName = newTeam != null ? newTeam.getTeamName() : "No active team assigned yet";
-
-        String title = "Employee Department Transfer";
-        String message = employeeName
-                + " has been transferred from "
-                + oldDepartmentName
-                + " / "
-                + oldTeamName
-                + " to "
-                + newDepartmentName
-                + " / "
-                + newTeamName
-                + ". Please review related team responsibilities, KPI, PIP, and 1:1 planning.";
-
-        Set<Integer> recipientIds = new HashSet<>();
-
-        if (oldDepartment != null && oldDepartment.getId() != null) {
-            userRepository.findActiveDepartmentHeadsByDepartmentId(oldDepartment.getId())
-                    .forEach(user -> recipientIds.add(user.getId()));
-        }
-
-        if (newDepartment != null && newDepartment.getId() != null) {
-            userRepository.findActiveDepartmentHeadsByDepartmentId(newDepartment.getId())
-                    .forEach(user -> recipientIds.add(user.getId()));
-        }
-
-        if (oldTeam != null && oldTeam.getTeamLeader() != null) {
-            recipientIds.add(oldTeam.getTeamLeader().getId());
-        }
-
-        if (newTeam != null && newTeam.getTeamLeader() != null) {
-            recipientIds.add(newTeam.getTeamLeader().getId());
-        }
-
-        if (employeeUser != null) {
-            recipientIds.add(employeeUser.getId());
-
-            if (employeeUser.getManagerId() != null) {
-                recipientIds.add(employeeUser.getManagerId());
-            }
-        }
-
-        recipientIds.stream()
-                .filter(Objects::nonNull)
-                .forEach(userId -> notificationService.send(userId, title, message, "EMPLOYEE_TRANSFER"));
-    }*/
-
-
-
-
     private void sendDepartmentTransferNotifications(
             Employee employee,
             User employeeUser,
@@ -756,22 +715,6 @@ public class EmployeeServiceImpl implements EmployeeService {
                     .forEach(user -> recipientIds.add(user.getId()));
         }
 
-        /*
-         * Relative team users:
-         * - old team leader
-         * - old team members
-         * - new team leader
-         * - new team members
-         *
-         * This covers normal employees, Project Managers, and Team Leaders
-         * if they are part of the related team.
-         */
-        addTeamRecipients(recipientIds, oldTeam);
-        addTeamRecipients(recipientIds, newTeam);
-
-        /*
-         * Employee and employee's direct manager.
-         */
         if (employeeUser != null) {
             recipientIds.add(employeeUser.getId());
 
@@ -1148,6 +1091,14 @@ public class EmployeeServiceImpl implements EmployeeService {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private String roleNameFromPosition(Position position) {
+        if (position != null && position.getRole() != null && position.getRole().getName() != null) {
+            return position.getRole().getName();
+        }
+
+        return "EMPLOYEE";
     }
 
     private String nullToBlank(String value) {

@@ -3,30 +3,29 @@ package com.epms.controller;
 import com.epms.dto.AccountProvisionResult;
 import com.epms.dto.GenericApiResponse;
 import com.epms.dto.HrEmployeeAccountCreateRequest;
+import com.epms.entity.AuditLog;
 import com.epms.entity.Department;
 import com.epms.entity.Role;
 import com.epms.entity.User;
 import com.epms.entity.UserProfile;
 import com.epms.entity.UserRole;
 import com.epms.exception.BadRequestException;
+import com.epms.repository.AuditLogRepository;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.RoleRepository;
 import com.epms.repository.UserProfileRepository;
 import com.epms.repository.UserRepository;
 import com.epms.repository.UserRoleRepository;
+import com.epms.security.DashboardResolver;
+import com.epms.security.SecurityUtils;
 import com.epms.service.HrEmployeeAccountService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -35,12 +34,17 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class UserAccountController {
 
+    private static final String ENTITY_TYPE_USER_DASHBOARD = "USER_DASHBOARD";
+    private static final String DASHBOARD_COLUMN = "dashboard";
+
     private final HrEmployeeAccountService hrEmployeeAccountService;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final DepartmentRepository departmentRepository;
     private final UserProfileRepository userProfileRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final DashboardResolver dashboardResolver;
 
     @GetMapping
     public ResponseEntity<GenericApiResponse<List<AdminUserAccountResponse>>> getUsers() {
@@ -54,6 +58,22 @@ public class UserAccountController {
                 .toList();
 
         return ResponseEntity.ok(GenericApiResponse.success("Users fetched", users));
+    }
+
+    @GetMapping("/{id}/dashboard-audit")
+    public ResponseEntity<GenericApiResponse<List<DashboardAuditResponse>>> getDashboardAudit(
+            @PathVariable Integer id
+    ) {
+        User target = userRepository.findById(id)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        List<DashboardAuditResponse> rows = auditLogRepository
+                .findTop200ByEntityTypeAndEntityIdOrderByTimestampDesc(ENTITY_TYPE_USER_DASHBOARD, target.getId())
+                .stream()
+                .map(this::toDashboardAuditResponse)
+                .toList();
+
+        return ResponseEntity.ok(GenericApiResponse.success("Dashboard audit fetched", rows));
     }
 
     @PostMapping
@@ -90,6 +110,20 @@ public class UserAccountController {
         User user = userRepository.findById(result.getUserId())
                 .orElseThrow(() -> new BadRequestException("User was created but could not be loaded"));
 
+        String dashboard = resolveDashboardForSave(request.getDashboard(), request.getRoleName());
+        String oldDashboard = user.getDashboard();
+
+        user.setDashboard(dashboard);
+        user.setUpdatedAt(new Date());
+        user = userRepository.save(user);
+
+        recordDashboardAuditIfChanged(
+                user,
+                oldDashboard,
+                dashboard,
+                "Dashboard assigned by Admin"
+        );
+
         AdminUserAccountResponse response = toResponse(user);
         response.setTemporaryPasswordEmailSent(result.isTemporaryPasswordEmailSent());
         response.setMessage(result.getMessage());
@@ -105,6 +139,11 @@ public class UserAccountController {
             @PathVariable Integer id,
             @RequestBody AdminUserAccountUpdateRequest request
     ) {
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        String oldDashboard = existing.getDashboard();
+
         User user = hrEmployeeAccountService.updateAdminUserAccount(
                 id,
                 request.getFullName(),
@@ -114,6 +153,19 @@ public class UserAccountController {
                 request.getPositionId(),
                 request.getRoleName(),
                 request.getActive()
+        );
+
+        String dashboard = resolveDashboardForSave(request.getDashboard(), request.getRoleName());
+
+        user.setDashboard(dashboard);
+        user.setUpdatedAt(new Date());
+        user = userRepository.save(user);
+
+        recordDashboardAuditIfChanged(
+                user,
+                oldDashboard,
+                dashboard,
+                "Dashboard changed by Admin"
         );
 
         return ResponseEntity.ok(
@@ -186,7 +238,101 @@ public class UserAccountController {
             response.setRoleName("EMPLOYEE");
         }
 
+        String dashboard = dashboardResolver.normalizeDashboard(user.getDashboard());
+
+        if (dashboard == null) {
+            dashboard = dashboardResolver.resolveDashboard(List.of(response.getRoleName()));
+        }
+
+        response.setDashboard(dashboard);
+
         return response;
+    }
+
+    private DashboardAuditResponse toDashboardAuditResponse(AuditLog log) {
+        DashboardAuditResponse response = new DashboardAuditResponse();
+
+        response.setId(log.getId());
+        response.setChangedByUserId(log.getUserId());
+        response.setChangedByName(resolveUserDisplayName(log.getUserId()));
+        response.setOldDashboard(log.getOldValue());
+        response.setNewDashboard(log.getNewValue());
+        response.setReason(log.getReason());
+        response.setTimestamp(log.getTimestamp());
+
+        return response;
+    }
+
+    private String resolveUserDisplayName(Integer userId) {
+        if (userId == null) {
+            return "System";
+        }
+
+        return userRepository.findById(userId)
+                .map(user -> {
+                    if (user.getFullName() != null && !user.getFullName().isBlank()) {
+                        return user.getFullName();
+                    }
+                    if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                        return user.getEmail();
+                    }
+                    return "User #" + user.getId();
+                })
+                .orElse("User #" + userId);
+    }
+
+    private void recordDashboardAuditIfChanged(
+            User targetUser,
+            String oldDashboardRaw,
+            String newDashboardRaw,
+            String reason
+    ) {
+        String oldDashboard = dashboardResolver.normalizeDashboard(oldDashboardRaw);
+        String newDashboard = dashboardResolver.normalizeDashboard(newDashboardRaw);
+
+        if (oldDashboard == null) {
+            oldDashboard = "";
+        }
+
+        if (newDashboard == null) {
+            newDashboard = "";
+        }
+
+        if (oldDashboard.equals(newDashboard)) {
+            return;
+        }
+
+        AuditLog log = new AuditLog();
+        log.setUserId(currentEditorId());
+        log.setAction("UPDATE");
+        log.setEntityType(ENTITY_TYPE_USER_DASHBOARD);
+        log.setEntityId(targetUser.getId());
+        log.setChangedColumn(DASHBOARD_COLUMN);
+        log.setOldValue(oldDashboard);
+        log.setNewValue(newDashboard);
+        log.setReason(reason);
+        log.setTimestamp(new Date());
+
+        auditLogRepository.save(log);
+    }
+
+    private Integer currentEditorId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String resolveDashboardForSave(String dashboardRaw, String roleNameRaw) {
+        String dashboard = dashboardResolver.normalizeDashboard(dashboardRaw);
+
+        if (dashboard != null) {
+            return dashboard;
+        }
+
+        String roleName = normalizeRoleName(roleNameRaw);
+        return dashboardResolver.resolveDashboard(List.of(roleName));
     }
 
     private String normalizeRoleName(String roleName) {
@@ -248,6 +394,7 @@ public class UserAccountController {
         private Integer departmentId;
         private Integer positionId;
         private String roleName;
+        private String dashboard;
         private Boolean active;
     }
 
@@ -266,6 +413,7 @@ public class UserAccountController {
         private String positionName;
 
         private String roleName;
+        private String dashboard;
 
         private Boolean active;
         private String accountStatus;
@@ -278,5 +426,16 @@ public class UserAccountController {
         private Boolean temporaryPasswordEmailSent;
         private String message;
         private String smtpErrorDetail;
+    }
+
+    @Data
+    public static class DashboardAuditResponse {
+        private Integer id;
+        private Integer changedByUserId;
+        private String changedByName;
+        private String oldDashboard;
+        private String newDashboard;
+        private String reason;
+        private Date timestamp;
     }
 }

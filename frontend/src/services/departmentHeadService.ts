@@ -1,163 +1,184 @@
+import { isAxiosError } from 'axios';
+import api from './api';
 
-import api from "./api";
+export type DepartmentHeadDashboardData = {
+  department?: any | null;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  totalEmployees?: number;
+  activeEmployees?: number;
+  totalTeams?: number;
+  activeTeams?: number;
+  employees?: any[];
+  teams?: any[];
+  recentActivities?: any[];
+  warnings?: string[];
+  [key: string]: any;
+};
 
-export interface CandidateUser {
+export type DepartmentHeadCandidate = {
   id: number;
-  name: string;
-  sourceType?: string;
-  type?: string;
+  userId?: number;
+  name?: string;
+  fullName?: string;
+  email?: string;
+  employeeCode?: string;
   departmentId?: number;
-  employeeId?: number | null;
+  departmentName?: string;
+  positionName?: string;
+  positionTitle?: string;
   available?: boolean;
-  isAvailable?: boolean;
   currentTeamId?: number | null;
   currentTeamName?: string | null;
-}
+  currentTeamNames?: string | null;
+  [key: string]: any;
+};
 
-export interface EmployeeResponse {
-  id: number;
-  fullName?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  positionTitle?: string;
-  positionName?: string;
-  active?: boolean;
-}
-
-export interface TeamMemberResponse {
-  userId?: number;
-  employeeId?: number;
-  userName?: string;
-  employeeName?: string;
-  startedDate?: string;
-}
-
-export interface TeamResponse {
-  id: number;
-  teamName: string;
+export type DepartmentHeadTeam = {
+  id?: number;
+  teamName?: string;
   departmentId?: number;
   departmentName?: string;
-  teamLeaderId: number;
+  teamLeaderId?: number;
   teamLeaderName?: string;
-  createdById?: number;
-  createdByName?: string;
-  createdDate?: string;
+  projectManagerId?: number | null;
+  projectManagerName?: string | null;
   status?: string;
-  teamGoal?: string;
-  members?: TeamMemberResponse[];
-}
+  members?: any[];
+  [key: string]: any;
+};
 
-export interface TeamRequest {
-  teamName: string;
-  teamLeaderId: number;
-  teamGoal: string;
-  status: string;
-  memberUserIds?: number[];
-  memberEmployeeIds?: number[];
-}
+const unwrap = <T,>(payload: any, fallback: T): T => {
+  if (payload?.data?.data !== undefined) return payload.data.data as T;
+  if (payload?.data !== undefined) return payload.data as T;
+  return fallback;
+};
 
-export interface DepartmentHeadDashboardResponse {
-  departmentName?: string;
-  employees?: EmployeeResponse[];
-  teams?: TeamResponse[];
-}
+const is422 = (error: unknown) => isAxiosError(error) && error.response?.status === 422;
 
-interface GenericApiResponse<T> {
-  success?: boolean;
-  message?: string;
-  data: T;
-}
+const messageOf = (error: unknown, fallback: string) => {
+  if (isAxiosError(error)) {
+    const data = error.response?.data;
 
-const unwrap = <T>(response: any): T => {
-  if (response.data?.data !== undefined) {
-    return response.data.data;
+    if (typeof data === 'string') return data;
+
+    if (data && typeof data === 'object') {
+      const message = (data as { message?: unknown; error?: unknown }).message;
+      const errorText = (data as { message?: unknown; error?: unknown }).error;
+
+      if (typeof message === 'string' && message.trim()) return message;
+      if (typeof errorText === 'string' && errorText.trim()) return errorText;
+    }
   }
 
-  return response.data;
+  if (error instanceof Error && error.message) return error.message;
+
+  return fallback;
 };
 
-const normalizeCandidate = (candidate: CandidateUser): CandidateUser => {
-  const available = candidate.available ?? candidate.isAvailable ?? true;
-
-  return {
-    ...candidate,
-    available,
-    isAvailable: available,
-  };
-};
+const emptyDashboard = (warning?: string): DepartmentHeadDashboardData => ({
+  department: null,
+  departmentId: null,
+  departmentName: '',
+  totalEmployees: 0,
+  activeEmployees: 0,
+  totalTeams: 0,
+  activeTeams: 0,
+  employees: [],
+  teams: [],
+  recentActivities: [],
+  warnings: warning ? [warning] : [],
+});
 
 export const fetchDepartmentHeadDashboard = async (
-  includeInactive = false
-): Promise<DepartmentHeadDashboardResponse> => {
-  const response = await api.get<
-    GenericApiResponse<DepartmentHeadDashboardResponse> | DepartmentHeadDashboardResponse
-  >(`/department-head/dashboard?includeInactive=${includeInactive}`);
+  includeInactive = false,
+): Promise<DepartmentHeadDashboardData> => {
+  try {
+    const response = await api.get('/department-head/dashboard', {
+      params: { includeInactive },
+    });
 
-  return unwrap<DepartmentHeadDashboardResponse>(response);
+    return unwrap<DepartmentHeadDashboardData>(response, emptyDashboard());
+  } catch (error) {
+    if (is422(error)) {
+      return emptyDashboard(
+        messageOf(
+          error,
+          'This account is using Department Head dashboard but no working department was found.',
+        ),
+      );
+    }
+
+    throw error;
+  }
 };
 
-export const fetchDepartmentHeadTeams = async (): Promise<TeamResponse[]> => {
-  const response = await api.get<
-    GenericApiResponse<TeamResponse[]> | TeamResponse[]
-  >("/department-head/teams");
-
-  return unwrap<TeamResponse[]>(response);
+export const fetchDepartmentHeadTeams = async (): Promise<DepartmentHeadTeam[]> => {
+  try {
+    const response = await api.get('/department-head/teams');
+    const data = unwrap<DepartmentHeadTeam[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
+    throw error;
+  }
 };
 
-export const fetchDepartmentHeadCandidateUsers = async (): Promise<
-  CandidateUser[]
+export const fetchDepartmentHeadCandidateUsers = async (): Promise<DepartmentHeadCandidate[]> => {
+  try {
+    const response = await api.get('/department-head/teams/candidates/users');
+    const data = unwrap<DepartmentHeadCandidate[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
+    throw error;
+  }
+};
+
+export const fetchDepartmentHeadCandidateMembers = async (): Promise<DepartmentHeadCandidate[]> => {
+  try {
+    const response = await api.get('/department-head/teams/candidates/members');
+    const data = unwrap<DepartmentHeadCandidate[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
+    throw error;
+  }
+};
+
+export const fetchDepartmentHeadCandidateProjectManagers = async (): Promise<
+  DepartmentHeadCandidate[]
 > => {
-  const response = await api.get<
-    GenericApiResponse<CandidateUser[]> | CandidateUser[]
-  >("/department-head/teams/candidates/users");
-
-  return unwrap<CandidateUser[]>(response).map(normalizeCandidate);
+  try {
+    const response = await api.get('/department-head/teams/candidates/project-managers');
+    const data = unwrap<DepartmentHeadCandidate[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
+    throw error;
+  }
 };
 
-export const fetchDepartmentHeadCandidateMembers = async (): Promise<
-  CandidateUser[]
-> => {
-  const response = await api.get<
-    GenericApiResponse<CandidateUser[]> | CandidateUser[]
-  >("/department-head/teams/candidates/members");
-
-  return unwrap<CandidateUser[]>(response).map(normalizeCandidate);
-};
-
-export const createDepartmentHeadTeam = async (
-  request: TeamRequest
-): Promise<TeamResponse> => {
-  const memberIds = request.memberUserIds ?? request.memberEmployeeIds ?? [];
-
-  const response = await api.post<
-    GenericApiResponse<TeamResponse> | TeamResponse
-  >("/department-head/teams", {
-    ...request,
-    memberUserIds: memberIds,
-    memberEmployeeIds: memberIds,
-  });
-
-  return unwrap<TeamResponse>(response);
+export const createDepartmentHeadTeam = async (payload: any): Promise<DepartmentHeadTeam> => {
+  const response = await api.post('/department-head/teams', payload);
+  return unwrap<DepartmentHeadTeam>(response, {});
 };
 
 export const updateDepartmentHeadTeam = async (
-  id: number,
-  request: TeamRequest
-): Promise<TeamResponse> => {
-  const memberIds = request.memberUserIds ?? request.memberEmployeeIds ?? [];
-
-  const response = await api.put<
-    GenericApiResponse<TeamResponse> | TeamResponse
-  >(`/department-head/teams/${id}`, {
-    ...request,
-    memberUserIds: memberIds,
-    memberEmployeeIds: memberIds,
-  });
-
-  return unwrap<TeamResponse>(response);
+  teamId: number,
+  payload: any,
+): Promise<DepartmentHeadTeam> => {
+  const response = await api.put(`/department-head/teams/${teamId}`, payload);
+  return unwrap<DepartmentHeadTeam>(response, {});
 };
 
-export const deleteDepartmentHeadTeam = async (id: number): Promise<void> => {
-  await api.delete(`/department-head/teams/${id}`);
+export const fetchDepartmentHeadTeamHistory = async (teamId: number): Promise<any[]> => {
+  try {
+    const response = await api.get(`/department-head/teams/${teamId}/history`);
+    const data = unwrap<any[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
+    throw error;
+  }
 };
