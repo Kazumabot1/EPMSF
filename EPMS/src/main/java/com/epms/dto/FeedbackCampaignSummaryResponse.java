@@ -27,5 +27,9 @@ public class FeedbackCampaignSummaryResponse {
     Long publishedByUserId;
     String publishNote;
     LocalDateTime summarizedAt;
+    List<FeedbackScoreDistributionResponse> scoreDistribution;
+    List<FeedbackRelationshipAverageResponse> relationshipAverages;
+    List<FeedbackCompetencyAverageResponse> competencyAverages;
+    List<FeedbackConfidenceBreakdownResponse> confidenceBreakdown;
     List<FeedbackResultItemResponse> items;
 }

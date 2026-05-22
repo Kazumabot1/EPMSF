@@ -33,7 +33,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'My KPIs', path: '/employee/kpis', icon: 'bi-bullseye' },
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
-    { label: 'My Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
+    { label: '360 Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
     { label: 'One-on-Ones', path: '/employee/one-on-ones', icon: 'bi-calendar-check' },
     {
       label: 'PIP',
@@ -65,7 +65,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   HR: [
     { label: 'Dashboard', path: '/dashboard', icon: 'bi-grid-1x2', end: true },
-    { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'Profile', path: '/hr/profile', icon: 'bi-person' },
     { label: 'Employees', path: '/hr/employee', icon: 'bi-people' },
     {
       label: 'Teams',
@@ -193,6 +193,8 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-clipboard-data',
       permissionField: 'selfAssessmentView',
     },
+    { label: 'Assessment Scores', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data' },
+    { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
     { label: 'Performance Reports', path: '/department-head/reports', icon: 'bi-file-earmark-bar-graph' },
     {
       label: 'Appraisals',
@@ -226,6 +228,8 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
+    { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
+
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     {
       label: 'Continuous Feedback',

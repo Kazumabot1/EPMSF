@@ -12,7 +12,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "feedback_responses", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"evaluator_assignment_id"})
+        @UniqueConstraint(columnNames = {"evaluator_assignment_id"})
 })
 @Getter
 @Setter
@@ -35,6 +35,12 @@ public class FeedbackResponse {
 
     @Column(name = "comments", columnDefinition = "TEXT")
     private String comments;
+
+    @Column(name = "assessment_date_text", length = 120)
+    private String assessmentDateText;
+
+    @Column(name = "effective_date_text", length = 120)
+    private String effectiveDateText;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "final_status", nullable = false)

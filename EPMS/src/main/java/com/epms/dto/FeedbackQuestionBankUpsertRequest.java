@@ -18,11 +18,12 @@ public class FeedbackQuestionBankUpsertRequest {
 
     private String responseType = "RATING_WITH_COMMENT";
 
-    /** SCORED, NON_SCORED, or HR_REVIEW. Blank values are inferred from responseType. */
+    /** Fixed to SCORED for performance 360 feedback. */
     private String scoringBehavior;
 
     private Integer ratingScaleId;
 
+    /** Ignored by the backend. Question-level weight is fixed to 1; competency weights drive scoring. */
     @DecimalMin(value = "0.01", message = "Weight must be greater than zero")
     private Double weight = 1.0;
 
@@ -31,5 +32,5 @@ public class FeedbackQuestionBankUpsertRequest {
     private String helpText;
 
 
-    private String status = "ACTIVE";
+    private String status = "DRAFT";
 }

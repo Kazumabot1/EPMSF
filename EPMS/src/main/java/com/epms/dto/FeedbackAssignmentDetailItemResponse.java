@@ -6,6 +6,8 @@ import com.epms.entity.enums.FeedbackRelationshipType;
 import lombok.Builder;
 import lombok.Value;
 
+import java.util.List;
+
 @Value
 @Builder
 public class FeedbackAssignmentDetailItemResponse {
@@ -15,6 +17,15 @@ public class FeedbackAssignmentDetailItemResponse {
     String targetEmployeeName;
     Long evaluatorEmployeeId;
     String evaluatorEmployeeName;
+    String evaluatorEmployeeCode;
+    String evaluatorEmployeeEmail;
+    Integer evaluatorDepartmentId;
+    Integer evaluatorPositionId;
+    String evaluatorPositionName;
+    String manualReason;
+    String selectionReason;
+    String confidence;
+    List<String> warnings;
     FeedbackRelationshipType relationshipType;
     EvaluatorSelectionMethod selectionMethod;
     AssignmentStatus status;

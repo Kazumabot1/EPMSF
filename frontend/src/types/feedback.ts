@@ -5,7 +5,7 @@ export interface ApiEnvelope<T> {
   timestamp: string;
 }
 
-export type FeedbackCampaignStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'CANCELLED';
+export type FeedbackCampaignStatus = 'DRAFT' | 'READY_TO_ACTIVATE' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 export interface FeedbackResponseItemPayload {
   questionId: number;
   ratingValue: number;
@@ -31,19 +31,25 @@ export interface FeedbackRequestCreatePayload {
 
 export interface FeedbackCampaignPayload {
   name: string;
+  campaignType: string;
+  reviewYear?: number;
   startDate: string;
   endDate: string;
   status?: FeedbackCampaignStatus;
-  formId?: number;
+  formId?: number | null;
 }
 
 export interface FeedbackCampaign {
   id: number;
   name: string;
+  campaignType?: string;
+  reviewYear?: number;
   startDate: string;
   endDate: string;
+  startAt?: string;
+  endAt?: string;
   status: FeedbackCampaignStatus;
-  formId?: number;
+  formId?: number | null;
   createdBy: number;
   createdAt: string;
   targetCount?: number;
@@ -137,6 +143,13 @@ export interface FeedbackReceivedItem {
   evaluatorSourceLabel?: string | null;
   identityProtectionReason?: string | null;
   visibilityReason?: string | null;
+  includeOverallScore?: boolean | null;
+  includeCompetencyBreakdown?: boolean | null;
+  includeSelfVsOthers?: boolean | null;
+  includeComments?: boolean | null;
+  includeScoreExplanation?: boolean | null;
+  relationshipSubmittedCount?: number | null;
+  commentsHiddenReason?: string | null;
   questionItems?: FeedbackReceivedQuestionItem[];
 }
 
@@ -171,12 +184,37 @@ export interface FeedbackCompletionItem {
   peerEvaluators?: number;
   subordinateEvaluators?: number;
   selfEvaluators?: number;
-  projectStakeholderEvaluators?: number;
   completionPercent: number;
   averageScore?: number | null;
   scoreCategory?: string | null;
   statusLabel?: string | null;
   actionNeeded?: string | null;
+}
+
+export interface FeedbackRelationshipProgress {
+  relationshipType: string;
+  label?: string | null;
+  total: number;
+  submitted: number;
+  pending: number;
+  overdue: number;
+  completionPercent: number;
+}
+
+export interface FeedbackAssignmentStatusBreakdown {
+  submitted: number;
+  inProgress: number;
+  notStarted: number;
+  overdue: number;
+  declined: number;
+  cancelled: number;
+}
+
+export interface FeedbackTargetStatusBreakdown {
+  completed: number;
+  pending: number;
+  overdue: number;
+  noAssignments: number;
 }
 
 export interface FeedbackCompletionDashboard {
@@ -203,7 +241,9 @@ export interface FeedbackCompletionDashboard {
   peerAssignments?: number;
   subordinateAssignments?: number;
   selfAssignments?: number;
-  projectStakeholderAssignments?: number;
+  statusBreakdown?: FeedbackAssignmentStatusBreakdown;
+  targetStatusBreakdown?: FeedbackTargetStatusBreakdown;
+  relationshipProgress?: FeedbackRelationshipProgress[];
   completionPercent: number;
   healthStatus?: string | null;
   healthMessage?: string | null;

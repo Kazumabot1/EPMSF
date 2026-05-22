@@ -2,7 +2,6 @@ package com.epms.repository;
 
 import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.enums.FeedbackCampaignEarlyCloseStatus;
-import com.epms.entity.enums.FeedbackCampaignRound;
 import com.epms.entity.enums.FeedbackCampaignStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,12 +15,6 @@ public interface FeedbackCampaignRepository extends JpaRepository<FeedbackCampai
     List<FeedbackCampaign> findByStatusOrderByStartDateDesc(FeedbackCampaignStatus status);
     List<FeedbackCampaign> findAllByOrderByStartDateDesc();
     List<FeedbackCampaign> findByEarlyCloseRequestStatusOrderByEarlyCloseRequestedAtAsc(FeedbackCampaignEarlyCloseStatus status);
-
-    List<FeedbackCampaign> findByReviewYearAndReviewRoundAndStatusIn(
-            Integer reviewYear,
-            FeedbackCampaignRound reviewRound,
-            Collection<FeedbackCampaignStatus> statuses
-    );
 
     @Query("""
             SELECT c

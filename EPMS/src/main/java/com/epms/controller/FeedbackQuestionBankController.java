@@ -1,14 +1,20 @@
 package com.epms.controller;
 
+import com.epms.dto.FeedbackCompetencyResponse;
+import com.epms.dto.FeedbackCompetencyUpsertRequest;
 import com.epms.dto.FeedbackDynamicFormPreviewResponse;
 import com.epms.dto.FeedbackQuestionBankResponse;
+import com.epms.dto.FeedbackQuestionBankReadinessResponse;
 import com.epms.dto.FeedbackQuestionBankUpsertRequest;
+import com.epms.dto.FeedbackQuestionQualityValidationResponse;
 import com.epms.dto.FeedbackQuestionRuleResponse;
 import com.epms.dto.FeedbackQuestionRuleUpsertRequest;
 import com.epms.dto.GenericApiResponse;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.security.SecurityUtils;
+import com.epms.service.FeedbackCompetencyService;
 import com.epms.service.FeedbackQuestionBankService;
+import com.epms.service.QuestionQualityValidationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -33,6 +39,62 @@ import java.util.Locale;
 public class FeedbackQuestionBankController {
 
     private final FeedbackQuestionBankService questionBankService;
+    private final FeedbackCompetencyService competencyService;
+    private final QuestionQualityValidationService qualityValidationService;
+
+
+    @GetMapping("/competencies")
+    public ResponseEntity<GenericApiResponse<List<FeedbackCompetencyResponse>>> getCompetencies() {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Feedback competencies retrieved successfully",
+                competencyService.getCompetencies()
+        ));
+    }
+
+    @PostMapping("/competencies")
+    public ResponseEntity<GenericApiResponse<FeedbackCompetencyResponse>> createCompetency(
+            @Valid @RequestBody FeedbackCompetencyUpsertRequest request
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.status(HttpStatus.CREATED).body(GenericApiResponse.success(
+                "Feedback competency created successfully",
+                competencyService.createCompetency(request)
+        ));
+    }
+
+    @PutMapping("/competencies/{competencyId}")
+    public ResponseEntity<GenericApiResponse<FeedbackCompetencyResponse>> updateCompetency(
+            @PathVariable Long competencyId,
+            @Valid @RequestBody FeedbackCompetencyUpsertRequest request
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Feedback competency updated successfully",
+                competencyService.updateCompetency(competencyId, request)
+        ));
+    }
+
+    @GetMapping("/readiness")
+    public ResponseEntity<GenericApiResponse<FeedbackQuestionBankReadinessResponse>> getReadiness() {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Question bank readiness retrieved successfully",
+                qualityValidationService.getReadiness()
+        ));
+    }
+
+    @PostMapping("/questions/quality-check")
+    public ResponseEntity<GenericApiResponse<FeedbackQuestionQualityValidationResponse>> validateQuestion(
+            @Valid @RequestBody FeedbackQuestionBankUpsertRequest request,
+            @RequestParam(required = false) Long excludeQuestionId
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Question quality checked successfully",
+                qualityValidationService.validateQuestion(request, excludeQuestionId)
+        ));
+    }
 
     @GetMapping("/questions")
     public ResponseEntity<GenericApiResponse<List<FeedbackQuestionBankResponse>>> getQuestions() {
@@ -70,6 +132,18 @@ public class FeedbackQuestionBankController {
         ));
     }
 
+    @PatchMapping("/questions/{questionId}/status")
+    public ResponseEntity<GenericApiResponse<FeedbackQuestionBankResponse>> updateQuestionStatus(
+            @PathVariable Long questionId,
+            @RequestParam String status
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Question status updated successfully",
+                questionBankService.updateQuestionStatus(questionId, status)
+        ));
+    }
+
     @GetMapping("/rules")
     public ResponseEntity<GenericApiResponse<List<FeedbackQuestionRuleResponse>>> getRules() {
         ensureHrOrAdmin();
@@ -103,6 +177,18 @@ public class FeedbackQuestionBankController {
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Question applicability rule updated successfully",
                 questionBankService.updateRule(ruleId, request)
+        ));
+    }
+
+    @PutMapping("/rules/rule-sets/{ruleSetId}")
+    public ResponseEntity<GenericApiResponse<List<FeedbackQuestionRuleResponse>>> updateRuleSet(
+            @PathVariable Long ruleSetId,
+            @Valid @RequestBody FeedbackQuestionRuleUpsertRequest request
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Question rule set updated successfully",
+                questionBankService.updateRuleSet(ruleSetId, request)
         ));
     }
 

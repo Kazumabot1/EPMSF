@@ -2,8 +2,6 @@ package com.epms.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -11,8 +9,20 @@ import java.util.List;
 @Data
 public class FeedbackQuestionRuleUpsertRequest {
 
-    @NotNull(message = "Question version is required")
-    private Long questionVersionId;
+    /** User-facing Rule Set name. If blank, backend generates a descriptive name. */
+    private String ruleSetName;
+
+    /** Optional HR-facing purpose/notes for the Rule Set. */
+    private String ruleSetDescription;
+
+    /** DRAFT, ACTIVE, DISABLED, or ARCHIVED. If omitted, active decides the status. */
+    private String ruleSetStatus;
+
+    /** Backward-compatible single-question field. */
+    private Long questionBankId;
+
+    /** Preferred rule-set field. Backend creates one internal rule row per selected question and role. */
+    private List<Long> questionBankIds;
 
     @Min(value = 1, message = "Minimum level rank must be between 1 and 9")
     @Max(value = 9, message = "Minimum level rank must be between 1 and 9")
@@ -29,22 +39,10 @@ public class FeedbackQuestionRuleUpsertRequest {
     /** Backward-compatible single-role field. */
     private String evaluatorRelationshipType;
 
-    /** Preferred multi-role field. Backend creates one rule per selected evaluator role. */
+    /** Preferred multi-role field. Use ALL to create one row per supported evaluator role. */
     private List<String> evaluatorRelationshipTypes;
 
-    @NotBlank(message = "Section code is required")
-    private String sectionCode;
-
-    @NotBlank(message = "Section title is required")
-    private String sectionTitle;
-
-    private Integer sectionOrder = 1;
-
     private Integer displayOrder = 1;
-
-    private Boolean requiredOverride;
-
-    private Double weightOverride;
 
     private Integer rulePriority = 100;
 

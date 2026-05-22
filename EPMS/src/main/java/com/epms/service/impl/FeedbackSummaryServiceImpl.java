@@ -7,6 +7,7 @@ import com.epms.dto.FeedbackResultItemResponse;
 import com.epms.dto.FeedbackTeamSummaryResponse;
 import com.epms.entity.Employee;
 import com.epms.entity.FeedbackCampaign;
+import com.epms.entity.FeedbackCampaignRelationshipWeight;
 import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackRequest;
 import com.epms.entity.FeedbackResponse;
@@ -20,6 +21,7 @@ import com.epms.entity.enums.ResponseStatus;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.EmployeeRepository;
+import com.epms.repository.FeedbackCampaignRelationshipWeightRepository;
 import com.epms.repository.FeedbackCampaignRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackRequestRepository;
@@ -49,8 +51,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
-    private static final String SCORE_METHOD = "SUBMITTED_RESPONSE_AVERAGE";
+    private static final String SCORE_METHOD = "RELATIONSHIP_WEIGHTED_SUBMITTED_RESPONSE_AVERAGE";
     private final FeedbackCampaignRepository feedbackCampaignRepository;
+    private final FeedbackCampaignRelationshipWeightRepository relationshipWeightRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
     private final FeedbackEvaluatorAssignmentRepository feedbackEvaluatorAssignmentRepository;
     private final FeedbackResponseRepository feedbackResponseRepository;
@@ -117,6 +120,8 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                 "publishedSummaries=" + publishableSummaries.size(),
                 "360 feedback summaries published"
         );
+        campaign.setStatus(FeedbackCampaignStatus.PUBLISHED);
+        feedbackCampaignRepository.save(campaign);
         feedbackOperationalService.notifySummaryPublished(campaign, publishableSummaries);
 
         return buildCampaignSummary(campaign, feedbackSummaryRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaignId));
@@ -286,7 +291,10 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     }
 
     private void refreshClosedCampaignSummariesForEmployees(List<Long> employeeIds) {
-        List<FeedbackCampaign> closedCampaigns = feedbackCampaignRepository.findByStatusOrderByStartDateDesc(FeedbackCampaignStatus.CLOSED);
+        List<FeedbackCampaign> closedCampaigns = feedbackCampaignRepository.findAllByOrderByStartDateDesc().stream()
+                .filter(campaign -> campaign.getStatus() == FeedbackCampaignStatus.CLOSED
+                        || campaign.getStatus() == FeedbackCampaignStatus.PUBLISHED)
+                .toList();
         for (FeedbackCampaign campaign : closedCampaigns) {
             List<FeedbackRequest> requests = feedbackRequestRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaign.getId())
                     .stream()
@@ -300,8 +308,9 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
     private FeedbackCampaign getClosedCampaign(Long campaignId) {
         FeedbackCampaign campaign = getCampaign(campaignId);
-        if (campaign.getStatus() != FeedbackCampaignStatus.CLOSED) {
-            throw new BusinessValidationException("Feedback results are available only after the campaign is CLOSED.");
+        if (campaign.getStatus() != FeedbackCampaignStatus.CLOSED
+                && campaign.getStatus() != FeedbackCampaignStatus.PUBLISHED) {
+            throw new BusinessValidationException("Feedback results are available only after the campaign is CLOSED or PUBLISHED.");
         }
         return campaign;
     }
@@ -378,19 +387,19 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         long pendingCount = Math.max(0, assignedCount - submittedCount);
         double completionRate = assignedCount == 0 ? 0.0 : roundToTwoDecimals((submittedCount * 100.0) / assignedCount);
         Double rawAverage = averageScore(responses);
+        Double relationshipWeightedAverage = weightedScoreByRelationship(campaign, responses);
         String confidenceLevel = determineConfidenceLevel(assignedCount, submittedCount, completionRate);
         boolean insufficientFeedback = isInsufficientFeedback(assignedCount, submittedCount);
 
         summary.setCampaign(campaign);
         summary.setTargetEmployeeId(targetEmployeeId);
         summary.setRawAverageScore(rawAverage);
-        summary.setAverageScore(rawAverage);
+        summary.setAverageScore(relationshipWeightedAverage);
         summary.setTotalResponses(submittedCount);
         summary.setManagerResponses(countByRelationship(responses, FeedbackRelationshipType.MANAGER));
         summary.setPeerResponses(countByRelationship(responses, FeedbackRelationshipType.PEER));
         summary.setSubordinateResponses(countByRelationship(responses, FeedbackRelationshipType.SUBORDINATE));
         summary.setSelfResponses(countByRelationship(responses, FeedbackRelationshipType.SELF));
-        summary.setProjectStakeholderResponses(countByRelationship(responses, FeedbackRelationshipType.PROJECT_STAKEHOLDER));
         summary.setAssignedEvaluatorCount(assignedCount);
         summary.setSubmittedEvaluatorCount(submittedCount);
         summary.setPendingEvaluatorCount(pendingCount);
@@ -398,12 +407,11 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         summary.setConfidenceLevel(confidenceLevel);
         summary.setInsufficientFeedback(insufficientFeedback);
         summary.setScoreCalculationMethod(SCORE_METHOD);
-        summary.setScoreCalculationNote(buildScoreCalculationNote(assignedCount, submittedCount, insufficientFeedback));
+        summary.setScoreCalculationNote(buildScoreCalculationNote(campaign, assignedCount, submittedCount, insufficientFeedback));
         summary.setManagerAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.MANAGER));
         summary.setPeerAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.PEER));
         summary.setSubordinateAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.SUBORDINATE));
         summary.setSelfAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.SELF));
-        summary.setProjectStakeholderAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.PROJECT_STAKEHOLDER));
         summary.setSummarizedAt(summarizedAt);
         applyVisibilityStatusAfterRecalculation(summary, campaign, submittedCount);
     }
@@ -415,9 +423,6 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         }
         if (campaign.getStatus() == FeedbackCampaignStatus.DRAFT) {
             throw new BusinessValidationException("Cannot publish draft campaign summary. Close the campaign before publishing.");
-        }
-        if (campaign.getStatus() == FeedbackCampaignStatus.CANCELLED) {
-            throw new BusinessValidationException("Cannot publish cancelled campaign summary.");
         }
         if (campaign.getStatus() != FeedbackCampaignStatus.CLOSED) {
             throw new BusinessValidationException("Cannot publish feedback summary until the campaign is CLOSED.");
@@ -447,7 +452,8 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     }
 
     private boolean isPublishedClosedSummary(FeedbackSummary summary) {
-        return summary.getCampaign().getStatus() == FeedbackCampaignStatus.CLOSED
+        return (summary.getCampaign().getStatus() == FeedbackCampaignStatus.CLOSED
+                || summary.getCampaign().getStatus() == FeedbackCampaignStatus.PUBLISHED)
                 && summary.getVisibilityStatus() == FeedbackSummaryVisibilityStatus.PUBLISHED;
     }
 
@@ -491,7 +497,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                 : summary.getVisibilityStatus().name();
     }
 
-    private String buildScoreCalculationNote(long assignedCount, long submittedCount, boolean insufficientFeedback) {
+    private String buildScoreCalculationNote(FeedbackCampaign campaign, long assignedCount, long submittedCount, boolean insufficientFeedback) {
         if (assignedCount == 0) {
             return "No evaluator assignments exist for this target employee.";
         }
@@ -499,9 +505,12 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
             return "No submitted feedback responses are available yet.";
         }
         if (insufficientFeedback) {
-            return "Feedback score is calculated from submitted responses, but confidence is low because too few evaluators submitted.";
+            return "Feedback score uses submitted responses and configured evaluator relationship weights, but confidence is low because too few evaluators submitted.";
         }
-        return "Feedback score is the average of submitted evaluator response scores. It is a 360 feedback score only, not a final performance score.";
+        if (Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
+            return "Feedback score applies configured evaluator relationship weights. Missing relationship roles are not redistributed.";
+        }
+        return "Feedback score applies configured evaluator relationship weights and redistributes missing submitted relationship roles across available roles.";
     }
 
     private boolean isInsufficientFeedback(long assignedCount, long submittedCount) {
@@ -528,6 +537,65 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         return responses.stream()
                 .filter(response -> response.getEvaluatorAssignment().getRelationshipType() == relationshipType)
                 .count();
+    }
+
+    private Double weightedScoreByRelationship(FeedbackCampaign campaign, List<FeedbackResponse> responses) {
+        if (responses == null || responses.isEmpty()) {
+            return null;
+        }
+        Map<FeedbackRelationshipType, Double> averages = new EnumMap<>(FeedbackRelationshipType.class);
+        for (FeedbackRelationshipType type : FeedbackRelationshipType.values()) {
+            Double average = averageScoreByRelationship(responses, type);
+            if (average != null) {
+                averages.put(type, average);
+            }
+        }
+        if (averages.isEmpty()) {
+            return null;
+        }
+
+        Map<FeedbackRelationshipType, Double> weights = relationshipWeights(campaign.getId());
+        if (weights.isEmpty()) {
+            return averageScore(responses);
+        }
+
+        double weightedTotal = 0.0;
+        double availableWeight = 0.0;
+        double configuredPositiveTotal = weights.values().stream().filter(value -> value > 0).mapToDouble(Double::doubleValue).sum();
+        for (Map.Entry<FeedbackRelationshipType, Double> entry : averages.entrySet()) {
+            double weight = weights.getOrDefault(entry.getKey(), 0.0);
+            if (weight <= 0.0) {
+                continue;
+            }
+            weightedTotal += entry.getValue() * weight;
+            availableWeight += weight;
+        }
+        if (availableWeight <= 0.0) {
+            return averageScore(responses);
+        }
+        double denominator = Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight())
+                ? (configuredPositiveTotal <= 0.0 ? availableWeight : configuredPositiveTotal)
+                : availableWeight;
+        return roundToTwoDecimals(weightedTotal / denominator);
+    }
+
+    private Map<FeedbackRelationshipType, Double> relationshipWeights(Long campaignId) {
+        Map<FeedbackRelationshipType, Double> weights = relationshipWeightRepository.findByCampaignIdOrderByRelationshipTypeAsc(campaignId).stream()
+                .filter(weight -> weight.getRelationshipType() != null)
+                .collect(Collectors.toMap(
+                        FeedbackCampaignRelationshipWeight::getRelationshipType,
+                        weight -> weight.getWeightPercent() == null ? 0.0 : weight.getWeightPercent().doubleValue(),
+                        (first, duplicate) -> duplicate,
+                        () -> new EnumMap<>(FeedbackRelationshipType.class)
+                ));
+        if (!weights.isEmpty()) {
+            return weights;
+        }
+        weights.put(FeedbackRelationshipType.MANAGER, 40.0);
+        weights.put(FeedbackRelationshipType.PEER, 30.0);
+        weights.put(FeedbackRelationshipType.SUBORDINATE, 20.0);
+        weights.put(FeedbackRelationshipType.SELF, 10.0);
+        return weights;
     }
 
     private Double averageScore(List<FeedbackResponse> responses) {
@@ -567,7 +635,6 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                         .peerResponses(safeLong(summary.getPeerResponses()))
                         .subordinateResponses(safeLong(summary.getSubordinateResponses()))
                         .selfResponses(safeLong(summary.getSelfResponses()))
-                        .projectStakeholderResponses(safeLong(summary.getProjectStakeholderResponses()))
                         .assignedEvaluatorCount(safeLong(summary.getAssignedEvaluatorCount()))
                         .submittedEvaluatorCount(safeLong(summary.getSubmittedEvaluatorCount()))
                         .pendingEvaluatorCount(safeLong(summary.getPendingEvaluatorCount()))
@@ -578,7 +645,6 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                         .peerAverageScore(summary.getPeerAverageScore())
                         .subordinateAverageScore(summary.getSubordinateAverageScore())
                         .selfAverageScore(summary.getSelfAverageScore())
-                        .projectStakeholderAverageScore(summary.getProjectStakeholderAverageScore())
                         .scoreCalculationMethod(summary.getScoreCalculationMethod())
                         .scoreCalculationNote(summary.getScoreCalculationNote())
                         .visibilityStatus(visibilityStatusName(summary))
@@ -610,12 +676,10 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                 .peerAverageScore(summary.getPeerAverageScore())
                 .subordinateAverageScore(summary.getSubordinateAverageScore())
                 .selfAverageScore(summary.getSelfAverageScore())
-                .projectStakeholderAverageScore(summary.getProjectStakeholderAverageScore())
                 .managerResponses(safeLong(summary.getManagerResponses()))
                 .peerResponses(safeLong(summary.getPeerResponses()))
                 .subordinateResponses(safeLong(summary.getSubordinateResponses()))
                 .selfResponses(safeLong(summary.getSelfResponses()))
-                .projectStakeholderResponses(safeLong(summary.getProjectStakeholderResponses()))
                 .scoreCalculationMethod(summary.getScoreCalculationMethod())
                 .scoreCalculationNote(summary.getScoreCalculationNote())
                 .visibilityStatus(visibilityStatusName(summary))

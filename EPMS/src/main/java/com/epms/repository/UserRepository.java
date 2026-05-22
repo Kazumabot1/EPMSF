@@ -31,6 +31,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     Optional<User> findByEmployeeId(Integer employeeId);
 
+    List<User> findByEmployeeIdIn(Collection<Integer> employeeIds);
+
     @Query("""
             SELECT u FROM User u
             WHERE u.employeeId = :employeeId
@@ -61,6 +63,16 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     List<User> findByDepartmentIdAndActiveTrue(Integer departmentId);
 
+
+    @Query(value = """
+            SELECT DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_'))
+            FROM users u
+            JOIN user_roles ur ON ur.user_id = u.id
+            JOIN roles r ON r.id = ur.role_id
+            WHERE u.id = :userId
+            """, nativeQuery = true)
+    List<String> findNormalizedRoleNamesByUserId(@Param("userId") Integer userId);
+
     @Query(value = """
             SELECT DISTINCT u.*
             FROM users u
@@ -70,6 +82,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
               AND UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_')) IN (:roleNames)
             """, nativeQuery = true)
     List<User> findActiveUsersByNormalizedRoleNames(@Param("roleNames") Collection<String> roleNames);
+
 
     @Query(value = """
             SELECT DISTINCT u.*
@@ -82,6 +95,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
                   IN ('DEPARTMENT_HEAD', 'DEPARTMENTHEAD', 'DEPT_HEAD', 'HEAD_OF_DEPARTMENT')
             """, nativeQuery = true)
     List<User> findActiveDepartmentHeadsByDepartmentId(@Param("departmentId") Integer departmentId);
+
 
     @Query(value = """
             SELECT DISTINCT u.*

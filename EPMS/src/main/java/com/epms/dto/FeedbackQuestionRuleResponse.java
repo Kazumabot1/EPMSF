@@ -9,8 +9,13 @@ import java.time.LocalDateTime;
 @Builder
 public class FeedbackQuestionRuleResponse {
     Long id;
+    Long ruleSetId;
+    String ruleSetName;
+    String ruleSetDescription;
+    String ruleSetStatus;
+    String ruleSetType;
     Long questionBankId;
-    Long questionVersionId;
+    Long activeVersionId;
     String questionCode;
     String competencyCode;
     String questionText;
@@ -23,12 +28,7 @@ public class FeedbackQuestionRuleResponse {
     Long targetPositionId;
     Long targetDepartmentId;
     String evaluatorRelationshipType;
-    String sectionCode;
-    String sectionTitle;
-    Integer sectionOrder;
     Integer displayOrder;
-    Boolean required;
-    Double weight;
     Integer rulePriority;
     Boolean active;
     LocalDateTime updatedAt;

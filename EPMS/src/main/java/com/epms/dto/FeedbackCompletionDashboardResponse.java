@@ -36,7 +36,10 @@ public class FeedbackCompletionDashboardResponse {
     private Long peerAssignments;
     private Long subordinateAssignments;
     private Long selfAssignments;
-    private Long projectStakeholderAssignments;
+
+    private FeedbackAssignmentStatusBreakdownResponse statusBreakdown;
+    private FeedbackTargetStatusBreakdownResponse targetStatusBreakdown;
+    private List<FeedbackRelationshipProgressResponse> relationshipProgress;
 
     private Double completionPercent;
     private String healthStatus;

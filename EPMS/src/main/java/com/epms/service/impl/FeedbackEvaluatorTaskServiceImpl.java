@@ -1,6 +1,7 @@
 package com.epms.service.impl;
 
 import com.epms.dto.FeedbackAssignmentDetailResponse;
+import com.epms.dto.FeedbackAssignmentEmployeeInfoResponse;
 import com.epms.dto.FeedbackAssignmentQuestionDetailResponse;
 import com.epms.dto.FeedbackAssignmentSectionDetailResponse;
 import com.epms.dto.FeedbackEvaluatorTaskResponse;
@@ -18,6 +19,7 @@ import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.EmployeeRepository;
+import com.epms.repository.DepartmentRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.RatingScaleRepository;
@@ -46,6 +48,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
     private final FeedbackResponseRepository feedbackResponseRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final DepartmentRepository departmentRepository;
     private final RatingScaleRepository ratingScaleRepository;
     private final FeedbackQuestionResolverService questionResolverService;
 
@@ -140,6 +143,8 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                 .targetEmployeeId(targetEmployeeId)
                 .targetEmployeeName(loadEmployeeNames(List.of(targetEmployeeId))
                         .getOrDefault(targetEmployeeId, "Employee #" + targetEmployeeId))
+                .target(buildTargetInfo(assignment))
+                .evaluator(buildEvaluatorInfo(assignment))
                 .relationshipType(assignment.getRelationshipType().name())
                 .anonymous(Boolean.TRUE.equals(assignment.getIsAnonymous()))
                 .status(assignment.getStatus().name())
@@ -150,6 +155,8 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                 .autoSubmitCompletedDraftsOnClose(isAutoSubmitCompletedDraftsOnClose(assignment))
                 .autoSubmitNotice(autoSubmitNotice(assignment))
                 .comments(response != null ? response.getComments() : null)
+                .assessmentDateText(response != null ? response.getAssessmentDateText() : null)
+                .effectiveDateText(response != null ? response.getEffectiveDateText() : null)
                 .totalQuestionCount(totalQuestionCount)
                 .requiredQuestionCount(requiredQuestionCount)
                 .answeredQuestionCount(answeredQuestionCount)
@@ -159,6 +166,66 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                 .submittedLocked(submittedLocked)
                 .sections(mapSections(questions, existingItems))
                 .build();
+    }
+
+
+    private FeedbackAssignmentEmployeeInfoResponse buildTargetInfo(FeedbackEvaluatorAssignment assignment) {
+        if (assignment == null || assignment.getFeedbackRequest() == null) {
+            return null;
+        }
+        com.epms.entity.FeedbackRequest request = assignment.getFeedbackRequest();
+        Long employeeId = request.getTargetEmployeeId();
+        User user = employeeId == null ? null : userRepository.findByEmployeeId(employeeId.intValue()).orElse(null);
+        return FeedbackAssignmentEmployeeInfoResponse.builder()
+                .employeeId(employeeId)
+                .userId(request.getTargetUserId())
+                .employeeCode(firstNonBlank(request.getTargetEmployeeCode(), user == null ? null : user.getEmployeeCode()))
+                .employeeName(firstNonBlank(request.getTargetEmployeeName(), user == null ? null : user.getFullName(), employeeId == null ? null : "Employee #" + employeeId))
+                .email(firstNonBlank(request.getTargetEmployeeEmail(), user == null ? null : user.getEmail()))
+                .positionName(firstNonBlank(request.getTargetPositionName(), user == null || user.getPosition() == null ? null : user.getPosition().getPositionTitle()))
+                .departmentName(firstNonBlank(request.getTargetCurrentDepartmentName(), request.getTargetParentDepartmentName(), resolveDepartmentName(user == null ? null : user.getDepartmentId())))
+                .levelCode(firstNonBlank(request.getTargetLevelCode(), user == null || user.getPosition() == null || user.getPosition().getLevel() == null ? null : user.getPosition().getLevel().getLevelCode()))
+                .build();
+    }
+
+    private FeedbackAssignmentEmployeeInfoResponse buildEvaluatorInfo(FeedbackEvaluatorAssignment assignment) {
+        if (assignment == null) {
+            return null;
+        }
+        Long employeeId = assignment.getEvaluatorEmployeeId();
+        User user = employeeId == null ? null : userRepository.findByEmployeeId(employeeId.intValue()).orElse(null);
+        Integer departmentId = assignment.getEvaluatorDepartmentId() != null ? assignment.getEvaluatorDepartmentId() : (user == null ? null : user.getDepartmentId());
+        return FeedbackAssignmentEmployeeInfoResponse.builder()
+                .employeeId(employeeId)
+                .userId(assignment.getEvaluatorUserId())
+                .employeeCode(firstNonBlank(assignment.getEvaluatorEmployeeCode(), user == null ? null : user.getEmployeeCode()))
+                .employeeName(firstNonBlank(assignment.getEvaluatorEmployeeName(), user == null ? null : user.getFullName(), employeeId == null ? null : "Employee #" + employeeId))
+                .email(firstNonBlank(assignment.getEvaluatorEmployeeEmail(), user == null ? null : user.getEmail()))
+                .positionName(firstNonBlank(assignment.getEvaluatorPositionName(), user == null || user.getPosition() == null ? null : user.getPosition().getPositionTitle()))
+                .departmentName(resolveDepartmentName(departmentId))
+                .levelCode(user == null || user.getPosition() == null || user.getPosition().getLevel() == null ? null : user.getPosition().getLevel().getLevelCode())
+                .build();
+    }
+
+    private String resolveDepartmentName(Integer departmentId) {
+        if (departmentId == null) {
+            return null;
+        }
+        return departmentRepository.findById(departmentId)
+                .map(com.epms.entity.Department::getDepartmentName)
+                .orElse(null);
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private Map<Long, FeedbackResponseItem> mapExistingItemsByAssignmentQuestion(
@@ -265,7 +332,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         return switch (value) {
             case 1 -> "Unsatisfactory";
             case 2 -> "Needs improvement";
-            case 3 -> "Meet requirement";
+            case 3 -> "Meets requirement";
             case 4 -> "Good";
             case 5 -> "Outstanding";
             default -> "Rating " + value;
@@ -288,7 +355,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
 
     private boolean isVisibleInEvaluatorWorkspace(FeedbackEvaluatorAssignment assignment) {
         FeedbackCampaignStatus campaignStatus = assignment.getFeedbackRequest().getCampaign().getStatus();
-        if (campaignStatus == FeedbackCampaignStatus.CANCELLED || campaignStatus == FeedbackCampaignStatus.DRAFT) {
+        if (campaignStatus == FeedbackCampaignStatus.DRAFT) {
             return false;
         }
         if (assignment.getStatus() == AssignmentStatus.CANCELLED) {
@@ -304,9 +371,6 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         FeedbackCampaignStatus campaignStatus = assignment.getFeedbackRequest().getCampaign().getStatus();
         if (campaignStatus == FeedbackCampaignStatus.DRAFT) {
             throw new BusinessValidationException("This feedback assignment is not available until HR activates the campaign.");
-        }
-        if (campaignStatus == FeedbackCampaignStatus.CANCELLED) {
-            throw new BusinessValidationException("This feedback campaign was cancelled.");
         }
         if (assignment.getStatus() == AssignmentStatus.CANCELLED) {
             throw new BusinessValidationException("This evaluator assignment was cancelled.");
@@ -357,9 +421,6 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         }
         if (campaignStatus == FeedbackCampaignStatus.CLOSED) {
             return "This campaign is closed. Feedback can no longer be edited or submitted.";
-        }
-        if (campaignStatus == FeedbackCampaignStatus.CANCELLED) {
-            return "This campaign was cancelled.";
         }
 
         LocalDateTime now = LocalDateTime.now();

@@ -108,7 +108,6 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
                 .peerAssignments(items.stream().mapToLong(FeedbackCompletionItemResponse::getPeerEvaluators).sum())
                 .subordinateAssignments(items.stream().mapToLong(FeedbackCompletionItemResponse::getSubordinateEvaluators).sum())
                 .selfAssignments(items.stream().mapToLong(FeedbackCompletionItemResponse::getSelfEvaluators).sum())
-                .projectStakeholderAssignments(items.stream().mapToLong(FeedbackCompletionItemResponse::getProjectStakeholderEvaluators).sum())
                 .completionPercent(completionPercent)
                 .healthStatus(resolveCompletionHealth(campaign, totalAssignments, submittedAssignments, overdueAssignments))
                 .healthMessage(resolveCompletionMessage(campaign, totalAssignments, submittedAssignments, overdueAssignments, completionPercent))
@@ -165,7 +164,6 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
                 .peerEvaluators(countAssignmentsByRelationship(assignments, FeedbackRelationshipType.PEER))
                 .subordinateEvaluators(countAssignmentsByRelationship(assignments, FeedbackRelationshipType.SUBORDINATE))
                 .selfEvaluators(countAssignmentsByRelationship(assignments, FeedbackRelationshipType.SELF))
-                .projectStakeholderEvaluators(countAssignmentsByRelationship(assignments, FeedbackRelationshipType.PROJECT_STAKEHOLDER))
                 .completionPercent(percent)
                 .averageScore(average)
                 .scoreCategory(FeedbackScoreUtil.category(average))
@@ -219,9 +217,6 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
         if (submitted >= total) {
             return "Complete";
         }
-        if (campaign.getStatus() == FeedbackCampaignStatus.CANCELLED) {
-            return "Cancelled";
-        }
         if (campaign.getStatus() == FeedbackCampaignStatus.CLOSED) {
             return "Closed with pending feedback";
         }
@@ -253,13 +248,10 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
         if (campaign.getStatus() == FeedbackCampaignStatus.CLOSED) {
             return "Campaign is closed; pending feedback can no longer be submitted.";
         }
-        return "Campaign was cancelled.";
+        return "Campaign is not active.";
     }
 
     private String resolveCompletionHealth(FeedbackCampaign campaign, long totalAssignments, long submittedAssignments, long overdueAssignments) {
-        if (campaign.getStatus() == FeedbackCampaignStatus.CANCELLED) {
-            return "CANCELLED";
-        }
         if (totalAssignments == 0) {
             return "SETUP_REQUIRED";
         }
@@ -282,9 +274,6 @@ public class FeedbackRequestServiceImpl implements FeedbackRequestService {
             long overdueAssignments,
             double completionPercent
     ) {
-        if (campaign.getStatus() == FeedbackCampaignStatus.CANCELLED) {
-            return "Campaign was cancelled. No more evaluator submissions are accepted.";
-        }
         if (totalAssignments == 0) {
             return "No evaluator assignments exist yet. Generate assignments before activating the campaign.";
         }

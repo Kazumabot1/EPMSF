@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "feedback_evaluator_assignments", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"feedback_request_id", "evaluator_employee_id"})
+        @UniqueConstraint(columnNames = {"feedback_request_id", "evaluator_employee_id"})
 })
 @Getter
 @Setter
@@ -29,6 +29,30 @@ public class FeedbackEvaluatorAssignment {
 
     @Column(name = "evaluator_employee_id", nullable = false)
     private Long evaluatorEmployeeId;
+
+    @Column(name = "evaluator_user_id")
+    private Integer evaluatorUserId;
+
+    @Column(name = "evaluator_employee_code", length = 80)
+    private String evaluatorEmployeeCode;
+
+    @Column(name = "evaluator_employee_name", length = 255)
+    private String evaluatorEmployeeName;
+
+    @Column(name = "evaluator_employee_email", length = 255)
+    private String evaluatorEmployeeEmail;
+
+    @Column(name = "evaluator_department_id")
+    private Integer evaluatorDepartmentId;
+
+    @Column(name = "evaluator_position_id")
+    private Integer evaluatorPositionId;
+
+    @Column(name = "evaluator_position_name", length = 255)
+    private String evaluatorPositionName;
+
+    @Column(name = "manual_reason", columnDefinition = "TEXT")
+    private String manualReason;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source_type", nullable = false)
