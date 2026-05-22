@@ -1,4 +1,3 @@
-
 package com.epms.security;
 
 import com.epms.entity.Permission;
@@ -104,7 +103,10 @@ public class CustomUserDetailsService implements UserDetailsService {
                 ? List.of(positionRoleName)
                 : roleNames.stream().toList();
 
-        String dashboard = dashboardResolver.resolveDashboard(dashboardRoles);
+        String selectedDashboard = dashboardResolver.normalizeDashboard(user.getDashboard());
+        String dashboard = selectedDashboard != null
+                ? selectedDashboard
+                : dashboardResolver.resolveDashboard(dashboardRoles);
 
         if (roleNames.isEmpty()) {
             roleNames.add(roleFromDashboard(dashboard));
@@ -150,16 +152,28 @@ public class CustomUserDetailsService implements UserDetailsService {
         String normalized = role
                 .replaceFirst("(?i)^ROLE_", "")
                 .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
                 .replaceAll("[^A-Za-z0-9]+", "_")
                 .replaceAll("^_+|_+$", "")
                 .toUpperCase();
 
-        if (normalized.equals("DEPARTMENTHEAD")) {
+        if (normalized.equals("DEPARTMENTHEAD")
+                || normalized.equals("DEPT_HEAD")
+                || normalized.equals("HEAD_OF_DEPARTMENT")) {
             return "DEPARTMENT_HEAD";
+        }
+
+        if (normalized.equals("PROJECT_MANAGER")
+                || normalized.equals("PROJECTMANAGER")
+                || normalized.equals("TEAM_MANAGER")
+                || normalized.equals("PM")) {
+            return "MANAGER";
+        }
+
+        if (normalized.equals("CEO")) {
+            return "CEO";
         }
 
         return normalized;
     }
 }
-
-

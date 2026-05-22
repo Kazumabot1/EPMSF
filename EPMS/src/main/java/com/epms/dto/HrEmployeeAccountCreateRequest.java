@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class HrEmployeeAccountCreateRequest {
+
     private Integer employeeId;
 
     private String firstName;
@@ -19,6 +20,19 @@ public class HrEmployeeAccountCreateRequest {
     private String positionName;
 
     private String roleName;
+
+    /*
+     * Admin-selected dashboard override.
+     *
+     * ADMIN_DASHBOARD
+     * HR_DASHBOARD
+     * EXECUTIVE_DASHBOARD
+     * DEPARTMENT_HEAD_DASHBOARD
+     * MANAGER_DASHBOARD
+     * EMPLOYEE_DASHBOARD
+     */
+    private String dashboard;
+
     private String password;
     private Boolean sendTemporaryPasswordEmail;
 }
