@@ -35,4 +35,5 @@ public class HrEmployeeAccountCreateRequest {
 
     private String password;
     private Boolean sendTemporaryPasswordEmail;
+
 }

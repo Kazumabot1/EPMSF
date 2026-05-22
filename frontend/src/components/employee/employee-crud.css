@@ -967,3 +967,326 @@
     transform: none;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   EmployeeFormModal  — "employee-*" classes
+   Used by the Add / Edit employee modal (EmployeeFormModal.tsx).
+   ────────────────────────────────────────────────────────────────── */
+
+/* Modal header (title + close button) */
+.employee-modal-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.employee-modal-header h2 {
+  margin: 0 0 0.15rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.employee-modal-header p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.employee-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: background 0.12s, color 0.12s;
+}
+
+.employee-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Form root */
+.employee-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.35rem 1.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: #a5b4fc #f1f5f9;
+}
+
+.employee-form::-webkit-scrollbar {
+  width: 8px;
+}
+
+.employee-form::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.employee-form::-webkit-scrollbar-thumb {
+  background: #a5b4fc;
+  border-radius: 6px;
+}
+
+.employee-form::-webkit-scrollbar-thumb:hover {
+  background: #818cf8;
+}
+
+/* 2-col grid */
+.employee-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 560px) {
+  .employee-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Field wrapper */
+.employee-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.employee-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.employee-field small {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.35;
+  margin-top: 0.15rem;
+}
+
+.employee-required {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+/* Input + Select base */
+.employee-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+
+.employee-input:hover {
+  border-color: #94a3b8;
+}
+
+.employee-input:focus {
+  outline: none;
+  border-color: var(--epms-accent, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+.employee-input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+select.employee-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M2.22 4.47a.75.75 0 011.06 0L6 7.19l2.72-2.72a.75.75 0 111.06 1.06l-3.25 3.25a.75.75 0 01-1.06 0L2.22 5.53a.75.75 0 010-1.06z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 12px;
+  padding-right: 2rem;
+}
+
+/* Textarea */
+.employee-textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+/* Section title (Contact & identity, Background, Family) */
+.employee-form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1.25rem 0 0.65rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+/* Login-account box */
+.employee-login-box {
+  margin: 1rem 0 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid #e0e7ff;
+  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
+}
+
+.employee-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #334155;
+  cursor: pointer;
+  margin-bottom: 0.35rem;
+}
+
+.employee-checkbox:last-child {
+  margin-bottom: 0;
+}
+
+.employee-checkbox input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--epms-accent, #4f46e5);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.employee-checkbox input[type='checkbox']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Error alert */
+.employee-alert {
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.employee-alert.error {
+  background: #fff1f2;
+  border: 1px solid #fecaca;
+  color: #9f1239;
+}
+
+/* Footer actions */
+.employee-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Buttons */
+.employee-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s, background 0.15s, border-color 0.15s, filter 0.15s;
+  font-family: inherit;
+}
+
+.employee-btn.secondary {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #334155;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.employee-btn.secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.employee-btn.primary {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 8px rgba(79, 70, 229, 0.3);
+  padding: 0.6rem 1.2rem;
+}
+
+.employee-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.04);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 4px 14px rgba(79, 70, 229, 0.35);
+}
+
+.employee-btn.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
+/* DashboardSelector inside employee-form: normalise the epms-emp-input-field
+   so it matches the surrounding employee-input look */
+.employee-login-box .epms-emp-input-field,
+.employee-field .epms-emp-input-field {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M2.22 4.47a.75.75 0 011.06 0L6 7.19l2.72-2.72a.75.75 0 111.06 1.06l-3.25 3.25a.75.75 0 01-1.06 0L2.22 5.53a.75.75 0 010-1.06z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 12px;
+  padding-right: 2rem;
+}
+
+.employee-login-box .epms-emp-input-field:focus,
+.employee-field .epms-emp-input-field:focus {
+  outline: none;
+  border-color: var(--epms-accent, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}

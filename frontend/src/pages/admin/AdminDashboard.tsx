@@ -3,6 +3,7 @@ import api from '../../services/api';
 import EmployeeAvatar from '../../components/EmployeeAvatar';
 import { exportToExcel, todayStr } from '../../utils/exportExcel';
 import './admin-dashboard.css';
+import DashboardSelector from '../../components/admin/DashboardSelector';
 
 type DepartmentOption = {
   id: number;
@@ -294,11 +295,14 @@ const AdminDashboard = () => {
   };
 
   const loadOptions = async () => {
-    const [departmentRes, positionRes, roleRes] = await Promise.allSettled([
-      api.get('/departments'),
-      api.get('/positions'),
-      api.get('/roles'),
-    ]);
+   const [departmentRes, positionRes] = await Promise.allSettled([
+     api.get('/departments'),
+     api.get('/positions'),
+   ]);
+
+   const roleRes = {
+     status: 'rejected',
+   } as PromiseRejectedResult;
 
     setOptions({
       departments:
@@ -309,10 +313,7 @@ const AdminDashboard = () => {
         positionRes.status === 'fulfilled'
           ? unwrap<PositionOption[]>(positionRes.value, [])
           : [],
-      roles:
-        roleRes.status === 'fulfilled'
-          ? unwrap<RoleOption[]>(roleRes.value, [])
-          : [],
+     roles: [],
     });
   };
 
@@ -723,6 +724,17 @@ const AdminDashboard = () => {
                     }}
                     required
                   >
+                  <div className="adm-field">
+                    <label>
+                      Dashboard <span className="adm-req">*</span>
+                    </label>
+
+                    <DashboardSelector
+                      value={form.dashboard}
+                      roleName={form.roleName}
+                      onChange={(dashboard) => setForm({ ...form, dashboard })}
+                    />
+                  </div>
                     {roleOptions.map((role) => {
                       const roleName = normalizeRoleName(role.name);
 
