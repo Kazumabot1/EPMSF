@@ -50,10 +50,8 @@ function KpiNumberInput({ value, disabled, onChange, min, max, className = '' }:
   return (
     <div className={`kpi-tpl-number-box ${disabled ? 'is-disabled' : ''} ${invalid ? 'is-invalid' : ''}`}>
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
-        min={min}
-        max={max}
         value={value ?? ''}
         disabled={disabled}
         onKeyDown={(event) => {
@@ -213,7 +211,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     value={row.target}
                     disabled={readOnly}
                     onChange={(target) => onRowChange(row.rowId, { target })}
-                    className="tabular-nums"
+                    className="text-right tabular-nums"
                   />
                 </td>
                 <td className="px-3 py-3">
@@ -260,7 +258,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     value={row.weight}
                     disabled={readOnly}
                     onChange={(weight) => onRowChange(row.rowId, { weight })}
-                    className="font-semibold tabular-nums"
+                    className="text-right font-semibold tabular-nums"
                   />
                 </td>
                 <td className="bg-violet-50/60 px-3 py-3">

@@ -22,6 +22,13 @@ const calculateWeightedScore = (score: number | null, weight: number | null): nu
   return Number(((score * weight) / 100).toFixed(2));
 };
 
+function isNumericKpiText(value: string) {
+  if (value === '') {
+    return true;
+  }
+  return /^\d+(\.\d*)?$/.test(value) && Number.isFinite(Number(value));
+}
+
 const labelFor = (
   id: number | null,
   list: { id: number; name: string }[],
@@ -70,12 +77,12 @@ const KpiDynamicRowsTable = ({
                 <tr key={row.rowId}>
                   <td>{labelFor(row.kpiItemId, items, '—')}</td>
                   <td>{row.kpiCategoryLabel?.trim() || labelFor(row.kpiCategoryId, categories, '—')}</td>
-                  <td>{row.target ?? '—'}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.target ?? '—'}</td>
                   <td>{row.kpiUnitLabel?.trim() || labelFor(row.kpiUnitId, units, '—')}</td>
-                  <td>{row.actual ?? '—'}</td>
-                  <td>{row.weight ?? '—'}</td>
-                  <td>{row.score ?? '—'}</td>
-                  <td className="kpi-weighted">{weightedScore.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.actual ?? '—'}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.weight ?? '—'}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.score ?? '—'}</td>
+                  <td className="kpi-weighted" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{weightedScore.toFixed(2)}</td>
                 </tr>
               );
             }
@@ -119,11 +126,15 @@ const KpiDynamicRowsTable = ({
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={row.target ?? ''}
-                    onChange={(event) => onRowChange(row.rowId, { target: event.target.value ? Number(event.target.value) : null })}
-                    className="kpi-input-sm"
+                    onChange={(event) => {
+                      if (isNumericKpiText(event.target.value)) {
+                        onRowChange(row.rowId, { target: event.target.value ? Number(event.target.value) : null });
+                      }
+                    }}
+                    className="kpi-input-sm text-right"
                   />
                 </td>
                 <td>
@@ -142,32 +153,44 @@ const KpiDynamicRowsTable = ({
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={row.actual ?? ''}
-                    onChange={(event) => onRowChange(row.rowId, { actual: event.target.value ? Number(event.target.value) : null })}
-                    className="kpi-input-sm"
+                    onChange={(event) => {
+                      if (isNumericKpiText(event.target.value)) {
+                        onRowChange(row.rowId, { actual: event.target.value ? Number(event.target.value) : null });
+                      }
+                    }}
+                    className="kpi-input-sm text-right"
                   />
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={row.weight ?? ''}
-                    onChange={(event) => onRowChange(row.rowId, { weight: event.target.value ? Number(event.target.value) : null })}
-                    className="kpi-input-sm"
+                    onChange={(event) => {
+                      if (isNumericKpiText(event.target.value)) {
+                        onRowChange(row.rowId, { weight: event.target.value ? Number(event.target.value) : null });
+                      }
+                    }}
+                    className="kpi-input-sm text-right"
                   />
                 </td>
                 <td>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={row.score ?? ''}
-                    onChange={(event) => onRowChange(row.rowId, { score: event.target.value ? Number(event.target.value) : null })}
-                    className="kpi-input-sm"
+                    onChange={(event) => {
+                      if (isNumericKpiText(event.target.value)) {
+                        onRowChange(row.rowId, { score: event.target.value ? Number(event.target.value) : null });
+                      }
+                    }}
+                    className="kpi-input-sm text-right"
                   />
                 </td>
-                <td className="kpi-weighted">{weightedScore.toFixed(2)}</td>
+                <td className="kpi-weighted" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{weightedScore.toFixed(2)}</td>
                 <td>
                   <button
                     type="button"
@@ -188,3 +211,4 @@ const KpiDynamicRowsTable = ({
 );
 
 export default KpiDynamicRowsTable;
+

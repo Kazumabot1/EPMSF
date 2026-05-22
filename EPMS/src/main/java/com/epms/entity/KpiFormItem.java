@@ -22,7 +22,7 @@ public class KpiFormItem {
     private KpiForm kpiForm;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kpi_category_id")
+    @JoinColumn(name = "kpi_category_id", nullable = true)
     @EqualsAndHashCode.Exclude
     private KpiCategory kpiCategory;
 
@@ -47,7 +47,7 @@ public class KpiFormItem {
     private String kpiLabel;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "kpi_unit_id")
+    @JoinColumn(name = "kpi_unit_id", nullable = true)
     @EqualsAndHashCode.Exclude
     private KpiUnit kpiUnit;
 

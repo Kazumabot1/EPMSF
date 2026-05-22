@@ -201,10 +201,10 @@ const HrEmployeeKpiListPage = () => {
                 {tab === 'in_progress' && (
                   <>
                     <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Workflow status</th>
-                    <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Lines entered</th>
+                    <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Lines entered</th>
                   </>
                 )}
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Weighted total</th>
+                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weighted total</th>
                 {tab === 'finalized' && (
                   <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Finalized</th>
                 )}
@@ -249,12 +249,12 @@ const HrEmployeeKpiListPage = () => {
                         <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
                           {r.status ?? '—'}
                         </td>
-                        <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+                        <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                           {linesEnteredCount(r)}/{r.lines.length}
                         </td>
                       </>
                     )}
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>
+                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {r.totalWeightedScore != null ? r.totalWeightedScore.toFixed(2) : '—'}
                     </td>
                     {tab === 'finalized' && (
@@ -308,30 +308,30 @@ const HrEmployeeKpiListPage = () => {
                             <thead>
                               <tr style={{ textAlign: 'left', color: '#64748b' }}>
                                 <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0' }}>KPI</th>
-                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0' }}>Target</th>
-                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0' }}>Weight %</th>
-                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0' }}>Actual</th>
-                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0' }}>Achievement %</th>
-                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0' }}>Weighted score</th>
+                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Target</th>
+                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weight %</th>
+                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Actual</th>
+                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Achievement %</th>
+                                <th style={{ padding: '.4rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weighted score</th>
                               </tr>
                             </thead>
                             <tbody>
                               {r.lines.map((line) => (
                                 <tr key={line.kpiFormItemId}>
                                   <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9' }}>{line.kpiLabel ?? '—'}</td>
-                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                                     {line.target != null ? line.target : '—'}
                                   </td>
-                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                                     {line.weight != null ? line.weight : '—'}
                                   </td>
-                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                                     {line.actualValue != null ? line.actualValue : '—'}
                                   </td>
-                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                                     {line.score != null ? line.score.toFixed(2) : '—'}
                                   </td>
-                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '.4rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                                     {line.weightedScore != null ? line.weightedScore.toFixed(4) : '—'}
                                   </td>
                                 </tr>
@@ -361,3 +361,4 @@ const HrEmployeeKpiListPage = () => {
 };
 
 export default HrEmployeeKpiListPage;
+

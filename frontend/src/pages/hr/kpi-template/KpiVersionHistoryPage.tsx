@@ -205,9 +205,9 @@ const VersionDetailModal = ({
                       <th className="px-4 py-3.5">Change</th>
                       <th className="px-4 py-3.5">KPI</th>
                       <th className="px-4 py-3.5">Category</th>
-                      <th className="px-4 py-3.5">Target</th>
+                      <th className="px-4 py-3.5 text-right">Target</th>
                       <th className="px-4 py-3.5">Unit</th>
-                      <th className="px-4 py-3.5">Weight</th>
+                      <th className="px-4 py-3.5 text-right">Weight</th>
                       <th className="px-4 py-3.5">Reason</th>
                       <th className="px-4 py-3.5">Date</th>
                     </tr>
@@ -230,9 +230,9 @@ const VersionDetailModal = ({
                           </td>
                           <td className="px-4 py-3.5 font-semibold text-gray-900">{row?.kpiName ?? '-'}</td>
                           <td className="px-4 py-3.5">{row?.kpiCategoryName ?? '-'}</td>
-                          <td className="px-4 py-3.5">{row?.target ?? '-'}</td>
+                          <td className="px-4 py-3.5 text-right tabular-nums">{row?.target ?? '-'}</td>
                           <td className="px-4 py-3.5">{row?.kpiUnitName ?? '-'}</td>
-                          <td className="px-4 py-3.5">{row?.weight ?? '-'}</td>
+                          <td className="px-4 py-3.5 text-right tabular-nums">{row?.weight ?? '-'}</td>
                           <td className="px-4 py-3.5">{change.reason ?? '-'}</td>
                           <td className="px-4 py-3.5">{formatDate(change.changedAt)}</td>
                         </tr>
