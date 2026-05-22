@@ -6,21 +6,40 @@ const api = axios.create({
   baseURL: '/api',
 });
 
-const isAuthEndpoint = (url?: string) => {
-  if (!url) return false;
+const TOKEN_FREE_ENDPOINTS = [
+  '/auth/login',
+  '/auth/forgot-password/request',
+  '/auth/forgot-password/verify',
+  '/auth/forgot-password/reset',
+];
 
-  return (
-    url.includes('/auth/login') ||
-    url.includes('/auth/refresh') ||
-    url.includes('/auth/logout') ||
-    url.includes('/auth/forgot-password') ||
-    url.includes('/auth/reset-password') ||
-    url.includes('/auth/change-password')
-  );
+const normalizeUrl = (url?: string) => {
+  if (!url) return '';
+
+  let normalized = url;
+
+  if (normalized.startsWith('http')) {
+    try {
+      normalized = new URL(normalized).pathname;
+    } catch {
+      normalized = url;
+    }
+  }
+
+  if (normalized.startsWith('/api/')) {
+    normalized = normalized.substring('/api'.length);
+  }
+
+  return normalized;
+};
+
+const isTokenFreeEndpoint = (url?: string) => {
+  const normalized = normalizeUrl(url);
+  return TOKEN_FREE_ENDPOINTS.some((endpoint) => normalized.startsWith(endpoint));
 };
 
 api.interceptors.request.use((config) => {
-  const token = authStorage.getAccessToken();
+  const normalizedUrl = normalizeUrl(config.url);
 
   if (typeof config.url === 'string' && config.url.startsWith('/api/')) {
     config.url = config.url.substring('/api'.length);
@@ -28,17 +47,22 @@ api.interceptors.request.use((config) => {
 
   config.headers = AxiosHeaders.from(config.headers);
 
+  if (isTokenFreeEndpoint(normalizedUrl)) {
+    config.headers.delete('Authorization');
+    config.headers.delete('authorization');
+    return config;
+  }
+
+  const token = authStorage.getAccessToken();
+
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
+    return config;
   }
 
-  if (!token && !isAuthEndpoint(config.url)) {
-    authStorage.clearSession();
-    window.location.href = '/login';
-    throw new Error('Missing authentication token. Please log in again.');
-  }
-
-  return config;
+  authStorage.clearSession();
+  window.location.href = '/login';
+  throw new Error('Missing authentication token. Please log in again.');
 });
 
 api.interceptors.response.use(
@@ -50,7 +74,6 @@ api.interceptors.response.use(
     const headers = AxiosHeaders.from(error?.config?.headers);
     const hasAuthorizationHeader = Boolean(headers.get('Authorization'));
 
-    // 409 conflicts and gateway errors are handled in UI; avoid noisy console errors.
     if (status !== 409 && !isBackendUnreachableStatus(status)) {
       console.error('API Error:', {
         status: error.response?.status,

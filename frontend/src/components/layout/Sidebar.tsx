@@ -20,36 +20,31 @@ type NavItem = {
 };
 
 const normalizeRoleName = (role: string) =>
-    String(role ?? '')
-        .replace(/^ROLE_/i, '')
-        .replace(/([a-z])([A-Z])/g, '$1_$2')
-        .replace(/[\s-]+/g, '_')
-        .toUpperCase();
+  String(role ?? '')
+    .replace(/^ROLE_/i, '')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toUpperCase();
 
 const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = authStorage.getUser();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const dashboard = user?.dashboard ?? '';
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
   const normalizedDashboard = normalizeRoleName(dashboard);
 
   const isAdmin =
-      normalizedRoles.includes('ADMIN') ||
-      normalizedDashboard === 'ADMIN_DASHBOARD';
+    normalizedRoles.includes('ADMIN') ||
+    normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isEmployee =
-      normalizedRoles.includes('EMPLOYEE') ||
-      normalizedDashboard === 'EMPLOYEE_DASHBOARD';
+    normalizedRoles.includes('EMPLOYEE') ||
+    normalizedDashboard === 'EMPLOYEE_DASHBOARD';
 
-  const isHrOnly =
-      normalizedRoles.includes('HR') ||
-      normalizedDashboard === 'HR_DASHBOARD' ||
-      normalizedDashboard === 'ADMIN_DASHBOARD' ||
-      variant === 'hr' ||
-      variant === 'admin';
   const isHr =
     normalizedRoles.includes('HR') ||
     normalizedDashboard === 'HR_DASHBOARD';
@@ -58,31 +53,31 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
 
   const roleLabel =
-      variant === 'admin'
+    variant === 'admin'
+      ? 'Admin'
+      : variant === 'hr'
+        ? 'HR'
+        : isAdmin
           ? 'Admin'
-          : variant === 'hr'
+          : normalizedDashboard === 'EMPLOYEE_DASHBOARD'
+            ? 'Employee'
+            : normalizedDashboard === 'HR_DASHBOARD'
               ? 'HR'
-              : isAdmin
-                  ? 'Admin'
-                  : normalizedDashboard === 'EMPLOYEE_DASHBOARD'
-                      ? 'Employee'
-                      : normalizedDashboard === 'HR_DASHBOARD'
-                          ? 'HR'
-                          : normalizedDashboard === 'MANAGER_DASHBOARD'
-                              ? 'Manager'
-                              : normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD'
-                                  ? 'Department Head'
-                                  : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
-                                      ? 'Executive'
-                                      : 'User';
+              : normalizedDashboard === 'MANAGER_DASHBOARD'
+                ? 'Manager'
+                : normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD'
+                  ? 'Department Head'
+                  : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
+                    ? 'Executive'
+                    : 'User';
 
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
-        ? [
+      ? [
           { to: '/pip/create', label: 'Create', icon: 'bi bi-plus-square' },
           { to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' },
         ]
-        : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
+      : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
     const adminNavItems: NavItem[] = [
       { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
@@ -98,27 +93,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/user-roles', label: 'User Roles', icon: 'bi bi-person-gear' },
           { to: '/role-permissions', label: 'Role Permissions', icon: 'bi bi-shield-check' },
           { to: '/permissions', label: 'Permissions', icon: 'bi bi-key' },
-          { to: '/position-permissions', label: 'Position Permissions', icon: 'bi bi-sliders2-vertical' },
-        ],
-      },
-      {
-        to: '/pip',
-        label: 'PIP',
-        icon: 'bi bi-clipboard2-pulse',
-        children: [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }],
-      },
-      {
-        to: '/hr/performance-kpi/unit',
-        label: 'KPI Management',
-        icon: 'bi bi-speedometer2',
-        children: [
-          { to: '/hr/performance-kpi/unit', label: 'KPI Units', icon: 'bi bi-speedometer2' },
-          { to: '/hr/performance-kpi/category', label: 'KPI Categories', icon: 'bi bi-tags' },
-          { to: '/hr/performance-kpi/item', label: 'KPI Items', icon: 'bi bi-card-checklist' },
-          { to: '/hr/kpi-template', label: 'KPI Templates', icon: 'bi bi-ui-checks-grid' },
-          { to: '/hr/kpi-version-history', label: 'KPI Version History', icon: 'bi bi-clock-history' },
-          { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
-          { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
+          {
+            to: '/position-permissions',
+            label: 'Position Permissions',
+            icon: 'bi bi-sliders2-vertical',
+          },
         ],
       },
     ];
@@ -172,10 +151,42 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'Appraisals',
         icon: 'bi bi-clipboard-check',
         children: [
-          { to: '/hr/appraisal', label: 'Appraisal Cycle Dashboard', icon: 'bi bi-speedometer2', end: true },
-          { to: '/hr/appraisal/template-forms', label: 'Template Forms', icon: 'bi bi-folder2-open' },
-          { to: '/hr/appraisal/cycles', label: 'Appraisal Cycles', icon: 'bi bi-calendar2-week' },
-          { to: '/hr/appraisal/review-check', label: 'Manager + Dept Review Check', icon: 'bi bi-shield-check' },
+          {
+            to: '/hr/appraisal',
+            label: 'Appraisal Cycle Dashboard',
+            icon: 'bi bi-speedometer2',
+            end: true,
+          },
+          {
+            to: '/hr/appraisal/template-create',
+            label: 'Template Form Create',
+            icon: 'bi bi-file-earmark-plus',
+          },
+          {
+            to: '/hr/appraisal/template-forms',
+            label: 'Template Form Records',
+            icon: 'bi bi-folder2-open',
+          },
+          {
+            to: '/hr/appraisal/create',
+            label: 'Create Appraisal',
+            icon: 'bi bi-calendar-plus',
+          },
+          {
+            to: '/hr/appraisal/cycles',
+            label: 'Cycle Records',
+            icon: 'bi bi-arrow-repeat',
+          },
+          {
+            to: '/hr/appraisal/review-check',
+            label: 'Manager + Dept Review Check',
+            icon: 'bi bi-shield-check',
+          },
+          {
+            to: '/hr/appraisal/employee-reviews',
+            label: 'Employee Reviews',
+            icon: 'bi bi-person-lines-fill',
+          },
         ],
       },
       {
@@ -186,10 +197,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/feedback/questions', label: 'Question Bank', icon: 'bi bi-collection', end: true },
           { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
           { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
-          { to: '/hr/feedback/campaigns', label: 'Campaigns', icon: 'bi bi-megaphone' },
+          { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
+          { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
+          { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
-          { to: '/hr/feedback/audit', label: 'Audit Trail', icon: 'bi bi-shield-check' },
+          { to: '/hr/feedback/audit', label: 'Audit Log', icon: 'bi bi-shield-check' },
         ],
       },
       {
@@ -272,6 +285,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       const response = await api.get('/notifications/unread-count');
       const body = response.data as { data?: number } | number;
       const count = typeof body === 'number' ? body : body?.data;
+
       setUnreadCount(typeof count === 'number' ? count : 0);
     } catch {
       setUnreadCount(0);
@@ -312,10 +326,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     <span className="hr-nav-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
   ) : null;
 
-  const hasActiveChild = (item: NavItem) =>
-      item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false;
-
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const hasActiveChild = useCallback(
+    (item: NavItem) =>
+      item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false,
+    [location.pathname],
+  );
 
   useEffect(() => {
     setExpanded((prev) => {
@@ -333,10 +348,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
       return next;
     });
-  }, [location.pathname, navItems]);
+  }, [hasActiveChild, navItems]);
 
   const isParentActive = (item: NavItem) =>
-      location.pathname.startsWith(item.to) || hasActiveChild(item);
+    location.pathname.startsWith(item.to) || hasActiveChild(item);
 
   const toggleParent = (item: NavItem) => {
     if (!item.children?.length) {
@@ -358,52 +373,34 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   };
 
   return (
-      <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
-        <div className="hr-sidebar-top">
-          <div className="hr-brand">
-            <div className="hr-brand-mark">E</div>
     <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="hr-sidebar-top">
         <div className="hr-brand">
           <SidebarCompanyLogo />
 
-            {!collapsed && (
-                <div className="hr-brand-copy">
-                  <h2>EPMS</h2>
-                  <p>Performance System</p>
-                </div>
-            )}
-          </div>
-
-          {!collapsed && <div className="hr-sidebar-top-divider" />}
+          {!collapsed && (
+            <div className="hr-brand-copy">
+              <h2>EPMS</h2>
+              <p>Performance System</p>
+            </div>
+          )}
         </div>
 
-        {!collapsed && (
-            <div className="hr-role-chip">
-              <small>CURRENT ROLE</small>
-              <strong>{roleLabel}</strong>
-            </div>
-        )}
+        {!collapsed && <div className="hr-sidebar-top-divider" />}
+      </div>
 
-        <nav className="hr-nav">
-          {navItems.map((item) => {
-            const isExpanded = expanded.has(item.to);
-            const parentActive = isParentActive(item);
+      {!collapsed && (
+        <div className="hr-role-chip">
+          <small>CURRENT ROLE</small>
+          <strong>{roleLabel}</strong>
+        </div>
+      )}
 
-            if (!item.children?.length) {
-              return (
-                  <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) => `hr-nav-link ${isActive ? 'active' : ''}`}
-                      title={collapsed ? item.label : undefined}
-                  >
-                    <i className={item.icon} />
-                    {!collapsed && <span>{item.label}</span>}
-                  </NavLink>
-              );
-            }
+      <nav className="hr-nav">
+        {navItems.map((item) => {
+          const isExpanded = expanded.has(item.to);
+          const parentActive = isParentActive(item);
+
           if (!item.children?.length) {
             return (
               <NavLink
@@ -420,27 +417,16 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             );
           }
 
-            return (
-                <div key={item.to} className="hr-nav-group">
-                  <button
-                      type="button"
-                      className={`hr-nav-link hr-nav-group-toggle ${parentActive ? 'active' : ''}`}
-                      onClick={() => toggleParent(item)}
-                      title={collapsed ? item.label : undefined}
-                  >
-                    <i className={item.icon} />
+          return (
+            <div key={item.to} className="hr-nav-group">
+              <button
+                type="button"
+                className={`hr-nav-link hr-nav-group-toggle ${parentActive ? 'active' : ''}`}
+                onClick={() => toggleParent(item)}
+                title={collapsed ? item.label : undefined}
+              >
+                <i className={item.icon} />
 
-                    {!collapsed && (
-                        <>
-                          <span>{item.label}</span>
-                          <i
-                              className={`bi ${
-                                  isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'
-                              } hr-submenu-caret`}
-                          />
-                        </>
-                    )}
-                  </button>
                 {!collapsed && (
                   <>
                     <span>{item.label}</span>
@@ -454,27 +440,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
                 )}
               </button>
 
-                  {!collapsed && isExpanded && (
-                      <div className="hr-submenu">
-                        {item.children.map((child) => (
-                            <NavLink
-                                key={child.to}
-                                to={child.to}
-                                end={child.end}
-                                className={({ isActive }) =>
-                                    `hr-submenu-link ${isActive ? 'active' : ''}`
-                                }
-                            >
-                              <i className={child.icon} />
-                              <span>{child.label}</span>
-                            </NavLink>
-                        ))}
-                      </div>
-                  )}
-                </div>
-            );
-          })}
-        </nav>
               {!collapsed && isExpanded && (
                 <div className="hr-submenu">
                   {item.children.map((child) => (
@@ -498,18 +463,18 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         })}
       </nav>
 
-        <div className="hr-sidebar-footer">
-          <button
-              type="button"
-              className="hr-sidebar-collapse"
-              onClick={onToggle}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
-            {!collapsed && <span>Collapse</span>}
-          </button>
-        </div>
-      </aside>
+      <div className="hr-sidebar-footer">
+        <button
+          type="button"
+          className="hr-sidebar-collapse"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
+    </aside>
   );
 };
 

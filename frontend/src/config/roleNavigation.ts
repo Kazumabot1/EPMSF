@@ -26,6 +26,18 @@ export interface UserLike {
 export const disabledFeatureMessage = (positionName?: string | null) =>
   `Your position (${positionName || 'your position'}) has this feature disabled!`;
 
+const feedbackChildren: NavItem[] = [
+  { label: 'Question Bank', path: '/hr/feedback/questions', icon: 'bi-question-circle' },
+  { label: 'Question Rules', path: '/hr/feedback/question-rules', icon: 'bi-sliders' },
+  { label: 'Dynamic Preview', path: '/hr/feedback/dynamic-preview', icon: 'bi-eye' },
+  { label: 'Campaign Setup', path: '/hr/feedback/campaigns', icon: 'bi-calendar-plus' },
+  { label: 'Targets & Evaluators', path: '/hr/feedback/targets', icon: 'bi-people' },
+  { label: 'Assignment Preview', path: '/hr/feedback/assignment-preview', icon: 'bi-diagram-3' },
+  { label: 'Monitoring', path: '/hr/feedback/monitoring', icon: 'bi-activity' },
+  { label: 'Analytics', path: '/hr/feedback/analytics', icon: 'bi-graph-up' },
+  { label: 'Audit Log', path: '/hr/feedback/audit', icon: 'bi-clock-history' },
+];
+
 export const roleNavigation: Record<UserRole, NavItem[]> = {
   Employee: [
     { label: 'My Dashboard', path: '/employee/dashboard', icon: 'bi-columns-gap', end: true },
@@ -125,7 +137,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Manager + Dept Review Check', path: '/hr/appraisal/review-check', icon: 'bi-shield-check' },
       ],
     },
-    { label: '360 Feedback', path: '/hr/feedback/dashboard', icon: 'bi-chat-dots' },
+    {
+      label: '360 Feedback',
+      path: '/hr/feedback/questions',
+      icon: 'bi-chat-dots',
+      children: feedbackChildren,
+    },
     {
       label: 'One-on-One',
       path: '/one-on-one-meetings',
@@ -193,7 +210,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-clipboard-data',
       permissionField: 'selfAssessmentView',
     },
-    { label: 'Assessment Scores', path: '/department-head/assessment-scores', icon: 'bi-clipboard-data' },
     { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
     { label: 'Performance Reports', path: '/department-head/reports', icon: 'bi-file-earmark-bar-graph' },
     {
@@ -228,9 +244,8 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
-    { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
-
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
     {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',
