@@ -197,11 +197,12 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             Integer departmentId,
             Set<Integer> positionIds
     ) {
-        List<Employee> candidates = employeeRepository.findCurrentByWorkingDepartmentId(departmentId, false);
+        ManagerEmployeeRouting routing = managerEmployeeRouting(departmentId);
+        List<Employee> candidates = new ArrayList<>(routing.routableEmployeesById().values());
 
         if (candidates.isEmpty()) {
             log.info(
-                    "KPI assignment diagnostics: templateId={}, cycleId={}, departmentId={} skipped because no active employees are linked to this department.",
+                    "KPI assignment diagnostics: templateId={}, cycleId={}, departmentId={} skipped because no active employees with active user accounts are linked to an active manager route.",
                     kpiFormId,
                     cycle == null ? null : cycle.getId(),
                     departmentId
@@ -214,6 +215,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         int skippedNoPosition = 0;
         int skippedPositionMismatch = 0;
         int matched = 0;
+        Set<Integer> matchedEmployeeIds = new HashSet<>();
 
         for (Employee emp : candidates) {
             if (emp.getPosition() == null) {
@@ -225,6 +227,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 continue;
             }
             matched++;
+            matchedEmployeeIds.add(emp.getId());
 
             if (hasExistingKpiAssignment(emp.getId(), kpiFormId, cycle)) {
                 skipped++;
@@ -250,9 +253,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             created++;
         }
 
-        LinkedHashSet<Integer> managerIds = resolveManagerUserIds(departmentId);
+        LinkedHashSet<Integer> managerIds = routing.managerIdsWithAnyEmployee(matchedEmployeeIds);
         log.info(
-                "KPI assignment diagnostics: templateId={}, cycleId={}, departmentId={}, candidates={}, matchedByPosition={}, created={}, duplicateSkipped={}, noPositionSkipped={}, positionMismatchSkipped={}, managers={}",
+                "KPI assignment diagnostics: templateId={}, cycleId={}, departmentId={}, routableCandidates={}, matchedByPosition={}, created={}, duplicateSkipped={}, noPositionSkipped={}, positionMismatchSkipped={}, managersWithMatches={}",
                 kpiFormId,
                 cycle == null ? null : cycle.getId(),
                 departmentId,
@@ -370,8 +373,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional(readOnly = true)
     public List<ManagerKpiTemplateSummaryDto> listKpiTemplatesForManagerDepartment() {
-        Integer deptId = requireManagerDepartmentId();
-        List<Integer> employeeIds = departmentEmployeeIds(deptId);
+        List<Integer> employeeIds = currentManagerScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();
         }
@@ -381,8 +383,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional(readOnly = true)
     public List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId) {
-        Integer deptId = requireManagerDepartmentId();
-        List<Integer> employeeIds = departmentEmployeeIds(deptId);
+        List<Integer> employeeIds = currentManagerScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();
         }
@@ -397,8 +398,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional(readOnly = true)
     public List<ManagerKpiAssignmentDto> listFinalizedHistoryForManagerDepartment() {
-        Integer deptId = requireManagerDepartmentId();
-        List<Integer> employeeIds = departmentEmployeeIds(deptId);
+        List<Integer> employeeIds = currentManagerScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();
         }
@@ -414,15 +414,15 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public ManagerKpiAssignmentDto updateScores(Integer employeeKpiFormId, UpdateEmployeeKpiScoresRequest request) {
-        Integer deptId = requireManagerDepartmentId();
-        Set<Integer> allowedEmployees = new HashSet<>(departmentEmployeeIds(deptId));
+        Set<Integer> allowedEmployees = new HashSet<>(currentManagerScopedEmployeeIds());
 
         EmployeeKpiForm ekf = employeeKpiFormRepository.findWithScoresForUpdate(employeeKpiFormId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI assignment not found."));
 
         if (!allowedEmployees.contains(ekf.getEmployee().getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This assignment is outside your department.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This assignment is outside your active manager scope.");
         }
+        ensureActiveEmployeeAccount(ekf.getEmployee());
 
         if (ekf.getScores() == null) {
             ekf.setScores(new LinkedHashSet<>());
@@ -509,10 +509,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public UseKpiTemplateResultDto finalizeDepartmentKpi(Integer kpiFormId) {
-        Integer deptId = requireManagerDepartmentId();
-        List<Integer> employeeIds = departmentEmployeeIds(deptId);
+        List<Integer> employeeIds = currentManagerScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No employees found for your department.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active employees found for your manager scope.");
         }
 
         KpiForm form = kpiFormRepository.findById(kpiFormId)
@@ -569,15 +568,15 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public ManagerKpiAssignmentDto finalizeEmployeeKpi(Integer employeeKpiFormId, FinalizeEmployeeKpiRequest request) {
-        Integer deptId = requireManagerDepartmentId();
-        Set<Integer> allowedEmployees = new HashSet<>(departmentEmployeeIds(deptId));
+        Set<Integer> allowedEmployees = new HashSet<>(currentManagerScopedEmployeeIds());
 
         EmployeeKpiForm ekf = employeeKpiFormRepository.findWithScoresForUpdate(employeeKpiFormId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI assignment not found."));
 
         if (!allowedEmployees.contains(ekf.getEmployee().getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This assignment is outside your department.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This assignment is outside your active manager scope.");
         }
+        ensureActiveEmployeeAccount(ekf.getEmployee());
         if (ekf.getStatus() == EmployeeKpiStatus.FINALIZED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This KPI assignment is already finalized.");
         }
@@ -878,10 +877,11 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .toList();
     }
 
-    private List<Integer> departmentEmployeeIds(Integer departmentId) {
-        return employeeRepository.findCurrentByWorkingDepartmentId(departmentId, false).stream()
-                .map(Employee::getId)
-                .toList();
+    private List<Integer> currentManagerScopedEmployeeIds() {
+        Integer deptId = requireManagerDepartmentId();
+        Integer managerId = SecurityUtils.currentUser().getId();
+        ManagerEmployeeRouting routing = managerEmployeeRouting(deptId);
+        return routing.employeeIdsForManager(managerId).stream().toList();
     }
 
     private Integer requireManagerDepartmentId() {
@@ -895,17 +895,113 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         return deptId;
     }
 
-    private LinkedHashSet<Integer> resolveManagerUserIds(Integer departmentId) {
-        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+    private ManagerEmployeeRouting managerEmployeeRouting(Integer departmentId) {
+        Map<Integer, Employee> activeDepartmentEmployees = employeeRepository
+                .findCurrentByWorkingDepartmentId(departmentId, false)
+                .stream()
+                .filter(this::hasActiveEmployeeAccount)
+                .collect(Collectors.toMap(Employee::getId, e -> e, (left, right) -> left, LinkedHashMap::new));
+
+        Map<Integer, LinkedHashSet<Integer>> managerEmployeeIds = new LinkedHashMap<>();
+        Set<Integer> activeProjectManagerTeamEmployeeIds = new HashSet<>();
+        Set<Integer> managersWithActiveTeams = new HashSet<>();
+
         for (Team team : teamRepository.findByDepartmentIdAndStatusIgnoreCase(departmentId, "Active")) {
-            if (team.getProjectManager() != null) {
-                ids.add(team.getProjectManager().getId());
+            User manager = team.getProjectManager();
+            if (!isActiveUser(manager)) {
+                continue;
+            }
+            managersWithActiveTeams.add(manager.getId());
+            LinkedHashSet<Integer> scopedIds = managerEmployeeIds.computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>());
+            if (team.getTeamMembers() == null) {
+                continue;
+            }
+            for (TeamMember member : team.getTeamMembers()) {
+                User memberUser = member == null ? null : member.getMemberUser();
+                Integer employeeId = memberUser == null ? null : memberUser.getEmployeeId();
+                if (member == null
+                        || member.getEndedDate() != null
+                        || !isActiveUser(memberUser)
+                        || employeeId == null
+                        || !activeDepartmentEmployees.containsKey(employeeId)) {
+                    continue;
+                }
+                scopedIds.add(employeeId);
+                activeProjectManagerTeamEmployeeIds.add(employeeId);
             }
         }
-        for (User u : userRepository.findActiveManagersByDepartmentId(departmentId)) {
-            ids.add(u.getId());
+
+        List<User> departmentManagers = userRepository.findActiveManagersByDepartmentId(departmentId);
+        List<Integer> teamlessEmployeeIds = activeDepartmentEmployees.keySet().stream()
+                .filter(employeeId -> !activeProjectManagerTeamEmployeeIds.contains(employeeId))
+                .toList();
+        for (User manager : departmentManagers) {
+            if (!isActiveUser(manager) || managersWithActiveTeams.contains(manager.getId())) {
+                continue;
+            }
+            managerEmployeeIds
+                    .computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>())
+                    .addAll(teamlessEmployeeIds);
         }
-        return ids;
+
+        Map<Integer, Employee> routableEmployees = managerEmployeeIds.values().stream()
+                .flatMap(Collection::stream)
+                .distinct()
+                .map(activeDepartmentEmployees::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Employee::getId, e -> e, (left, right) -> left, LinkedHashMap::new));
+
+        return new ManagerEmployeeRouting(managerEmployeeIds, routableEmployees);
+    }
+
+    private void ensureActiveEmployeeAccount(Employee employee) {
+        if (!hasActiveEmployeeAccount(employee)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Scores can be calculated only for active team member accounts."
+            );
+        }
+    }
+
+    private boolean hasActiveEmployeeAccount(Employee employee) {
+        return employee != null
+                && activeFlag(employee.getActive())
+                && employee.getId() != null
+                && userRepository.findActiveByEmployeeId(employee.getId()).isPresent();
+    }
+
+    private boolean isActiveUser(User user) {
+        return user != null && user.getId() != null && activeFlag(user.getActive());
+    }
+
+    private boolean activeFlag(Boolean value) {
+        return value == null || Boolean.TRUE.equals(value);
+    }
+
+    private record ManagerEmployeeRouting(
+            Map<Integer, LinkedHashSet<Integer>> managerEmployeeIds,
+            Map<Integer, Employee> routableEmployeesById
+    ) {
+        LinkedHashSet<Integer> managerIds() {
+            return new LinkedHashSet<>(managerEmployeeIds.keySet());
+        }
+
+        LinkedHashSet<Integer> employeeIdsForManager(Integer managerId) {
+            return new LinkedHashSet<>(managerEmployeeIds.getOrDefault(managerId, new LinkedHashSet<>()));
+        }
+
+        LinkedHashSet<Integer> managerIdsWithAnyEmployee(Set<Integer> employeeIds) {
+            LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+            if (employeeIds == null || employeeIds.isEmpty()) {
+                return ids;
+            }
+            for (Map.Entry<Integer, LinkedHashSet<Integer>> entry : managerEmployeeIds.entrySet()) {
+                if (entry.getValue().stream().anyMatch(employeeIds::contains)) {
+                    ids.add(entry.getKey());
+                }
+            }
+            return ids;
+        }
     }
 
     private static String fullName(Employee e) {
