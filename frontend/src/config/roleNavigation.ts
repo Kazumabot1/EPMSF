@@ -78,6 +78,8 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   HR: [
     { label: 'Dashboard', path: '/dashboard', icon: 'bi-grid-1x2', end: true },
     { label: 'Profile', path: '/hr/profile', icon: 'bi-person' },
+    { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'My KPIs', path: '/hr/kpis', icon: 'bi-bullseye' },
     { label: 'Employees', path: '/hr/employee', icon: 'bi-people' },
     {
       label: 'Teams',
@@ -197,6 +199,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'My KPIs', path: '/department-head/kpis', icon: 'bi-bullseye' },
     { label: 'Self-Assessment', path: '/department-head/self-assessment', icon: 'bi-pencil-square' },
     {
       label: 'Continuous Feedback',
@@ -212,6 +215,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     },
     { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
     { label: 'Performance Reports', path: '/department-head/reports', icon: 'bi-file-earmark-bar-graph' },
+    {
+      label: 'KPI Management',
+      path: '/department-head/kpi-scoring',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'KPI Form', path: '/department-head/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'KPI History', path: '/department-head/kpi/history', icon: 'bi-clock-history' },
+      ],
+    },
     {
       label: 'Appraisals',
       path: '/department-head/appraisals',
@@ -246,6 +258,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
+    { label: 'My KPIs', path: '/manager/kpis', icon: 'bi-bullseye' },
     {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',
@@ -279,8 +292,8 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/manager/kpi-scoring',
       icon: 'bi-bullseye',
       children: [
-        { label: 'Employee KPI Form', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
-        { label: 'Employee KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
+        { label: 'KPI Form', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
       ],
     },
     {
@@ -308,6 +321,16 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'My KPIs', path: '/executive/kpis', icon: 'bi-bullseye' },
+    {
+      label: 'KPI Management',
+      path: '/executive/kpi-scoring',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'KPI Form', path: '/executive/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'KPI History', path: '/executive/kpi/history', icon: 'bi-clock-history' },
+      ],
+    },
     { label: 'Reports', path: '/executive/reports', icon: 'bi-bar-chart-line' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
   ],

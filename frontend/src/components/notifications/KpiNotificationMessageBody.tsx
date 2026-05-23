@@ -7,17 +7,32 @@ function isKpiNotificationType(type: string | null | undefined): boolean {
 }
 
 /** Where to send the user for a KPI template deep-link based on role. */
-export function kpiNotificationDetailPath(user: UserLike | null | undefined, templateId: number): string | null {
+export function kpiNotificationDetailPath(
+  user: UserLike | null | undefined,
+  templateId: number,
+  type?: string | null,
+): string | null {
   if (!user || templateId == null || Number.isNaN(Number(templateId))) return null;
+  const normalizedType = String(type ?? '').toUpperCase();
   const raw = (user.roles ?? []).map((r) => String(r).toUpperCase().replace(/^ROLE_/, ''));
+  if (normalizedType === 'KPI_FINALIZED_EMPLOYEE') {
+    return '/my-kpis';
+  }
+  if (normalizedType === 'KPI_FINALIZED_HR') {
+    return '/hr/employee-kpis';
+  }
   if (raw.some((r) => r === 'HR' || r.startsWith('HR_'))) {
     return `/hr/kpi-template/${templateId}`;
   }
-  if (raw.includes('MANAGER')) {
-    return '/manager/kpi-scoring';
+  if (
+    raw.some((r) =>
+      ['MANAGER', 'PROJECT_MANAGER', 'TEAM_MANAGER', 'DEPARTMENT_HEAD', 'DEPARTMENTHEAD', 'DEPT_HEAD', 'HEAD_OF_DEPARTMENT', 'CEO', 'EXECUTIVE'].includes(r),
+    )
+  ) {
+    return '/kpi-scoring';
   }
-  if (raw.includes('EMPLOYEE')) {
-    return '/employee/kpis';
+  if (raw.some((r) => ['EMPLOYEE', 'HR', 'HUMAN_RESOURCE', 'HUMAN_RESOURCES', 'HR_MANAGER', 'HR_ADMIN'].includes(r))) {
+    return '/my-kpis';
   }
   return null;
 }
@@ -45,7 +60,7 @@ export default function KpiNotificationMessageBody({
   onKpiLinkNavigate,
 }: Props) {
   const path =
-    referenceId != null && isKpiNotificationType(type) ? kpiNotificationDetailPath(user, referenceId) : null;
+    referenceId != null && isKpiNotificationType(type) ? kpiNotificationDetailPath(user, referenceId, type) : null;
 
   if (!path) {
     return <span className={className}>{message}</span>;

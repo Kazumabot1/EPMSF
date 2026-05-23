@@ -92,6 +92,7 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/employee/notifications" element={<Notifications />} />
+            <Route path="/my-kpis" element={<EmployeeKpiResultsPage />} />
             <Route path="/pip/past-plans" element={<PipPastPlansPage />} />
           </Route>
 
@@ -105,6 +106,14 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead']} />}>
             <Route element={<AppLayout />}>
               <Route path="/continuous-feedback" element={<ContinuousFeedbackPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead', 'Executive']} />}>
+            <Route element={<AppLayout />}>
+              <Route path="/kpi" element={<Navigate to="/kpi-scoring" replace />} />
+              <Route path="/kpi/history" element={<ManagerKpiHistoryPage />} />
+              <Route path="/kpi-scoring" element={<ManagerKpiScoringPage />} />
             </Route>
           </Route>
 
@@ -149,6 +158,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Manager']} />}>
             <Route element={<AppLayout />}>
               <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+              <Route path="/manager/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/manager/self-assessment" element={<EmployeeSelfAssessmentPage />} />
               <Route path="/manager/assessment-review" element={<ManagerAssessmentReviewPage />} />
               <Route path="/manager/self-assessment-review" element={<ManagerAssessmentReviewPage />} />
@@ -168,6 +178,14 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<CeoDashboard />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
+              <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />
+              <Route path="/executive/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />
+              <Route path="/executive/kpi/history" element={<ManagerKpiHistoryPage />} />
+              <Route path="/executive/kpi-scoring" element={<ManagerKpiScoringPage />} />
+              <Route path="/ceo/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />
+              <Route path="/ceo/kpi/history" element={<Navigate to="/executive/kpi/history" replace />} />
+              <Route path="/ceo/kpi-scoring" element={<Navigate to="/executive/kpi-scoring" replace />} />
               <Route path="/executive/reports" element={<ReportingDashboardPage />} />
               <Route path="/ceo/reports" element={<Navigate to="/executive/reports" replace />} />
             </Route>
@@ -176,6 +194,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
             <Route element={<AppLayout />}>
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
+              <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/department-head/self-assessment" element={<EmployeeSelfAssessmentPage />} />
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
@@ -184,6 +203,10 @@ function App() {
               <Route path="/department-head/appraisals/history" element={<AppraisalHistoryListPage role="dept-head" />} />
               <Route path="/department-head/feedback" element={<EmployeeFeedbackDashboardPage />} />
               <Route path="/department-head/feedback/assignments/:assignmentId" element={<FeedbackFormPage />} />
+              <Route path="/department-head/kpi" element={<Navigate to="/department-head/kpi-scoring" replace />} />
+              <Route path="/department-head/kpi/history" element={<ManagerKpiHistoryPage />} />
+              <Route path="/department-head/kpi-scoring" element={<ManagerKpiScoringPage />} />
+
               <Route path="/pip/create" element={<PipCreatePage />} />
             </Route>
           </Route>
@@ -193,6 +216,8 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Home />} />
               <Route path="/hr/profile" element={<ProfilePage />} />
+              <Route path="/hr/kpis" element={<EmployeeKpiResultsPage />} />
+
               <Route path="/hr/employee" element={<EmployeeManagement />} />
               <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
               <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />

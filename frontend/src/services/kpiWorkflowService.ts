@@ -8,7 +8,7 @@ import type {
   UseKpiTemplateResult,
 } from '../types/kpiWorkflow';
 
-const M_BASE = '/manager/kpi-workflow';
+const M_BASE = '/kpi-workflow';
 
 export const kpiWorkflowService = {
   async listManagerTemplates(): Promise<ManagerKpiTemplateSummary[]> {
