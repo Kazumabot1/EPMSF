@@ -64,9 +64,9 @@ const ManagerKpiHistoryPage = () => {
         >
           <i className="bi bi-clock-history" /> KPI Management
         </span>
-        <h1 style={{ fontSize: '1.65rem', color: '#1e293b', margin: '0 0 .35rem' }}>Employee KPI History</h1>
+        <h1 style={{ fontSize: '1.65rem', color: '#1e293b', margin: '0 0 .35rem' }}>KPI History</h1>
         <p style={{ color: '#64748b', margin: 0, maxWidth: '720px' }}>
-          Finalized KPI records for employees in your department. Assigned and in-progress forms stay under Employee KPI Form.
+          Finalized KPI records in your evaluator scope. Assigned and in-progress forms stay under KPI Form.
         </p>
       </header>
 

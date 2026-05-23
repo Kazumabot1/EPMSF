@@ -70,6 +70,18 @@ public class SecurityConfig {
             "EXECUTIVE"
     );
 
+    private static final Set<String> KPI_EVALUATOR_ROLES = Set.of(
+            "MANAGER",
+            "PROJECT_MANAGER",
+            "TEAM_MANAGER",
+            "DEPARTMENT_HEAD",
+            "DEPARTMENTHEAD",
+            "DEPT_HEAD",
+            "HEAD_OF_DEPARTMENT",
+            "CEO",
+            "EXECUTIVE"
+    );
+
     private static final Set<String> SCORE_TABLE_ROLES = Set.of(
             "HR",
             "HUMAN_RESOURCE",
@@ -111,6 +123,15 @@ public class SecurityConfig {
     );
 
     private static final Set<String> EXECUTIVE_DASHBOARDS = Set.of(
+            "EXECUTIVE_DASHBOARD",
+            "CEO_DASHBOARD"
+    );
+
+    private static final Set<String> KPI_EVALUATOR_DASHBOARDS = Set.of(
+            "MANAGER_DASHBOARD",
+            "DEPARTMENT_HEAD_DASHBOARD",
+            "DEPARTMENTHEAD_DASHBOARD",
+            "DEPT_HEAD_DASHBOARD",
             "EXECUTIVE_DASHBOARD",
             "CEO_DASHBOARD"
     );
@@ -172,7 +193,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/departments",
                                 "/api/departments/**",
-                                "/api/employees/active-by-department/**"
+                                "/api/employees/active-by-department/**",
+                                "/api/roles",
+                                "/api/roles/**"
                         ).authenticated()
 
                         /*
@@ -308,6 +331,15 @@ public class SecurityConfig {
                                 "/api/pip-updates/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
+                        )
+
+                        .requestMatchers(
+                                "/api/kpi-workflow",
+                                "/api/kpi-workflow/**",
+                                "/api/manager/kpi-workflow",
+                                "/api/manager/kpi-workflow/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), KPI_EVALUATOR_ROLES, KPI_EVALUATOR_DASHBOARDS)
                         )
 
                         .requestMatchers(

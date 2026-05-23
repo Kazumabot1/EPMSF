@@ -88,7 +88,7 @@ class EmployeeKpiWorkflowServiceImplTest {
     }
 
     @Test
-    void useTemplateForDepartmentAssignsOnlyActiveMembersUnderActiveProjectManagers() {
+    void useTemplateForDepartmentAssignsAllActiveMatchingAccountsAndNotifiesOnlyScopedEvaluators() {
         Position engineer = position(10, "Engineer");
         KpiForm form = form(100, engineer);
         Department department = department(7);
@@ -117,15 +117,17 @@ class EmployeeKpiWorkflowServiceImplTest {
                     : Optional.empty();
         });
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of());
+        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
         when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(anyInt(), eq(100))).thenReturn(Optional.empty());
 
         service.useTemplateForDepartment(100, departmentRequest(7));
 
         ArgumentCaptor<EmployeeKpiForm> saved = ArgumentCaptor.forClass(EmployeeKpiForm.class);
-        verify(employeeKpiFormRepository, org.mockito.Mockito.times(2)).save(saved.capture());
+        verify(employeeKpiFormRepository, org.mockito.Mockito.times(3)).save(saved.capture());
         assertThat(saved.getAllValues())
                 .extracting(ekf -> ekf.getEmployee().getId())
-                .containsExactlyInAnyOrder(11, 12);
+                .containsExactlyInAnyOrder(11, 12, 14);
         verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
         verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
         verify(notificationService, never()).send(eq(3), any(), any(), any(), any());
@@ -150,6 +152,8 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(userRepository.findActiveByEmployeeId(anyInt())).thenAnswer(invocation ->
                 Optional.of(user(1000 + invocation.<Integer>getArgument(0), 7, invocation.getArgument(0), true)));
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager, noTeamManager));
+        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
         when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(anyInt(), eq(100))).thenReturn(Optional.empty());
 
         service.useTemplateForDepartment(100, departmentRequest(7));
@@ -173,12 +177,135 @@ class EmployeeKpiWorkflowServiceImplTest {
         Employee teamless = employee(12, engineer, true);
         authenticate(projectManager);
 
+        when(userRepository.findById(1)).thenReturn(Optional.of(projectManager));
         when(employeeRepository.findCurrentByWorkingDepartmentId(7, false)).thenReturn(List.of(teamMember, teamless));
         when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active"))
                 .thenReturn(List.of(team(21, department, projectManager, member(user(31, 7, 11, true)))));
         when(userRepository.findActiveByEmployeeId(anyInt())).thenAnswer(invocation ->
                 Optional.of(user(1000 + invocation.<Integer>getArgument(0), 7, invocation.getArgument(0), true)));
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager, user(2, 7, null, true)));
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, engineer)));
+        when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
+
+        List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
+
+        assertThat(result).isEmpty();
+        ArgumentCaptor<Collection<Integer>> employeeIds = ArgumentCaptor.forClass(Collection.class);
+        verify(employeeKpiFormRepository).findByKpiFormIdAndEmployeeIdIn(eq(100), employeeIds.capture());
+        assertThat(employeeIds.getValue()).containsExactly(11);
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void departmentHeadAssignmentListUsesOnlyManagersInOwnDepartment() {
+        Position managerPosition = position(20, "Manager");
+        User departmentHead = user(50, 7, 50, true);
+        User ownDepartmentManager = user(1, 7, 11, true);
+        User otherDepartmentManager = user(2, 8, 12, true);
+        authenticate(departmentHead, List.of("DEPARTMENT_HEAD"), "DEPARTMENT_HEAD_DASHBOARD");
+
+        when(userRepository.findById(50)).thenReturn(Optional.of(departmentHead));
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(ownDepartmentManager));
+        when(employeeRepository.findById(11)).thenReturn(Optional.of(employee(11, managerPosition, true)));
+        when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(user(1011, 7, 11, true)));
+        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, managerPosition)));
+        when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
+
+        List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
+
+        assertThat(result).isEmpty();
+        ArgumentCaptor<Collection<Integer>> employeeIds = ArgumentCaptor.forClass(Collection.class);
+        verify(employeeKpiFormRepository).findByKpiFormIdAndEmployeeIdIn(eq(100), employeeIds.capture());
+        assertThat(employeeIds.getValue()).containsExactly(11);
+        assertThat(employeeIds.getValue()).doesNotContain(12, 50);
+        assertThat(otherDepartmentManager.getDepartmentId()).isEqualTo(8);
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void executiveAssignmentListUsesDepartmentHeadsAndHrAcrossDepartments() {
+        Position leadershipPosition = position(30, "Leadership");
+        User executive = user(99, null, 99, true);
+        User departmentHead = user(50, 7, 21, true);
+        User hr = user(60, 8, 22, true);
+        User manager = user(70, 7, 23, true);
+        authenticate(executive, List.of("EXECUTIVE"), "EXECUTIVE_DASHBOARD");
+
+        when(userRepository.findById(99)).thenReturn(Optional.of(executive));
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenAnswer(invocation -> {
+            Collection<String> roles = invocation.getArgument(0);
+            if (roles.contains("DEPARTMENT_HEAD")) {
+                return List.of(departmentHead);
+            }
+            if (roles.contains("HR")) {
+                return List.of(hr);
+            }
+            if (roles.contains("MANAGER")) {
+                return List.of(manager);
+            }
+            return List.of();
+        });
+        when(employeeRepository.findById(21)).thenReturn(Optional.of(employee(21, leadershipPosition, true)));
+        when(employeeRepository.findById(22)).thenReturn(Optional.of(employee(22, leadershipPosition, true)));
+        when(userRepository.findActiveByEmployeeId(21)).thenReturn(Optional.of(user(1021, 7, 21, true)));
+        when(userRepository.findActiveByEmployeeId(22)).thenReturn(Optional.of(user(1022, 8, 22, true)));
+        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, leadershipPosition)));
+        when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
+
+        List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
+
+        assertThat(result).isEmpty();
+        ArgumentCaptor<Collection<Integer>> employeeIds = ArgumentCaptor.forClass(Collection.class);
+        verify(employeeKpiFormRepository).findByKpiFormIdAndEmployeeIdIn(eq(100), employeeIds.capture());
+        assertThat(employeeIds.getValue()).containsExactly(21, 22);
+        assertThat(employeeIds.getValue()).doesNotContain(23, 99);
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void managerAssignmentListExcludesManagerDepartmentHeadAndHrTargets() {
+        Position engineer = position(10, "Engineer");
+        Department department = department(7);
+        User projectManager = user(1, 7, null, true);
+        User managerTarget = user(2, 7, 12, true);
+        User departmentHeadTarget = user(3, 7, 13, true);
+        User hrTarget = user(4, 7, 14, true);
+        Employee regular = employee(11, engineer, true);
+        Employee managerEmployee = employee(12, engineer, true);
+        Employee departmentHeadEmployee = employee(13, engineer, true);
+        Employee hrEmployee = employee(14, engineer, true);
+        authenticate(projectManager);
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(projectManager));
+        when(employeeRepository.findCurrentByWorkingDepartmentId(7, false))
+                .thenReturn(List.of(regular, managerEmployee, departmentHeadEmployee, hrEmployee));
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active"))
+                .thenReturn(List.of(team(
+                        21,
+                        department,
+                        projectManager,
+                        member(user(31, 7, 11, true)),
+                        member(user(32, 7, 12, true)),
+                        member(user(33, 7, 13, true)),
+                        member(user(34, 7, 14, true))
+                )));
+        when(userRepository.findActiveByEmployeeId(anyInt())).thenAnswer(invocation ->
+                Optional.of(user(1000 + invocation.<Integer>getArgument(0), 7, invocation.getArgument(0), true)));
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenAnswer(invocation -> {
+            Collection<String> roles = invocation.getArgument(0);
+            if (roles.contains("MANAGER")) {
+                return List.of(managerTarget);
+            }
+            if (roles.contains("DEPARTMENT_HEAD")) {
+                return List.of(departmentHeadTarget);
+            }
+            if (roles.contains("HR")) {
+                return List.of(hrTarget);
+            }
+            return List.of();
+        });
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager));
         when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, engineer)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
@@ -277,7 +404,11 @@ class EmployeeKpiWorkflowServiceImplTest {
     }
 
     private static void authenticate(User user) {
-        UserPrincipal principal = new UserPrincipal(user, List.of("MANAGER"), List.of(), "MANAGER");
+        authenticate(user, List.of("MANAGER"), "MANAGER");
+    }
+
+    private static void authenticate(User user, List<String> roles, String dashboard) {
+        UserPrincipal principal = new UserPrincipal(user, roles, List.of(), dashboard);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, principal.getPassword(), principal.getAuthorities())
         );

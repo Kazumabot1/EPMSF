@@ -11,13 +11,23 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/manager/kpi-workflow")
+@RequestMapping({"/api/manager/kpi-workflow", "/api/kpi-workflow"})
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 @PreAuthorize(
         "hasRole('MANAGER') "
                 + "or hasAuthority('ROLE_MANAGER') "
-                + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD'"
+                + "or hasRole('PROJECT_MANAGER') "
+                + "or hasRole('TEAM_MANAGER') "
+                + "or hasRole('DEPARTMENT_HEAD') "
+                + "or hasRole('CEO') "
+                + "or hasRole('EXECUTIVE') "
+                + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'DEPARTMENTHEAD_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'DEPT_HEAD_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'EXECUTIVE_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'CEO_DASHBOARD'"
 )
 public class ManagerKpiWorkflowController {
 

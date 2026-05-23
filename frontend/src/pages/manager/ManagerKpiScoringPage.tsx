@@ -261,13 +261,13 @@ const ManagerKpiScoringPage = () => {
             letterSpacing: '.05em',
           }}
         >
-          <i className="bi bi-clipboard-data" /> Manager
+          <i className="bi bi-clipboard-data" /> KPI Management
         </span>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>Team KPI scoring</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>KPI scoring</h1>
         <p style={{ color: '#64748b', margin: 0, maxWidth: '640px' }}>
-          Click an employee name to enter <strong>actual</strong> results and save. Achievement % is (actual ÷ target) × 100.
-          When every KPI line is scored for each employee, use <strong>Finalize department KPI</strong> to lock scores, notify
-          your team, alert HR (sidebar notifications), and publish rows under HR → Employee KPI.
+          Click an employee name to enter <strong>actual</strong> results and save. Achievement % is (actual / target) x 100.
+          When every KPI line is scored for each person in your evaluator scope, use <strong>Finalize KPI</strong> to lock scores,
+          notify score targets, alert HR, and publish rows under HR - Employee KPI.
         </p>
       </header>
 
@@ -332,7 +332,7 @@ const ManagerKpiScoringPage = () => {
             opacity: selectedSummary && selectedSummary.openAssignments > 0 ? 1 : 0.7,
           }}
         >
-          {finalizing ? 'Finalizing…' : 'Finalize department KPI'}
+          {finalizing ? 'Finalizing...' : 'Finalize KPI'}
         </button>
       </div>
 
@@ -351,7 +351,7 @@ const ManagerKpiScoringPage = () => {
           <strong style={{ color: '#334155' }}>Scoring period</strong>
           {periodStartLabel && periodEndLabel ? (
             <>
-              : {periodStartLabel} – {periodEndLabel}. You can finalize before the end date once all lines are complete.
+              : {periodStartLabel} - {periodEndLabel}. You can finalize before the end date once all lines are complete.
             </>
           ) : periodEndLabel ? (
             <>
@@ -364,7 +364,7 @@ const ManagerKpiScoringPage = () => {
       )}
 
       {loadingAssignments && (
-        <p style={{ color: '#64748b', fontSize: '.9rem' }}>Loading assignments…</p>
+        <p style={{ color: '#64748b', fontSize: '.9rem' }}>Loading assignments...</p>
       )}
 
       {!loadingAssignments && selectedFormId !== '' && assignments.length > 0 && (
@@ -489,7 +489,7 @@ const ManagerKpiScoringPage = () => {
       )}
 
       {!loadingAssignments && selectedFormId !== '' && assignments.length === 0 && (
-        <p style={{ color: '#64748b' }}>No assignments for this template in your department.</p>
+        <p style={{ color: '#64748b' }}>No assignments for this template in your KPI evaluator scope.</p>
       )}
 
       <ManagerEmployeeKpiScoreModal
