@@ -1,5 +1,5 @@
 
-q.app-shell {
+.app-shell {
   min-height: 100vh;
   background: #f8fafc;
 }
@@ -9,17 +9,35 @@ q.app-shell {
 }
 
 .app-main-employee {
-  margin-left: 304px;
+  margin-left: 264px;
+  width: calc(100% - 264px);
+  max-width: calc(100% - 264px);
+  min-width: 0;
   padding-top: 72px;
-  transition: margin-left 0.3s ease;
+  overflow-x: hidden;
+  transition: margin-left 0.3s ease, width 0.3s ease, max-width 0.3s ease;
 }
 
 .app-shell.employee-collapsed .app-main-employee {
-  margin-left: 88px;
+  margin-left: 76px;
+  width: calc(100% - 76px);
+  max-width: calc(100% - 76px);
 }
 
 .app-content-employee {
-  padding: 24px 28px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 22px 24px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1536px) {
+  .app-content-employee {
+    padding: 24px 28px;
+  }
 }
 
 .app-main-hr {
@@ -35,7 +53,7 @@ q.app-shell {
   position: fixed;
   left: 0;
   top: 0;
-  width: 304px;
+  width: 264px;
   height: 100vh;
   background: #fff;
   border-right: 1px solid #e2e8f0;
@@ -46,7 +64,7 @@ q.app-shell {
 }
 
 .employee-sidebar.collapsed {
-  width: 88px;
+  width: 76px;
 }
 
 .employee-sidebar-top {
@@ -194,7 +212,7 @@ q.app-shell {
 .employee-header {
   position: fixed;
   top: 0;
-  left: 304px;
+  left: 264px;
   right: 0;
   height: 72px;
   background: #fff;
@@ -209,7 +227,7 @@ q.app-shell {
 }
 
 .employee-header.collapsed {
-  left: 88px;
+  left: 76px;
 }
 
 .employee-header-search {
@@ -473,6 +491,8 @@ q.app-shell {
   .app-main-employee,
   .app-shell.employee-collapsed .app-main-employee {
     margin-left: 0;
+    width: 100%;
+    max-width: 100%;
   }
 
   .employee-header,
@@ -649,3 +669,8 @@ q.app-shell {
     padding: 5px;
   }
 }
+
+.app-main-employee {
+  overflow-x: hidden;
+}
+
