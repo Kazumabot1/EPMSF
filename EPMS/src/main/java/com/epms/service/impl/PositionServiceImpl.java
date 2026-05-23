@@ -153,7 +153,11 @@ public class PositionServiceImpl implements PositionService {
         validateUpdate(request);
 
         PositionLevel level = getLevel(request.getLevelId());
-        Role role = request.getRoleId() == null ? null : getRole(request.getRoleId());
+        Role role = request.getRoleId() == null ? position.getRole() : getRole(request.getRoleId());
+
+        if (role == null || role.getId() == null) {
+            throw new RuntimeException("Dashboard role is required. Every position must connect to a dashboard role.");
+        }
 
         position.setPositionTitle(cleanRequired(request.getPositionTitle(), "Position title"));
         position.setLevel(level);

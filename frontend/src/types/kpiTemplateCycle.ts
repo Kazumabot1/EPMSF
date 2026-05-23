@@ -1,4 +1,4 @@
-export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'DEACTIVATED';
+export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'CLOSING' | 'DEACTIVATED';
 
 export interface KpiTemplateCycleFormSummary {
   id: number;
@@ -13,6 +13,13 @@ export interface KpiTemplateCycleResponse {
   durationMonths: number;
   durationLabel: string;
   status: KpiTemplateCycleStatus;
+  currentPeriodId: number | null;
+  currentPeriodNumber: number | null;
+  currentPeriodStartDate: string | null;
+  currentPeriodEndDate: string | null;
+  closingRequestedAt: string | null;
+  graceEndsAt: string | null;
+  closedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   kpiForms: KpiTemplateCycleFormSummary[];

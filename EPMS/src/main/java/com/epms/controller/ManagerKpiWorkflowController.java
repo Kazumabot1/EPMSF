@@ -39,8 +39,11 @@ public class ManagerKpiWorkflowController {
     }
 
     @GetMapping("/assignments")
-    public ResponseEntity<List<ManagerKpiAssignmentDto>> listAssignments(@RequestParam Integer kpiFormId) {
-        return ResponseEntity.ok(employeeKpiWorkflowService.listDepartmentAssignmentsForManager(kpiFormId));
+    public ResponseEntity<List<ManagerKpiAssignmentDto>> listAssignments(
+            @RequestParam Integer kpiFormId,
+            @RequestParam(required = false) Integer cyclePeriodId
+    ) {
+        return ResponseEntity.ok(employeeKpiWorkflowService.listDepartmentAssignmentsForManager(kpiFormId, cyclePeriodId));
     }
 
     @GetMapping("/history")
@@ -58,7 +61,7 @@ public class ManagerKpiWorkflowController {
 
     @PostMapping("/finalize")
     public ResponseEntity<UseKpiTemplateResultDto> finalizeDepartment(@Valid @RequestBody FinalizeDepartmentKpiRequest request) {
-        return ResponseEntity.ok(employeeKpiWorkflowService.finalizeDepartmentKpi(request.getKpiFormId()));
+        return ResponseEntity.ok(employeeKpiWorkflowService.finalizeDepartmentKpi(request.getKpiFormId(), request.getCyclePeriodId()));
     }
 
     @PostMapping("/assignments/{employeeKpiFormId}/finalize")

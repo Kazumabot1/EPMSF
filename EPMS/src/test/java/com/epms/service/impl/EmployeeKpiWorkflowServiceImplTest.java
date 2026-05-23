@@ -5,6 +5,7 @@ import com.epms.dto.UseKpiDepartmentRequest;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
 import com.epms.entity.EmployeeKpiForm;
+import com.epms.entity.EmployeeKpiScore;
 import com.epms.entity.KpiForm;
 import com.epms.entity.KpiFormItem;
 import com.epms.entity.KpiPosition;
@@ -12,14 +13,19 @@ import com.epms.entity.Position;
 import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
+import com.epms.entity.enums.EmployeeKpiStatus;
 import com.epms.entity.enums.KpiFormStatus;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeKpiFormRepository;
+import com.epms.repository.EmployeeKpiFormEvaluatorRepository;
+import com.epms.repository.EmployeeKpiPositionTransitionRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.KpiFormRepository;
 import com.epms.repository.KpiPositionRepository;
 import com.epms.repository.KpiTemplateCycleFormRepository;
+import com.epms.repository.KpiTemplateCyclePeriodRepository;
 import com.epms.repository.KpiTemplateCycleRepository;
+import com.epms.repository.PositionRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.UserPrincipal;
@@ -59,6 +65,9 @@ class EmployeeKpiWorkflowServiceImplTest {
     private KpiTemplateCycleFormRepository kpiTemplateCycleFormRepository;
 
     @Mock
+    private KpiTemplateCyclePeriodRepository kpiTemplateCyclePeriodRepository;
+
+    @Mock
     private KpiPositionRepository kpiPositionRepository;
 
     @Mock
@@ -68,6 +77,12 @@ class EmployeeKpiWorkflowServiceImplTest {
     private EmployeeKpiFormRepository employeeKpiFormRepository;
 
     @Mock
+    private EmployeeKpiFormEvaluatorRepository employeeKpiFormEvaluatorRepository;
+
+    @Mock
+    private EmployeeKpiPositionTransitionRepository employeeKpiPositionTransitionRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -75,6 +90,9 @@ class EmployeeKpiWorkflowServiceImplTest {
 
     @Mock
     private DepartmentRepository departmentRepository;
+
+    @Mock
+    private PositionRepository positionRepository;
 
     @Mock
     private NotificationService notificationService;
@@ -185,7 +203,7 @@ class EmployeeKpiWorkflowServiceImplTest {
                 Optional.of(user(1000 + invocation.<Integer>getArgument(0), 7, invocation.getArgument(0), true)));
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager, user(2, 7, null, true)));
         when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
-        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, engineer)));
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, engineer)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
         List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
@@ -209,7 +227,7 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(ownDepartmentManager));
         when(employeeRepository.findById(11)).thenReturn(Optional.of(employee(11, managerPosition, true)));
         when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(user(1011, 7, 11, true)));
-        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, managerPosition)));
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, managerPosition)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
         List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
@@ -250,7 +268,7 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(employeeRepository.findById(22)).thenReturn(Optional.of(employee(22, leadershipPosition, true)));
         when(userRepository.findActiveByEmployeeId(21)).thenReturn(Optional.of(user(1021, 7, 21, true)));
         when(userRepository.findActiveByEmployeeId(22)).thenReturn(Optional.of(user(1022, 8, 22, true)));
-        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, leadershipPosition)));
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, leadershipPosition)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
         List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
@@ -306,7 +324,7 @@ class EmployeeKpiWorkflowServiceImplTest {
             return List.of();
         });
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager));
-        when(kpiFormRepository.findById(100)).thenReturn(Optional.of(form(100, engineer)));
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, engineer)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
         List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
@@ -317,6 +335,76 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(employeeIds.getValue()).containsExactly(11);
     }
 
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void managerAssignmentListReconcilesMissingRowsForNonFinalizedAssignmentsOnly() {
+        Position engineer = position(10, "Engineer");
+        Department department = department(7);
+        User projectManager = user(1, 7, null, true);
+        Employee employeeA = employee(11, engineer, true);
+        Employee employeeB = employee(12, engineer, true);
+        KpiForm form = form(
+                100,
+                engineer,
+                item(501, "Delivery", 100.0, 40, 0),
+                item(502, "Quality", 80.0, 40, 1),
+                item(503, "Milestone", 90.0, 20, 2)
+        );
+        EmployeeKpiForm assigned = employeeAssignment(
+                700,
+                form,
+                employeeA,
+                EmployeeKpiStatus.ASSIGNED,
+                form.getItems().get(0),
+                form.getItems().get(1)
+        );
+        EmployeeKpiForm finalized = employeeAssignment(
+                701,
+                form,
+                employeeB,
+                EmployeeKpiStatus.FINALIZED,
+                form.getItems().get(0),
+                form.getItems().get(1)
+        );
+        authenticate(projectManager);
+
+        when(userRepository.findById(1)).thenReturn(Optional.of(projectManager));
+        when(employeeRepository.findCurrentByWorkingDepartmentId(7, false)).thenReturn(List.of(employeeA, employeeB));
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active"))
+                .thenReturn(List.of(team(
+                        21,
+                        department,
+                        projectManager,
+                        member(user(31, 7, 11, true)),
+                        member(user(32, 7, 12, true))
+                )));
+        when(userRepository.findActiveByEmployeeId(anyInt())).thenAnswer(invocation ->
+                Optional.of(user(1000 + invocation.<Integer>getArgument(0), 7, invocation.getArgument(0), true)));
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager));
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form));
+        when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any()))
+                .thenReturn(List.of(assigned, finalized));
+
+        List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
+
+        assertThat(result)
+                .filteredOn(row -> row.getEmployeeKpiFormId().equals(700))
+                .singleElement()
+                .satisfies(row -> assertThat(row.getLines()).hasSize(3));
+        assertThat(result)
+                .filteredOn(row -> row.getEmployeeKpiFormId().equals(701))
+                .singleElement()
+                .satisfies(row -> assertThat(row.getLines()).hasSize(2));
+
+        ArgumentCaptor<EmployeeKpiForm> saved = ArgumentCaptor.forClass(EmployeeKpiForm.class);
+        verify(employeeKpiFormRepository).save(saved.capture());
+        assertThat(saved.getValue().getId()).isEqualTo(700);
+        assertThat(saved.getValue().getScores())
+                .extracting(score -> score.getKpiFormItem().getId())
+                .containsExactlyInAnyOrder(501, 502, 503);
+    }
+
     private static UseKpiDepartmentRequest departmentRequest(Integer departmentId) {
         UseKpiDepartmentRequest request = new UseKpiDepartmentRequest();
         request.setDepartmentId(departmentId);
@@ -324,20 +412,56 @@ class EmployeeKpiWorkflowServiceImplTest {
     }
 
     private static KpiForm form(Integer id, Position position) {
+        return form(
+                id,
+                position,
+                item(501, "Delivery", 100.0, 100, 1)
+        );
+    }
+
+    private static KpiForm form(Integer id, Position position, KpiFormItem... items) {
         KpiForm form = new KpiForm();
         form.setId(id);
         form.setTitle("Engineering KPI");
         form.setStatus(KpiFormStatus.ACTIVE);
-        KpiFormItem item = KpiFormItem.builder()
-                .id(501)
-                .kpiLabel("Delivery")
-                .target(100.0)
-                .weight(100)
-                .sortOrder(1)
-                .build();
-        form.addItem(item);
+        for (KpiFormItem item : items) {
+            form.addItem(item);
+        }
         form.setKpiPositions(List.of(kpiPosition(form, position)));
         return form;
+    }
+
+    private static KpiFormItem item(Integer id, String label, Double target, Integer weight, Integer sortOrder) {
+        return KpiFormItem.builder()
+                .id(id)
+                .kpiLabel(label)
+                .target(target)
+                .weight(weight)
+                .sortOrder(sortOrder)
+                .build();
+    }
+
+    private static EmployeeKpiForm employeeAssignment(
+            Integer id,
+            KpiForm form,
+            Employee employee,
+            EmployeeKpiStatus status,
+            KpiFormItem... scoredItems
+    ) {
+        EmployeeKpiForm assignment = new EmployeeKpiForm();
+        assignment.setId(id);
+        assignment.setEmployee(employee);
+        assignment.setKpiForm(form);
+        assignment.setStatus(status);
+        int nextScoreId = 800;
+        for (KpiFormItem item : scoredItems) {
+            EmployeeKpiScore score = EmployeeKpiScore.builder()
+                    .kpiFormItem(item)
+                    .build();
+            score.setId(nextScoreId++);
+            assignment.addScore(score);
+        }
+        return assignment;
     }
 
     private static KpiPosition kpiPosition(KpiForm form, Position position) {

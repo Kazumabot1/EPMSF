@@ -24,6 +24,13 @@ public class KpiTemplateCycleResponseDTO {
     private Integer durationMonths;
     private String durationLabel;
     private KpiTemplateCycleStatus status;
+    private Integer currentPeriodId;
+    private Integer currentPeriodNumber;
+    private LocalDate currentPeriodStartDate;
+    private LocalDate currentPeriodEndDate;
+    private LocalDateTime closingRequestedAt;
+    private LocalDateTime graceEndsAt;
+    private LocalDateTime closedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

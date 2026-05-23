@@ -5,6 +5,8 @@ export function kpiCycleStatusBadgeClass(status: string): string {
   switch (status) {
     case 'ACTIVE':
       return `${base} bg-emerald-50 text-emerald-800 ring-emerald-600/15`;
+    case 'CLOSING':
+      return `${base} bg-amber-50 text-amber-800 ring-amber-600/20`;
     case 'DEACTIVATED':
       return `${base} bg-gray-100 text-gray-600 ring-gray-400/20`;
     case 'DRAFT':

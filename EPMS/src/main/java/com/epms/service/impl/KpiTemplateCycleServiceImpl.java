@@ -5,11 +5,13 @@ import com.epms.dto.KpiTemplateCycleResponseDTO;
 import com.epms.entity.KpiForm;
 import com.epms.entity.KpiTemplateCycle;
 import com.epms.entity.KpiTemplateCycleForm;
+import com.epms.entity.KpiTemplateCyclePeriod;
 import com.epms.entity.User;
 import com.epms.entity.enums.KpiFormStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.KpiFormRepository;
 import com.epms.repository.KpiTemplateCycleFormRepository;
+import com.epms.repository.KpiTemplateCyclePeriodRepository;
 import com.epms.repository.KpiTemplateCycleRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
@@ -35,6 +37,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
     private final KpiTemplateCycleRepository cycleRepository;
     private final KpiTemplateCycleFormRepository cycleFormRepository;
+    private final KpiTemplateCyclePeriodRepository cyclePeriodRepository;
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
@@ -109,7 +112,13 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
             if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
                 return getById(id);
             }
+            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Closing cycles cannot be reactivated.");
+            }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+            cycle.setClosingRequestedAt(null);
+            cycle.setGraceEndsAt(null);
+            cycle.setClosedAt(null);
         } else {
             if (cycle.getStatus() != KpiTemplateCycleStatus.ACTIVE) {
                 if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
@@ -120,7 +129,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         "Only active cycles can be deactivated."
                 );
             }
-            cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
         }
 
         cycle.setUpdatedByUser(currentUser());
@@ -128,6 +136,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycleRepository.flush();
         if (active) {
             employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+        } else {
+            employeeKpiWorkflowService.startCycleClosingGrace(id);
         }
         return getById(id);
     }
@@ -199,6 +209,9 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         .title(link.getKpiForm().getTitle())
                         .build())
                 .toList();
+        KpiTemplateCyclePeriod currentPeriod = cyclePeriodRepository
+                .findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .orElse(null);
 
         return KpiTemplateCycleResponseDTO.builder()
                 .id(cycle.getId())
@@ -208,6 +221,13 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .durationMonths(cycle.getDurationMonths())
                 .durationLabel(durationLabel(cycle.getDurationMonths()))
                 .status(cycle.getStatus())
+                .currentPeriodId(currentPeriod != null ? currentPeriod.getId() : null)
+                .currentPeriodNumber(currentPeriod != null ? currentPeriod.getPeriodNumber() : null)
+                .currentPeriodStartDate(currentPeriod != null ? currentPeriod.getStartDate() : null)
+                .currentPeriodEndDate(currentPeriod != null ? currentPeriod.getEndDate() : null)
+                .closingRequestedAt(cycle.getClosingRequestedAt())
+                .graceEndsAt(cycle.getGraceEndsAt())
+                .closedAt(cycle.getClosedAt())
                 .createdAt(cycle.getCreatedAt())
                 .updatedAt(cycle.getUpdatedAt())
                 .kpiForms(forms)

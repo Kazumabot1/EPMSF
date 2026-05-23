@@ -28,6 +28,7 @@ import com.epms.repository.UserRoleRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeService;
+import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.NotificationService;
 import com.epms.service.UserAccountProvisioningService;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
+    private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @Override
     @Transactional(readOnly = true)
@@ -272,6 +274,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
 
         Position oldPosition = employee.getPosition();
+        Integer oldPositionId = oldPosition != null ? oldPosition.getId() : null;
         String oldPositionTitle = oldPosition != null ? oldPosition.getPositionTitle() : null;
         String oldPositionLevelCode = oldPosition != null && oldPosition.getLevel() != null
                 ? oldPosition.getLevel().getLevelCode()
@@ -342,6 +345,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         copyRequestToEntity(request, employee);
 
         Employee saved = employeeRepository.save(employee);
+        Integer newPositionId = saved.getPosition() != null ? saved.getPosition().getId() : null;
         syncDepartmentAssignment(currentDepartment, parentDepartment, saved);
 
         AccountProvisionResult provision = null;
@@ -385,6 +389,8 @@ public class EmployeeServiceImpl implements EmployeeService {
                     newTeam
             );
         }
+
+        employeeKpiWorkflowService.handleEmployeePositionChanged(saved.getId(), oldPositionId, newPositionId);
 
         EmployeeResponseDto dto = getEmployeeById(id);
         mergeAccountProvisioning(dto, provision);
