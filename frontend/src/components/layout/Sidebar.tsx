@@ -146,7 +146,54 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/assessment-forms', label: 'Form Create', icon: 'bi bi-ui-checks-grid', end: true },
         ],
       },
-      { to: '/hr/reports', label: 'Reports', icon: 'bi bi-file-earmark-bar-graph' },
+      {
+        to: '/hr/reports',
+        label: 'Reports',
+        icon: 'bi bi-file-earmark-bar-graph',
+        children: [
+          {
+            to: '/hr/reports/performance',
+            label: 'Performance Reports',
+            icon: 'bi bi-file-earmark-bar-graph',
+            end: true,
+          },
+          {
+            to: '/hr/reports/department-performance',
+            label: 'Department Performance',
+            icon: 'bi bi-graph-up-arrow',
+            end: true,
+          },
+          {
+            to: '/hr/reports/assessment-scores',
+            label: 'Assessment Scores',
+            icon: 'bi bi-clipboard-data',
+            end: true,
+          },
+          {
+            to: '/hr/reports/pip-status',
+            label: 'PIP Status',
+            icon: 'bi bi-clipboard2-pulse',
+            end: true,
+          },
+          {
+            to: '/hr/reports/feedback-completion',
+            label: 'Feedback Completion',
+            icon: 'bi bi-chat-dots',
+            end: true,
+          },
+          {
+            to: '/hr/reports/recommendations',
+            label: 'Recommendations',
+            icon: 'bi bi-stars',
+            end: true,
+          },
+          {
+            to: '/hr/feedback/analytics',
+            label: '360 Feedback Analytics',
+            icon: 'bi bi-bar-chart-line',
+          },
+        ],
+      },
       {
         to: '/hr/appraisal',
         label: 'Appraisals',

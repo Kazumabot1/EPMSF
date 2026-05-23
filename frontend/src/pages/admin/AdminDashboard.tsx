@@ -300,10 +300,6 @@ const AdminDashboard = () => {
      api.get('/positions'),
    ]);
 
-   const roleRes = {
-     status: 'rejected',
-   } as PromiseRejectedResult;
-
     setOptions({
       departments:
         departmentRes.status === 'fulfilled'

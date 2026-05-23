@@ -37,6 +37,7 @@ const emptyForm = (): AssessmentFormPayload => ({
   startDate: today(),
   endDate: defaultEndDate(),
   targetRoles: ['Employee'],
+  targetDepartmentIds: [],
   scoreBands: [],
   sections: [
     {
@@ -132,6 +133,7 @@ const AssessmentFormBuilderPage = () => {
       startDate: item.startDate ?? today(),
       endDate: item.endDate ?? defaultEndDate(),
       targetRoles: item.targetRoles?.length ? item.targetRoles : ['Employee'],
+      targetDepartmentIds: item.targetDepartmentIds ?? [],
       scoreBands: item.scoreBands ?? [],
       sections: item.sections?.length
         ? item.sections.map((section, sectionIndex) => ({

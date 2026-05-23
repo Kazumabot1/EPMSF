@@ -393,11 +393,6 @@ const EmployeeManagement = () => {
                   {paged.map((emp) => {
                     const active = isEmployeeActive(emp);
 
-                    const name =
-                      emp.fullName?.trim() ||
-                      [emp.firstName, emp.lastName].filter(Boolean).join(' ').trim() ||
-                      '—';
-
                     return (
                       <tr key={emp.id}>
                         <td>

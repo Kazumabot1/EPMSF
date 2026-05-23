@@ -1,13 +1,30 @@
-
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ProfileNameCell from './ProfileNameCell';
+import './Home.css';
+
+type DashboardData = {
+  user?: any;
+  stats?: {
+    directReports?: number;
+    kpisCreated?: number;
+    activePipsManaged?: number;
+    unreadNotifications?: number;
+  };
+  recentKpis?: Array<{ id: number | string; title?: string; weight?: number | string }>;
+  recentNotifications?: Array<{ id: number | string; title?: string; read?: boolean }>;
+};
+
+const numberValue = (value: unknown) => {
+  const result = Number(value ?? 0);
+  return Number.isFinite(result) ? result : 0;
+};
 
 function Home() {
   const navigate = useNavigate();
 
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [totalEmployees, setTotalEmployees] = useState<number | null>(null);
   const [error, setError] = useState('');
 
@@ -41,149 +58,110 @@ function Home() {
       });
   }, []);
 
-  return (
-    <div className="hr-dashboard">
-      <div className="hr-dashboard-title">
-        <h2>HR Dashboard</h2>
-        <p>Employee performance and configuration overview</p>
-      </div>
+  const stats = useMemo(() => {
+    return {
+      employees: totalEmployees ?? numberValue(data?.stats?.directReports),
+      kpis: numberValue(data?.stats?.kpisCreated),
+      pips: numberValue(data?.stats?.activePipsManaged),
+      notifications: numberValue(data?.stats?.unreadNotifications),
+    };
+  }, [data?.stats, totalEmployees]);
 
-      {error && <p className="hr-error">{error}</p>}
-      {!data && !error && <p className="hr-loading">Loading...</p>}
+  return (
+    <div className="fluxen-dashboard hr-fluxen-dashboard">
+      <section className="fluxen-hero hr-fluxen-hero">
+        <div className="fluxen-orb fluxen-orb--one" />
+        <div className="fluxen-orb fluxen-orb--two" />
+
+        <div className="fluxen-hero-copy">
+          <span className="fluxen-eyebrow">
+            <i className="bi bi-grid-1x2" /> HR Command Center
+          </span>
+          <h1>HR Dashboard</h1>
+          <p>
+            Monitor organization setup, workforce activity, KPIs, PIP attention, and HR operating
+            signals from one clean Fluxen-style workspace.
+          </p>
+        </div>
+
+        <div className="fluxen-hero-score">
+          <span>Active Employees</span>
+          <strong>{stats.employees}</strong>
+          <small>Current HR scope</small>
+        </div>
+      </section>
+
+      {error && <div className="fluxen-alert fluxen-alert--error">{error}</div>}
+      {!data && !error && <div className="fluxen-alert">Loading HR dashboard...</div>}
 
       {data && (
         <>
-          <section className="hr-stat-grid">
-            <article className="hr-stat-card">
-              <div className="hr-stat-card-head">
-                <p>Total Employees</p>
-                <span className="hr-stat-icon blue">
-                  <i className="bi bi-people" />
-                </span>
-              </div>
-              <h3>{totalEmployees ?? data.stats?.directReports ?? 0}</h3>
-              <small>Active in system</small>
-            </article>
-
-            <article className="hr-stat-card">
-              <div className="hr-stat-card-head">
-                <p>KPIs Created</p>
-                <span className="hr-stat-icon amber">
-                  <i className="bi bi-clipboard-check" />
-                </span>
-              </div>
-              <h3>{data.stats?.kpisCreated ?? 0}</h3>
-              <small>Configured by you</small>
-            </article>
-
-            <article className="hr-stat-card">
-              <div className="hr-stat-card-head">
-                <p>Active PIPs</p>
-                <span className="hr-stat-icon red">
-                  <i className="bi bi-exclamation-triangle" />
-                </span>
-              </div>
-              <h3>{data.stats?.activePipsManaged ?? 0}</h3>
-              <small>Currently tracked</small>
-            </article>
-
-            <article className="hr-stat-card">
-              <div className="hr-stat-card-head">
-                <p>Unread Notifications</p>
-                <span className="hr-stat-icon sky">
-                  <i className="bi bi-bell" />
-                </span>
-              </div>
-              <h3>{data.stats?.unreadNotifications ?? 0}</h3>
-              <small>Need attention</small>
-            </article>
+          <section className="fluxen-metric-grid">
+            <MetricCard
+              icon="bi-people"
+              label="Active Employees"
+              value={stats.employees}
+              detail="Active in system"
+              tone="sky"
+            />
+            <MetricCard
+              icon="bi-clipboard-check"
+              label="KPIs Created"
+              value={stats.kpis}
+              detail="Configured by HR"
+              tone="amber"
+            />
+            <MetricCard
+              icon="bi-exclamation-triangle"
+              label="Active PIPs"
+              value={stats.pips}
+              detail="Currently tracked"
+              tone="rose"
+            />
+            <MetricCard
+              icon="bi-bell"
+              label="Unread Notifications"
+              value={stats.notifications}
+              detail="Need attention"
+              tone="violet"
+            />
           </section>
 
-          <section
-            style={{
-              marginTop: '1.25rem',
-              marginBottom: '1.25rem',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: '1rem',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => navigate('/hr/reports')}
-              style={{
-                border: '1px solid #c7d2fe',
-                borderRadius: 22,
-                padding: '1.25rem',
-                background: 'linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%)',
-                textAlign: 'left',
-                cursor: 'pointer',
-                boxShadow: '0 18px 40px rgba(79, 70, 229, 0.12)',
-              }}
-            >
-              <span
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 16,
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: '#4f46e5',
-                  color: '#fff',
-                  fontSize: 22,
-                  marginBottom: 12,
-                }}
-              >
-                <i className="bi bi-file-earmark-bar-graph" />
-              </span>
-
-              <strong
-                style={{
-                  display: 'block',
-                  fontSize: '1.05rem',
-                  fontWeight: 900,
-                  color: '#1e1b4b',
-                  marginBottom: 6,
-                }}
-              >
-                Performance Reports
-              </strong>
-
-              <small
-                style={{
-                  display: 'block',
-                  color: '#64748b',
-                  fontSize: '.85rem',
-                  lineHeight: 1.55,
-                  fontWeight: 650,
-                }}
-              >
-                View organization-wide employee performance, department comparison,
-                PIP status, feedback participation, and recommendations.
-              </small>
-
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginTop: 14,
-                  color: '#4f46e5',
-                  fontWeight: 900,
-                  fontSize: '.84rem',
-                }}
-              >
-                Open reporting dashboard <i className="bi bi-arrow-right" />
-              </span>
-            </button>
+          <section className="fluxen-action-grid">
+            <DashboardAction
+              icon="bi-people-fill"
+              title="Teams"
+              description="Manage teams, leaders, and historical team changes."
+              onClick={() => navigate('/hr/team')}
+            />
+            <DashboardAction
+              icon="bi-building"
+              title="Departments"
+              description="Maintain departments and department-level structure."
+              onClick={() => navigate('/hr/department')}
+            />
+            <DashboardAction
+              icon="bi-clipboard-data"
+              title="Assessment Scores"
+              description="Review score records and assessment progress."
+              onClick={() => navigate('/hr/assessment-scores')}
+            />
+            <DashboardAction
+              icon="bi-chat-square-dots"
+              title="360 Feedback"
+              description="Configure questions, rules, campaigns, and analytics."
+              onClick={() => navigate('/hr/feedback/questions')}
+            />
           </section>
 
-          <section className="hr-panel-grid">
-            <article className="hr-panel-card">
-              <h4>
-                <i className="bi bi-person-badge" /> Logged in as
-              </h4>
-              <div className="hr-list-item">
+          <section className="fluxen-panel-grid">
+            <article className="fluxen-panel-card">
+              <div className="fluxen-panel-head">
+                <h2>
+                  <i className="bi bi-person-badge" /> Logged in as
+                </h2>
+              </div>
+              <div className="fluxen-list-item">
                 <ProfileNameCell
                   person={{
                     ...data.user,
@@ -192,41 +170,45 @@ function Home() {
                   size="md"
                   subtitle={data.user?.position ?? data.user?.email ?? 'HR'}
                 />
-                <span className="review">{data.user?.employeeCode ?? 'No code'}</span>
+                <span>{data.user?.employeeCode ?? 'No code'}</span>
               </div>
             </article>
 
-            <article className="hr-panel-card">
-              <h4>
-                <i className="bi bi-bullseye" /> Recent KPIs
-              </h4>
+            <article className="fluxen-panel-card">
+              <div className="fluxen-panel-head">
+                <h2>
+                  <i className="bi bi-bullseye" /> Recent KPIs
+                </h2>
+              </div>
               {data.recentKpis?.length ? (
-                data.recentKpis.map((item: any) => (
-                  <div className="hr-list-item" key={item.id}>
-                    <strong>{item.title}</strong>
-                    <span className="pending">Weight {item.weight}</span>
+                data.recentKpis.map((item) => (
+                  <div className="fluxen-list-item" key={item.id}>
+                    <strong>{item.title || 'Untitled KPI'}</strong>
+                    <span>Weight {item.weight ?? '—'}</span>
                   </div>
                 ))
               ) : (
-                <p className="hr-loading">No KPI records yet.</p>
+                <p className="fluxen-muted">No KPI records yet.</p>
               )}
             </article>
 
-            <article className="hr-panel-card">
-              <h4>
-                <i className="bi bi-bell" /> Recent Notifications
-              </h4>
+            <article className="fluxen-panel-card">
+              <div className="fluxen-panel-head">
+                <h2>
+                  <i className="bi bi-bell" /> Recent Notifications
+                </h2>
+              </div>
               {data.recentNotifications?.length ? (
-                data.recentNotifications.map((item: any) => (
-                  <div className="hr-list-item" key={item.id}>
-                    <strong>{item.title}</strong>
-                    <span className={item.read ? 'review' : 'pending'}>
+                data.recentNotifications.map((item) => (
+                  <div className="fluxen-list-item" key={item.id}>
+                    <strong>{item.title || 'Notification'}</strong>
+                    <span className={item.read ? 'is-soft' : 'is-hot'}>
                       {item.read ? 'Read' : 'Unread'}
                     </span>
                   </div>
                 ))
               ) : (
-                <p className="hr-loading">No notifications yet.</p>
+                <p className="fluxen-muted">No notifications yet.</p>
               )}
             </article>
           </section>
@@ -235,5 +217,51 @@ function Home() {
     </div>
   );
 }
+
+const MetricCard = ({
+  icon,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  icon: string;
+  label: string;
+  value: number;
+  detail: string;
+  tone: 'sky' | 'amber' | 'rose' | 'violet';
+}) => (
+  <article className={`fluxen-metric-card fluxen-metric-card--${tone}`}>
+    <span className="fluxen-metric-icon">
+      <i className={`bi ${icon}`} />
+    </span>
+    <p>{label}</p>
+    <strong>{value.toLocaleString()}</strong>
+    <small>{detail}</small>
+  </article>
+);
+
+const DashboardAction = ({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) => (
+  <button type="button" className="fluxen-action-card" onClick={onClick}>
+    <span>
+      <i className={`bi ${icon}`} />
+    </span>
+    <strong>{title}</strong>
+    <small>{description}</small>
+    <em>
+      Open <i className="bi bi-arrow-right" />
+    </em>
+  </button>
+);
 
 export default Home;
