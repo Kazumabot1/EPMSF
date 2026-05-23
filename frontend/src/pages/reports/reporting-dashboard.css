@@ -230,6 +230,33 @@
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
 }
 
+
+.reporting-toolbar--single {
+  align-items: stretch;
+}
+
+.reporting-current-section {
+  display: grid;
+  align-content: center;
+  gap: 0.16rem;
+  padding: 0.25rem 0.65rem;
+}
+
+.reporting-current-section span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reporting-current-section strong {
+  color: #0f172a;
+  font-size: 1.02rem;
+  font-weight: 1000;
+  letter-spacing: -0.02em;
+}
+
 .reporting-toolbar-title {
   display: flex;
   align-items: center;

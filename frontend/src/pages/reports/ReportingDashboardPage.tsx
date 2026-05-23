@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { exportToExcel } from '../../utils/exportExcel';
 import {
   reportingService,
@@ -95,12 +95,52 @@ const scoreClass = (score?: number | null) => {
   return 'report-score report-score--bad';
 };
 
-const ReportingDashboardPage = () => {
+type ReportType = 'employees' | 'departments' | 'pip' | 'feedback' | 'recommendations';
+
+type ReportingDashboardPageProps = {
+  reportType?: ReportType;
+};
+
+const reportCopy: Record<ReportType, { title: string; description: string; exportLabel: string; searchPlaceholder: string }> = {
+  employees: {
+    title: 'Performance Reports',
+    description: 'View submitted appraisal results, scores, review status, and employee performance labels.',
+    exportLabel: 'employee-performance-report',
+    searchPlaceholder: 'Search employees, department, manager, status...',
+  },
+  departments: {
+    title: 'Department Performance',
+    description: 'Compare department-level assessment volume, average score, pending reviews, and active PIP load.',
+    exportLabel: 'department-performance-report',
+    searchPlaceholder: 'Search departments or performance label...',
+  },
+  pip: {
+    title: 'PIP Status',
+    description: 'Track active and completed performance improvement plans by employee, department, and owner.',
+    exportLabel: 'pip-status-report',
+    searchPlaceholder: 'Search employee, department, goal, owner...',
+  },
+  feedback: {
+    title: 'Feedback Completion',
+    description: 'Monitor 360 feedback campaign participation, submitted responses, pending responses, and completion rate.',
+    exportLabel: 'feedback-participation-report',
+    searchPlaceholder: 'Search campaign or status...',
+  },
+  recommendations: {
+    title: 'Recommendations',
+    description: 'Review promotion, increment, and performance-watch recommendations generated from appraisal scores.',
+    exportLabel: 'recommendation-report',
+    searchPlaceholder: 'Search employee, department, recommendation...',
+  },
+};
+
+const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboardPageProps) => {
   const [dashboard, setDashboard] = useState<ReportingDashboard>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'employees' | 'departments' | 'pip' | 'feedback' | 'recommendations'>('employees');
+  const activeReportType: ReportType = reportCopy[reportType] ? reportType : 'employees';
+  const activeCopy = reportCopy[activeReportType];
 
   const loadDashboard = async () => {
     try {
@@ -187,8 +227,8 @@ const ReportingDashboardPage = () => {
     );
   }, [dashboard.promotionRecommendations, query]);
 
-  const exportActiveTab = () => {
-    if (activeTab === 'employees') {
+  const exportActiveReport = () => {
+    if (activeReportType === 'employees') {
       exportToExcel<EmployeePerformanceRow & Record<string, unknown>>(
         filteredEmployees as (EmployeePerformanceRow & Record<string, unknown>)[],
         [
@@ -204,12 +244,12 @@ const ReportingDashboardPage = () => {
           { header: 'Label', key: 'performanceLabel' },
           { header: 'Submitted At', key: 'submittedAt' },
         ],
-        'employee-performance-report',
+        activeCopy.exportLabel,
       );
       return;
     }
 
-    if (activeTab === 'departments') {
+    if (activeReportType === 'departments') {
       exportToExcel<DepartmentPerformanceRow & Record<string, unknown>>(
         filteredDepartments as (DepartmentPerformanceRow & Record<string, unknown>)[],
         [
@@ -222,12 +262,12 @@ const ReportingDashboardPage = () => {
           { header: 'Average Score', key: 'averageScore' },
           { header: 'Label', key: 'performanceLabel' },
         ],
-        'department-performance-report',
+        activeCopy.exportLabel,
       );
       return;
     }
 
-    if (activeTab === 'pip') {
+    if (activeReportType === 'pip') {
       exportToExcel<PipReportRow & Record<string, unknown>>(
         filteredPips as (PipReportRow & Record<string, unknown>)[],
         [
@@ -240,12 +280,12 @@ const ReportingDashboardPage = () => {
           { header: 'End Date', key: 'endDate' },
           { header: 'Created By', key: 'createdByName' },
         ],
-        'pip-status-report',
+        activeCopy.exportLabel,
       );
       return;
     }
 
-    if (activeTab === 'feedback') {
+    if (activeReportType === 'feedback') {
       exportToExcel<FeedbackParticipationRow & Record<string, unknown>>(
         filteredFeedback as (FeedbackParticipationRow & Record<string, unknown>)[],
         [
@@ -258,7 +298,7 @@ const ReportingDashboardPage = () => {
           { header: 'Pending', key: 'pendingCount' },
           { header: 'Completion %', key: 'completionRate' },
         ],
-        'feedback-participation-report',
+        activeCopy.exportLabel,
       );
       return;
     }
@@ -274,7 +314,7 @@ const ReportingDashboardPage = () => {
         { header: 'Label', key: 'performanceLabel' },
         { header: 'Reason', key: 'reason' },
       ],
-      'recommendation-report',
+      activeCopy.exportLabel,
     );
   };
 
@@ -293,11 +333,8 @@ const ReportingDashboardPage = () => {
       <section className="reporting-hero">
         <div>
           <span className="reporting-eyebrow">Reporting & Analytics</span>
-          <h1>Performance Reports</h1>
-          <p>
-            View performance summaries, department comparison, PIP status, feedback participation,
-            and recommendation insights.
-          </p>
+          <h1>{activeCopy.title}</h1>
+          <p>{activeCopy.description}</p>
         </div>
 
         <div className="reporting-hero-card">
@@ -318,13 +355,10 @@ const ReportingDashboardPage = () => {
         <Metric title="High / Low" value={`${formatNumber(summary.highPerformers)} / ${formatNumber(summary.lowPerformers)}`} detail="Performance watch" icon="bi-stars" />
       </section>
 
-      <section className="reporting-toolbar">
-        <div className="reporting-tabs">
-          <TabButton active={activeTab === 'employees'} onClick={() => setActiveTab('employees')}>Employees</TabButton>
-          <TabButton active={activeTab === 'departments'} onClick={() => setActiveTab('departments')}>Departments</TabButton>
-          <TabButton active={activeTab === 'pip'} onClick={() => setActiveTab('pip')}>PIP</TabButton>
-          <TabButton active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')}>Feedback</TabButton>
-          <TabButton active={activeTab === 'recommendations'} onClick={() => setActiveTab('recommendations')}>Recommendations</TabButton>
+      <section className="reporting-toolbar reporting-toolbar--single">
+        <div className="reporting-current-section">
+          <span>Current report</span>
+          <strong>{activeCopy.title}</strong>
         </div>
 
         <div className="reporting-actions">
@@ -333,7 +367,7 @@ const ReportingDashboardPage = () => {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search current report..."
+              placeholder={activeCopy.searchPlaceholder}
             />
           </label>
 
@@ -342,7 +376,7 @@ const ReportingDashboardPage = () => {
             Refresh
           </button>
 
-          <button type="button" className="reporting-button" onClick={exportActiveTab}>
+          <button type="button" className="reporting-button" onClick={exportActiveReport}>
             <i className="bi bi-file-earmark-excel" />
             Export Excel
           </button>
@@ -350,20 +384,22 @@ const ReportingDashboardPage = () => {
       </section>
 
       <section className="reporting-content-card">
-        {activeTab === 'employees' && <EmployeePerformanceTable rows={filteredEmployees} />}
-        {activeTab === 'departments' && <DepartmentPerformanceTable rows={filteredDepartments} />}
-        {activeTab === 'pip' && <PipTable rows={filteredPips} />}
-        {activeTab === 'feedback' && <FeedbackTable rows={filteredFeedback} />}
-        {activeTab === 'recommendations' && <RecommendationTable rows={filteredRecommendations} />}
+        {activeReportType === 'employees' && <EmployeePerformanceTable rows={filteredEmployees} />}
+        {activeReportType === 'departments' && <DepartmentPerformanceTable rows={filteredDepartments} />}
+        {activeReportType === 'pip' && <PipTable rows={filteredPips} />}
+        {activeReportType === 'feedback' && <FeedbackTable rows={filteredFeedback} />}
+        {activeReportType === 'recommendations' && <RecommendationTable rows={filteredRecommendations} />}
       </section>
 
-      <section className="reporting-content-card">
-        <div className="reporting-section-title">
-          <h2>Assessment Status Breakdown</h2>
-          <span>{formatNumber(dashboard.assessmentStatusBreakdown.reduce((sum, row) => sum + row.count, 0))} total</span>
-        </div>
-        <StatusBreakdown rows={dashboard.assessmentStatusBreakdown} />
-      </section>
+      {(activeReportType === 'employees' || activeReportType === 'departments') && (
+        <section className="reporting-content-card">
+          <div className="reporting-section-title">
+            <h2>Assessment Status Breakdown</h2>
+            <span>{formatNumber(dashboard.assessmentStatusBreakdown.reduce((sum, row) => sum + row.count, 0))} total</span>
+          </div>
+          <StatusBreakdown rows={dashboard.assessmentStatusBreakdown} />
+        </section>
+      )}
     </div>
   );
 };
@@ -377,12 +413,6 @@ const Metric = ({ title, value, detail, icon }: { title: string; value: string; 
     <strong>{value}</strong>
     <small>{detail}</small>
   </article>
-);
-
-const TabButton = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) => (
-  <button type="button" className={`reporting-tab ${active ? 'is-active' : ''}`} onClick={onClick}>
-    {children}
-  </button>
 );
 
 const EmptyRows = () => (
