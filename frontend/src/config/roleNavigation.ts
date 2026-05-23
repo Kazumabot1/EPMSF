@@ -1,12 +1,12 @@
 import type { PositionPermission } from '../types/positionPermission';
 
 export type UserRole =
-  | 'Employee'
-  | 'Admin'
-  | 'HR'
-  | 'DepartmentHead'
-  | 'Manager'
-  | 'Executive';
+    | 'Employee'
+    | 'Admin'
+    | 'HR'
+    | 'DepartmentHead'
+    | 'Manager'
+    | 'Executive';
 
 export interface NavItem {
   label: string;
@@ -24,7 +24,7 @@ export interface UserLike {
 }
 
 export const disabledFeatureMessage = (positionName?: string | null) =>
-  `Your position (${positionName || 'your position'}) has this feature disabled!`;
+    `Your position (${positionName || 'your position'}) has this feature disabled!`;
 
 const feedbackChildren: NavItem[] = [
   { label: 'Question Bank', path: '/hr/feedback/questions', icon: 'bi-question-circle' },
@@ -41,7 +41,6 @@ const feedbackChildren: NavItem[] = [
 export const roleNavigation: Record<UserRole, NavItem[]> = {
   Employee: [
     { label: 'My Dashboard', path: '/employee/dashboard', icon: 'bi-columns-gap', end: true },
-    { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'My KPIs', path: '/employee/kpis', icon: 'bi-bullseye' },
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
@@ -314,11 +313,11 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 };
 
 const normalizeRoleName = (role: string) =>
-  String(role ?? '')
-    .replace(/^ROLE_/i, '')
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .replace(/[\s-]+/g, '_')
-    .toUpperCase();
+    String(role ?? '')
+        .replace(/^ROLE_/i, '')
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        .replace(/[\s-]+/g, '_')
+        .toUpperCase();
 
 export const resolveUserRole = (user?: UserLike | null): UserRole => {
   if (!user) return 'Employee';
@@ -332,40 +331,40 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
   }
 
   if (
-    normalizedRoles.includes('DEPARTMENT_HEAD') ||
-    normalizedRoles.includes('DEPARTMENTHEAD') ||
-    normalizedRoles.includes('DEPT_HEAD') ||
-    normalizedRoles.includes('HEAD_OF_DEPARTMENT') ||
-    dashboard === 'DEPARTMENT_HEAD_DASHBOARD' ||
-    dashboard === 'DEPARTMENTHEAD_DASHBOARD' ||
-    dashboard === 'DEPT_HEAD_DASHBOARD'
+      normalizedRoles.includes('DEPARTMENT_HEAD') ||
+      normalizedRoles.includes('DEPARTMENTHEAD') ||
+      normalizedRoles.includes('DEPT_HEAD') ||
+      normalizedRoles.includes('HEAD_OF_DEPARTMENT') ||
+      dashboard === 'DEPARTMENT_HEAD_DASHBOARD' ||
+      dashboard === 'DEPARTMENTHEAD_DASHBOARD' ||
+      dashboard === 'DEPT_HEAD_DASHBOARD'
   ) {
     return 'DepartmentHead';
   }
 
   if (
-    normalizedRoles.includes('HR') ||
-    dashboard === 'HR_DASHBOARD' ||
-    normalizedPosition.includes('HR') ||
-    normalizedPosition.includes('HUMAN_RESOURCE')
+      normalizedRoles.includes('HR') ||
+      dashboard === 'HR_DASHBOARD' ||
+      normalizedPosition.includes('HR') ||
+      normalizedPosition.includes('HUMAN_RESOURCE')
   ) {
     return 'HR';
   }
 
   if (
-    normalizedRoles.includes('MANAGER') ||
-    normalizedRoles.includes('PROJECT_MANAGER') ||
-    normalizedRoles.includes('TEAM_MANAGER') ||
-    dashboard === 'MANAGER_DASHBOARD'
+      normalizedRoles.includes('MANAGER') ||
+      normalizedRoles.includes('PROJECT_MANAGER') ||
+      normalizedRoles.includes('TEAM_MANAGER') ||
+      dashboard === 'MANAGER_DASHBOARD'
   ) {
     return 'Manager';
   }
 
   if (
-    normalizedRoles.includes('CEO') ||
-    normalizedRoles.includes('EXECUTIVE') ||
-    dashboard === 'CEO_DASHBOARD' ||
-    dashboard === 'EXECUTIVE_DASHBOARD'
+      normalizedRoles.includes('CEO') ||
+      normalizedRoles.includes('EXECUTIVE') ||
+      dashboard === 'CEO_DASHBOARD' ||
+      dashboard === 'EXECUTIVE_DASHBOARD'
   ) {
     return 'Executive';
   }
