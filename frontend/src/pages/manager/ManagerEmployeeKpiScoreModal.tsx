@@ -144,11 +144,11 @@ const ManagerEmployeeKpiScoreModal = ({
               <thead>
                 <tr style={{ textAlign: 'left', color: '#64748b' }}>
                   <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>KPI</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>Target</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>Weight %</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>Actual</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>Achievement %</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>Weighted score</th>
+                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Target</th>
+                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weight %</th>
+                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Actual</th>
+                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Achievement %</th>
+                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weighted score</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,14 +172,12 @@ const ManagerEmployeeKpiScoreModal = ({
                         {line.kpiLabel ?? '—'}
                         {line.unitName ? <span style={{ color: '#94a3b8' }}> ({line.unitName})</span> : null}
                       </td>
-                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9' }}>{line.target ?? '—'}</td>
-                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9' }}>{line.weight ?? '—'}</td>
-                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{line.target ?? '—'}</td>
+                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{line.weight ?? '—'}</td>
+                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
                         <input
-                          type="number"
-                          min={1}
-                          max={100}
-                          step={0.01}
+                          type="text"
+                          inputMode="decimal"
                           disabled={isFinal}
                           value={drafts[assignment.employeeKpiFormId]?.[line.kpiFormItemId] ?? ''}
                           onKeyDown={(e) => {
@@ -201,6 +199,8 @@ const ManagerEmployeeKpiScoreModal = ({
                           style={{
                             width: '100px',
                             padding: '.35rem .5rem',
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
                             borderRadius: '8px',
                             border: actualInvalid ? '1px solid #ef4444' : '1px solid #cbd5e1',
                             background: actualInvalid ? '#fff7f7' : '#fff',
@@ -210,12 +210,12 @@ const ManagerEmployeeKpiScoreModal = ({
                         />
                       </td>
                       <td
-                        style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', color: '#475569' }}
+                        style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', color: '#475569', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                         title="(actual ÷ target) × 100"
                       >
                         {achievementDisp}
                       </td>
-                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+                      <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', color: '#475569', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                         {line.weightedScore != null ? line.weightedScore.toFixed(2) : '—'}
                       </td>
                     </tr>
@@ -268,3 +268,4 @@ const ManagerEmployeeKpiScoreModal = ({
 };
 
 export default ManagerEmployeeKpiScoreModal;
+

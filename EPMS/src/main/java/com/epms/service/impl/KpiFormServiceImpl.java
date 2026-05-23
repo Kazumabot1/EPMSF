@@ -502,9 +502,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .kpiItemId(ki != null ? ki.getId() : null)
                 .kpiItemName(ki != null ? ki.getName() : null)
                 .kpiCategoryId(cat != null ? cat.getId() : null)
-                .kpiCategoryName(cat != null ? cat.getName() : null)
+                .kpiCategoryName(categoryDisplayName(item))
+                .kpiCategoryLabel(item.getKpiCategoryLabel())
                 .kpiUnitId(unit != null ? unit.getId() : null)
-                .kpiUnitName(unit != null ? unit.getName() : null)
+                .kpiUnitName(unitDisplayName(item))
+                .kpiUnitLabel(item.getKpiUnitLabel())
                 .target(item.getTarget())
                 .weight(item.getWeight())
                 .sortOrder(item.getSortOrder())
@@ -934,9 +936,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .kpiName(master != null ? master.getName() : item.getKpiLabel())
                 .kpiItemId(master != null ? master.getId() : null)
                 .kpiCategoryId(category != null ? category.getId() : null)
-                .kpiCategoryName(category != null ? category.getName() : null)
+                .kpiCategoryName(categoryDisplayName(item))
+                .kpiCategoryLabel(item.getKpiCategoryLabel())
                 .kpiUnitId(unit != null ? unit.getId() : null)
-                .kpiUnitName(unit != null ? unit.getName() : null)
+                .kpiUnitName(unitDisplayName(item))
+                .kpiUnitLabel(item.getKpiUnitLabel())
                 .target(item.getTarget())
                 .weight(item.getWeight())
                 .sortOrder(item.getSortOrder())
@@ -958,9 +962,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .kpiName(master != null ? master.getName() : row.getKpiLabel())
                 .kpiItemId(master != null ? master.getId() : row.getKpiItemId())
                 .kpiCategoryId(category != null ? category.getId() : row.getKpiCategoryId())
-                .kpiCategoryName(category != null ? category.getName() : row.getKpiCategoryName())
+                .kpiCategoryName(category != null ? category.getName() : categoryLabel(row))
+                .kpiCategoryLabel(categoryLabel(row))
                 .kpiUnitId(unit != null ? unit.getId() : row.getKpiUnitId())
-                .kpiUnitName(unit != null ? unit.getName() : row.getKpiUnitName())
+                .kpiUnitName(unit != null ? unit.getName() : unitLabel(row))
+                .kpiUnitLabel(unitLabel(row))
                 .target(row.getTarget())
                 .weight(row.getWeight())
                 .sortOrder(row.getSortOrder())
@@ -997,7 +1003,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Row " + (i + 1) + ": enter a KPI name or select a KPI item.");
             }
-            if (row.getKpiCategoryId() == null || row.getKpiUnitId() == null || row.getTarget() == null || row.getWeight() == null) {
+            boolean hasMasterCategory = row.getKpiCategoryId() != null;
+            boolean hasCategoryLabel = categoryLabel(row) != null;
+            boolean hasMasterUnit = row.getKpiUnitId() != null;
+            boolean hasUnitLabel = unitLabel(row) != null;
+            if ((!hasMasterCategory && !hasCategoryLabel) || (!hasMasterUnit && !hasUnitLabel) || row.getTarget() == null || row.getWeight() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Row " + (i + 1) + ": category, unit, target, and weight are required.");
             }
@@ -1153,10 +1163,16 @@ public class KpiFormServiceImpl implements KpiFormService {
     }
 
     private void applyItemFields(KpiFormItem entity, KpiFormItemDTO row, int index) {
-        KpiCategory category = kpiCategoryRepository.findById(row.getKpiCategoryId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI category not found."));
-        KpiUnit unit = kpiUnitRepository.findById(row.getKpiUnitId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI unit not found."));
+        KpiCategory category = null;
+        if (row.getKpiCategoryId() != null) {
+            category = kpiCategoryRepository.findById(row.getKpiCategoryId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI category not found."));
+        }
+        KpiUnit unit = null;
+        if (row.getKpiUnitId() != null) {
+            unit = kpiUnitRepository.findById(row.getKpiUnitId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI unit not found."));
+        }
 
         KpiItem masterItem = null;
         if (row.getKpiItemId() != null) {
@@ -1165,12 +1181,48 @@ public class KpiFormServiceImpl implements KpiFormService {
         }
 
         String label = row.getKpiLabel() != null ? row.getKpiLabel().trim() : null;
+        String categoryLabel = categoryLabel(row);
+        String unitLabel = unitLabel(row);
         entity.setKpiCategory(category);
+        entity.setKpiCategoryLabel(category == null ? categoryLabel : null);
         entity.setKpiUnit(unit);
+        entity.setKpiUnitLabel(unit == null ? unitLabel : null);
         entity.setKpiItem(masterItem);
         entity.setKpiLabel(masterItem == null ? label : null);
         entity.setTarget(row.getTarget());
         entity.setWeight(row.getWeight());
         entity.setSortOrder(row.getSortOrder() != null ? row.getSortOrder() : index);
+    }
+
+    private String categoryDisplayName(KpiFormItem item) {
+        KpiCategory category = item.getKpiCategory();
+        if (category != null) {
+            return category.getName();
+        }
+        return item.getKpiCategoryLabel();
+    }
+
+    private String unitDisplayName(KpiFormItem item) {
+        KpiUnit unit = item.getKpiUnit();
+        if (unit != null) {
+            return unit.getName();
+        }
+        return item.getKpiUnitLabel();
+    }
+
+    private String unitLabel(KpiFormItemDTO row) {
+        String label = row.getKpiUnitLabel() != null ? row.getKpiUnitLabel() : row.getKpiUnitName();
+        if (label == null || label.trim().isEmpty()) {
+            return null;
+        }
+        return label.trim();
+    }
+
+    private String categoryLabel(KpiFormItemDTO row) {
+        String label = row.getKpiCategoryLabel() != null ? row.getKpiCategoryLabel() : row.getKpiCategoryName();
+        if (label == null || label.trim().isEmpty()) {
+            return null;
+        }
+        return label.trim();
     }
 }

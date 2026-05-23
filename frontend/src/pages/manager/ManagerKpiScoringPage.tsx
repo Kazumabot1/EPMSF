@@ -375,8 +375,8 @@ const ManagerKpiScoringPage = () => {
                 <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Employee</th>
                 <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Position</th>
                 <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Status</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Lines scored</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Weighted total</th>
+                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Lines scored</th>
+                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weighted total</th>
                 <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', width: '220px' }} />
               </tr>
             </thead>
@@ -433,10 +433,10 @@ const ManagerKpiScoringPage = () => {
                       {a.positionTitle ?? 'No Position Assigned'}
                     </td>
                     <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>{a.status}</td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {scored}/{totalLines}
                     </td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>
+                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {a.totalWeightedScore != null ? a.totalWeightedScore.toFixed(2) : '-'}
                     </td>
                     <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9' }}>
@@ -598,3 +598,4 @@ const ManagerKpiScoringPage = () => {
 };
 
 export default ManagerKpiScoringPage;
+

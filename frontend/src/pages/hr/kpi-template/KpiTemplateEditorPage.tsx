@@ -145,7 +145,9 @@ const KpiTemplateEditorPage = () => {
       kpiLabel: row.kpiItemId !== null ? null : row.kpiLabel.trim() || null,
       kpiItemId: row.kpiItemId,
       kpiCategoryId: row.kpiCategoryId,
+      kpiCategoryLabel: row.kpiCategoryId !== null ? null : row.kpiCategoryLabel.trim() || null,
       kpiUnitId: row.kpiUnitId,
+      kpiUnitLabel: row.kpiUnitId !== null ? null : row.kpiUnitLabel.trim() || null,
       target: row.target,
       weight: row.weight,
       sortOrder: index,
@@ -156,7 +158,7 @@ const KpiTemplateEditorPage = () => {
       score: null,
       weightedScore: null,
       id: row.id ?? null,
-      changeReason: row.id == null ? row.changeReason ?? null : null,
+      changeReason: isEdit && row.id == null ? row.changeReason ?? null : null,
     })),
     removedItemReasons,
   });
@@ -176,7 +178,9 @@ const KpiTemplateEditorPage = () => {
       const hasCatalog = row.kpiItemId !== null;
       const hasLabel = row.kpiLabel.trim().length > 0;
       if (!hasCatalog && !hasLabel) return `Row ${i + 1}: choose a catalog KPI or enter a KPI label.`;
-      if (row.kpiCategoryId === null || row.kpiUnitId === null || row.target === null || row.weight === null) {
+      const hasCategory = row.kpiCategoryId !== null || row.kpiCategoryLabel.trim().length > 0;
+      const hasUnit = row.kpiUnitId !== null || row.kpiUnitLabel.trim().length > 0;
+      if (!hasCategory || !hasUnit || row.target === null || row.weight === null) {
         return `Row ${i + 1}: category, unit, target, and weight are required.`;
       }
     }
@@ -232,10 +236,8 @@ const KpiTemplateEditorPage = () => {
     setSavingAction(action);
 
     try {
-      let savedFormId: number;
       if (isEdit && !Number.isNaN(templateId)) {
-        const updated = await kpiTemplateService.updateTemplate(templateId, payload);
-        savedFormId = updated.id;
+        await kpiTemplateService.updateTemplate(templateId, payload);
       } else {
         const result = await saveKpiTemplateCreateOrUpdate({
           positionId,
@@ -244,7 +246,6 @@ const KpiTemplateEditorPage = () => {
             navigate(`/hr/kpi-template/${existingId}/edit`, { replace: true });
           },
         });
-        savedFormId = result.templateId;
         if (!result.created) {
           toast.success('KPI template updated for this position.');
         }
@@ -453,7 +454,13 @@ const KpiTemplateEditorPage = () => {
                 categories={categories}
                 units={units}
                 items={items}
-                onAddRow={() => setReasonAction({ type: 'add' })}
+                onAddRow={() => {
+                  if (isEdit) {
+                    setReasonAction({ type: 'add' });
+                    return;
+                  }
+                  setRows((prev) => [...prev, newKpiTemplateRow()]);
+                }}
                 onRemoveRow={(rowId) => {
                   const row = rows.find((candidate) => candidate.rowId === rowId);
                   if (row && rows.length > 1) {

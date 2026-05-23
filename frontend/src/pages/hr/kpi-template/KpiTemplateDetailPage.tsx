@@ -72,16 +72,23 @@ const KpiTemplateDetailPage = () => {
   const sortedItems = [...template.items].sort(
     (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
   );
-  const addedChanges = versionDetail?.changes.filter((change) => change.changeType === 'CREATED') ?? [];
-  const removedChanges = versionDetail?.changes.filter((change) => change.changeType === 'DELETED') ?? [];
+  const addedChanges = versionDetail?.changes.filter((change) => change.rowStatus === 'ADDED') ?? [];
+  const removedChanges = versionDetail?.changes.filter(
+    (change) => change.rowStatus === 'REMOVED' || change.changeType === 'DELETED',
+  ) ?? [];
   const isAddedLine = (line: KpiTemplateItem) =>
     addedChanges.some((change) => {
       const row = change.row;
       const name = line.kpiItemName ?? line.kpiLabel ?? null;
+      if (row?.itemId != null && line.id != null) {
+        return row.itemId === line.id;
+      }
       return row != null
         && row.kpiName === name
         && row.kpiCategoryId === line.kpiCategoryId
+        && row.kpiCategoryName === line.kpiCategoryName
         && row.kpiUnitId === line.kpiUnitId
+        && row.kpiUnitName === line.kpiUnitName
         && row.target === line.target
         && row.weight === line.weight;
     });
@@ -147,12 +154,12 @@ const KpiTemplateDetailPage = () => {
                     <tr className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                       <th className="px-4 py-3.5">KPI</th>
                       <th className="px-4 py-3.5">Category</th>
-                      <th className="px-4 py-3.5">Target</th>
+                      <th className="px-4 py-3.5 text-right">Target</th>
                       <th className="px-4 py-3.5">Unit</th>
-                      <th className="bg-violet-50 px-4 py-3.5 text-violet-900">Actual</th>
-                      <th className="px-4 py-3.5">Weight %</th>
-                      <th className="bg-violet-50 px-4 py-3.5 text-violet-900">Score %</th>
-                      <th className="bg-violet-50 px-4 py-3.5 text-violet-900">Weighted</th>
+                      <th className="bg-violet-50 px-4 py-3.5 text-right text-violet-900">Actual</th>
+                      <th className="px-4 py-3.5 text-right">Weight %</th>
+                      <th className="bg-violet-50 px-4 py-3.5 text-right text-violet-900">Score %</th>
+                      <th className="bg-violet-50 px-4 py-3.5 text-right text-violet-900">Weighted</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
@@ -168,16 +175,16 @@ const KpiTemplateDetailPage = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3.5 text-gray-700">{line.kpiCategoryName ?? '—'}</td>
-                          <td className="px-4 py-3.5 tabular-nums text-gray-800">{line.target ?? '—'}</td>
+                          <td className="px-4 py-3.5 text-right tabular-nums text-gray-800">{line.target ?? '—'}</td>
                           <td className="px-4 py-3.5 text-gray-700">{line.kpiUnitName ?? '—'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">
                             —
                           </td>
-                          <td className="px-4 py-3.5 font-bold tabular-nums text-gray-900">{line.weight ?? '—'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">
+                          <td className="px-4 py-3.5 text-right font-bold tabular-nums text-gray-900">{line.weight ?? '—'}</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">
                             —
                           </td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">
                             —
                           </td>
                         </tr>
@@ -195,12 +202,12 @@ const KpiTemplateDetailPage = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3.5 text-gray-700">{row.kpiCategoryName ?? 'â€”'}</td>
-                          <td className="px-4 py-3.5 tabular-nums text-gray-800">{row.target ?? 'â€”'}</td>
+                          <td className="px-4 py-3.5 text-right tabular-nums text-gray-800">{row.target ?? 'â€”'}</td>
                           <td className="px-4 py-3.5 text-gray-700">{row.kpiUnitName ?? 'â€”'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">â€”</td>
-                          <td className="px-4 py-3.5 font-bold tabular-nums text-gray-900">{row.weight ?? 'â€”'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">â€”</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-center text-xs font-medium text-violet-600/75">â€”</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">â€”</td>
+                          <td className="px-4 py-3.5 text-right font-bold tabular-nums text-gray-900">{row.weight ?? 'â€”'}</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">â€”</td>
+                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">â€”</td>
                         </tr>
                       );
                     })}
@@ -210,8 +217,8 @@ const KpiTemplateDetailPage = () => {
                       <td colSpan={5} className="px-4 py-3.5 text-right text-gray-700">
                         Total weight
                       </td>
-                      <td className="px-4 py-3.5 tabular-nums text-gray-900">{totalWeight}%</td>
-                      <td colSpan={2} className="bg-violet-50/50 px-4 py-3.5 text-center text-xs text-violet-700/80">
+                      <td className="px-4 py-3.5 text-right tabular-nums text-gray-900">{totalWeight}%</td>
+                      <td colSpan={2} className="bg-violet-50/50 px-4 py-3.5 text-right text-xs tabular-nums text-violet-700/80">
                         Total score — PM phase
                       </td>
                     </tr>
@@ -231,3 +238,4 @@ const KpiTemplateDetailPage = () => {
 };
 
 export default KpiTemplateDetailPage;
+
