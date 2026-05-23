@@ -62,8 +62,6 @@ const managerReportsChildren: NavItem[] = [
   { label: 'PIP Status', path: '/manager/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
   { label: 'Feedback Completion', path: '/manager/reports/feedback-completion', icon: 'bi-chat-dots', end: true },
   { label: 'Recommendations', path: '/manager/reports/recommendations', icon: 'bi-stars', end: true },
-  { label: 'KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
-  { label: 'Review History', path: '/manager/appraisals/history', icon: 'bi-clipboard-check' },
 ];
 
 export const roleNavigation: Record<UserRole, NavItem[]> = {
@@ -281,7 +279,31 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
-    { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    {
+      label: 'Assessment Review',
+      path: '/manager/assessment-review',
+      icon: 'bi-person-check',
+      permissionField: 'selfAssessmentSign',
+    },
+    {
+      label: 'Team Appraisals',
+      path: '/manager/appraisals',
+      icon: 'bi-clipboard-check',
+      children: [
+        { label: 'Performance Review', path: '/manager/appraisals', icon: 'bi-pencil-square', end: true },
+        { label: 'Review History', path: '/manager/appraisals/history', icon: 'bi-clock-history' },
+      ],
+    },
+    {
+      label: 'Team KPIs',
+      path: '/manager/kpi-scoring',
+      icon: 'bi-bullseye',
+      permissionField: 'kpiInput',
+      children: [
+        { label: 'KPI Scoring', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
+      ],
+    },
     { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
     {
       label: 'Continuous Feedback',
@@ -290,44 +312,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       permissionField: 'continuousFeedbackGive',
     },
     {
-      label: 'KPI Scoring',
-      path: '/manager/kpi-scoring',
-      icon: 'bi-bullseye',
-      permissionField: 'kpiInput',
-    },
-    { label: 'Self-Assessment', path: '/manager/self-assessment', icon: 'bi-pencil-square' },
-    {
-      label: 'Self-Assessment Review',
-      path: '/manager/assessment-review',
-      icon: 'bi-person-check',
-      permissionField: 'selfAssessmentSign',
-    },
-    {
-      label: 'Reports',
-      path: '/manager/reports',
-      icon: 'bi-file-earmark-bar-graph',
-      children: managerReportsChildren,
-    },
-    {
-      label: 'Team Appraisals',
-      path: '/manager/appraisals',
-      icon: 'bi-clipboard-check',
-      children: [
-        { label: 'Employee Performance Review', path: '/manager/appraisals', icon: 'bi-pencil-square', end: true },
-        { label: 'Review History List', path: '/manager/appraisals/history', icon: 'bi-clock-history' },
-      ],
-    },
-    {
-      label: 'KPI Management',
-      path: '/manager/kpi-scoring',
-      icon: 'bi-bullseye',
-      children: [
-        { label: 'Employee KPI Form', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
-        { label: 'Employee KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
-      ],
-    },
-    {
-      label: 'One-on-One',
+      label: 'One-on-One Meetings',
       path: '/one-on-one-meetings',
       icon: 'bi-chat-left-text',
       children: [
@@ -335,16 +320,23 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Action Items', path: '/one-on-one-action-items', icon: 'bi-list-check' },
       ],
     },
-    { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
-      label: 'PIP',
+      label: 'PIP Tracking',
       path: '/pip',
       icon: 'bi-clipboard2-pulse',
       children: [
-        { label: 'Create', path: '/pip/create', icon: 'bi-plus-square' },
+        { label: 'Create PIP', path: '/pip/create', icon: 'bi-plus-square' },
         { label: 'Past Plans', path: '/pip/past-plans', icon: 'bi-clock-history' },
       ],
     },
+    {
+      label: 'Reports',
+      path: '/manager/reports',
+      icon: 'bi-file-earmark-bar-graph',
+      children: managerReportsChildren,
+    },
+    { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
+    { label: 'My Self-Assessment', path: '/manager/self-assessment', icon: 'bi-pencil-square' },
   ],
 
   Executive: [
