@@ -36,9 +36,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    private static final Set<String> ADMIN_ROLES = Set.of(
-            "ADMIN"
-    );
+    private static final Set<String> ADMIN_ROLES = Set.of("ADMIN");
 
     private static final Set<String> HR_ROLES = Set.of(
             "HR",
@@ -70,6 +68,18 @@ public class SecurityConfig {
             "EXECUTIVE"
     );
 
+    private static final Set<String> KPI_EVALUATOR_ROLES = Set.of(
+            "MANAGER",
+            "PROJECT_MANAGER",
+            "TEAM_MANAGER",
+            "DEPARTMENT_HEAD",
+            "DEPARTMENTHEAD",
+            "DEPT_HEAD",
+            "HEAD_OF_DEPARTMENT",
+            "CEO",
+            "EXECUTIVE"
+    );
+
     private static final Set<String> SCORE_TABLE_ROLES = Set.of(
             "HR",
             "HUMAN_RESOURCE",
@@ -80,11 +90,9 @@ public class SecurityConfig {
             "PEOPLE_OPS",
             "TALENT",
             "ADMIN",
-
             "MANAGER",
             "PROJECT_MANAGER",
             "TEAM_MANAGER",
-
             "DEPARTMENT_HEAD",
             "DEPARTMENTHEAD",
             "DEPT_HEAD",
@@ -111,6 +119,15 @@ public class SecurityConfig {
     );
 
     private static final Set<String> EXECUTIVE_DASHBOARDS = Set.of(
+            "EXECUTIVE_DASHBOARD",
+            "CEO_DASHBOARD"
+    );
+
+    private static final Set<String> KPI_EVALUATOR_DASHBOARDS = Set.of(
+            "MANAGER_DASHBOARD",
+            "DEPARTMENT_HEAD_DASHBOARD",
+            "DEPARTMENTHEAD_DASHBOARD",
+            "DEPT_HEAD_DASHBOARD",
             "EXECUTIVE_DASHBOARD",
             "CEO_DASHBOARD"
     );
@@ -143,6 +160,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password/request").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password/reset").permitAll()
 
                         .requestMatchers(
                                 "/api/auth/me",
@@ -172,15 +192,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/departments",
                                 "/api/departments/**",
-                                "/api/employees/active-by-department/**"
+                                "/api/employees/active-by-department/**",
+                                "/api/roles",
+                                "/api/roles/**"
                         ).authenticated()
 
-                        /*
-                         * Employee APIs are protected again at controller level with explicit HR/Admin
-                         * + dashboard fallback checks. Keep the filter-chain requirement here simple so
-                         * HR users who land on the HR dashboard via position-role mapping do not get
-                         * blocked before controller-level auth runs.
-                         */
                         .requestMatchers(
                                 "/api/employees",
                                 "/api/employees/**"
@@ -208,56 +224,6 @@ public class SecurityConfig {
                                 hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )
 
-                        /*.requestMatchers(
-                                "/api/dashboard",
-                                "/api/dashboard/**",
-                                "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**",
-
-                                "/api/assessment-forms",
-                                "/api/assessment-forms/**",
-
-                                "/api/appraisal/templates",
-                                "/api/appraisal/templates/**",
-                                "/api/hr/appraisal/templates",
-                                "/api/hr/appraisal/templates/**",
-                                "/api/appraisal/cycles",
-                                "/api/appraisal/cycles/**",
-                                "/api/hr/appraisal/cycles",
-                                "/api/hr/appraisal/cycles/**",
-                                "/api/hr/appraisal/score-bands",
-                                "/api/hr/appraisal/score-bands/**",
-
-                                "/api/kpis",
-                                "/api/kpis/**",
-                                "/api/kpi-units",
-                                "/api/kpi-units/**",
-                                "/api/kpi-categories",
-                                "/api/kpi-categories/**",
-                                "/api/kpi-items",
-                                "/api/kpi-items/**",
-                                "/api/hr/kpi-templates",
-                                "/api/hr/kpi-templates/**",
-                                "/api/hr/kpi-template-cycles",
-                                "/api/hr/kpi-template-cycles/**",
-
-                                "/api/positions",
-                                "/api/positions/**",
-                                "/api/position-levels",
-                                "/api/position-levels/**",
-
-                                "/api/departments",
-                                "/api/departments/**",
-                                "/api/teams",
-                                "/api/teams/**",
-
-                                "/api/notification-templates",
-                                "/api/notification-templates/**",
-                                "/api/pip-updates",
-                                "/api/pip-updates/**"
-                        ).access((authentication, context) ->
-                                hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
-                        )*/
                         .requestMatchers(
                                 "/api/teams",
                                 "/api/teams/**"
@@ -268,10 +234,8 @@ public class SecurityConfig {
                                 "/api/dashboard/**",
                                 "/api/hr/employee-accounts",
                                 "/api/hr/employee-accounts/**",
-
                                 "/api/assessment-forms",
                                 "/api/assessment-forms/**",
-
                                 "/api/appraisal/templates",
                                 "/api/appraisal/templates/**",
                                 "/api/hr/appraisal/templates",
@@ -282,7 +246,6 @@ public class SecurityConfig {
                                 "/api/hr/appraisal/cycles/**",
                                 "/api/hr/appraisal/score-bands",
                                 "/api/hr/appraisal/score-bands/**",
-
                                 "/api/kpis",
                                 "/api/kpis/**",
                                 "/api/kpi-units",
@@ -293,21 +256,59 @@ public class SecurityConfig {
                                 "/api/kpi-items/**",
                                 "/api/hr/kpi-templates",
                                 "/api/hr/kpi-templates/**",
-
                                 "/api/positions",
                                 "/api/positions/**",
                                 "/api/position-levels",
                                 "/api/position-levels/**",
-
                                 "/api/departments",
                                 "/api/departments/**",
-
                                 "/api/notification-templates",
                                 "/api/notification-templates/**",
                                 "/api/pip-updates",
                                 "/api/pip-updates/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
+                        )
+
+                        .requestMatchers(
+                                "/api/reports",
+                                "/api/reports/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(
+                                        authentication.get(),
+                                        Set.of(
+                                                "HR",
+                                                "ADMIN",
+                                                "MANAGER",
+                                                "PROJECT_MANAGER",
+                                                "TEAM_MANAGER",
+                                                "DEPARTMENT_HEAD",
+                                                "DEPARTMENTHEAD",
+                                                "DEPT_HEAD",
+                                                "HEAD_OF_DEPARTMENT",
+                                                "CEO",
+                                                "EXECUTIVE"
+                                        ),
+                                        Set.of(
+                                                "HR_DASHBOARD",
+                                                "ADMIN_DASHBOARD",
+                                                "MANAGER_DASHBOARD",
+                                                "DEPARTMENT_HEAD_DASHBOARD",
+                                                "DEPARTMENTHEAD_DASHBOARD",
+                                                "DEPT_HEAD_DASHBOARD",
+                                                "EXECUTIVE_DASHBOARD",
+                                                "CEO_DASHBOARD"
+                                        )
+                                )
+                        )
+
+                        .requestMatchers(
+                                "/api/kpi-workflow",
+                                "/api/kpi-workflow/**",
+                                "/api/manager/kpi-workflow",
+                                "/api/manager/kpi-workflow/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), KPI_EVALUATOR_ROLES, KPI_EVALUATOR_DASHBOARDS)
                         )
 
                         .requestMatchers(

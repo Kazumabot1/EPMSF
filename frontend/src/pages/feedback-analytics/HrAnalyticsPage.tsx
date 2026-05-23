@@ -25,6 +25,17 @@ const ANALYTICS_COLUMNS: Array<{ key: AnalyticsColumn; label: string }> = [
 
 const DEFAULT_ANALYTICS_COLUMNS: AnalyticsColumn[] = ['employee', 'score', 'confidence', 'completion', 'responses', 'breakdown', 'publish', 'summarized'];
 
+const DEFAULT_PUBLISH_PAYLOAD = {
+    scope: 'ALL_READY' as const,
+    includeOverallScore: true,
+    includeCompetencyBreakdown: true,
+    includeSelfVsOthers: true,
+    includeComments: false,
+    includeScoreExplanation: true,
+    notifyEmployees: true,
+};
+
+
 const formatScore = (value?: number | null) => (value == null ? '—' : `${value.toFixed(1)}%`);
 
 const formatDate = (value: string) =>
@@ -188,7 +199,7 @@ const HrAnalyticsPage = () => {
         setActionError('');
         try {
             if (action === 'publish') {
-                await feedbackAnalyticsApi.publishCampaignSummary(campaignId);
+                await feedbackAnalyticsApi.publishCampaignSummary(campaignId, DEFAULT_PUBLISH_PAYLOAD);
                 setActionMessage('Summary published. Target employees can now view their feedback results.');
             } else {
                 await feedbackAnalyticsApi.unpublishCampaignSummary(campaignId);

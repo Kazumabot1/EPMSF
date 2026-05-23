@@ -14,4 +14,6 @@ public class FinalizeDepartmentKpiRequest {
 
     @NotNull
     private Integer kpiFormId;
+
+    private Integer cyclePeriodId;
 }

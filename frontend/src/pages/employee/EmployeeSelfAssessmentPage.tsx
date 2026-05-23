@@ -536,8 +536,6 @@ const EmployeeSelfAssessmentPage = () => {
   const isLocked = LOCKED.includes(assessment.status);
   const step = stepIdx(assessment.status);
   const banner = BANNERS[assessment.status];
-  const items = flat(assessment);
-
   return (
     <div className="ess-page">
       <div className="ess-toast-stack">

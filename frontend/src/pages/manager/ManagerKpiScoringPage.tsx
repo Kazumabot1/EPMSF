@@ -21,6 +21,9 @@ const sortTemplateSummaries = (rows: ManagerKpiTemplateSummary[]) =>
     return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
   });
 
+const summaryKey = (summary: Pick<ManagerKpiTemplateSummary, 'kpiFormId' | 'cyclePeriodId'>) =>
+  `${summary.kpiFormId}:${summary.cyclePeriodId ?? 'legacy'}`;
+
 function lineEffectivelyScored(
   line: ManagerKpiAssignment['lines'][number],
   draftRaw: string | undefined,
@@ -35,7 +38,7 @@ function lineEffectivelyScored(
 
 const ManagerKpiScoringPage = () => {
   const [summaries, setSummaries] = useState<ManagerKpiTemplateSummary[]>([]);
-  const [selectedFormId, setSelectedFormId] = useState<number | ''>('');
+  const [selectedSummaryKey, setSelectedSummaryKey] = useState('');
   const [assignments, setAssignments] = useState<ManagerKpiAssignment[]>([]);
   const [drafts, setDrafts] = useState<DraftScores>({});
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -52,9 +55,9 @@ const ManagerKpiScoringPage = () => {
       setLoadingMeta(true);
       const data = sortTemplateSummaries(await kpiWorkflowService.listManagerTemplates());
       setSummaries(data);
-      setSelectedFormId((prev) => {
+      setSelectedSummaryKey((prev) => {
         if (prev !== '') return prev;
-        return data.length ? data[0].kpiFormId : '';
+        return data.length ? summaryKey(data[0]) : '';
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load KPI list.');
@@ -67,10 +70,10 @@ const ManagerKpiScoringPage = () => {
     void loadSummaries();
   }, [loadSummaries]);
 
-  const loadAssignments = useCallback(async (kpiFormId: number) => {
+  const loadAssignments = useCallback(async (summary: ManagerKpiTemplateSummary) => {
     try {
       setLoadingAssignments(true);
-      const data = await kpiWorkflowService.listAssignments(kpiFormId);
+      const data = await kpiWorkflowService.listAssignments(summary.kpiFormId, summary.cyclePeriodId);
       setAssignments(data);
       const nextDrafts: DraftScores = {};
       for (const row of data) {
@@ -89,13 +92,14 @@ const ManagerKpiScoringPage = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedFormId === '') return;
-    void loadAssignments(selectedFormId);
-  }, [selectedFormId, loadAssignments]);
+    const summary = summaries.find((s) => summaryKey(s) === selectedSummaryKey);
+    if (!summary) return;
+    void loadAssignments(summary);
+  }, [selectedSummaryKey, summaries, loadAssignments]);
 
   const selectedSummary = useMemo(
-    () => summaries.find((s) => s.kpiFormId === selectedFormId),
-    [summaries, selectedFormId],
+    () => summaries.find((s) => summaryKey(s) === selectedSummaryKey),
+    [summaries, selectedSummaryKey],
   );
 
   const assignmentsByPosition = useMemo(() => {
@@ -156,7 +160,7 @@ const ManagerKpiScoringPage = () => {
   };
 
   const finalize = async () => {
-    if (selectedFormId === '') return;
+    if (!selectedSummary) return;
     const endLabel = formatIsoDate(selectedSummary?.periodEndDate ?? undefined);
     const earlyNote =
       endLabel && selectedSummary?.periodEndDate
@@ -171,10 +175,10 @@ const ManagerKpiScoringPage = () => {
     }
     try {
       setFinalizing(true);
-      const result = await kpiWorkflowService.finalizeDepartment(selectedFormId);
+      const result = await kpiWorkflowService.finalizeDepartment(selectedSummary.kpiFormId, selectedSummary.cyclePeriodId);
       toast.success(`Finalized ${result.assignmentsCreated} employee record(s).`);
       await loadSummaries();
-      await loadAssignments(selectedFormId);
+      await loadAssignments(selectedSummary);
       setModalAssignment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Finalize failed.');
@@ -261,13 +265,13 @@ const ManagerKpiScoringPage = () => {
             letterSpacing: '.05em',
           }}
         >
-          <i className="bi bi-clipboard-data" /> Manager
+          <i className="bi bi-clipboard-data" /> KPI Management
         </span>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>Team KPI scoring</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>KPI scoring</h1>
         <p style={{ color: '#64748b', margin: 0, maxWidth: '640px' }}>
-          Click an employee name to enter <strong>actual</strong> results and save. Achievement % is (actual ÷ target) × 100.
-          When every KPI line is scored for each employee, use <strong>Finalize department KPI</strong> to lock scores, notify
-          your team, alert HR (sidebar notifications), and publish rows under HR → Employee KPI.
+          Click an employee name to enter <strong>actual</strong> results and save. Achievement % is (actual / target) x 100.
+          When every KPI line is scored for each person in your evaluator scope, use <strong>Finalize KPI</strong> to lock scores,
+          notify score targets, alert HR, and publish rows under HR - Employee KPI.
         </p>
       </header>
 
@@ -295,15 +299,16 @@ const ManagerKpiScoringPage = () => {
               fontSize: '.9rem',
             }}
             disabled={loadingMeta || summaries.length === 0}
-            value={selectedFormId === '' ? '' : String(selectedFormId)}
-            onChange={(e) => setSelectedFormId(e.target.value === '' ? '' : Number(e.target.value))}
+            value={selectedSummaryKey}
+            onChange={(e) => setSelectedSummaryKey(e.target.value)}
           >
             {summaries.length === 0 ? (
               <option value="">No KPI assignments yet</option>
             ) : (
               summaries.map((s) => (
-                <option key={s.kpiFormId} value={s.kpiFormId}>
+                <option key={summaryKey(s)} value={summaryKey(s)}>
                   {s.title}
+                  {s.periodStartDate ? ` - ${formatIsoDate(s.periodStartDate)}` : ''}
                   {s.openAssignments > 0 ? ` (${s.openAssignments} open)` : ' (complete)'}
                 </option>
               ))
@@ -313,7 +318,7 @@ const ManagerKpiScoringPage = () => {
         <button
           type="button"
           disabled={
-            selectedFormId === '' ||
+            selectedSummaryKey === '' ||
             finalizing ||
             !selectedSummary ||
             selectedSummary.openAssignments === 0
@@ -332,7 +337,7 @@ const ManagerKpiScoringPage = () => {
             opacity: selectedSummary && selectedSummary.openAssignments > 0 ? 1 : 0.7,
           }}
         >
-          {finalizing ? 'Finalizing…' : 'Finalize department KPI'}
+          {finalizing ? 'Finalizing...' : 'Finalize KPI'}
         </button>
       </div>
 
@@ -351,7 +356,7 @@ const ManagerKpiScoringPage = () => {
           <strong style={{ color: '#334155' }}>Scoring period</strong>
           {periodStartLabel && periodEndLabel ? (
             <>
-              : {periodStartLabel} – {periodEndLabel}. You can finalize before the end date once all lines are complete.
+              : {periodStartLabel} - {periodEndLabel}. You can finalize before the end date once all lines are complete.
             </>
           ) : periodEndLabel ? (
             <>
@@ -364,10 +369,10 @@ const ManagerKpiScoringPage = () => {
       )}
 
       {loadingAssignments && (
-        <p style={{ color: '#64748b', fontSize: '.9rem' }}>Loading assignments…</p>
+        <p style={{ color: '#64748b', fontSize: '.9rem' }}>Loading assignments...</p>
       )}
 
-      {!loadingAssignments && selectedFormId !== '' && assignments.length > 0 && (
+      {!loadingAssignments && selectedSummaryKey !== '' && assignments.length > 0 && (
         <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#fff' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem' }}>
             <thead>
@@ -488,8 +493,8 @@ const ManagerKpiScoringPage = () => {
         </div>
       )}
 
-      {!loadingAssignments && selectedFormId !== '' && assignments.length === 0 && (
-        <p style={{ color: '#64748b' }}>No assignments for this template in your department.</p>
+      {!loadingAssignments && selectedSummaryKey !== '' && assignments.length === 0 && (
+        <p style={{ color: '#64748b' }}>No assignments for this template in your KPI evaluator scope.</p>
       )}
 
       <ManagerEmployeeKpiScoreModal

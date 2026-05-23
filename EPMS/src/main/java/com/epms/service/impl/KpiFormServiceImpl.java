@@ -11,6 +11,7 @@ import com.epms.dto.KpiVersionRowSnapshotDTO;
 import com.epms.dto.PositionResponseDto;
 import com.epms.entity.*;
 import com.epms.entity.enums.KpiChangeType;
+import com.epms.entity.enums.EmployeeKpiStatus;
 import com.epms.entity.enums.KpiFormStatus;
 import com.epms.entity.enums.KpiVersionRowStatus;
 import com.epms.repository.*;
@@ -29,7 +30,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,6 +54,7 @@ public class KpiFormServiceImpl implements KpiFormService {
     private final KpiUnitRepository kpiUnitRepository;
     private final KpiItemRepository kpiItemRepository;
     private final KpiFormItemRepository kpiFormItemRepository;
+    private final EmployeeKpiFormRepository employeeKpiFormRepository;
     private final UserRepository userRepository;
     private final KpiVersionHistoryRepository kpiVersionHistoryRepository;
     private final KpiTemplateVersionRowRepository kpiTemplateVersionRowRepository;
@@ -158,7 +162,9 @@ public class KpiFormServiceImpl implements KpiFormService {
         }
         syncItems(form, dto.getItems());
 
-        kpiFormRepository.save(form);
+        kpiFormRepository.saveAndFlush(form);
+        KpiForm persistedForm = kpiFormRepository.findDetailWithItemsById(id).orElse(form);
+        backfillMissingEmployeeScores(persistedForm);
         if (rowDiff.hasChanges()) {
             recordVersionCollection(form, rowDiff, dto.getItems(), editor, versionNumber);
         }
@@ -1159,6 +1165,49 @@ public class KpiFormServiceImpl implements KpiFormService {
                 form.addItem(entity);
             }
             applyItemFields(entity, row, i);
+        }
+    }
+
+    private void backfillMissingEmployeeScores(KpiForm form) {
+        if (form.getId() == null || form.getItems() == null || form.getItems().isEmpty()) {
+            return;
+        }
+
+        List<KpiFormItem> currentItems = form.getItems().stream()
+                .filter(item -> item.getId() != null)
+                .toList();
+        if (currentItems.isEmpty()) {
+            return;
+        }
+
+        List<EmployeeKpiForm> assignments = employeeKpiFormRepository.findNonFinalizedByKpiFormIdWithScores(
+                form.getId(),
+                EmployeeKpiStatus.FINALIZED
+        );
+
+        for (EmployeeKpiForm assignment : assignments) {
+            if (assignment.getScores() == null) {
+                assignment.setScores(new LinkedHashSet<>());
+            }
+
+            Set<Integer> existingItemIds = assignment.getScores().stream()
+                    .filter(score -> score.getKpiFormItem() != null && score.getKpiFormItem().getId() != null)
+                    .map(score -> score.getKpiFormItem().getId())
+                    .collect(Collectors.toCollection(HashSet::new));
+
+            boolean changed = false;
+            for (KpiFormItem item : currentItems) {
+                if (existingItemIds.add(item.getId())) {
+                    assignment.addScore(EmployeeKpiScore.builder()
+                            .kpiFormItem(item)
+                            .build());
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                employeeKpiFormRepository.save(assignment);
+            }
         }
     }
 

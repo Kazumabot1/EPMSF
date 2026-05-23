@@ -1,19 +1,51 @@
 import { isAxiosError } from 'axios';
 import api from './api';
 
-export type DepartmentHeadDashboardData = {
-  department?: any | null;
-  departmentId?: number | null;
-  departmentName?: string | null;
-  totalEmployees?: number;
-  activeEmployees?: number;
-  totalTeams?: number;
-  activeTeams?: number;
-  employees?: any[];
-  teams?: any[];
-  recentActivities?: any[];
-  warnings?: string[];
-  [key: string]: any;
+export type DepartmentHeadEmployee = {
+  id?: number;
+  userId?: number;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  positionTitle?: string;
+  positionName?: string;
+  active?: boolean;
+  currentDepartmentId?: number | null;
+  currentDepartment?: string | null;
+  parentDepartmentId?: number | null;
+  parentDepartment?: string | null;
+  workingDepartmentId?: number | null;
+  workingDepartment?: string | null;
+  [key: string]: unknown;
+};
+
+export type DepartmentHeadTeamMember = {
+  userId?: number;
+  employeeId?: number;
+  userName?: string;
+  employeeName?: string;
+  startedDate?: string | null;
+  [key: string]: unknown;
+};
+
+export type DepartmentHeadTeam = {
+  id: number;
+  teamName?: string;
+  departmentId?: number;
+  departmentName?: string;
+  teamLeaderId?: number;
+  teamLeaderName?: string;
+  projectManagerId?: number | null;
+  projectManagerName?: string | null;
+  projectManagerTeams?: string | null;
+  createdById?: number;
+  createdByName?: string;
+  createdDate?: string | null;
+  status?: string;
+  teamGoal?: string;
+  members?: DepartmentHeadTeamMember[];
+  [key: string]: unknown;
 };
 
 export type DepartmentHeadCandidate = {
@@ -28,29 +60,70 @@ export type DepartmentHeadCandidate = {
   positionName?: string;
   positionTitle?: string;
   available?: boolean;
+  isAvailable?: boolean;
   currentTeamId?: number | null;
   currentTeamName?: string | null;
   currentTeamNames?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
-export type DepartmentHeadTeam = {
-  id?: number;
-  teamName?: string;
-  departmentId?: number;
-  departmentName?: string;
-  teamLeaderId?: number;
-  teamLeaderName?: string;
+export type DepartmentHeadDashboardData = {
+  department?: unknown | null;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  departmentCode?: string | null;
+  headEmployee?: string | null;
+  status?: boolean | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+  employeeCount?: number;
+  totalEmployees?: number;
+  activeEmployees?: number;
+  currentDepartmentEmployeeCount?: number;
+  parentDepartmentEmployeeCount?: number;
+  teamCount?: number;
+  totalTeams?: number;
+  activeTeamCount?: number;
+  activeTeams?: number;
+  inactiveTeamCount?: number;
+  employees?: DepartmentHeadEmployee[];
+  teams?: DepartmentHeadTeam[];
+  recentActivities?: unknown[];
+  warnings?: string[];
+  [key: string]: unknown;
+};
+
+export type CandidateUser = DepartmentHeadCandidate;
+export type TeamResponse = DepartmentHeadTeam;
+export type EmployeeResponse = DepartmentHeadEmployee;
+
+export type DepartmentHeadTeamPayload = {
+  teamName: string;
+  teamLeaderId: number;
   projectManagerId?: number | null;
-  projectManagerName?: string | null;
+  teamGoal?: string;
   status?: string;
-  members?: any[];
-  [key: string]: any;
+  reason?: string;
+  memberUserIds?: number[];
+  memberEmployeeIds?: number[];
 };
 
-const unwrap = <T,>(payload: any, fallback: T): T => {
-  if (payload?.data?.data !== undefined) return payload.data.data as T;
-  if (payload?.data !== undefined) return payload.data as T;
+const unwrap = <T,>(payload: unknown, fallback: T): T => {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'data' in payload &&
+    (payload as { data?: unknown }).data &&
+    typeof (payload as { data?: unknown }).data === 'object' &&
+    'data' in ((payload as { data?: unknown }).data as Record<string, unknown>)
+  ) {
+    return ((payload as { data: { data: T } }).data.data ?? fallback) as T;
+  }
+
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return ((payload as { data?: T }).data ?? fallback) as T;
+  }
+
   return fallback;
 };
 
@@ -80,10 +153,16 @@ const emptyDashboard = (warning?: string): DepartmentHeadDashboardData => ({
   department: null,
   departmentId: null,
   departmentName: '',
+  employeeCount: 0,
   totalEmployees: 0,
   activeEmployees: 0,
+  currentDepartmentEmployeeCount: 0,
+  parentDepartmentEmployeeCount: 0,
+  teamCount: 0,
   totalTeams: 0,
+  activeTeamCount: 0,
   activeTeams: 0,
+  inactiveTeamCount: 0,
   employees: [],
   teams: [],
   recentActivities: [],
@@ -159,23 +238,25 @@ export const fetchDepartmentHeadCandidateProjectManagers = async (): Promise<
   }
 };
 
-export const createDepartmentHeadTeam = async (payload: any): Promise<DepartmentHeadTeam> => {
+export const createDepartmentHeadTeam = async (
+  payload: DepartmentHeadTeamPayload,
+): Promise<DepartmentHeadTeam> => {
   const response = await api.post('/department-head/teams', payload);
-  return unwrap<DepartmentHeadTeam>(response, {});
+  return unwrap<DepartmentHeadTeam>(response, {} as DepartmentHeadTeam);
 };
 
 export const updateDepartmentHeadTeam = async (
   teamId: number,
-  payload: any,
+  payload: DepartmentHeadTeamPayload,
 ): Promise<DepartmentHeadTeam> => {
   const response = await api.put(`/department-head/teams/${teamId}`, payload);
-  return unwrap<DepartmentHeadTeam>(response, {});
+  return unwrap<DepartmentHeadTeam>(response, {} as DepartmentHeadTeam);
 };
 
-export const fetchDepartmentHeadTeamHistory = async (teamId: number): Promise<any[]> => {
+export const fetchDepartmentHeadTeamHistory = async (teamId: number): Promise<unknown[]> => {
   try {
     const response = await api.get(`/department-head/teams/${teamId}/history`);
-    const data = unwrap<any[]>(response, []);
+    const data = unwrap<unknown[]>(response, []);
     return Array.isArray(data) ? data : [];
   } catch (error) {
     if (is422(error)) return [];

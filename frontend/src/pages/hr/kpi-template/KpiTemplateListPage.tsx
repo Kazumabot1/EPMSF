@@ -31,7 +31,7 @@ const KpiTemplateListPage = () => {
         const cycles = await kpiTemplateCycleService.list();
         setActiveCycleTemplateIds(new Set(
           cycles
-            .filter((cycle) => cycle.status === 'ACTIVE')
+            .filter((cycle) => cycle.status === 'ACTIVE' || cycle.status === 'CLOSING')
             .flatMap((cycle) => cycle.kpiForms.map((form) => form.id)),
         ));
       } catch {

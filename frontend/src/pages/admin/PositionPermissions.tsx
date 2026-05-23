@@ -419,7 +419,7 @@ const PositionPermissions = () => {
             {!selectedPosition ? (
               <div className="position-state">Select a position to manage permissions.</div>
             ) : !selectedPosition.roleName ? (
-              <div className="position-alert error">This position is not connected to a role yet. Edit/create the position with HR, ADMIN, CEO, EMPLOYEE, DEPARTMENTHEAD, or MANAGER first.</div>
+              <div className="position-alert error">This position is not connected to a dashboard role yet. Edit the position and choose a Dashboard Role first.</div>
             ) : (
               <>
                 <div className="position-detail-summary" style={{ marginBottom: 20 }}>

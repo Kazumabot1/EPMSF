@@ -17,7 +17,9 @@ import java.util.List;
 public class EmployeeKpiResultDto {
     private Integer employeeKpiFormId;
     private Integer kpiFormId;
+    private Integer cyclePeriodId;
     private String kpiTitle;
+    private String positionTitle;
     private EmployeeKpiStatus status;
     private Double totalScore;
     private Double totalWeightedScore;

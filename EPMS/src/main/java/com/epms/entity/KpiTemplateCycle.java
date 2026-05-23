@@ -53,6 +53,15 @@ public class KpiTemplateCycle {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "closing_requested_at")
+    private LocalDateTime closingRequestedAt;
+
+    @Column(name = "grace_ends_at")
+    private LocalDateTime graceEndsAt;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
     @Builder.Default
     @OneToMany(mappedBy = "cycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude

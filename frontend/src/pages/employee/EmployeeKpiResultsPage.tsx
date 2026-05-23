@@ -70,6 +70,11 @@ const EmployeeKpiResultsPage = () => {
             <header style={{ marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#1e293b' }}>{r.kpiTitle}</h2>
               <p style={{ margin: '.4rem 0 0', fontSize: '.82rem', color: '#64748b' }}>
+                {r.positionTitle && (
+                  <>
+                    Position: <strong style={{ color: '#0f172a' }}>{r.positionTitle}</strong> Â·{' '}
+                  </>
+                )}
                 Finalized {formatWhen(r.finalizedAt)}
                 {r.totalScore != null && (
                   <>

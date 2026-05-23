@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import './ceo-dashboard.css';
 
 interface AppraisalReview {
   id: number;
@@ -166,6 +167,7 @@ const CeoDashboard = () => {
 
   return (
     <div
+      className="executive-fluxen-dashboard"
       style={{
         padding: '2rem',
         maxWidth: '1200px',
@@ -208,77 +210,6 @@ const CeoDashboard = () => {
           Executive view of appraisal reports, performance summaries, and organization-level reporting.
         </p>
       </div>
-
-      <Link
-        to="/executive/reports"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr auto',
-          alignItems: 'center',
-          gap: '1rem',
-          textDecoration: 'none',
-          background: 'linear-gradient(135deg,#faf5ff 0%,#eef2ff 100%)',
-          border: '1px solid #ddd6fe',
-          borderRadius: 22,
-          padding: '1.25rem',
-          marginBottom: '1.5rem',
-          boxShadow: '0 18px 40px rgba(124, 58, 237, 0.12)',
-        }}
-      >
-        <span
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 18,
-            display: 'grid',
-            placeItems: 'center',
-            background: '#7c3aed',
-            color: '#fff',
-            fontSize: 25,
-            flexShrink: 0,
-          }}
-        >
-          <i className="bi bi-file-earmark-bar-graph" />
-        </span>
-
-        <span>
-          <strong
-            style={{
-              display: 'block',
-              color: '#3b0764',
-              fontSize: '1.08rem',
-              fontWeight: 900,
-            }}
-          >
-            Organization Performance Reports
-          </strong>
-
-          <small
-            style={{
-              display: 'block',
-              color: '#64748b',
-              fontWeight: 650,
-              marginTop: 4,
-              lineHeight: 1.55,
-            }}
-          >
-            Open executive reporting for employee performance, department comparison,
-            feedback participation, PIP status, and performance recommendations.
-          </small>
-        </span>
-
-        <span
-          style={{
-            color: '#7c3aed',
-            fontWeight: 900,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          Open Reports <i className="bi bi-arrow-right" />
-        </span>
-      </Link>
 
       <div
         style={{

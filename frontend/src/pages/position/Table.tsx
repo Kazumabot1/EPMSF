@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { positionService } from '../../services/positionService';
+import api from '../../services/api';
 import type { PositionDetailResponse, PositionEmployeeUsage, PositionLevelResponse, PositionResponse } from '../../types/position';
 import './position-ui.css';
+
+type DashboardRoleOption = {
+  id: number;
+  name: string;
+  label: string;
+  dashboard: string;
+};
 
 type EditFormState = {
   id: number;
   positionTitle: string;
   levelId: string;
+  roleId: string;
   description: string;
   status: boolean;
   reason: string;
@@ -35,11 +44,20 @@ const statusText = (value?: string | null) => {
   return value;
 };
 
+const unwrap = <T,>(payload: any, fallback: T): T => {
+  if (payload?.data?.data !== undefined) return payload.data.data as T;
+  if (payload?.data !== undefined) return payload.data as T;
+  return fallback;
+};
+
 const PositionTable = () => {
   const [positions, setPositions] = useState<PositionResponse[]>([]);
   const [levels, setLevels] = useState<PositionLevelResponse[]>([]);
+  const [roles, setRoles] = useState<DashboardRoleOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [rolesLoading, setRolesLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rolesError, setRolesError] = useState('');
   const [query, setQuery] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -78,9 +96,30 @@ const PositionTable = () => {
     }
   };
 
+  const loadDashboardRoles = async () => {
+    try {
+      setRolesLoading(true);
+      setRolesError('');
+      const response = await api.get('/positions/dashboard-roles');
+      const data = unwrap<DashboardRoleOption[]>(response, []);
+      setRoles(Array.isArray(data) ? data : []);
+    } catch (roleError: any) {
+      const message =
+        roleError?.response?.data?.message ||
+        roleError?.response?.data?.error ||
+        roleError?.message ||
+        'Failed to load dashboard roles.';
+      setRolesError(message);
+      setRoles([]);
+    } finally {
+      setRolesLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadPositions();
     void loadLevels();
+    void loadDashboardRoles();
   }, []);
 
   const filteredPositions = useMemo(() => {
@@ -88,7 +127,7 @@ const PositionTable = () => {
     if (!q) return positions;
 
     return positions.filter((position) =>
-      [position.positionTitle, position.levelCode, position.description, position.createdBy]
+      [position.positionTitle, position.levelCode, position.roleName, position.description, position.createdBy]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q)),
     );
@@ -107,6 +146,7 @@ const PositionTable = () => {
       id: position.id,
       positionTitle: position.positionTitle || '',
       levelId: String(position.levelId || ''),
+      roleId: String(position.roleId || ''),
       description: position.description || '',
       status: position.status !== false,
       reason: '',
@@ -155,6 +195,7 @@ const PositionTable = () => {
     return (
       editForm.positionTitle.trim() !== (originalPosition.positionTitle || '') ||
       Number(editForm.levelId) !== originalPosition.levelId ||
+      Number(editForm.roleId) !== originalPosition.roleId ||
       editForm.description.trim() !== (originalPosition.description || '') ||
       editForm.status !== (originalPosition.status !== false)
     );
@@ -165,6 +206,12 @@ const PositionTable = () => {
     if (editForm.positionTitle.trim().length === 0) return 'Position title is required.';
     if (editForm.levelId.trim().length === 0 || Number.isNaN(Number(editForm.levelId))) {
       return 'Position level is required.';
+    }
+    if (editForm.roleId.trim().length === 0 || Number.isNaN(Number(editForm.roleId))) {
+      return 'Dashboard role is required.';
+    }
+    if (!roles.some((role) => role.id === Number(editForm.roleId))) {
+      return 'Selected dashboard role is no longer available. Please choose again.';
     }
     if (!hasChanges()) return 'No changes detected.';
     if (editForm.reason.trim().length === 0) return 'Reason is required for edit or deactivate.';
@@ -191,6 +238,7 @@ const PositionTable = () => {
       await positionService.updatePosition(editForm.id, {
         positionTitle: editForm.positionTitle.trim(),
         levelId: Number(editForm.levelId),
+        roleId: Number(editForm.roleId),
         description: editForm.description.trim(),
         status: editForm.status,
         reason: editForm.reason.trim(),
@@ -259,6 +307,7 @@ const PositionTable = () => {
                     <th>ID</th>
                     <th>Position Title</th>
                     <th>Level Code</th>
+                    <th>Dashboard Role</th>
                     <th>Status</th>
                     <th>Description</th>
                     <th>Created By</th>
@@ -274,6 +323,7 @@ const PositionTable = () => {
                         <strong>{position.positionTitle}</strong>
                       </td>
                       <td>{position.levelCode || '-'}</td>
+                      <td>{position.roleName || 'No role linked'}</td>
                       <td>
                         <span className={`position-pill ${position.status ? 'active' : 'inactive'}`}>
                           {position.status ? 'Active' : 'Inactive'}
@@ -364,6 +414,33 @@ const PositionTable = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="position-field">
+                  <label htmlFor="editRoleId">
+                    Dashboard Role <span className="position-required">*</span>
+                  </label>
+                  <select
+                    id="editRoleId"
+                    className="position-select"
+                    value={editForm.roleId}
+                    disabled={rolesLoading || roles.length === 0}
+                    onChange={(event) => setEditForm((prev) => (prev ? { ...prev, roleId: event.target.value } : prev))}
+                  >
+                    <option value="">
+                      {rolesLoading
+                        ? 'Loading dashboard roles...'
+                        : roles.length === 0
+                          ? 'No dashboard roles available'
+                          : 'Select dashboard role'}
+                    </option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                  {rolesError && <div className="position-alert error">{rolesError}</div>}
                 </div>
               </div>
 
@@ -499,6 +576,10 @@ const PositionTable = () => {
                   <div>
                     <span>Status</span>
                     <strong>{details.status ? 'Active' : 'Inactive'}</strong>
+                  </div>
+                  <div>
+                    <span>Dashboard role</span>
+                    <strong>{details.roleName || 'No role linked'}</strong>
                   </div>
                   <div>
                     <span>Created by</span>
