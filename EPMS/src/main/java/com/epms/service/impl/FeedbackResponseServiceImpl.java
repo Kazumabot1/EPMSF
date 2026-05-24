@@ -63,6 +63,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private static final String RESPONSE_YES_NO = "YES_NO";
     private static final String SCORING_SCORED = "SCORED";
     private static final int MIN_REQUIRED_COMMENT_LENGTH = 10;
+    private static final int MAX_REQUIRED_COMMENT_LENGTH = 1000;
 
     private final FeedbackResponseRepository responseRepository;
     private final FeedbackSummaryRepository feedbackSummaryRepository;
@@ -515,11 +516,18 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
                         "Rating for question " + assignmentQuestion.getQuestionCode() + " must be between 1 and " + formatScore(maxRating) + "."
                 );
             }
+            int commentLength = normalizedCommentLength(item.getComment());
             if (requireAnswersForRequiredQuestions && Boolean.TRUE.equals(assignmentQuestion.getRequired())
-                    && normalizedCommentLength(item.getComment()) < MIN_REQUIRED_COMMENT_LENGTH) {
+                    && commentLength < MIN_REQUIRED_COMMENT_LENGTH) {
                 throw new BusinessValidationException(
                         "A supporting comment of at least " + MIN_REQUIRED_COMMENT_LENGTH + " characters is required for question "
                                 + assignmentQuestion.getQuestionCode() + "."
+                );
+            }
+            if (commentLength > MAX_REQUIRED_COMMENT_LENGTH) {
+                throw new BusinessValidationException(
+                        "Comment for question " + assignmentQuestion.getQuestionCode() + " must be "
+                                + MAX_REQUIRED_COMMENT_LENGTH + " characters or fewer."
                 );
             }
         }
@@ -530,7 +538,10 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             return false;
         }
         if (isRatingResponseType(question.getResponseType())) {
-            return item.getRatingValue() != null && normalizedCommentLength(item.getComment()) >= MIN_REQUIRED_COMMENT_LENGTH;
+            int commentLength = normalizedCommentLength(item.getComment());
+            return item.getRatingValue() != null
+                    && commentLength >= MIN_REQUIRED_COMMENT_LENGTH
+                    && commentLength <= MAX_REQUIRED_COMMENT_LENGTH;
         }
         return !isBlank(item.getComment());
     }

@@ -237,7 +237,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
-    { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'Self-Assessment', path: '/department-head/self-assessment', icon: 'bi-pencil-square' },
     {
       label: 'Continuous Feedback',

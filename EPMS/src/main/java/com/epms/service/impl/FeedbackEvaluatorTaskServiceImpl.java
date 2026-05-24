@@ -44,6 +44,8 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskService {
 
+    private static final int MIN_REQUIRED_COMMENT_LENGTH = 10;
+
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackResponseRepository feedbackResponseRepository;
     private final UserRepository userRepository;
@@ -53,7 +55,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
     private final FeedbackQuestionResolverService questionResolverService;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<FeedbackEvaluatorTaskResponse> getMyTasks(Long userId) {
         Long evaluatorEmployeeId = resolveEmployeeIdForUser(userId);
         List<FeedbackEvaluatorAssignment> assignments = assignmentRepository.findByEvaluatorEmployeeId(evaluatorEmployeeId);
@@ -71,6 +73,21 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                         .thenComparing(FeedbackEvaluatorAssignment::getId))
                 .map(assignment -> {
                     FeedbackResponse response = assignment.getResponse();
+                    List<FeedbackAssignmentQuestion> questions = questionResolverService.findOrCreateAssignmentQuestions(assignment);
+                    Map<Long, FeedbackResponseItem> existingItems = mapExistingItemsByAssignmentQuestion(response, questions);
+                    int totalQuestionCount = questions.size();
+                    int requiredQuestionCount = (int) questions.stream()
+                            .filter(question -> Boolean.TRUE.equals(question.getRequired()))
+                            .count();
+                    int answeredQuestionCount = (int) existingItems.values().stream()
+                            .filter(item -> item.getRatingValue() != null)
+                            .count();
+                    int answeredRequiredQuestionCount = countCompleteRequiredQuestions(questions, existingItems);
+                    int completionPercent = calculateCompletionPercent(requiredQuestionCount, answeredRequiredQuestionCount);
+                    boolean submittedLocked = response != null && response.getSubmittedAt() != null;
+                    boolean finalSubmissionReady = !submittedLocked
+                            && canSubmit(assignment, response)
+                            && answeredRequiredQuestionCount >= requiredQuestionCount;
                     Long targetEmployeeId = assignment.getFeedbackRequest().getTargetEmployeeId();
                     return FeedbackEvaluatorTaskResponse.builder()
                             .assignmentId(assignment.getId())
@@ -89,6 +106,12 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                             .autoSubmitNotice(autoSubmitNotice(assignment))
                             .dueAt(resolveEffectiveDeadline(assignment))
                             .submittedAt(response != null ? response.getSubmittedAt() : null)
+                            .totalQuestionCount(totalQuestionCount)
+                            .requiredQuestionCount(requiredQuestionCount)
+                            .answeredQuestionCount(answeredQuestionCount)
+                            .answeredRequiredQuestionCount(answeredRequiredQuestionCount)
+                            .completionPercent(completionPercent)
+                            .finalSubmissionReady(finalSubmissionReady)
                             .build();
                 })
                 .toList();
@@ -118,16 +141,8 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         int answeredQuestionCount = (int) existingItems.values().stream()
                 .filter(item -> item.getRatingValue() != null)
                 .count();
-        int answeredRequiredQuestionCount = (int) questions.stream()
-                .filter(question -> Boolean.TRUE.equals(question.getRequired()))
-                .filter(question -> {
-                    FeedbackResponseItem item = existingItems.get(question.getId());
-                    return item != null && item.getRatingValue() != null;
-                })
-                .count();
-        int completionPercent = requiredQuestionCount == 0
-                ? 100
-                : Math.min(100, Math.round((answeredRequiredQuestionCount * 100.0f) / requiredQuestionCount));
+        int answeredRequiredQuestionCount = countCompleteRequiredQuestions(questions, existingItems);
+        int completionPercent = calculateCompletionPercent(requiredQuestionCount, answeredRequiredQuestionCount);
         boolean submittedLocked = response != null && response.getSubmittedAt() != null;
         boolean finalSubmissionReady = !submittedLocked
                 && canSubmit(assignment, response)
@@ -226,6 +241,31 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
             }
         }
         return null;
+    }
+
+    private int countCompleteRequiredQuestions(
+            List<FeedbackAssignmentQuestion> questions,
+            Map<Long, FeedbackResponseItem> existingItems
+    ) {
+        return (int) questions.stream()
+                .filter(question -> Boolean.TRUE.equals(question.getRequired()))
+                .filter(question -> {
+                    FeedbackResponseItem item = existingItems.get(question.getId());
+                    return item != null
+                            && item.getRatingValue() != null
+                            && normalizedCommentLength(item.getComment()) >= MIN_REQUIRED_COMMENT_LENGTH;
+                })
+                .count();
+    }
+
+    private int calculateCompletionPercent(int requiredQuestionCount, int answeredRequiredQuestionCount) {
+        return requiredQuestionCount == 0
+                ? 100
+                : Math.min(100, Math.round((answeredRequiredQuestionCount * 100.0f) / requiredQuestionCount));
+    }
+
+    private int normalizedCommentLength(String value) {
+        return value == null ? 0 : value.trim().length();
     }
 
     private Map<Long, FeedbackResponseItem> mapExistingItemsByAssignmentQuestion(

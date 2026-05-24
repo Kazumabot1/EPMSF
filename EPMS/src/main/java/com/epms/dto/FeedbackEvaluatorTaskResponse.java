@@ -24,4 +24,11 @@ public class FeedbackEvaluatorTaskResponse {
     String autoSubmitNotice;
     LocalDateTime dueAt;
     LocalDateTime submittedAt;
+    Integer totalQuestionCount;
+    Integer requiredQuestionCount;
+    Integer answeredQuestionCount;
+    Integer answeredRequiredQuestionCount;
+    Integer completionPercent;
+    Boolean finalSubmissionReady;
 }
+
