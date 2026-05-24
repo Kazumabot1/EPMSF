@@ -6,6 +6,22 @@ const api = axios.create({
   baseURL: '/api',
 });
 
+
+const normalizeErrorResponseData = async (data: unknown): Promise<unknown> => {
+  if (typeof Blob !== 'undefined' && data instanceof Blob) {
+    const text = await data.text();
+    if (!text) return data;
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { message: text };
+    }
+  }
+
+  return data;
+};
+
 const isAuthEndpoint = (url?: string) => {
   if (!url) return false;
 
@@ -43,7 +59,11 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    if (error?.response) {
+      error.response.data = await normalizeErrorResponseData(error.response.data);
+    }
+
     const status = error?.response?.status;
     const url = error?.config?.url ?? '';
     const hasToken = Boolean(authStorage.getAccessToken());

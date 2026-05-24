@@ -257,6 +257,32 @@ export const appraisalWorkflowService = {
     const response = await api.get<ApiEnvelope<EmployeeAppraisalFormResponse[]>>('/appraisal/workflow/employee/forms');
     return unwrap<EmployeeAppraisalFormResponse[]>(response);
   },
+
+  exportHrEmployeeReviewPdf: async (formId: number) => {
+    try {
+      const response = await api.get<Blob>(`/appraisal/reports/hr/forms/${formId}/pdf`, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+      if (responseData instanceof Blob) {
+        const text = await responseData.text();
+        if (text) {
+          try {
+            const parsed = JSON.parse(text) as { message?: string; error?: string };
+            throw new Error(parsed.message || parsed.error || text);
+          } catch (parseError) {
+            if (parseError instanceof SyntaxError) {
+              throw new Error(text);
+            }
+            throw parseError;
+          }
+        }
+      }
+      throw error;
+    }
+  },
 };
 
 export const appraisalScoreBandService = {
