@@ -301,6 +301,17 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
         ],
       },
+      {
+        to: '/hr/department-kpi-template',
+        label: 'Department KPI Management',
+        icon: 'bi bi-building-gear',
+        children: [
+          { to: '/hr/department-kpi-template', label: 'Department KPI Templates', icon: 'bi bi-building-gear' },
+          { to: '/hr/department-kpi-cycle', label: 'Department KPI Cycle', icon: 'bi bi-arrow-repeat' },
+          { to: '/hr/department-kpi-scoring', label: 'Department KPI Scoring', icon: 'bi bi-clipboard2-check' },
+          { to: '/hr/department-kpi-results', label: 'Department KPI Results', icon: 'bi bi-building-check' },
+        ],
+      },
     ];
 
     const employeeNavItems: NavItem[] = [

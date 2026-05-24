@@ -222,6 +222,17 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
       ],
     },
+    {
+      label: 'Department KPI Management',
+      path: '/hr/department-kpi-template',
+      icon: 'bi-building-gear',
+      children: [
+        { label: 'Department KPI Templates', path: '/hr/department-kpi-template', icon: 'bi-building-gear' },
+        { label: 'Department KPI Cycle', path: '/hr/department-kpi-cycle', icon: 'bi-arrow-repeat' },
+        { label: 'Department KPI Scoring', path: '/hr/department-kpi-scoring', icon: 'bi-clipboard2-check' },
+        { label: 'Department KPI Results', path: '/hr/department-kpi-results', icon: 'bi-building-check' },
+      ],
+    },
   ],
 
   DepartmentHead: [
@@ -241,6 +252,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       permissionField: 'selfAssessmentView',
     },
     { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
+    { label: 'Department KPIs', path: '/department-head/department-kpis', icon: 'bi-building-check' },
     {
       label: 'Reports',
       path: '/department-head/reports',

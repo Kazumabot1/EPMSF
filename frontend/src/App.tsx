@@ -60,6 +60,12 @@ import KpiTemplateCycleListPage from './pages/hr/kpi-template/KpiTemplateCycleLi
 import KpiTemplateCycleEditorPage from './pages/hr/kpi-template/KpiTemplateCycleEditorPage';
 import KpiVersionHistoryPage from './pages/hr/kpi-template/KpiVersionHistoryPage';
 import HrEmployeeKpiListPage from './pages/hr/kpi-template/HrEmployeeKpiListPage';
+import DepartmentKpiTemplateListPage from './pages/hr/department-kpi/DepartmentKpiTemplateListPage';
+import DepartmentKpiTemplateEditorPage from './pages/hr/department-kpi/DepartmentKpiTemplateEditorPage';
+import DepartmentKpiCycleListPage from './pages/hr/department-kpi/DepartmentKpiCycleListPage';
+import DepartmentKpiCycleEditorPage from './pages/hr/department-kpi/DepartmentKpiCycleEditorPage';
+import DepartmentKpiScoringPage from './pages/hr/department-kpi/DepartmentKpiScoringPage';
+import DepartmentKpiResultsPage from './pages/hr/department-kpi/DepartmentKpiResultsPage';
 
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
 import Notifications from './pages/Notifications';
@@ -221,6 +227,7 @@ function App() {
               <Route path="/department-head/kpi" element={<Navigate to="/department-head/kpi-scoring" replace />} />
               <Route path="/department-head/kpi/history" element={<ManagerKpiHistoryPage />} />
               <Route path="/department-head/kpi-scoring" element={<ManagerKpiScoringPage />} />
+              <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
 
               <Route path="/pip/create" element={<PipCreatePage />} />
             </Route>
@@ -274,6 +281,14 @@ function App() {
               <Route path="/hr/kpi-template-cycle/:id/edit" element={<KpiTemplateCycleEditorPage />} />
               <Route path="/hr/kpi-template-cycle" element={<KpiTemplateCycleListPage />} />
               <Route path="/hr/employee-kpis" element={<HrEmployeeKpiListPage />} />
+              <Route path="/hr/department-kpi-template/new" element={<DepartmentKpiTemplateEditorPage />} />
+              <Route path="/hr/department-kpi-template/:id/edit" element={<DepartmentKpiTemplateEditorPage />} />
+              <Route path="/hr/department-kpi-template" element={<DepartmentKpiTemplateListPage />} />
+              <Route path="/hr/department-kpi-cycle/new" element={<DepartmentKpiCycleEditorPage />} />
+              <Route path="/hr/department-kpi-cycle/:id/edit" element={<DepartmentKpiCycleEditorPage />} />
+              <Route path="/hr/department-kpi-cycle" element={<DepartmentKpiCycleListPage />} />
+              <Route path="/hr/department-kpi-scoring" element={<DepartmentKpiScoringPage />} />
+              <Route path="/hr/department-kpi-results" element={<DepartmentKpiResultsPage />} />
             </Route>
           </Route>
         </Route>
