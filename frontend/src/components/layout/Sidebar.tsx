@@ -104,7 +104,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
     const hrNavItems: NavItem[] = [
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
-      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
+      // { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       { to: '/hr/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       {
         to: '/hr/team',
