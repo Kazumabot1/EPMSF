@@ -34,7 +34,7 @@ public class AppraisalReportController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        headers.setContentDisposition(ContentDisposition.inline().filename(filename).build());
         headers.setContentLength(pdf.length);
 
         return ResponseEntity.ok()
