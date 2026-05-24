@@ -39,6 +39,10 @@ type FeedbackQuestionGroup = {
 };
 
 const MIN_REQUIRED_COMMENT_LENGTH = 10;
+const MAX_REQUIRED_COMMENT_LENGTH = 1000;
+const MAX_ADDITIONAL_COMMENT_LENGTH = 2000;
+
+const normalizedLength = (value?: string | null) => (value ?? '').trim().length;
 
 const DEFAULT_RATING_OPTIONS: FeedbackRatingOption[] = [
   { value: 1, label: 'Unsatisfactory' },
@@ -246,14 +250,40 @@ const FeedbackFormPage = () => {
           flatQuestions.filter((question, index) => {
             if (!question.required) return false;
             const ratingComplete = !isRatingQuestion(question) || Boolean(watchedResponses?.[index]?.ratingValue?.trim());
-            const commentComplete = (watchedResponses?.[index]?.comment?.trim().length ?? 0) >= MIN_REQUIRED_COMMENT_LENGTH;
+            const length = normalizedLength(watchedResponses?.[index]?.comment);
+            const commentComplete = length >= MIN_REQUIRED_COMMENT_LENGTH && length <= MAX_REQUIRED_COMMENT_LENGTH;
             return ratingComplete && commentComplete;
           }).length,
       [flatQuestions, watchedResponses],
   );
   const requiredCount = requiredQuestions.length;
   const completionPercent = requiredCount === 0 ? 100 : Math.min(100, Math.round((answeredRequiredCount / requiredCount) * 100));
+  const additionalCommentsLength = normalizedLength(watchedComments);
+  const additionalCommentsTooLong = additionalCommentsLength > MAX_ADDITIONAL_COMMENT_LENGTH;
   const hasMissingRequired = requiredCount > 0 && answeredRequiredCount < requiredCount;
+
+  const attentionItems = useMemo(() =>
+          flatQuestions.flatMap((question, index) => {
+            if (!question.required) return [];
+            const response = watchedResponses?.[index];
+            const items: Array<{ index: number; label: string; message: string }> = [];
+            if (isRatingQuestion(question) && !response?.ratingValue?.trim()) {
+              items.push({ index, label: question.sectionTitle || `Question ${index + 1}`, message: 'Rating is required.' });
+            }
+            const length = normalizedLength(response?.comment);
+            if (length < MIN_REQUIRED_COMMENT_LENGTH) {
+              items.push({ index, label: question.sectionTitle || `Question ${index + 1}`, message: `Comment needs at least ${MIN_REQUIRED_COMMENT_LENGTH} characters.` });
+            } else if (length > MAX_REQUIRED_COMMENT_LENGTH) {
+              items.push({ index, label: question.sectionTitle || `Question ${index + 1}`, message: `Comment must be under ${MAX_REQUIRED_COMMENT_LENGTH} characters.` });
+            }
+            return items;
+          }),
+      [flatQuestions, watchedResponses],
+  );
+
+  const scrollToQuestion = (index: number) => {
+    document.getElementById(`feedback-question-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   useEffect(() => {
     if (!assignment) return;
@@ -353,8 +383,14 @@ const FeedbackFormPage = () => {
             return null;
           }
 
-          if (question.required && response.comment.trim().length < MIN_REQUIRED_COMMENT_LENGTH) {
-            setError(`responses.${index}.comment`, { type: 'required', message: `A comment of at least ${MIN_REQUIRED_COMMENT_LENGTH} characters is required.` });
+          const responseCommentLength = normalizedLength(response.comment);
+          if (question.required && responseCommentLength < MIN_REQUIRED_COMMENT_LENGTH) {
+            setError(`responses.${index}.comment`, { type: 'required', message: `Comment must be at least ${MIN_REQUIRED_COMMENT_LENGTH} characters.` });
+            hasClientError = true;
+            return null;
+          }
+          if (responseCommentLength > MAX_REQUIRED_COMMENT_LENGTH) {
+            setError(`responses.${index}.comment`, { type: 'maxLength', message: `Comment must be ${MAX_REQUIRED_COMMENT_LENGTH} characters or fewer.` });
             hasClientError = true;
             return null;
           }
@@ -413,7 +449,7 @@ const FeedbackFormPage = () => {
     if (!assignment) return;
     setDraftSavedMessage('');
     const { hasClientError, responses } = validateResponsesForSubmit(values);
-    if (hasClientError) return;
+    if (hasClientError || normalizedLength(values.comments) > MAX_ADDITIONAL_COMMENT_LENGTH) return;
 
     const confirmed = window.confirm('Submit final feedback? After final submission, you will not be able to edit this response.');
     if (!confirmed) return;
@@ -450,7 +486,7 @@ const FeedbackFormPage = () => {
               ? 'Draft save failed. Use Save draft to retry.'
               : lastSavedAt
                   ? `Last saved at ${formatTimeOnly(lastSavedAt)}`
-                  : 'Draft not saved in this session';
+                  : assignment.status === 'IN_PROGRESS' ? 'Draft saved previously' : 'Draft not saved yet';
 
   return (
       <div className="feedback-form-page-clean">
@@ -485,7 +521,24 @@ const FeedbackFormPage = () => {
         {assignment.lifecycleMessage ? <div className={`feedback-evaluator-banner ${assignment.canSubmit ? 'info' : 'warning'}`}>{assignment.lifecycleMessage}</div> : null}
         {assignment.autoSubmitNotice ? <div className="feedback-evaluator-banner info">{assignment.autoSubmitNotice}</div> : null}
         {draftSavedMessage ? <div className="feedback-evaluator-banner success">{draftSavedMessage}</div> : null}
-        {hasMissingRequired && assignment.canSubmit ? <div className="feedback-evaluator-banner warning">Complete all required ratings and comments before final submission.</div> : null}
+        {attentionItems.length > 0 && assignment.canSubmit ? (
+            <section className="feedback-warm-attention-card">
+              <div>
+                <strong>{attentionItems.length} item{attentionItems.length === 1 ? '' : 's'} need attention before submitting.</strong>
+                <p>Comments must be {MIN_REQUIRED_COMMENT_LENGTH}–{MAX_REQUIRED_COMMENT_LENGTH} characters. Select an item to jump to it.</p>
+              </div>
+              <div className="feedback-warm-attention-list">
+                {attentionItems.slice(0, 6).map((item, itemIndex) => (
+                    <button type="button" key={`${item.index}-${item.message}-${itemIndex}`} onClick={() => scrollToQuestion(item.index)}>
+                      <span>{item.label}</span>
+                      <em>{item.message}</em>
+                    </button>
+                ))}
+                {attentionItems.length > 6 ? <small>+{attentionItems.length - 6} more items</small> : null}
+              </div>
+            </section>
+        ) : null}
+        {additionalCommentsTooLong ? <div className="feedback-evaluator-banner warning">Additional comments must be {MAX_ADDITIONAL_COMMENT_LENGTH} characters or fewer.</div> : null}
         {saveDraftMutation.error instanceof Error ? <div className="feedback-evaluator-banner error">{saveDraftMutation.error.message}</div> : null}
         {submitMutation.error instanceof Error ? <div className="feedback-evaluator-banner error">{submitMutation.error.message}</div> : null}
 
@@ -540,8 +593,11 @@ const FeedbackFormPage = () => {
                         const ratingOptions = getQuestionRatingOptions(question);
                         const responseCommentRegistration = register(`responses.${index}.comment`);
                         const requiresRating = isRatingQuestion(question);
+                        const commentLength = normalizedLength(watchedResponses?.[index]?.comment);
+                        const commentTooShort = question.required && commentLength > 0 && commentLength < MIN_REQUIRED_COMMENT_LENGTH;
+                        const commentTooLong = commentLength > MAX_REQUIRED_COMMENT_LENGTH;
                         return (
-                            <article key={question.id} className="feedback-preview-question-card">
+                            <article id={`feedback-question-${index}`} key={question.id} className={`feedback-preview-question-card ${errors.responses?.[index]?.comment || errors.responses?.[index]?.ratingValue ? 'has-error' : ''}`}>
                               <div className="feedback-preview-question-index">{index + 1}</div>
                               <div className="feedback-preview-question-body">
                                 <div className="feedback-preview-question-meta">
@@ -586,12 +642,16 @@ const FeedbackFormPage = () => {
                                   <textarea
                                       disabled={!assignment.canSubmit || submitting}
                                       {...responseCommentRegistration}
-                                      placeholder="Evaluator must write the reason for the rating."
+                                      maxLength={MAX_REQUIRED_COMMENT_LENGTH + 100}
+                                      placeholder="Share a specific example, observed behavior, or impact."
                                       onChange={(event) => {
                                         responseCommentRegistration.onChange(event);
                                         setDraftSavedMessage('');
                                       }}
                                   />
+                                  <small className={`feedback-warm-char-count ${commentTooShort || commentTooLong ? 'invalid' : commentLength >= MIN_REQUIRED_COMMENT_LENGTH ? 'valid' : ''}`}>
+                                    {commentLength}/{MAX_REQUIRED_COMMENT_LENGTH} characters · minimum {MIN_REQUIRED_COMMENT_LENGTH}
+                                  </small>
                                   {errors.responses?.[index]?.comment ? <small className="feedback-evaluator-error">{errors.responses[index]?.comment?.message}</small> : null}
                                 </label>
                               </div>
@@ -610,11 +670,13 @@ const FeedbackFormPage = () => {
                 disabled={!assignment.canSubmit || submitting}
                 {...additionalCommentsRegistration}
                 placeholder="Add any additional context, examples, strengths, or improvement suggestions."
+                maxLength={MAX_ADDITIONAL_COMMENT_LENGTH + 100}
                 onChange={(event) => {
                   additionalCommentsRegistration.onChange(event);
                   setDraftSavedMessage('');
                 }}
             />
+            <small className={`feedback-warm-char-count ${additionalCommentsTooLong ? 'invalid' : ''}`}>{additionalCommentsLength}/{MAX_ADDITIONAL_COMMENT_LENGTH} characters · optional</small>
           </label>
 
           <section className="feedback-score-explanation-card">
@@ -636,12 +698,12 @@ const FeedbackFormPage = () => {
           <div className="feedback-form-sticky-actions feedback-form-actions-clean">
             <div>
               <span>{autoSaveText}</span>
-              {isDirty && assignment.canSubmit ? <small>Unsaved changes detected</small> : <small>Changes are up to date</small>}
+              {attentionItems.length > 0 ? <small>{attentionItems.length} item{attentionItems.length === 1 ? '' : 's'} need attention before submitting</small> : isDirty && assignment.canSubmit ? <small>Unsaved changes detected</small> : <small>Ready when you are</small>}
             </div>
             <button className="feedback-evaluator-secondary solid" disabled={!assignment.canSubmit || actionBusy} type="button" onClick={handleSaveDraft}>
               {draftSaving ? 'Saving draft...' : 'Save draft'}
             </button>
-            <button className="feedback-evaluator-primary" disabled={!assignment.canSubmit || actionBusy || hasMissingRequired} type="submit">
+            <button className="feedback-evaluator-primary" disabled={!assignment.canSubmit || actionBusy || hasMissingRequired || additionalCommentsTooLong} type="submit">
               {submitting ? 'Submitting feedback...' : 'Submit final feedback'}
             </button>
           </div>

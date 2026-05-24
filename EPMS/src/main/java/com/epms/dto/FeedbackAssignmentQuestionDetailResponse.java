@@ -27,6 +27,8 @@ public class FeedbackAssignmentQuestionDetailResponse {
     List<FeedbackRatingOptionResponse> ratingOptions;
     Double weight;
     Boolean required;
+    Integer minRequiredCommentLength;
+    Integer maxCommentLength;
     Double existingRatingValue;
     String existingComment;
 }

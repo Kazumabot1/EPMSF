@@ -26,4 +26,3 @@ public class FeedbackManualAssignmentRequest {
     /** Required in the new campaign wizard so manual overrides remain auditable. */
     private String reason;
 }
-
