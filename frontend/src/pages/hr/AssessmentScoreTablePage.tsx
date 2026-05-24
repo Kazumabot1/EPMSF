@@ -10,6 +10,7 @@ import type {
 } from '../../types/employeeAssessment';
 import '../appraisal/appraisal.css';
 import './assessment-score-table.css';
+import SelfAssessmentScoreTableEditor from './SelfAssessmentScoreTableEditor';
 
 type RoleFlags = {
   isHr: boolean;
@@ -101,14 +102,8 @@ const normalizeStatusValue = (status?: string | null) =>
     .trim()
     .toUpperCase();
 
-const isDeptHeadForwardableStatus = (status?: string | null) => {
-  const normalized = normalizeStatusValue(status);
-
-  return (
-    normalized === 'SUBMITTED' ||
-    normalized === 'PENDING_MANAGER' ||
-    normalized === 'PENDING_DEPARTMENT_HEAD'
-  );
+const isDeptHeadForwardableStatus = (_status?: string | null) => {
+  return false;
 };
 
 const scoreBadgeClass = (label?: string) => {
@@ -142,9 +137,10 @@ const statusBadgeClass = (status?: string) => {
       return 'ast-status-pending-hr';
     case 'APPROVED':
       return 'ast-status-approved';
-    case 'DECLINED':
-    case 'REJECTED':
-      return 'ast-status-declined';
+ case 'DECLINED':
+ case 'REJECTED':
+ case 'CLOSED_REJECTED':
+   return 'ast-status-declined';
     default:
       return 'ast-status-default';
   }
@@ -194,6 +190,7 @@ const statusOptions: Array<{ value: 'ALL' | AssessmentStatus; label: string }> =
   { value: 'APPROVED', label: 'Approved' },
   { value: 'DECLINED', label: 'Declined' },
   { value: 'REJECTED', label: 'Rejected' },
+  { value: 'CLOSED_REJECTED', label: 'Closed Rejected' },
 ];
 
 const defaultScoreBands: AssessmentScoreBand[] = [
@@ -267,11 +264,11 @@ const SignatureSlot = ({
 );
 
 const SignatureBadges = ({ row }: { row: AssessmentScoreRow }) => {
-  const badges = [
-    { label: 'Employee', signed: row.employeeSigned },
-    { label: 'Dept Head', signed: row.departmentHeadSigned },
-    { label: 'HR', signed: row.hrSigned },
-  ];
+const badges = [
+  { label: 'Employee', signed: row.employeeSigned },
+  { label: 'Manager', signed: row.managerSigned },
+  { label: 'HR', signed: row.hrSigned },
+];
 
   return (
     <div className="ast-signature-badges">
@@ -307,11 +304,7 @@ const AssessmentDetailModal = ({
 
   const items = flattenItems(assessment);
 
-  const canDeptHeadSign =
-    roleFlags.isDepartmentHead &&
-    isDeptHeadForwardableStatus(assessment.status) &&
-    !assessment.departmentHeadSignatureId &&
-    !assessment.departmentHeadSignedAt;
+ const canDeptHeadSign = false;
 
   const canHrAct = roleFlags.isHr && normalizeStatusValue(assessment.status) === 'PENDING_HR';
 
@@ -386,7 +379,16 @@ const AssessmentDetailModal = ({
         reason,
         hrComment.trim() || undefined,
       );
-      setActionMessage('Assessment declined.');
+if (updated.status === 'DRAFT') {
+  setActionMessage(
+    'Assessment returned to the employee for correction. The employee can edit and resubmit before the assessment period ends.',
+  );
+} else {
+  setActionMessage(
+    'Assessment closed as rejected because the assessment period has ended.',
+  );
+}
+
       onChanged(updated);
     } catch (err) {
       setActionError(getErrorMessage(err, 'Unable to decline assessment.'));
@@ -429,7 +431,7 @@ const AssessmentDetailModal = ({
                 <h4>Assessment Information</h4>
                 <p><strong>Assessment Date:</strong> {formatDate(assessment.assessmentDate)}</p>
                 <p><strong>Assigned Manager:</strong> {assessment.managerName || '-'}</p>
-                <p><strong>Department Head:</strong> {assessment.departmentHeadName || '-'}</p>
+<p><strong>Manager Reviewer:</strong> {assessment.managerName || '-'}</p>
                 <p><strong>Period:</strong> {assessment.period || '-'}</p>
                 <p>
                   <strong>Status:</strong>{' '}
@@ -521,10 +523,10 @@ const AssessmentDetailModal = ({
                 <p>{assessment.managerComment || 'No manager remarks yet.'}</p>
               </div>
 
-              <div className="appraisal-review-block">
-                <h4>Department Head's Comment</h4>
-                <p>{assessment.departmentHeadComment || 'No department head comment yet.'}</p>
-              </div>
+            <div className="appraisal-review-block">
+              <h4>HR Comment</h4>
+              <p>{assessment.hrComment || 'No HR comment yet.'}</p>
+            </div>
             </div>
 
             <div className="appraisal-inline-grid">
@@ -548,13 +550,13 @@ const AssessmentDetailModal = ({
                 signedAt={assessment.employeeSignedAt || assessment.submittedAt}
               />
 
-              <SignatureSlot
-                label="Signature of Dept. Head & Date"
-                imageData={assessment.departmentHeadSignatureImageData}
-                imageType={assessment.departmentHeadSignatureImageType}
-                name={assessment.departmentHeadSignatureName || assessment.departmentHeadName}
-                signedAt={assessment.departmentHeadSignedAt}
-              />
+         <SignatureSlot
+           label="Signature of Manager & Date"
+           imageData={assessment.managerSignatureImageData}
+           imageType={assessment.managerSignatureImageType}
+           name={assessment.managerSignatureName || assessment.managerName}
+           signedAt={assessment.managerSignedAt}
+         />
 
               <SignatureSlot
                 label="Signature of HR & Date"
@@ -666,7 +668,8 @@ const AssessmentScoreTablePage = () => {
   const [selectedAssessment, setSelectedAssessment] = useState<EmployeeAssessment | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | AssessmentStatus>('ALL');
+ const [statusFilter, setStatusFilter] = useState<'ALL' | AssessmentStatus>('ALL');
+ const [scoreEditorOpen, setScoreEditorOpen] = useState(false);
 
   const roleFlags = useMemo(() => getCurrentRoleFlags(), []);
 
@@ -754,7 +757,7 @@ const AssessmentScoreTablePage = () => {
   const canDeptHeadForwardRow = (row: AssessmentScoreRow) =>
     roleFlags.isDepartmentHead &&
     isDeptHeadForwardableStatus(row.status) &&
-    !row.departmentHeadSigned;
+    !row.managerSigned;
 
   const handleDeptHeadForwardFromRow = async (row: AssessmentScoreRow) => {
     if (!row.id) return;
@@ -779,7 +782,12 @@ const AssessmentScoreTablePage = () => {
   };
 
   return (
-    <div className="ast-page">
+   <div className="ast-page">
+     <SelfAssessmentScoreTableEditor
+       open={scoreEditorOpen}
+       onClose={() => setScoreEditorOpen(false)}
+       onUpdated={() => void loadScoreTable()}
+     />
       {selectedAssessment && (
         <AssessmentDetailModal
           assessment={selectedAssessment}
@@ -799,16 +807,29 @@ const AssessmentScoreTablePage = () => {
 
             <h1>Employee Self-Assessment Scores</h1>
 
-            <p>
-              Review self-assessments, manager remarks, department head signature,
-              and HR final actions.
-            </p>
+          <p>
+            Review self-assessments, manager signature, manager remarks,
+            and HR final actions.
+          </p>
           </div>
 
-          <button type="button" onClick={() => void loadScoreTable()} className="ast-refresh-btn">
-            <i className={`bi bi-arrow-repeat ${loading ? 'ast-spin' : ''}`} />
-            Refresh
-          </button>
+       <div className="ast-hero-actions">
+         {roleFlags.isHr && (
+           <button
+             type="button"
+             onClick={() => setScoreEditorOpen(true)}
+             className="ast-edit-score-btn"
+           >
+             <i className="bi bi-sliders" />
+             Edit Score Table
+           </button>
+         )}
+
+         <button type="button" onClick={() => void loadScoreTable()} className="ast-refresh-btn">
+           <i className={`bi bi-arrow-repeat ${loading ? 'ast-spin' : ''}`} />
+           Refresh
+         </button>
+       </div>
         </div>
 
         <div className="ast-stat-grid">

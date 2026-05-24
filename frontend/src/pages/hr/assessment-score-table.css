@@ -287,3 +287,60 @@
   .ast-hr-grid { grid-template-columns: 1fr; }
   .self-assessment-signature-grid { grid-template-columns: 1fr; }
 }
+
+
+
+
+
+
+
+
+
+
+.ast-hero-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ast-edit-score-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 0;
+  background: #4f46e5;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.2);
+}
+
+.ast-edit-score-btn:hover {
+  background: #4338ca;
+  transform: translateY(-1px);
+}
+
+
+
+.ast-status-closed-rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.ast-reject-note {
+  margin-top: 10px;
+  border-radius: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}

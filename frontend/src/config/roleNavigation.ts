@@ -85,16 +85,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
-    { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Access Control',
-      path: '/user-roles',
+      path: '/position-permissions',
       icon: 'bi-shield-lock',
       children: [
-        { label: 'User Roles', path: '/user-roles', icon: 'bi-person-gear' },
-        { label: 'Role Permissions', path: '/role-permissions', icon: 'bi-shield-check' },
-        { label: 'Permissions', path: '/permissions', icon: 'bi-key' },
         { label: 'Position Permissions', path: '/position-permissions', icon: 'bi-sliders2-vertical' },
       ],
     },
@@ -109,8 +105,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/hr/team',
       icon: 'bi-people-fill',
       children: [
-        { label: 'Teams', path: '/hr/team', icon: 'bi-people-fill', end: true },
-        { label: 'Create Team', path: '/hr/team/create', icon: 'bi-plus-square' },
+        { label: 'View Teams', path: '/hr/team', icon: 'bi-eye', end: true },
         { label: 'Team History', path: '/hr/team/history', icon: 'bi-clock-history' },
       ],
     },
@@ -238,7 +233,11 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    { label: 'Self-Assessment', path: '/department-head/self-assessment', icon: 'bi-pencil-square' },
+    {
+      label: 'View Self-assessment Form',
+      path: '/department-head/self-assessment-forms',
+      icon: 'bi bi-eye',
+    },
     {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',
@@ -253,6 +252,17 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     },
     { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
     { label: 'Department KPIs', path: '/department-head/department-kpis', icon: 'bi-building-check' },
+    {
+      label: 'Teams',
+      path: '/department-head/teams',
+      icon: 'bi-people-fill',
+      permissionField: 'teamView',
+      children: [
+        { label: 'View Teams', path: '/department-head/teams', icon: 'bi-eye', end: true },
+        { label: 'Create Team', path: '/department-head/teams/create', icon: 'bi-plus-square', permissionField: 'teamCreate' },
+        { label: 'Team History', path: '/department-head/team-history', icon: 'bi-clock-history', permissionField: 'teamHistory' },
+      ],
+    },
     {
       label: 'Reports',
       path: '/department-head/reports',

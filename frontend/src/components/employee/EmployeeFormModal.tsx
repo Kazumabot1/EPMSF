@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import api from '../../services/api';
-import DashboardSelector from '../admin/DashboardSelector';
 import {
   defaultDashboardForRole,
-  normalizeDashboard,
-  type DashboardValue,
+  dashboardDisplayName,
+  roleDisplayName,
 } from '../../utils/dashboardOptions';
 
 type ModalMode = 'create' | 'edit';
@@ -30,9 +29,11 @@ type PositionOption = {
   positionName?: string;
   name?: string;
   levelCode?: string;
-  roleName?: string;
+  roleId?: number | null;
+  roleName?: string | null;
   role?: {
-    name?: string;
+    id?: number | null;
+    name?: string | null;
   } | string | null;
 };
 
@@ -51,7 +52,6 @@ type EmployeeFormState = {
 
   createLoginAccount: boolean;
   sendTemporaryPasswordEmail: boolean;
-  dashboard: DashboardValue;
 
   race: string;
   religion: string;
@@ -79,7 +79,6 @@ const emptyForm: EmployeeFormState = {
 
   createLoginAccount: true,
   sendTemporaryPasswordEmail: true,
-  dashboard: 'EMPLOYEE_DASHBOARD',
 
   race: '',
   religion: '',
@@ -99,21 +98,38 @@ const unwrap = <T,>(payload: any, fallback: T): T => {
 };
 
 const getDepartmentName = (department: DepartmentOption) =>
-  department.departmentName || department.department_name || department.name || `Department #${department.id}`;
+  department.departmentName ||
+  department.department_name ||
+  department.name ||
+  `Department #${department.id}`;
 
 const getPositionName = (position: PositionOption) =>
-  position.positionTitle || position.positionName || position.name || `Position #${position.id}`;
+  position.positionTitle ||
+  position.positionName ||
+  position.name ||
+  `Position #${position.id}`;
 
 const getRoleNameFromPosition = (position?: PositionOption | null) => {
-  if (!position) return 'EMPLOYEE';
+  if (!position) return '';
 
-  if (position.roleName) return position.roleName;
+  if (position.roleName && String(position.roleName).trim()) {
+    return String(position.roleName).trim();
+  }
 
-  if (typeof position.role === 'string') return position.role;
+  if (typeof position.role === 'string' && position.role.trim()) {
+    return position.role.trim();
+  }
 
-  if (position.role?.name) return position.role.name;
+  if (position.role?.name && String(position.role.name).trim()) {
+    return String(position.role.name).trim();
+  }
 
-  return 'EMPLOYEE';
+  return '';
+};
+
+const positionHasRole = (position?: PositionOption | null) => {
+  if (!position) return false;
+  return Boolean(position.roleId || getRoleNameFromPosition(position));
 };
 
 const toDateInput = (value?: string | null) => {
@@ -160,6 +176,9 @@ const EmployeeFormModal = ({
   );
 
   const selectedRoleName = getRoleNameFromPosition(selectedPosition);
+  const derivedDashboard = selectedRoleName
+    ? defaultDashboardForRole(selectedRoleName)
+    : null;
 
   const parentDepartmentOptions = useMemo(() => {
     if (!form.currentDepartmentId) return [];
@@ -205,13 +224,6 @@ const EmployeeFormModal = ({
     if (!open) return;
 
     if (mode === 'edit' && employee) {
-      const roleName =
-        employee.roleName ||
-        employee.positionRoleName ||
-        employee.position?.roleName ||
-        employee.position?.role?.name ||
-        'EMPLOYEE';
-
       setForm({
         firstName: firstValue(employee.firstName),
         lastName: firstValue(employee.lastName),
@@ -233,9 +245,8 @@ const EmployeeFormModal = ({
         gender: firstValue(employee.gender),
         dateOfBirth: toDateInput(employee.dateOfBirth),
 
-        createLoginAccount: Boolean(employee.email || employee.workEmail),
+        createLoginAccount: Boolean(employee.email || employee.workEmail || employee.userId),
         sendTemporaryPasswordEmail: false,
-        dashboard: normalizeDashboard(employee.dashboard, roleName),
 
         race: firstValue(employee.race),
         religion: firstValue(employee.religion),
@@ -261,14 +272,15 @@ const EmployeeFormModal = ({
   const validate = () => {
     if (!form.firstName.trim()) return 'First name is required.';
     if (!form.lastName.trim()) return 'Last name is required.';
+    if (!form.positionId) return 'Position is required.';
+    if (!selectedPosition) return 'Selected position was not found. Please refresh and try again.';
+    if (!positionHasRole(selectedPosition)) {
+      return 'This position does not have a role connected yet. Please connect this position with a role before assigning it to an employee.';
+    }
     if (!form.currentDepartmentId) return 'Current Department is required.';
 
     if (form.createLoginAccount && !form.email.trim()) {
       return 'Work email is required when creating a login account.';
-    }
-
-    if (form.createLoginAccount && !form.dashboard) {
-      return 'Dashboard is required when creating a login account.';
     }
 
     return '';
@@ -298,10 +310,6 @@ const EmployeeFormModal = ({
 
     createLoginAccount: form.createLoginAccount,
     sendTemporaryPasswordEmail: form.sendTemporaryPasswordEmail,
-
-    dashboard: form.createLoginAccount
-      ? normalizeDashboard(form.dashboard, selectedRoleName)
-      : null,
 
     race: form.race.trim() || null,
     religion: form.religion.trim() || null,
@@ -351,15 +359,15 @@ const EmployeeFormModal = ({
   };
 
   return (
-   <div className="epms-emp-modal-overlay">
-     <div className="epms-emp-modal epms-emp-modal--wide">
+    <div className="epms-emp-modal-overlay">
+      <div className="epms-emp-modal epms-emp-modal--wide">
         <div className="employee-modal-header">
           <div>
             <h2>{mode === 'edit' ? 'Edit employee' : 'Add employee'}</h2>
             <p>
               {mode === 'edit'
-                ? 'Update employee master data and login dashboard.'
-                : 'Create employee master data and optional login account.'}
+                ? 'Update employee master data. Dashboard is assigned automatically from the selected position.'
+                : 'Create employee master data. Dashboard is assigned automatically from the selected position.'}
             </p>
           </div>
 
@@ -399,35 +407,65 @@ const EmployeeFormModal = ({
 
           <div className="employee-form-grid">
             <div className="employee-field">
-              <label>Position</label>
+              <label>
+                Position <span className="employee-required">*</span>
+              </label>
               <select
                 className="employee-input"
                 value={form.positionId}
                 disabled={loadingLookups}
                 onChange={(event) => {
-                  const nextPositionId = event.target.value;
-                  const nextPosition =
-                    positions.find(
-                      (position) => String(position.id) === String(nextPositionId),
-                    ) ?? null;
-
-                  const nextRoleName = getRoleNameFromPosition(nextPosition);
-
                   setForm((prev) => ({
                     ...prev,
-                    positionId: nextPositionId,
-                    dashboard: defaultDashboardForRole(nextRoleName),
+                    positionId: event.target.value,
                   }));
                 }}
               >
-                <option value="">—</option>
-                {positions.map((position) => (
-                  <option key={position.id} value={position.id}>
-                    {getPositionName(position)}
-                    {position.levelCode ? ` (${position.levelCode})` : ''}
-                  </option>
-                ))}
+                <option value="">— Select Position —</option>
+                {positions.map((position) => {
+                  const roleName = getRoleNameFromPosition(position);
+                  return (
+                    <option key={position.id} value={position.id}>
+                      {getPositionName(position)}
+                      {position.levelCode ? ` (${position.levelCode})` : ''}
+                      {roleName ? ` — ${roleDisplayName(roleName)}` : ' — No role connected'}
+                    </option>
+                  );
+                })}
               </select>
+              <small>
+                Position role decides the employee dashboard and access.
+              </small>
+            </div>
+
+            <div className="employee-field">
+              <label>
+                Assigned Dashboard <span className="employee-required">*</span>
+              </label>
+              <div
+                className="employee-input"
+                style={{
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: selectedPosition && !positionHasRole(selectedPosition)
+                    ? '#fef2f2'
+                    : '#f8fafc',
+                  color: selectedPosition && !positionHasRole(selectedPosition)
+                    ? '#b91c1c'
+                    : '#334155',
+                  fontWeight: 800,
+                }}
+              >
+                {!selectedPosition
+                  ? 'Select a position first'
+                  : !positionHasRole(selectedPosition)
+                    ? 'No dashboard available. Connect this position with a role first.'
+                    : dashboardDisplayName(derivedDashboard, selectedRoleName)}
+              </div>
+              <small>
+                This field is read-only. It is calculated from the selected position role.
+              </small>
             </div>
 
             <div className="employee-field">
@@ -592,28 +630,26 @@ const EmployeeFormModal = ({
               Send temporary password onboarding email
             </label>
 
-            {form.createLoginAccount && (
-              <div className="employee-field" style={{ marginTop: 12 }}>
-                <label>
-                  Dashboard <span className="employee-required">*</span>
-                </label>
-
-                <DashboardSelector
-                  value={form.dashboard}
-                  roleName={selectedRoleName}
-                  onChange={(dashboard) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      dashboard,
-                    }))
-                  }
-                />
-
-                <small>
-                  This controls which dashboard the login account opens after login.
-                </small>
+            <div className="employee-field" style={{ marginTop: 12 }}>
+              <label>Login dashboard</label>
+              <div
+                className="employee-input"
+                style={{
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                  fontWeight: 800,
+                }}
+              >
+                {selectedPosition && positionHasRole(selectedPosition)
+                  ? dashboardDisplayName(derivedDashboard, selectedRoleName)
+                  : 'Dashboard will appear after selecting a position with a connected role.'}
               </div>
-            )}
+              <small>
+                HR cannot manually choose a dashboard here. The selected position decides it.
+              </small>
+            </div>
           </div>
 
           <h3 className="employee-form-section-title">Background</h3>

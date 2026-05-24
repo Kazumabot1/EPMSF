@@ -1,5 +1,6 @@
 package com.epms.controller;
 
+import com.epms.dto.AssessmentFormDtos.AssessmentFormActivationPayload;
 import com.epms.dto.AssessmentFormDtos.AssessmentFormPayload;
 import com.epms.dto.AssessmentFormDtos.AssessmentFormResponse;
 import com.epms.dto.GenericApiResponse;
@@ -11,18 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * HR Assessment Form Builder endpoint.
- *
- * Frontend calls:
- * GET    /api/appraisal-forms
- * GET    /api/appraisal-forms/{id}
- * POST   /api/appraisal-forms
- * PUT    /api/appraisal-forms/{id}
- * DELETE /api/appraisal-forms/{id}
- *
- * SecurityConfig protects this endpoint.
- */
 @RestController
 @RequestMapping("/api/appraisal-forms")
 @RequiredArgsConstructor
@@ -62,6 +51,16 @@ public class AssessmentFormDefinitionController {
     ) {
         return ResponseEntity.ok(
                 GenericApiResponse.success("Assessment form updated", service.update(id, payload))
+        );
+    }
+
+    @PatchMapping("/{id}/activation")
+    public ResponseEntity<GenericApiResponse<AssessmentFormResponse>> updateActivation(
+            @PathVariable Integer id,
+            @RequestBody AssessmentFormActivationPayload payload
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Assessment form activation updated", service.updateActivation(id, payload))
         );
     }
 

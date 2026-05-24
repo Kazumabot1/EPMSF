@@ -113,6 +113,8 @@ const statusBadgeClass = (status?: string) => {
       return 'border-emerald-200 bg-emerald-50 text-emerald-700';
     case 'DECLINED':
     case 'REJECTED':
+        case 'CLOSED_REJECTED':
+
       return 'border-red-200 bg-red-50 text-red-700';
     default:
       return 'border-slate-200 bg-slate-50 text-slate-600';
@@ -170,14 +172,18 @@ const ReviewModal = ({
   onClose: () => void;
   onSaved: (assessment: EmployeeAssessment) => void;
 }) => {
-  const [comment, setComment] = useState(assessment.managerComment || '');
-  const [saving, setSaving] = useState(false);
-  const [actionError, setActionError] = useState('');
-  const [actionMessage, setActionMessage] = useState('');
-
+const [comment, setComment] = useState(assessment.managerComment || '');
+const [rejectReason, setRejectReason] = useState('');
+const [saving, setSaving] = useState(false);
+const [actionError, setActionError] = useState('');
+const [actionMessage, setActionMessage] = useState('');
   const items = flattenItems(assessment);
   const scoreBands = assessment.scoreBands?.length ? assessment.scoreBands : defaultScoreBands;
-  const canSaveRemark = ['PENDING_MANAGER', 'SUBMITTED'].includes(assessment.status) && Boolean(assessment.id);
+const canManagerAct =
+  ['PENDING_MANAGER', 'SUBMITTED'].includes(assessment.status) &&
+  Boolean(assessment.id);
+
+const canSaveRemark = canManagerAct;
 
   const handleSaveRemark = async () => {
     if (!assessment.id) return;
@@ -191,7 +197,7 @@ const ReviewModal = ({
         assessment.id,
         comment.trim() || undefined,
       );
-      setActionMessage('Manager remarks saved. Department Head can sign this assessment without manager signature.');
+      setActionMessage('Manager signature completed. The form has been sent to HR for final confirmation.');
       onSaved(updated);
     } catch (err) {
       setActionError(getErrorMessage(err, 'Unable to save manager remarks.'));
@@ -199,6 +205,45 @@ const ReviewModal = ({
       setSaving(false);
     }
   };
+
+const handleManagerDecline = async () => {
+  if (!assessment.id) return;
+
+  const reason = rejectReason.trim();
+
+  if (!reason) {
+    setActionError('Rejection reason is required.');
+    return;
+  }
+
+  setSaving(true);
+  setActionError('');
+  setActionMessage('');
+
+  try {
+    const updated = await employeeAssessmentService.managerDecline(
+      assessment.id,
+      reason,
+      comment.trim() || undefined,
+    );
+
+    if (updated.status === 'DRAFT') {
+      setActionMessage(
+        'Assessment returned to the employee for correction. The employee can edit and resubmit before the assessment period ends.',
+      );
+    } else {
+      setActionMessage(
+        'Assessment closed as rejected because the assessment period has ended.',
+      );
+    }
+
+    onSaved(updated);
+  } catch (err) {
+    setActionError(getErrorMessage(err, 'Unable to reject assessment.'));
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/60 p-4">
@@ -341,20 +386,52 @@ const ReviewModal = ({
                 placeholder="Optional manager remarks..."
               />
 
-              {canSaveRemark ? (
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void handleSaveRemark()}
-                  className="mt-4 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  {saving ? 'Saving...' : 'Save Remarks'}
-                </button>
-              ) : (
-                <p className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">
-                  Remarks are locked because this assessment has already moved past department-head review.
-                </p>
-              )}
+{canSaveRemark ? (
+  <div className="mt-4 space-y-4">
+    <div className="flex flex-wrap gap-3">
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => void handleSaveRemark()}
+        className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
+      >
+        {saving ? 'Saving...' : 'Sign & Send to HR'}
+      </button>
+    </div>
+
+    <div className="rounded-3xl border border-red-200 bg-red-50 p-4">
+      <h5 className="mb-1 text-sm font-black text-red-800">
+        Reject Assessment
+      </h5>
+
+      <p className="mb-3 text-sm font-semibold text-red-700">
+        If the assessment period is still open, this will return the form to the employee for correction. If the period has ended, it will be closed as rejected.
+      </p>
+
+      <textarea
+        value={rejectReason}
+        disabled={saving}
+        onChange={(event) => setRejectReason(event.target.value)}
+        rows={3}
+        className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100 disabled:bg-slate-100"
+        placeholder="Enter rejection reason..."
+      />
+
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => void handleManagerDecline()}
+        className="mt-3 rounded-2xl bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+      >
+        {saving ? 'Rejecting...' : 'Reject Assessment'}
+      </button>
+    </div>
+  </div>
+) : (
+  <p className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">
+    Manager actions are locked because this assessment has already moved past manager review.
+  </p>
+)}
 
               {actionMessage && (
                 <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">

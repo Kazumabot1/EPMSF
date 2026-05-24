@@ -21,7 +21,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -46,14 +46,14 @@ public class AssessmentFormDefinition {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "start_date", nullable = false)
-    private LocalDate startDate;
+    @Column(name = "start_date")
+    private LocalDateTime startDate;
 
-    @Column(name = "end_date", nullable = false)
-    private LocalDate endDate;
+    @Column(name = "end_date")
+    private LocalDateTime endDate;
 
     @Column(name = "is_active", nullable = false)
-    private Boolean active = true;
+    private Boolean active = false;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
@@ -101,7 +101,7 @@ public class AssessmentFormDefinition {
         Date now = new Date();
 
         if (active == null) {
-            active = true;
+            active = false;
         }
 
         if (targetRoles == null) {

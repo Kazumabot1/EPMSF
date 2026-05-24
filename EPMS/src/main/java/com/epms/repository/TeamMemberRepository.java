@@ -11,11 +11,41 @@ import java.util.List;
 @Repository
 public interface TeamMemberRepository extends JpaRepository<TeamMember, Integer> {
 
-    @EntityGraph(attributePaths = {"team", "team.department", "memberUser"})
+    @EntityGraph(attributePaths = {
+            "team",
+            "team.department",
+            "team.teamLeader",
+            "team.teamLeader.position",
+            "team.projectManager",
+            "team.projectManager.position",
+            "memberUser",
+            "memberUser.position"
+    })
     List<TeamMember> findByTeamId(Integer teamId);
 
-    @EntityGraph(attributePaths = {"team", "team.department", "memberUser"})
+    @EntityGraph(attributePaths = {
+            "team",
+            "team.department",
+            "team.teamLeader",
+            "team.teamLeader.position",
+            "team.projectManager",
+            "team.projectManager.position",
+            "memberUser",
+            "memberUser.position"
+    })
     List<TeamMember> findByMemberUserId(Integer userId);
+
+    @EntityGraph(attributePaths = {
+            "team",
+            "team.department",
+            "team.teamLeader",
+            "team.teamLeader.position",
+            "team.projectManager",
+            "team.projectManager.position",
+            "memberUser",
+            "memberUser.position"
+    })
+    List<TeamMember> findByMemberUserIdAndEndedDateIsNull(Integer userId);
 
     @EntityGraph(attributePaths = {"team", "team.department", "memberUser", "memberUser.position"})
     @Query("""
@@ -28,9 +58,6 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Integer>
           AND LOWER(t.status) = 'active'
         """)
     List<TeamMember> findActiveMemberships();
-
-    @EntityGraph(attributePaths = {"team", "team.department", "memberUser"})
-    List<TeamMember> findByMemberUserIdAndEndedDateIsNull(Integer userId);
 
     boolean existsByMemberUserIdAndEndedDateIsNull(Integer userId);
 }

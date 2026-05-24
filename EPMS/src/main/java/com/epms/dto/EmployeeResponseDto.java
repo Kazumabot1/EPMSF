@@ -102,6 +102,8 @@ public class EmployeeResponseDto {
     private Integer positionId;
     private String positionTitle;
     private String positionLevelCode;
+    private String positionRoleName;
+    private String dashboard;
 
     /** Employee's main/original department. */
     private Integer currentDepartmentId;

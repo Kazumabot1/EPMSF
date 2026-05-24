@@ -10,13 +10,14 @@ import com.epms.dto.EmployeeAssessmentDtos.ReviewActionRequest;
 import com.epms.dto.EmployeeAssessmentDtos.ScoreTableRowResponse;
 import com.epms.entity.AssessmentFormDefinition;
 import com.epms.entity.AssessmentFormQuestionDefinition;
-import com.epms.entity.AssessmentFormScoreBandDefinition;
 import com.epms.entity.AssessmentFormSectionDefinition;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
 import com.epms.entity.EmployeeAssessment;
 import com.epms.entity.EmployeeAssessmentAnswer;
 import com.epms.entity.Signature;
+import com.epms.entity.Team;
+import com.epms.entity.TeamMember;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssessmentStatus;
 import com.epms.exception.BadRequestException;
@@ -28,6 +29,7 @@ import com.epms.repository.EmployeeAssessmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.SignatureRepository;
+import com.epms.repository.TeamMemberRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
@@ -64,7 +66,8 @@ public class EmployeeAssessmentService {
             AssessmentStatus.PENDING_HR,
             AssessmentStatus.APPROVED,
             AssessmentStatus.DECLINED,
-            AssessmentStatus.REJECTED
+            AssessmentStatus.REJECTED,
+            AssessmentStatus.CLOSED_REJECTED
     );
 
     private static final List<AssessmentStatus> REVIEW_TABLE_STATUSES = List.of(
@@ -74,7 +77,8 @@ public class EmployeeAssessmentService {
             AssessmentStatus.PENDING_HR,
             AssessmentStatus.APPROVED,
             AssessmentStatus.DECLINED,
-            AssessmentStatus.REJECTED
+            AssessmentStatus.REJECTED,
+            AssessmentStatus.CLOSED_REJECTED
     );
 
     private static final List<AssessmentStatus> NON_EDITABLE_STATUSES = List.of(
@@ -84,7 +88,8 @@ public class EmployeeAssessmentService {
             AssessmentStatus.PENDING_HR,
             AssessmentStatus.APPROVED,
             AssessmentStatus.DECLINED,
-            AssessmentStatus.REJECTED
+            AssessmentStatus.REJECTED,
+            AssessmentStatus.CLOSED_REJECTED
     );
 
     private final EmployeeAssessmentRepository assessmentRepository;
@@ -95,6 +100,8 @@ public class EmployeeAssessmentService {
     private final SignatureRepository signatureRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final PositionPermissionService positionPermissionService;
+    private final SelfAssessmentScoreBandService selfAssessmentScoreBandService;
+    private final TeamMemberRepository teamMemberRepository;
 
     @Transactional(readOnly = true)
     public AssessmentResponse getTemplateForCurrentUser() {
@@ -109,6 +116,7 @@ public class EmployeeAssessmentService {
                     .findByUserIdOrderByUpdatedAtDesc(user.getId())
                     .stream()
                     .filter(assessment -> assessment.getStatus() != null)
+                    .filter(assessment -> !AssessmentStatus.DRAFT.equals(assessment.getStatus()))
                     .findFirst();
 
             if (latestExistingAssessment.isPresent()) {
@@ -206,36 +214,19 @@ public class EmployeeAssessmentService {
         validateAssessmentBelongsToAssignedForm(assessment, form);
         validateRequestFormMatchesAssignedForm(request, form);
 
-        boolean currentUserIsDepartmentHead = isCurrentUserDepartmentHead();
-
-        AssessmentStatus nextStatus = currentUserIsDepartmentHead
-                ? AssessmentStatus.PENDING_HR
-                : nextReviewStatus(assessment);
-
-        applyRequest(assessment, request, nextStatus, form);
+        applyRequest(assessment, request, AssessmentStatus.PENDING_MANAGER, form);
         validateComplete(assessment);
         calculateScores(assessment, form);
         attachEmployeeSignature(assessment);
 
-        if (currentUserIsDepartmentHead) {
-            attachDepartmentHeadSignatureForOwnAssessment(assessment);
-            assessment.setStatus(AssessmentStatus.PENDING_HR);
-        }
+        applyInitialManagerRouting(assessment);
 
+        assessment.setStatus(AssessmentStatus.PENDING_MANAGER);
         assessment.setSubmittedAt(LocalDateTime.now());
+        assessment.setApprovedAt(null);
+        assessment.setDeclinedAt(null);
 
         return toResponse(assessmentRepository.save(assessment));
-    }
-
-    private AssessmentStatus nextReviewStatus(EmployeeAssessment assessment) {
-        Integer currentUserId = SecurityUtils.currentUserId();
-        Integer managerUserId = assessment.getManagerUserId();
-
-        if (managerUserId != null && !Objects.equals(managerUserId, currentUserId)) {
-            return AssessmentStatus.PENDING_MANAGER;
-        }
-
-        return AssessmentStatus.PENDING_DEPARTMENT_HEAD;
     }
 
     @Transactional
@@ -243,17 +234,29 @@ public class EmployeeAssessmentService {
         EmployeeAssessment assessment = findAssessment(id);
         UserPrincipal principal = SecurityUtils.currentUser();
 
-        if (!Objects.equals(assessment.getManagerUserId(), principal.getId())) {
-            throw new UnauthorizedActionException("Only this employee's assigned manager can add remarks to this self-assessment.");
+        if (!isEligibleManagerReviewer(assessment, principal)) {
+            throw new UnauthorizedActionException("Only an eligible manager can sign this self-assessment.");
         }
 
         if (!AssessmentStatus.PENDING_MANAGER.equals(assessment.getStatus())
                 && !AssessmentStatus.SUBMITTED.equals(assessment.getStatus())) {
-            throw new BadRequestException("Manager can add remarks only while the assessment is waiting for manager review.");
+            throw new BadRequestException("Manager can sign only while the assessment is waiting for manager review.");
         }
 
+        User manager = currentUserEntity();
+        Signature signature = currentDefaultSignature();
+
+        assessment.setManagerUserId(manager.getId());
+        assessment.setManagerName(normalizeOptional(manager.getFullName()) == null
+                ? manager.getEmail()
+                : manager.getFullName());
         assessment.setManagerComment(clean(request == null ? null : request.getComment()));
-        assessment.setStatus(AssessmentStatus.PENDING_DEPARTMENT_HEAD);
+        assessment.setManagerSignatureId(signature.getId());
+        assessment.setManagerSignatureName(signature.getName());
+        assessment.setManagerSignatureImageData(signature.getImageData());
+        assessment.setManagerSignatureImageType(signature.getImageType());
+        assessment.setManagerSignedAt(LocalDateTime.now());
+        assessment.setStatus(AssessmentStatus.PENDING_HR);
 
         return toResponse(assessmentRepository.save(assessment));
     }
@@ -264,55 +267,34 @@ public class EmployeeAssessmentService {
     }
 
     @Transactional
-    public AssessmentResponse departmentHeadSign(Long id, ReviewActionRequest request) {
+    public AssessmentResponse managerDecline(Long id, ReviewActionRequest request) {
         EmployeeAssessment assessment = findAssessment(id);
         UserPrincipal principal = SecurityUtils.currentUser();
-        Set<String> roles = currentUserTargetRoles(principal);
 
-        if (!isDepartmentHeadRole(roles)) {
-            throw new UnauthorizedActionException("Only department head can sign this self-assessment.");
+        if (!isEligibleManagerReviewer(assessment, principal)) {
+            throw new UnauthorizedActionException("Only an eligible manager can reject this self-assessment.");
         }
 
-        if (!positionPermissionService.currentUserHasPermission("selfAssessmentSign")) {
-            throw new UnauthorizedActionException("Your position does not have permission to sign and forward self-assessments.");
+        if (!AssessmentStatus.PENDING_MANAGER.equals(assessment.getStatus())
+                && !AssessmentStatus.SUBMITTED.equals(assessment.getStatus())) {
+            throw new BadRequestException("Manager can reject only while the assessment is waiting for manager review.");
         }
 
-        if (assessment.getDepartmentId() == null) {
-            throw new BadRequestException("Assessment department information is missing.");
+        String reason = requiredReason(request, "Manager rejection reason is required.");
+        String comment = clean(request == null ? null : request.getComment());
+
+        if (canEmployeeReviseAfterRejection(assessment)) {
+            reopenRejectedAssessmentForEmployeeRevision(assessment, reason, comment, false);
+        } else {
+            closeRejectedAssessment(assessment, reason, comment, false);
         }
-
-        if (!currentUserDepartmentIds(principal).contains(assessment.getDepartmentId())) {
-            throw new UnauthorizedActionException("Only the department head of this employee's department can sign this self-assessment.");
-        }
-
-        if (!isDepartmentHeadSignableStatus(assessment)) {
-            throw new BadRequestException("This assessment is not ready for department head signature.");
-        }
-
-        User currentUser = currentUserEntity();
-        Signature signature = currentDefaultSignature();
-
-        assessment.setDepartmentHeadUserId(currentUser.getId());
-        assessment.setDepartmentHeadName(currentUser.getFullName());
-        assessment.setDepartmentHeadSignatureId(signature.getId());
-        assessment.setDepartmentHeadSignatureName(signature.getName());
-        assessment.setDepartmentHeadSignatureImageData(signature.getImageData());
-        assessment.setDepartmentHeadSignatureImageType(signature.getImageType());
-        assessment.setDepartmentHeadSignedAt(LocalDateTime.now());
-        assessment.setDepartmentHeadComment(clean(request == null ? null : request.getComment()));
-        assessment.setStatus(AssessmentStatus.PENDING_HR);
 
         return toResponse(assessmentRepository.save(assessment));
     }
 
-    private boolean isDepartmentHeadSignableStatus(EmployeeAssessment assessment) {
-        if (assessment == null || assessment.getStatus() == null) {
-            return false;
-        }
-
-        return AssessmentStatus.SUBMITTED.equals(assessment.getStatus())
-                || AssessmentStatus.PENDING_MANAGER.equals(assessment.getStatus())
-                || AssessmentStatus.PENDING_DEPARTMENT_HEAD.equals(assessment.getStatus());
+    @Transactional
+    public AssessmentResponse departmentHeadSign(Long id, ReviewActionRequest request) {
+        throw new BadRequestException("Department Head can only view self-assessment forms. Department Head signature is not required in the current self-assessment workflow.");
     }
 
     @Transactional
@@ -329,8 +311,8 @@ public class EmployeeAssessmentService {
             throw new BadRequestException("This assessment is not ready for HR approval.");
         }
 
-        if (assessment.getDepartmentHeadSignatureId() == null) {
-            throw new BadRequestException("HR cannot approve until the department head signature is completed.");
+        if (assessment.getManagerSignatureId() == null || assessment.getManagerSignedAt() == null) {
+            throw new BadRequestException("HR cannot approve until manager signature is completed.");
         }
 
         Signature signature = currentDefaultSignature();
@@ -343,6 +325,7 @@ public class EmployeeAssessmentService {
         assessment.setHrComment(clean(request == null ? null : request.getComment()));
         assessment.setStatus(AssessmentStatus.APPROVED);
         assessment.setApprovedAt(LocalDateTime.now());
+        assessment.setDeclinedAt(null);
 
         return toResponse(assessmentRepository.save(assessment));
     }
@@ -354,27 +337,29 @@ public class EmployeeAssessmentService {
         Set<String> roles = currentUserTargetRoles(principal);
 
         if (!roles.contains("HR") && !roles.contains("ADMIN")) {
-            throw new UnauthorizedActionException("Only HR can decline this self-assessment.");
+            throw new UnauthorizedActionException("Only HR can reject this self-assessment.");
         }
 
         if (AssessmentStatus.DRAFT.equals(assessment.getStatus())) {
-            throw new BadRequestException("HR cannot decline a draft assessment.");
+            throw new BadRequestException("HR cannot reject a draft assessment.");
         }
 
         if (AssessmentStatus.APPROVED.equals(assessment.getStatus())) {
-            throw new BadRequestException("Approved assessments cannot be declined.");
+            throw new BadRequestException("Approved assessments cannot be rejected.");
         }
 
-        String reason = clean(request == null ? null : request.getReason());
-
-        if (reason == null) {
-            reason = "Declined by HR.";
+        if (AssessmentStatus.CLOSED_REJECTED.equals(assessment.getStatus())) {
+            throw new BadRequestException("This assessment is already closed as rejected.");
         }
 
-        assessment.setDeclineReason(reason);
-        assessment.setHrComment(clean(request == null ? null : request.getComment()));
-        assessment.setStatus(AssessmentStatus.DECLINED);
-        assessment.setDeclinedAt(LocalDateTime.now());
+        String reason = requiredReason(request, "HR rejection reason is required.");
+        String comment = clean(request == null ? null : request.getComment());
+
+        if (canEmployeeReviseAfterRejection(assessment)) {
+            reopenRejectedAssessmentForEmployeeRevision(assessment, reason, comment, true);
+        } else {
+            closeRejectedAssessment(assessment, reason, comment, true);
+        }
 
         return toResponse(assessmentRepository.save(assessment));
     }
@@ -413,12 +398,11 @@ public class EmployeeAssessmentService {
                     )
                     .forEach(assessment -> visible.put(assessment.getId(), assessment));
 
-            assessmentRepository
-                    .findByUserIdAndStatusInOrderBySubmittedAtDesc(
-                            principal.getId(),
-                            REVIEW_TABLE_STATUSES
-                    )
-                    .forEach(assessment -> visible.put(assessment.getId(), assessment));
+            for (EmployeeAssessment assessment : assessmentRepository.findByStatusInOrderBySubmittedAtDesc(REVIEW_TABLE_STATUSES)) {
+                if (isEligibleManagerReviewer(assessment, principal)) {
+                    visible.put(assessment.getId(), assessment);
+                }
+            }
 
             return visible.values()
                     .stream()
@@ -445,13 +429,6 @@ public class EmployeeAssessmentService {
                         )
                         .forEach(assessment -> visible.put(assessment.getId(), assessment));
             }
-
-            assessmentRepository
-                    .findByUserIdAndStatusInOrderBySubmittedAtDesc(
-                            principal.getId(),
-                            REVIEW_TABLE_STATUSES
-                    )
-                    .forEach(assessment -> visible.put(assessment.getId(), assessment));
 
             return visible.values()
                     .stream()
@@ -617,9 +594,7 @@ public class EmployeeAssessmentService {
     }
 
     private String scoreLabel(double scorePercent, AssessmentFormDefinition form) {
-        List<AssessmentScoreBandResponse> bands = form == null
-                ? defaultScoreBands()
-                : scoreBandsFromForm(form);
+        List<AssessmentScoreBandResponse> bands = selfAssessmentScoreBandService.getActiveBandsForAssessment();
 
         return bands.stream()
                 .filter(band -> scorePercent >= band.getMinScore() && scorePercent <= band.getMaxScore())
@@ -661,15 +636,11 @@ public class EmployeeAssessmentService {
                 .hrComment(null)
                 .declineReason(null)
                 .sections(templateSectionsFromForm(form))
-                .scoreBands(scoreBandsFromForm(form))
+                .scoreBands(selfAssessmentScoreBandService.getActiveBandsForAssessment())
                 .build();
     }
 
     private AssessmentResponse toResponse(EmployeeAssessment assessment) {
-        AssessmentFormDefinition form = assessment.getAssessmentFormId() == null
-                ? null
-                : formRepository.findById(assessment.getAssessmentFormId()).orElse(null);
-
         EmployeeProfile profile = userRepository
                 .findById(assessment.getUserId())
                 .map(this::resolveProfile)
@@ -739,7 +710,7 @@ public class EmployeeAssessmentService {
                 .approvedAt(assessment.getApprovedAt())
                 .declinedAt(assessment.getDeclinedAt())
                 .sections(groupSections(assessment.getAnswers()))
-                .scoreBands(form == null ? defaultScoreBands() : scoreBandsFromForm(form))
+                .scoreBands(selfAssessmentScoreBandService.getActiveBandsForAssessment())
                 .build();
     }
 
@@ -766,7 +737,7 @@ public class EmployeeAssessmentService {
                 .approvedAt(assessment.getApprovedAt())
                 .declinedAt(assessment.getDeclinedAt())
                 .employeeSigned(assessment.getEmployeeSignatureId() != null)
-                .managerSigned(false)
+                .managerSigned(assessment.getManagerSignatureId() != null)
                 .departmentHeadSigned(assessment.getDepartmentHeadSignatureId() != null)
                 .hrSigned(assessment.getHrSignatureId() != null)
                 .build();
@@ -862,30 +833,30 @@ public class EmployeeAssessmentService {
     private AssessmentFormDefinition findAssignedActiveFormForCurrentUser() {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> currentRoles = currentUserTargetRoles(principal);
-        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
 
         return formRepository
-                .findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(today, today)
+                .findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(now, now)
                 .stream()
                 .filter(form -> formTargetsCurrentUser(form, currentRoles))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "No active self-assessment form is available for your role or the form date period is closed. Please contact HR."
+                        "No active self-assessment form is available for your role or the form date/time period is closed. Please contact HR."
                 ));
     }
 
     private void ensureFormOpenForSubmission(AssessmentFormDefinition form) {
-        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
 
         if (form == null || !Boolean.TRUE.equals(form.getActive())) {
             throw new BadRequestException("This self-assessment form is not active.");
         }
 
-        if (form.getStartDate() != null && today.isBefore(form.getStartDate())) {
+        if (form.getStartDate() != null && now.isBefore(form.getStartDate())) {
             throw new BadRequestException("This self-assessment form is not open yet.");
         }
 
-        if (form.getEndDate() != null && today.isAfter(form.getEndDate())) {
+        if (form.getEndDate() != null && now.isAfter(form.getEndDate())) {
             throw new BadRequestException("This self-assessment form submission period has ended.");
         }
     }
@@ -990,11 +961,6 @@ public class EmployeeAssessmentService {
                 || roles.contains("HEAD_OF_DEPARTMENT");
     }
 
-    private boolean isCurrentUserDepartmentHead() {
-        UserPrincipal principal = SecurityUtils.currentUser();
-        return isDepartmentHeadRole(currentUserTargetRoles(principal));
-    }
-
     private Signature currentDefaultSignature() {
         Integer userId = SecurityUtils.currentUserId();
 
@@ -1011,20 +977,6 @@ public class EmployeeAssessmentService {
         assessment.setEmployeeSignatureImageData(signature.getImageData());
         assessment.setEmployeeSignatureImageType(signature.getImageType());
         assessment.setEmployeeSignedAt(LocalDateTime.now());
-    }
-
-    private void attachDepartmentHeadSignatureForOwnAssessment(EmployeeAssessment assessment) {
-        User currentUser = currentUserEntity();
-        Signature signature = currentDefaultSignature();
-
-        assessment.setDepartmentHeadUserId(currentUser.getId());
-        assessment.setDepartmentHeadName(currentUser.getFullName());
-        assessment.setDepartmentHeadSignatureId(signature.getId());
-        assessment.setDepartmentHeadSignatureName(signature.getName());
-        assessment.setDepartmentHeadSignatureImageData(signature.getImageData());
-        assessment.setDepartmentHeadSignatureImageType(signature.getImageType());
-        assessment.setDepartmentHeadSignedAt(LocalDateTime.now());
-        assessment.setDepartmentHeadComment("Self-assessment submitted by Department Head. Department Head review skipped.");
     }
 
     private List<AssessmentFormSectionDefinition> sortedSections(AssessmentFormDefinition form) {
@@ -1053,68 +1005,6 @@ public class EmployeeAssessmentService {
                         Comparator.nullsLast(Integer::compareTo)
                 ))
                 .toList();
-    }
-
-    private List<AssessmentScoreBandResponse> scoreBandsFromForm(AssessmentFormDefinition form) {
-        if (form == null || form.getScoreBands() == null || form.getScoreBands().isEmpty()) {
-            return defaultScoreBands();
-        }
-
-        return form.getScoreBands()
-                .stream()
-                .sorted(Comparator.comparing(
-                        AssessmentFormScoreBandDefinition::getSortOrder,
-                        Comparator.nullsLast(Integer::compareTo)
-                ))
-                .map(band -> AssessmentScoreBandResponse.builder()
-                        .id(band.getId())
-                        .minScore(band.getMinScore())
-                        .maxScore(band.getMaxScore())
-                        .label(band.getLabel())
-                        .description(band.getDescription())
-                        .sortOrder(band.getSortOrder())
-                        .build())
-                .toList();
-    }
-
-    private List<AssessmentScoreBandResponse> defaultScoreBands() {
-        return List.of(
-                AssessmentScoreBandResponse.builder()
-                        .minScore(86)
-                        .maxScore(100)
-                        .label("Outstanding")
-                        .description("Performance exceptional and far exceeds expectations. Consistently demonstrates excellent standards in all job requirements.")
-                        .sortOrder(1)
-                        .build(),
-                AssessmentScoreBandResponse.builder()
-                        .minScore(71)
-                        .maxScore(85)
-                        .label("Good")
-                        .description("Performance is consistent. Clearly meets essential requirements of job.")
-                        .sortOrder(2)
-                        .build(),
-                AssessmentScoreBandResponse.builder()
-                        .minScore(60)
-                        .maxScore(70)
-                        .label("Meet Requirement")
-                        .description("Performance is satisfactory. Meets requirements of the job.")
-                        .sortOrder(3)
-                        .build(),
-                AssessmentScoreBandResponse.builder()
-                        .minScore(40)
-                        .maxScore(59)
-                        .label("Need Improvement")
-                        .description("Performance is inconsistent. Meets requirements of the job occasionally. Supervision and training is required for most problem areas.")
-                        .sortOrder(4)
-                        .build(),
-                AssessmentScoreBandResponse.builder()
-                        .minScore(0)
-                        .maxScore(39)
-                        .label("Unsatisfactory")
-                        .description("Performance does not meet the minimum requirement of the job.")
-                        .sortOrder(5)
-                        .build()
-        );
     }
 
     private EmployeeAssessment findAssessment(Long id) {
@@ -1258,7 +1148,7 @@ public class EmployeeAssessmentService {
             return;
         }
 
-        if (roles.contains("MANAGER") && Objects.equals(assessment.getManagerUserId(), principal.getId())) {
+        if (roles.contains("MANAGER") && isEligibleManagerReviewer(assessment, principal)) {
             return;
         }
 
@@ -1367,6 +1257,234 @@ public class EmployeeAssessmentService {
 
         String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private void applyInitialManagerRouting(EmployeeAssessment assessment) {
+        if (assessment == null) {
+            return;
+        }
+
+        List<User> eligibleManagers = eligibleManagersForAssessment(assessment);
+
+        if (eligibleManagers.size() == 1) {
+            User manager = eligibleManagers.get(0);
+
+            assessment.setManagerUserId(manager.getId());
+            assessment.setManagerName(normalizeOptional(manager.getFullName()) == null
+                    ? manager.getEmail()
+                    : manager.getFullName());
+            return;
+        }
+
+        if (eligibleManagers.size() > 1) {
+            assessment.setManagerUserId(null);
+            assessment.setManagerName("Department Managers");
+            return;
+        }
+
+        throw new BadRequestException(
+                "No eligible manager was found for this employee. Please assign the employee to a team with a manager, or make sure the department has at least one active Manager."
+        );
+    }
+
+    private List<User> eligibleManagersForAssessment(EmployeeAssessment assessment) {
+        if (assessment == null || assessment.getUserId() == null) {
+            return List.of();
+        }
+
+        List<TeamMember> activeMemberships = activeTeamMembershipsForUser(assessment.getUserId());
+
+        if (!activeMemberships.isEmpty()) {
+            Map<Integer, User> managers = new LinkedHashMap<>();
+
+            for (TeamMember membership : activeMemberships) {
+                Team team = membership.getTeam();
+
+                if (team == null) {
+                    continue;
+                }
+
+                addIfManager(managers, team.getProjectManager());
+                addIfManager(managers, team.getTeamLeader());
+            }
+
+            return new ArrayList<>(managers.values());
+        }
+
+        if (assessment.getDepartmentId() == null) {
+            return List.of();
+        }
+
+        return userRepository
+                .findAll()
+                .stream()
+                .filter(user -> !Boolean.FALSE.equals(user.getActive()))
+                .filter(user -> Objects.equals(user.getDepartmentId(), assessment.getDepartmentId()))
+                .filter(this::userHasManagerRole)
+                .toList();
+    }
+
+    private void addIfManager(Map<Integer, User> managers, User user) {
+        if (user == null || user.getId() == null) {
+            return;
+        }
+
+        if (Boolean.FALSE.equals(user.getActive())) {
+            return;
+        }
+
+        if (!userHasManagerRole(user)) {
+            return;
+        }
+
+        managers.put(user.getId(), user);
+    }
+
+    private boolean isEligibleManagerReviewer(EmployeeAssessment assessment, UserPrincipal principal) {
+        if (assessment == null || principal == null || principal.getId() == null) {
+            return false;
+        }
+
+        Set<String> roles = currentUserTargetRoles(principal);
+
+        if (!roles.contains("MANAGER")) {
+            return false;
+        }
+
+        if (assessment.getManagerUserId() != null
+                && Objects.equals(assessment.getManagerUserId(), principal.getId())) {
+            return true;
+        }
+
+        return eligibleManagersForAssessment(assessment)
+                .stream()
+                .anyMatch(manager -> Objects.equals(manager.getId(), principal.getId()));
+    }
+
+    private List<TeamMember> activeTeamMembershipsForUser(Integer userId) {
+        if (userId == null) {
+            return List.of();
+        }
+
+        return teamMemberRepository
+                .findByMemberUserIdAndEndedDateIsNull(userId)
+                .stream()
+                .filter(membership -> membership.getTeam() != null)
+                .toList();
+    }
+
+    private boolean userHasManagerRole(User user) {
+        if (user == null) {
+            return false;
+        }
+
+        Set<String> roles = new LinkedHashSet<>();
+
+        if (user.getDashboard() != null) {
+            addRoleWithAliases(roles, roleFromDashboard(user.getDashboard()));
+        }
+
+        if (user.getPosition() != null && user.getPosition().getRole() != null) {
+            addRoleWithAliases(roles, user.getPosition().getRole().getName());
+        }
+
+        return roles.contains("MANAGER");
+    }
+
+    private boolean canEmployeeReviseAfterRejection(EmployeeAssessment assessment) {
+        if (assessment == null || assessment.getAssessmentFormId() == null) {
+            return false;
+        }
+
+        AssessmentFormDefinition form = formRepository
+                .findById(assessment.getAssessmentFormId())
+                .orElse(null);
+
+        if (form == null) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        return form.getEndDate() == null || !now.isAfter(form.getEndDate());
+    }
+
+    private void reopenRejectedAssessmentForEmployeeRevision(
+            EmployeeAssessment assessment,
+            String reason,
+            String reviewerComment,
+            boolean rejectedByHr
+    ) {
+        assessment.setStatus(AssessmentStatus.DRAFT);
+        assessment.setDeclineReason(reason);
+        assessment.setDeclinedAt(LocalDateTime.now());
+        assessment.setApprovedAt(null);
+        assessment.setSubmittedAt(null);
+
+        if (rejectedByHr) {
+            assessment.setHrComment(reviewerComment);
+        } else {
+            assessment.setManagerComment(reviewerComment);
+        }
+
+        clearEmployeeSubmissionAndReviewSignatures(assessment);
+    }
+
+    private void closeRejectedAssessment(
+            EmployeeAssessment assessment,
+            String reason,
+            String reviewerComment,
+            boolean rejectedByHr
+    ) {
+        assessment.setStatus(AssessmentStatus.CLOSED_REJECTED);
+        assessment.setDeclineReason(reason);
+        assessment.setDeclinedAt(LocalDateTime.now());
+        assessment.setApprovedAt(null);
+
+        if (rejectedByHr) {
+            assessment.setHrComment(reviewerComment);
+        } else {
+            assessment.setManagerComment(reviewerComment);
+        }
+    }
+
+    private void clearEmployeeSubmissionAndReviewSignatures(EmployeeAssessment assessment) {
+        assessment.setEmployeeSignatureId(null);
+        assessment.setEmployeeSignatureName(null);
+        assessment.setEmployeeSignatureImageData(null);
+        assessment.setEmployeeSignatureImageType(null);
+        assessment.setEmployeeSignedAt(null);
+
+        assessment.setManagerSignatureId(null);
+        assessment.setManagerSignatureName(null);
+        assessment.setManagerSignatureImageData(null);
+        assessment.setManagerSignatureImageType(null);
+        assessment.setManagerSignedAt(null);
+
+        assessment.setDepartmentHeadSignatureId(null);
+        assessment.setDepartmentHeadSignatureName(null);
+        assessment.setDepartmentHeadSignatureImageData(null);
+        assessment.setDepartmentHeadSignatureImageType(null);
+        assessment.setDepartmentHeadSignedAt(null);
+
+        assessment.setHrSignatureId(null);
+        assessment.setHrSignatureName(null);
+        assessment.setHrSignatureImageData(null);
+        assessment.setHrSignatureImageType(null);
+        assessment.setHrSignedAt(null);
+
+        assessment.setDepartmentHeadUserId(null);
+        assessment.setDepartmentHeadName(null);
+    }
+
+    private String requiredReason(ReviewActionRequest request, String message) {
+        String reason = clean(request == null ? null : request.getReason());
+
+        if (reason == null) {
+            throw new BadRequestException(message);
+        }
+
+        return reason;
     }
 
     private String clean(String value) {
