@@ -285,7 +285,15 @@ const KpiTemplateEditorPage = () => {
     await saveTemplate('use-in-cycle');
   };
 
-  if (loading) {
+  const positionPlaceholder = loading
+    ? 'Loading positions...'
+    : positions.length === 0
+      ? 'No positions in system'
+      : !isEdit && availablePositionCount === 0
+        ? 'All positions already have a KPI template'
+        : 'Select position...';
+
+  if (loading && isEdit) {
     return (
       <div className="kpi-tpl-page">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-center px-4 py-28">
@@ -374,7 +382,7 @@ const KpiTemplateEditorPage = () => {
                   <select
                     required
                     value={positionId ?? ''}
-                    disabled={savingAction !== null}
+                    disabled={savingAction !== null || loading}
                     onChange={(event) => {
                       const next = event.target.value ? Number(event.target.value) : null;
                       setValidationMessage(null);
@@ -383,6 +391,7 @@ const KpiTemplateEditorPage = () => {
                     className={`${fieldClass} cursor-pointer appearance-none pr-10`}
                     aria-label="Position"
                   >
+                    {loading && <option value="">{positionPlaceholder}</option>}
                     <option value="">
                       {positions.length === 0
                         ? 'No positions in system'
@@ -397,14 +406,14 @@ const KpiTemplateEditorPage = () => {
                     ))}
                   </select>
                 </div>
-                {positions.length > 0 && (
+                {!loading && positions.length > 0 && (
                   <p className="text-sm text-gray-500">
                     {!isEdit
                       ? `${availablePositionCount} of ${positions.length} position${positions.length === 1 ? '' : 's'} available for a new KPI template.`
                       : `${positions.length} position${positions.length === 1 ? '' : 's'} in the organization.`}
                   </p>
                 )}
-                {positions.length === 0 && (
+                {!loading && positions.length === 0 && (
                   <p className="text-sm text-amber-700">
                     No positions found.{' '}
                     <Link to="/hr/position/table" className="font-semibold underline">
@@ -482,7 +491,7 @@ const KpiTemplateEditorPage = () => {
             <button
               type="button"
               onClick={() => void saveTemplate('draft')}
-              disabled={savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
+              disabled={loading || savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
               className="kpi-tpl-btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
               {savingAction === 'draft' ? (
@@ -496,7 +505,7 @@ const KpiTemplateEditorPage = () => {
             </button>
             <button
               type="submit"
-              disabled={savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
+              disabled={loading || savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
               className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
               title="Save this form and return to the KPI template list"
             >

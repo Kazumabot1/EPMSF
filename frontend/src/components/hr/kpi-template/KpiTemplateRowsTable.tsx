@@ -126,12 +126,12 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.map((row, rowIndex) => (
-              <tr
-                key={row.rowId}
-                className={`align-top odd:bg-gray-50/40 transition-colors hover:bg-violet-50/30 ${
-                  row.id == null && row.changeReason ? 'kpi-tpl-row-added' : ''
-                }`}
-              >
+                <tr
+                  key={row.rowId}
+                  className={`align-top odd:bg-gray-50/40 transition-colors hover:bg-violet-50/30 ${
+                    row.id == null && row.changeReason ? 'kpi-tpl-row-added' : ''
+                  }`}
+                >
                 <td className="px-3 py-3">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
@@ -285,7 +285,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     </button>
                   )}
                 </td>
-              </tr>
+                </tr>
             ))}
           </tbody>
           <tfoot>

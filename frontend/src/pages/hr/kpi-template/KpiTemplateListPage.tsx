@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../../components/ConfirmModal';
 import '../../../components/hr/kpi-template/kpi-template.css';
@@ -116,10 +116,10 @@ const KpiTemplateListPage = () => {
                 <i className="bi bi-arrow-clockwise text-base text-gray-500" aria-hidden />
                 Refresh
               </button>
-              <a href="/hr/kpi-template/new" className="kpi-tpl-btn-primary no-underline">
+              <Link to="/hr/kpi-template/new" className="kpi-tpl-btn-primary no-underline">
                 <i className="bi bi-plus-lg text-lg" aria-hidden />
                 New template
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -183,10 +183,10 @@ const KpiTemplateListPage = () => {
                   : 'Try a different search term.'}
               </p>
               {templates.length === 0 && (
-                <a href="/hr/kpi-template/new" className="kpi-tpl-btn-primary mt-8 inline-flex no-underline">
+                <Link to="/hr/kpi-template/new" className="kpi-tpl-btn-primary mt-8 inline-flex no-underline">
                   <i className="bi bi-plus-circle text-lg" aria-hidden />
                   Create template
-                </a>
+                </Link>
               )}
             </div>
           )}
