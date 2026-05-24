@@ -1138,11 +1138,31 @@ public class EmployeeAssessmentService {
 
     private void assertCanView(EmployeeAssessment assessment) {
         UserPrincipal principal = SecurityUtils.currentUser();
-        Set<String> roles = currentUserTargetRoles(principal);
+        Integer currentUserId = SecurityUtils.currentUserId();
 
-        if (assessment.getUserId().equals(principal.getId())) {
+        /*
+         * Employee owner check.
+         * Use SecurityUtils.currentUserId() because this is the same value used by my-history.
+         */
+        if (sameId(assessment.getUserId(), currentUserId)) {
             return;
         }
+
+        /*
+         * Safety fallback:
+         * If the user account was recreated or linked differently, still allow the
+         * employee to view their own assessment through employeeId.
+         */
+        if (currentUserId != null) {
+            Optional<User> currentUser = userRepository.findById(currentUserId);
+
+            if (currentUser.isPresent()
+                    && sameId(assessment.getEmployeeId(), currentUser.get().getEmployeeId())) {
+                return;
+            }
+        }
+
+        Set<String> roles = currentUserTargetRoles(principal);
 
         if (roles.contains("HR") || roles.contains("ADMIN")) {
             return;
@@ -1292,11 +1312,16 @@ public class EmployeeAssessmentService {
             return List.of();
         }
 
+        Map<Integer, User> managers = new LinkedHashMap<>();
+
         List<TeamMember> activeMemberships = activeTeamMembershipsForUser(assessment.getUserId());
 
+        /*
+         * Case 1:
+         * Employee is inside one or more active teams.
+         * The form goes to that team Project Manager / Team Leader.
+         */
         if (!activeMemberships.isEmpty()) {
-            Map<Integer, User> managers = new LinkedHashMap<>();
-
             for (TeamMember membership : activeMemberships) {
                 Team team = membership.getTeam();
 
@@ -1308,20 +1333,45 @@ public class EmployeeAssessmentService {
                 addIfManager(managers, team.getTeamLeader());
             }
 
-            return new ArrayList<>(managers.values());
+            if (!managers.isEmpty()) {
+                return new ArrayList<>(managers.values());
+            }
         }
 
-        if (assessment.getDepartmentId() == null) {
-            return List.of();
+        /*
+         * Case 2:
+         * Employee has no team, or team has no valid manager.
+         * Send to all active Manager-role users in the same department.
+         */
+        if (assessment.getDepartmentId() != null) {
+            for (User user : userRepository.findAll()) {
+                if (Boolean.FALSE.equals(user.getActive())) {
+                    continue;
+                }
+
+                if (!userBelongsToDepartment(user, assessment.getDepartmentId())) {
+                    continue;
+                }
+
+                if (!userHasManagerRole(user)) {
+                    continue;
+                }
+
+                managers.put(user.getId(), user);
+            }
         }
 
-        return userRepository
-                .findAll()
-                .stream()
-                .filter(user -> !Boolean.FALSE.equals(user.getActive()))
-                .filter(user -> Objects.equals(user.getDepartmentId(), assessment.getDepartmentId()))
-                .filter(this::userHasManagerRole)
-                .toList();
+        /*
+         * Case 3 fallback:
+         * If employee profile already has an assigned manager, use that manager.
+         */
+        if (managers.isEmpty() && assessment.getManagerUserId() != null) {
+            userRepository.findById(assessment.getManagerUserId())
+                    .filter(user -> !Boolean.FALSE.equals(user.getActive()))
+                    .ifPresent(user -> managers.put(user.getId(), user));
+        }
+
+        return new ArrayList<>(managers.values());
     }
 
     private void addIfManager(Map<Integer, User> managers, User user) {
@@ -1373,6 +1423,31 @@ public class EmployeeAssessmentService {
                 .toList();
     }
 
+    private boolean userBelongsToDepartment(User user, Integer departmentId) {
+        if (user == null || departmentId == null) {
+            return false;
+        }
+
+        if (Objects.equals(user.getDepartmentId(), departmentId)) {
+            return true;
+        }
+
+        if (user.getEmployeeId() == null) {
+            return false;
+        }
+
+        return employeeDepartmentRepository
+                .findActiveAssignmentsForEmployeeId(user.getEmployeeId())
+                .stream()
+                .anyMatch(assignment -> {
+                    Department current = assignment.getCurrentDepartment();
+                    Department parent = assignment.getParentDepartment();
+
+                    return (current != null && Objects.equals(current.getId(), departmentId))
+                            || (parent != null && Objects.equals(parent.getId(), departmentId));
+                });
+    }
+
     private boolean userHasManagerRole(User user) {
         if (user == null) {
             return false;
@@ -1384,8 +1459,12 @@ public class EmployeeAssessmentService {
             addRoleWithAliases(roles, roleFromDashboard(user.getDashboard()));
         }
 
-        if (user.getPosition() != null && user.getPosition().getRole() != null) {
-            addRoleWithAliases(roles, user.getPosition().getRole().getName());
+        if (user.getPosition() != null) {
+            if (user.getPosition().getRole() != null) {
+                addRoleWithAliases(roles, user.getPosition().getRole().getName());
+            }
+
+            addRoleWithAliases(roles, user.getPosition().getPositionTitle());
         }
 
         return roles.contains("MANAGER");
@@ -1485,6 +1564,14 @@ public class EmployeeAssessmentService {
         }
 
         return reason;
+    }
+
+    private boolean sameId(Integer left, Integer right) {
+        if (left == null || right == null) {
+            return false;
+        }
+
+        return Objects.equals(left.longValue(), right.longValue());
     }
 
     private String clean(String value) {
