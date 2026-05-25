@@ -20,11 +20,11 @@ type NavItem = {
 };
 
 const normalizeRoleName = (role: string) =>
-  String(role ?? '')
-    .replace(/^ROLE_/i, '')
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .replace(/[\s-]+/g, '_')
-    .toUpperCase();
+    String(role ?? '')
+        .replace(/^ROLE_/i, '')
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        .replace(/[\s-]+/g, '_')
+        .toUpperCase();
 
 const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const navigate = useNavigate();
@@ -38,50 +38,49 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const normalizedDashboard = normalizeRoleName(dashboard);
 
   const isAdmin =
-    normalizedRoles.includes('ADMIN') ||
-    normalizedDashboard === 'ADMIN_DASHBOARD';
+      normalizedRoles.includes('ADMIN') ||
+      normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isEmployee =
-    normalizedRoles.includes('EMPLOYEE') ||
-    normalizedDashboard === 'EMPLOYEE_DASHBOARD';
+      normalizedRoles.includes('EMPLOYEE') ||
+      normalizedDashboard === 'EMPLOYEE_DASHBOARD';
 
   const isHr =
-    normalizedRoles.includes('HR') ||
-    normalizedDashboard === 'HR_DASHBOARD';
+      normalizedRoles.includes('HR') ||
+      normalizedDashboard === 'HR_DASHBOARD';
 
   const isHrOnly = variant === 'hr' || isHr;
   const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
 
   const roleLabel =
-    variant === 'admin'
-      ? 'Admin'
-      : variant === 'hr'
-        ? 'HR'
-        : isAdmin
+      variant === 'admin'
           ? 'Admin'
-          : normalizedDashboard === 'EMPLOYEE_DASHBOARD'
-            ? 'Employee'
-            : normalizedDashboard === 'HR_DASHBOARD'
+          : variant === 'hr'
               ? 'HR'
-              : normalizedDashboard === 'MANAGER_DASHBOARD'
-                ? 'Manager'
-                : normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD'
-                  ? 'Department Head'
-                  : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
-                    ? 'Executive'
-                    : 'User';
+              : isAdmin
+                  ? 'Admin'
+                  : normalizedDashboard === 'EMPLOYEE_DASHBOARD'
+                      ? 'Employee'
+                      : normalizedDashboard === 'HR_DASHBOARD'
+                          ? 'HR'
+                          : normalizedDashboard === 'MANAGER_DASHBOARD'
+                              ? 'Manager'
+                              : normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD'
+                                  ? 'Department Head'
+                                  : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
+                                      ? 'Executive'
+                                      : 'User';
 
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
-      ? [
+        ? [
           { to: '/pip/create', label: 'Create', icon: 'bi bi-plus-square' },
           { to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' },
         ]
-      : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
+        : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
     const adminNavItems: NavItem[] = [
       { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
-      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
       { to: '/admin/employee/import', label: 'Import Accounts', icon: 'bi bi-upload' },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
@@ -104,7 +103,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
     const hrNavItems: NavItem[] = [
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
-      // { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       { to: '/hr/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       {
         to: '/hr/team',
@@ -246,8 +244,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
           { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
-          { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
-          { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
+          // { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
+          // { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
           { to: '/hr/feedback/audit', label: 'Audit Log', icon: 'bi bi-shield-check' },
@@ -382,13 +380,13 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   });
 
   const notificationBadge = unreadCount > 0 ? (
-    <span className="hr-nav-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+      <span className="hr-nav-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
   ) : null;
 
   const hasActiveChild = useCallback(
-    (item: NavItem) =>
-      item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false,
-    [location.pathname],
+      (item: NavItem) =>
+          item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false,
+      [location.pathname],
   );
 
   useEffect(() => {
@@ -410,7 +408,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   }, [hasActiveChild, navItems]);
 
   const isParentActive = (item: NavItem) =>
-    location.pathname.startsWith(item.to) || hasActiveChild(item);
+      location.pathname.startsWith(item.to) || hasActiveChild(item);
 
   const toggleParent = (item: NavItem) => {
     if (!item.children?.length) {
@@ -432,108 +430,108 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   };
 
   return (
-    <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
-      <div className="hr-sidebar-top">
-        <div className="hr-brand">
-          <SidebarCompanyLogo />
+      <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <div className="hr-sidebar-top">
+          <div className="hr-brand">
+            <SidebarCompanyLogo />
 
-          {!collapsed && (
-            <div className="hr-brand-copy">
-              <h2>EPMS</h2>
-              <p>Performance System</p>
-            </div>
-          )}
-        </div>
-
-        {!collapsed && <div className="hr-sidebar-top-divider" />}
-      </div>
-
-      {!collapsed && (
-        <div className="hr-role-chip">
-          <small>CURRENT ROLE</small>
-          <strong>{roleLabel}</strong>
-        </div>
-      )}
-
-      <nav className="hr-nav">
-        {navItems.map((item) => {
-          const isExpanded = expanded.has(item.to);
-          const parentActive = isParentActive(item);
-
-          if (!item.children?.length) {
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) => `hr-nav-link ${isActive ? 'active' : ''}`}
-                title={collapsed ? item.label : undefined}
-              >
-                <i className={item.icon} />
-                {!collapsed && <span>{item.label}</span>}
-                {item.to.includes('notifications') && notificationBadge}
-              </NavLink>
-            );
-          }
-
-          return (
-            <div key={item.to} className="hr-nav-group">
-              <button
-                type="button"
-                className={`hr-nav-link hr-nav-group-toggle ${parentActive ? 'active' : ''}`}
-                onClick={() => toggleParent(item)}
-                title={collapsed ? item.label : undefined}
-              >
-                <i className={item.icon} />
-
-                {!collapsed && (
-                  <>
-                    <span>{item.label}</span>
-                    {item.to.includes('notifications') && notificationBadge}
-                    <i
-                      className={`bi ${
-                        isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'
-                      } hr-submenu-caret`}
-                    />
-                  </>
-                )}
-              </button>
-
-              {!collapsed && isExpanded && (
-                <div className="hr-submenu">
-                  {item.children.map((child) => (
-                    <NavLink
-                      key={child.to}
-                      to={child.to}
-                      end={child.end}
-                      className={({ isActive }) =>
-                        `hr-submenu-link ${isActive ? 'active' : ''}`
-                      }
-                    >
-                      <i className={child.icon} />
-                      <span>{child.label}</span>
-                      {child.to.includes('notifications') && notificationBadge}
-                    </NavLink>
-                  ))}
+            {!collapsed && (
+                <div className="hr-brand-copy">
+                  <h2>EPMS</h2>
+                  <p>Performance System</p>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
+            )}
+          </div>
 
-      <div className="hr-sidebar-footer">
-        <button
-          type="button"
-          className="hr-sidebar-collapse"
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
-          {!collapsed && <span>Collapse</span>}
-        </button>
-      </div>
-    </aside>
+          {!collapsed && <div className="hr-sidebar-top-divider" />}
+        </div>
+
+        {!collapsed && (
+            <div className="hr-role-chip">
+              <small>CURRENT ROLE</small>
+              <strong>{roleLabel}</strong>
+            </div>
+        )}
+
+        <nav className="hr-nav">
+          {navItems.map((item) => {
+            const isExpanded = expanded.has(item.to);
+            const parentActive = isParentActive(item);
+
+            if (!item.children?.length) {
+              return (
+                  <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) => `hr-nav-link ${isActive ? 'active' : ''}`}
+                      title={collapsed ? item.label : undefined}
+                  >
+                    <i className={item.icon} />
+                    {!collapsed && <span>{item.label}</span>}
+                    {item.to.includes('notifications') && notificationBadge}
+                  </NavLink>
+              );
+            }
+
+            return (
+                <div key={item.to} className="hr-nav-group">
+                  <button
+                      type="button"
+                      className={`hr-nav-link hr-nav-group-toggle ${parentActive ? 'active' : ''}`}
+                      onClick={() => toggleParent(item)}
+                      title={collapsed ? item.label : undefined}
+                  >
+                    <i className={item.icon} />
+
+                    {!collapsed && (
+                        <>
+                          <span>{item.label}</span>
+                          {item.to.includes('notifications') && notificationBadge}
+                          <i
+                              className={`bi ${
+                                  isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'
+                              } hr-submenu-caret`}
+                          />
+                        </>
+                    )}
+                  </button>
+
+                  {!collapsed && isExpanded && (
+                      <div className="hr-submenu">
+                        {item.children.map((child) => (
+                            <NavLink
+                                key={child.to}
+                                to={child.to}
+                                end={child.end}
+                                className={({ isActive }) =>
+                                    `hr-submenu-link ${isActive ? 'active' : ''}`
+                                }
+                            >
+                              <i className={child.icon} />
+                              <span>{child.label}</span>
+                              {child.to.includes('notifications') && notificationBadge}
+                            </NavLink>
+                        ))}
+                      </div>
+                  )}
+                </div>
+            );
+          })}
+        </nav>
+
+        <div className="hr-sidebar-footer">
+          <button
+              type="button"
+              className="hr-sidebar-collapse"
+              onClick={onToggle}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i className={`bi ${collapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} />
+            {!collapsed && <span>Collapse</span>}
+          </button>
+        </div>
+      </aside>
   );
 };
 

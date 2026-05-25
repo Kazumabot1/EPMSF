@@ -2,14 +2,23 @@ import EmployeeHeader from '../components/header/EmployeeHeader';
 import HRHeader from '../components/header/HRHeader';
 import type { UserRole } from '../config/roleNavigation';
 
+interface RoleBasedHeaderUser {
+  fullName?: string;
+  email?: string;
+  employeeCode?: string;
+  position?: string;
+  roles?: string[];
+  dashboard?: string;
+}
+
 interface RoleBasedHeaderProps {
   role: UserRole;
   collapsed: boolean;
-  user?: any;
+  user?: RoleBasedHeaderUser | null;
 }
 
 const RoleBasedHeader = ({ role, collapsed, user }: RoleBasedHeaderProps) => {
-  if (role === 'HR') {
+  if (role === 'HR' || role === 'Admin') {
     return <HRHeader collapsed={collapsed} />;
   }
 
