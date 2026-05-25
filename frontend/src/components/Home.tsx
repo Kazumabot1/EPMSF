@@ -1,7 +1,31 @@
-import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+    DashboardChartCard,
+    DashboardMetricCard,
+    DashboardShell,
+    DonutSummaryChart,
+    EmptyChartState,
+    HorizontalBarChart,
+    InsightCard,
+    StatusDistributionChart,
+} from './dashboard';
 import api from '../services/api';
+import {
+    emptyReportingDashboard,
+    reportingService,
+    type FeedbackParticipationRow,
+    type ReportingDashboard,
+} from '../services/reportingService';
+import {
+    buildScoreBands,
+    buildStatusDistribution,
+    buildTopValueBars,
+    formatDashboardPercent,
+    getDashboardStatusColor,
+    toDashboardNumber,
+    type DashboardChartDatum,
+} from '../utils/dashboardChartData';
 
 type DashboardUser = Record<string, unknown> & {
     id?: number | string;
@@ -25,42 +49,43 @@ type DashboardData = {
     recentNotifications?: Array<{ id?: number | string; title?: string; read?: boolean }>;
 };
 
-type EmployeeRecord = {
+type EmployeeRecord = Record<string, unknown> & {
     id?: number | string;
     active?: boolean;
     status?: string;
     department?: string;
     departmentName?: string;
     currentDepartment?: string;
+    position?: string;
+    positionName?: string;
+    gender?: string;
 };
-
-type IconName =
-    | 'activity'
-    | 'alert'
-    | 'bell'
-    | 'briefcase'
-    | 'building'
-    | 'calendar'
-    | 'check'
-    | 'clipboard'
-    | 'document'
-    | 'flag'
-    | 'grid'
-    | 'kpi'
-    | 'message'
-    | 'people'
-    | 'shield'
-    | 'sparkles'
-    | 'user';
-
-type Tone = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'slate';
 
 type HrStats = {
     employees: number;
+    activeEmployees: number;
+    inactiveEmployees: number;
     departments: number;
     kpis: number;
     pips: number;
     notifications: number;
+    pendingAssessments: number;
+    activeFeedbackCampaigns: number;
+    feedbackCompletionRate: number;
+    averageScore: number;
+    lowPerformers: number;
+};
+
+type FeedbackSummary = {
+    assigned: number;
+    submitted: number;
+    pending: number;
+    completionRate: number;
+};
+
+type LoadNotice = {
+    tone: 'info' | 'warning';
+    message: string;
 };
 
 const numberValue = (value: unknown) => {
@@ -68,32 +93,187 @@ const numberValue = (value: unknown) => {
     return Number.isFinite(result) ? result : 0;
 };
 
-const activeEmployeeCount = (employees: EmployeeRecord[]) =>
-    employees.filter((employee) => employee.active !== false && employee.status !== 'INACTIVE').length;
+const textValue = (value: unknown, fallback = 'Unknown') => {
+    const result = String(value ?? '').trim();
+    return result || fallback;
+};
+
+const isEmployeeActive = (employee: EmployeeRecord) => {
+    const status = String(employee.status ?? '').trim().toUpperCase();
+
+    if (employee.active === false) return false;
+    if (['INACTIVE', 'DISABLED', 'ARCHIVED', 'TERMINATED'].includes(status)) return false;
+
+    return true;
+};
+
+const getDepartmentName = (employee: EmployeeRecord) =>
+    textValue(employee.departmentName ?? employee.currentDepartment ?? employee.department, 'Unassigned Department');
+
+const getPositionName = (employee: EmployeeRecord) =>
+    textValue(employee.positionName ?? employee.position, 'Unassigned Position');
 
 const uniqueDepartmentCount = (employees: EmployeeRecord[]) => {
     const names = employees
-        .map((employee) => employee.departmentName ?? employee.currentDepartment ?? employee.department)
-        .filter((name): name is string => Boolean(name && String(name).trim()));
+        .map((employee) => getDepartmentName(employee))
+        .filter((name) => name !== 'Unassigned Department');
 
-    return new Set(names.map((name) => name.trim().toLowerCase())).size;
+    return new Set(names.map((name) => name.toLowerCase())).size;
 };
 
-const formatNumber = (value: number) => value.toLocaleString();
-
-const getUserDisplayName = (user?: DashboardUser) =>
-    String(user?.fullName ?? user?.name ?? user?.email ?? 'HR User');
+const getUserDisplayName = (user?: DashboardUser) => String(user?.fullName ?? user?.name ?? user?.email ?? 'HR User');
 
 const getUserSubtitle = (user?: DashboardUser) =>
     String(user?.position ?? user?.employeeCode ?? user?.email ?? 'Human Resources');
 
-function Home() {
+const formatNumber = (value?: number | string | null) => numberValue(value).toLocaleString();
+
+const formatPercent = (value?: number | string | null) => `${numberValue(value).toFixed(1)}%`;
+
+const makeRouteButton = (label: string, onClick: () => void, variant: 'primary' | 'light' = 'light') => (
+    <button
+        type="button"
+        onClick={onClick}
+        className={`epms-dashboard-button ${variant === 'primary' ? 'epms-dashboard-button--primary' : 'epms-dashboard-button--secondary'}`}
+    >
+        {label}
+        <i className="bi bi-arrow-right-short" aria-hidden="true" />
+    </button>
+);
+
+const buildDepartmentBars = (employees: EmployeeRecord[]): DashboardChartDatum[] => {
+    const map = new Map<string, number>();
+
+    employees.forEach((employee) => {
+        const name = getDepartmentName(employee);
+        map.set(name, (map.get(name) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+        .map(([label, value], index) => ({
+            label,
+            value,
+            color: label === 'Unassigned Department' ? '#d97706' : '#2563eb',
+        }))
+        .sort((left, right) => right.value - left.value)
+        .slice(0, 8);
+};
+
+const buildPositionBars = (employees: EmployeeRecord[]): DashboardChartDatum[] => {
+    const map = new Map<string, number>();
+
+    employees.forEach((employee) => {
+        const name = getPositionName(employee);
+        map.set(name, (map.get(name) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+        .map(([label, value], index) => ({
+            label,
+            value,
+            color: label === 'Unassigned Position' ? '#d97706' : '#2563eb',
+        }))
+        .sort((left, right) => right.value - left.value)
+        .slice(0, 6);
+};
+
+const buildEmployeeStatusData = (employees: EmployeeRecord[]): DashboardChartDatum[] => [
+    { label: 'Active', value: employees.filter(isEmployeeActive).length, color: '#16a34a' },
+    { label: 'Inactive', value: employees.filter((employee) => !isEmployeeActive(employee)).length, color: '#94a3b8' },
+];
+
+const buildAssessmentStatusData = (dashboard: ReportingDashboard): DashboardChartDatum[] => {
+    if (dashboard.assessmentStatusBreakdown.length) {
+        return dashboard.assessmentStatusBreakdown.map((row, index) => ({
+            label: textValue(row.status, 'Unknown'),
+            value: toDashboardNumber(row.count),
+            color: getDashboardStatusColor(row.status, index),
+        }));
+    }
+
+    return [
+        { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#0284c7' },
+        { label: 'Approved', value: dashboard.summary.approvedAssessments, color: '#16a34a' },
+        { label: 'Pending', value: dashboard.summary.pendingAssessments, color: '#d97706' },
+    ];
+};
+
+const isActiveFeedbackStatus = (status?: string | null) => {
+    const normalized = String(status || '').trim().toLowerCase();
+    return ['active', 'in progress', 'in_progress', 'running', 'open', 'started'].includes(normalized);
+};
+
+const selectPrimaryFeedbackRow = (rows: FeedbackParticipationRow[]) => {
+    const assignedRows = rows.filter((row) => toDashboardNumber(row.assignedCount) > 0);
+
+    if (!assignedRows.length) return null;
+
+    return assignedRows.find((row) => isActiveFeedbackStatus(row.status)) ?? assignedRows[0];
+};
+
+const buildFeedbackSummary = (rows: FeedbackParticipationRow[], fallbackRate: number): FeedbackSummary => {
+    const row = selectPrimaryFeedbackRow(rows);
+
+    if (!row) {
+        return {
+            assigned: 0,
+            submitted: 0,
+            pending: 0,
+            completionRate: fallbackRate,
+        };
+    }
+
+    const assigned = toDashboardNumber(row.assignedCount);
+    const submitted = toDashboardNumber(row.submittedCount);
+    const pending = toDashboardNumber(row.pendingCount);
+
+    return {
+        assigned,
+        submitted,
+        pending,
+        completionRate: assigned > 0 ? (submitted / assigned) * 100 : toDashboardNumber(row.completionRate),
+    };
+};
+
+const buildFeedbackCompletionData = (rows: FeedbackParticipationRow[]): DashboardChartDatum[] =>
+    rows
+        .map((row, index) => {
+            const assigned = toDashboardNumber(row.assignedCount);
+            const submitted = toDashboardNumber(row.submittedCount);
+            const pending = toDashboardNumber(row.pendingCount);
+            const calculatedRate = assigned > 0 ? (submitted / assigned) * 100 : toDashboardNumber(row.completionRate);
+
+            return {
+                label: textValue(row.campaignName, 'Feedback Campaign'),
+                value: calculatedRate,
+                detail: `${formatNumber(submitted)} submitted · ${formatNumber(pending)} pending`,
+                color: '#0284c7',
+                raw: row,
+            };
+        })
+        .filter((item) => item.value > 0 || toDashboardNumber((item.raw as FeedbackParticipationRow).assignedCount) > 0)
+        .sort((left, right) => {
+            const leftRow = left.raw as FeedbackParticipationRow;
+            const rightRow = right.raw as FeedbackParticipationRow;
+
+            if (isActiveFeedbackStatus(leftRow.status) !== isActiveFeedbackStatus(rightRow.status)) {
+                return isActiveFeedbackStatus(leftRow.status) ? -1 : 1;
+            }
+
+            return 0;
+        })
+        .slice(0, 6);
+
+const hasChartData = (items: DashboardChartDatum[]) => items.some((item) => toDashboardNumber(item.value) > 0);
+
+const Home = () => {
     const navigate = useNavigate();
 
-    const [data, setData] = useState<DashboardData | null>(null);
+    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+    const [reportingDashboard, setReportingDashboard] = useState<ReportingDashboard>(emptyReportingDashboard);
     const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [notice, setNotice] = useState<LoadNotice | null>(null);
 
     useEffect(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -102,26 +282,29 @@ function Home() {
 
         const loadDashboard = async () => {
             setLoading(true);
-            setError('');
+            setNotice(null);
 
             try {
-                const [summaryResult, employeeResult] = await Promise.allSettled([
+                const [summaryResult, employeeResult, reportingResult] = await Promise.allSettled([
                     api.get('/dashboard/summary'),
                     api.get('/employees'),
+                    reportingService.getDashboard(),
                 ]);
 
                 if (!mounted) return;
 
                 if (summaryResult.status === 'fulfilled') {
-                    setData(summaryResult.value.data ?? null);
+                    setDashboardData(summaryResult.value.data ?? null);
                 } else {
+                    setDashboardData(null);
                     const status = summaryResult.reason?.response?.status;
-                    if (status === 401 || status === 403) {
-                        setError('Your session is not authorized for this HR dashboard.');
-                    } else {
-                        setError('HR dashboard summary could not be loaded. Available information is still shown.');
-                    }
-                    setData(null);
+                    setNotice({
+                        tone: status === 401 || status === 403 ? 'warning' : 'info',
+                        message:
+                            status === 401 || status === 403
+                                ? 'Your session is not authorized for the HR dashboard summary. Other available HR data is still shown.'
+                                : 'HR dashboard summary could not be loaded. Available reporting and workforce data is still shown.',
+                    });
                 }
 
                 if (employeeResult.status === 'fulfilled') {
@@ -129,6 +312,18 @@ function Home() {
                     setEmployees(Array.isArray(list) ? list : []);
                 } else {
                     setEmployees([]);
+                }
+
+                if (reportingResult.status === 'fulfilled') {
+                    setReportingDashboard(reportingResult.value);
+                } else {
+                    setReportingDashboard(emptyReportingDashboard);
+                    setNotice((current) =>
+                            current ?? {
+                                tone: 'info',
+                                message: 'Reporting analytics could not be loaded yet. Workforce and quick actions are still available.',
+                            },
+                    );
                 }
             } finally {
                 if (mounted) setLoading(false);
@@ -142,711 +337,561 @@ function Home() {
         };
     }, []);
 
+    const feedbackSummary = useMemo(
+        () => buildFeedbackSummary(reportingDashboard.feedbackParticipation, numberValue(reportingDashboard.summary.feedbackCompletionRate)),
+        [reportingDashboard.feedbackParticipation, reportingDashboard.summary.feedbackCompletionRate],
+    );
+
     const stats: HrStats = useMemo(() => {
-        const employeeTotal = activeEmployeeCount(employees);
-        const departmentTotal = uniqueDepartmentCount(employees);
+        const activeEmployees = employees.filter(isEmployeeActive).length;
+        const inactiveEmployees = employees.length - activeEmployees;
 
         return {
-            employees: employeeTotal || numberValue(data?.stats?.directReports),
-            departments: departmentTotal,
-            kpis: numberValue(data?.stats?.kpisCreated),
-            pips: numberValue(data?.stats?.activePipsManaged),
-            notifications: numberValue(data?.stats?.unreadNotifications),
+            employees: employees.length || numberValue(reportingDashboard.summary.totalEmployees),
+            activeEmployees: activeEmployees || numberValue(reportingDashboard.summary.activeEmployees),
+            inactiveEmployees,
+            departments: uniqueDepartmentCount(employees) || reportingDashboard.departmentPerformance.length,
+            kpis: numberValue(dashboardData?.stats?.kpisCreated),
+            pips: numberValue(reportingDashboard.summary.activePips || dashboardData?.stats?.activePipsManaged),
+            notifications: numberValue(dashboardData?.stats?.unreadNotifications),
+            pendingAssessments: numberValue(reportingDashboard.summary.pendingAssessments),
+            activeFeedbackCampaigns: numberValue(reportingDashboard.summary.activeFeedbackCampaigns),
+            feedbackCompletionRate: feedbackSummary.completionRate,
+            averageScore: numberValue(reportingDashboard.summary.averageAssessmentScore),
+            lowPerformers: numberValue(reportingDashboard.summary.lowPerformers),
         };
-    }, [data?.stats, employees]);
+    }, [dashboardData?.stats, employees, feedbackSummary.completionRate, reportingDashboard]);
 
-    const recentKpis = data?.recentKpis ?? [];
-    const recentNotifications = data?.recentNotifications ?? [];
-    const userName = getUserDisplayName(data?.user);
+    const userName = getUserDisplayName(dashboardData?.user);
     const firstName = userName.split(' ')[0] || 'HR';
+    const recentKpis = dashboardData?.recentKpis ?? [];
+    const recentNotifications = dashboardData?.recentNotifications ?? [];
+
+    const workforceStatusData = useMemo(() => buildEmployeeStatusData(employees), [employees]);
+    const departmentBars = useMemo(() => buildDepartmentBars(employees), [employees]);
+    const positionBars = useMemo(() => buildPositionBars(employees), [employees]);
+    const assessmentStatusData = useMemo(() => buildAssessmentStatusData(reportingDashboard), [reportingDashboard]);
+    const feedbackCompletionData = useMemo(
+        () => buildFeedbackCompletionData(reportingDashboard.feedbackParticipation),
+        [reportingDashboard.feedbackParticipation],
+    );
+    const performanceBands = useMemo(
+        () => buildScoreBands(reportingDashboard.employeePerformance, (row) => row.scorePercent),
+        [reportingDashboard.employeePerformance],
+    );
+    const departmentScoreBars = useMemo(
+        () =>
+            buildTopValueBars(
+                reportingDashboard.departmentPerformance,
+                (row) => row.departmentName || 'Unknown Department',
+                (row) => row.averageScore,
+                5,
+            ),
+        [reportingDashboard.departmentPerformance],
+    );
+    const pipStatusData = useMemo(
+        () => [
+            { label: 'Active PIPs', value: reportingDashboard.summary.activePips, color: '#dc2626' },
+            { label: 'Completed PIPs', value: reportingDashboard.summary.completedPips, color: '#16a34a' },
+        ],
+        [reportingDashboard.summary.activePips, reportingDashboard.summary.completedPips],
+    );
+    const recommendationData = useMemo(
+        () => buildStatusDistribution(reportingDashboard.promotionRecommendations, (row) => row.recommendationType || 'Recommendation'),
+        [reportingDashboard.promotionRecommendations],
+    );
+
+    const hasFinalizedScores = reportingDashboard.employeePerformance.length > 0 || stats.averageScore > 0;
+    const hasAssessmentStatus = hasChartData(assessmentStatusData);
+    const hasPerformanceBands = hasChartData(performanceBands);
+    const hasDepartmentPerformance = hasChartData(departmentScoreBars);
+    const hasPipStatus = hasChartData(pipStatusData);
+    const hasRecommendations = hasChartData(recommendationData);
+    const hasSecondaryAnalytics = hasAssessmentStatus || hasPerformanceBands || hasDepartmentPerformance || hasPipStatus || hasRecommendations;
+
+    const unassignedPositionCount = employees.filter((employee) => getPositionName(employee) === 'Unassigned Position').length;
+    const unassignedDepartmentCount = employees.filter((employee) => getDepartmentName(employee) === 'Unassigned Department').length;
+    const positionSetupIncomplete = stats.employees > 0 && unassignedPositionCount >= stats.employees;
+    const departmentSetupIncomplete = stats.employees > 0 && unassignedDepartmentCount > 0;
+    const setupIssueCount = unassignedPositionCount + unassignedDepartmentCount;
+
+    const attentionCount = stats.pendingAssessments + stats.pips + stats.lowPerformers + setupIssueCount;
+    const healthTone = attentionCount ? 'warning' : 'success';
 
     return (
-        <main className="min-w-0 bg-slate-50 px-2 py-2 text-slate-950 sm:px-3 lg:px-4">
-            <div className="flex w-full max-w-[1420px] flex-col gap-3 xl:gap-4">
-                <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_14px_44px_rgba(15,23,42,0.07)]">
-                    <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
-                        <div className="min-w-0">
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-blue-700">
-                <Icon name="grid" className="h-4 w-4" />
-                HR Dashboard
-              </span>
-                            <h1 className="mt-4 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl lg:text-5xl">
-                                Welcome back, {firstName} <span aria-hidden="true">👋</span>
-                            </h1>
-                            <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
-                                Monitor workforce setup, appraisal workflows, KPI activity, feedback operations,
-                                and HR attention items from one clean workspace.
-                            </p>
+        <DashboardShell
+            className="hr-command-dashboard"
+            variant="default"
+            eyebrow="HR Command Center"
+            title={`Welcome back, ${firstName}`}
+            description="Monitor workforce setup, reviews, feedback completion, PIP risk, and reporting health from one workspace."
+            metaLabel="Today"
+            metaValue={attentionCount ? `${formatNumber(attentionCount)} item${attentionCount === 1 ? '' : 's'} need review` : 'Healthy'}
+            metaDetail={
+                attentionCount
+                    ? `${formatNumber(stats.pendingAssessments)} pending reviews · ${formatNumber(setupIssueCount)} setup issues · ${formatNumber(stats.activeFeedbackCampaigns)} active feedback campaigns`
+                    : 'No major HR attention items detected'
+            }
+            actions={
+                <>
+                    {makeRouteButton('Open Reports', () => navigate('/hr/reports/performance'), 'primary')}
+                    {makeRouteButton('Manage Employees', () => navigate('/hr/employee'))}
+                </>
+            }
+        >
+            {notice ? (
+                <InsightCard
+                    tone={notice.tone === 'warning' ? 'warning' : 'info'}
+                    icon={<i className="bi bi-info-circle" aria-hidden="true" />}
+                    title="Dashboard notice"
+                    description={notice.message}
+                    className="mb-4"
+                />
+            ) : null}
 
-                            <div className="mt-5 flex flex-wrap gap-2.5">
-                                <SummaryChip icon="people" label="Employees" value={`${formatNumber(stats.employees)} active`} />
-                                <SummaryChip
-                                    icon="building"
-                                    label="Departments"
-                                    value={stats.departments ? `${stats.departments} visible` : 'Setup needed'}
-                                />
-                                <SummaryChip icon="bell" label="Alerts" value={`${formatNumber(stats.notifications)} unread`} />
-                                <SummaryChip icon="user" label="Role" value={getUserSubtitle(data?.user)} />
-                            </div>
-                        </div>
+            {loading ? (
+                <InsightCard
+                    tone="info"
+                    icon={<i className="bi bi-arrow-repeat" aria-hidden="true" />}
+                    title="Loading HR dashboard"
+                    description="Preparing workforce analytics, reports, feedback, PIP, and KPI summary."
+                    className="mb-4"
+                />
+            ) : null}
 
-                        <div className="rounded-[22px] border border-slate-200 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 shadow-inner">
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">HR Operating View</p>
-                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
-                  Today
-                </span>
-                            </div>
-                            <div className="mt-4 grid gap-2.5">
-                                <MiniStatus label="Workforce" value={`${formatNumber(stats.employees)} active`} />
-                                <MiniStatus label="KPI setup" value={`${formatNumber(stats.kpis)} configured`} />
-                                <MiniStatus label="PIP attention" value={`${formatNumber(stats.pips)} active`} />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => navigate('/hr/reports/performance')}
-                                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
-                            >
-                                Open HR Reports
-                                <span aria-hidden="true">→</span>
-                            </button>
-                        </div>
-                    </div>
-                </section>
+            <section className="dashboard-grid dashboard-grid--metrics hr-metric-strip">
+                <DashboardMetricCard
+                    title="Active Employees"
+                    value={formatNumber(stats.activeEmployees)}
+                    detail={`${formatNumber(stats.employees)} total employees`}
+                    tone="blue"
+                    icon={<i className="bi bi-people" aria-hidden="true" />}
+                    trend={{ label: stats.inactiveEmployees ? `${formatNumber(stats.inactiveEmployees)} inactive` : 'All visible employees active' }}
+                />
+                <DashboardMetricCard
+                    title="Average Score"
+                    value={hasFinalizedScores ? formatPercent(stats.averageScore) : '—'}
+                    detail={hasFinalizedScores ? 'Latest finalized appraisal average' : 'No finalized results yet'}
+                    tone={hasFinalizedScores ? 'emerald' : 'slate'}
+                    icon={<i className="bi bi-graph-up-arrow" aria-hidden="true" />}
+                    trend={{
+                        label: hasFinalizedScores
+                            ? `${formatNumber(reportingDashboard.employeePerformance.length)} employee results`
+                            : 'Waiting for approved appraisals',
+                        direction: hasFinalizedScores ? 'flat' : 'flat',
+                    }}
+                />
+                <DashboardMetricCard
+                    title="Pending Reviews"
+                    value={formatNumber(stats.pendingAssessments)}
+                    detail="Assessments waiting in workflow"
+                    tone={stats.pendingAssessments ? 'amber' : 'emerald'}
+                    icon={<i className="bi bi-clipboard-check" aria-hidden="true" />}
+                    trend={{ label: stats.pendingAssessments ? 'Needs HR follow-up' : 'No pending review load', direction: stats.pendingAssessments ? 'up' : 'flat' }}
+                />
+                <DashboardMetricCard
+                    title="Active PIPs"
+                    value={formatNumber(stats.pips)}
+                    detail="Employees under active improvement plans"
+                    tone={stats.pips ? 'rose' : 'emerald'}
+                    icon={<i className="bi bi-exclamation-triangle" aria-hidden="true" />}
+                    trend={{ label: stats.pips ? 'Review plan status' : 'No active PIP risk', direction: stats.pips ? 'up' : 'flat' }}
+                />
+            </section>
 
-                {error && <Notice tone="warning" icon="alert" title="Dashboard notice" message={error} />}
-                {loading && <Notice tone="info" icon="activity" title="Loading HR dashboard" message="Preparing workforce, KPI, PIP, and notification summary." />}
-
-                <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard
-                        icon="people"
-                        title="Active Employees"
-                        value={formatNumber(stats.employees)}
-                        description="Current active people in HR scope."
-                        action="View employees"
-                        onClick={() => navigate('/hr/employee')}
-                        tone="blue"
+            <section className="dashboard-grid dashboard-grid--overview mb-4">
+                <DashboardChartCard
+                    title="Department Distribution"
+                    subtitle="Employee count grouped by department."
+                    action={makeRouteButton('Departments', () => navigate('/hr/department'))}
+                >
+                    <HorizontalBarChart
+                        data={departmentBars}
+                        height={220}
+                        maxBars={8}
+                        emptyTitle="No department distribution yet"
+                        emptyDescription="Assign employees to departments to show department coverage."
                     />
-                    <MetricCard
-                        icon="building"
-                        title="Departments"
-                        value={stats.departments ? formatNumber(stats.departments) : '—'}
-                        description={stats.departments ? 'Visible from employee records.' : 'Department records need setup.'}
-                        action="Manage departments"
-                        onClick={() => navigate('/hr/department')}
-                        tone="violet"
-                    />
-                    <MetricCard
-                        icon="kpi"
-                        title="KPI Setup"
-                        value={formatNumber(stats.kpis)}
-                        description={stats.kpis ? 'KPI records configured by HR.' : 'No KPI records configured yet.'}
-                        action="Open KPIs"
-                        onClick={() => navigate('/hr/kpi-template')}
-                        tone="emerald"
-                    />
-                    <MetricCard
-                        icon="alert"
-                        title="Active PIPs"
-                        value={formatNumber(stats.pips)}
-                        description={stats.pips ? 'PIP records currently tracked.' : 'No active PIP attention right now.'}
-                        action="Review PIP status"
-                        onClick={() => navigate('/hr/reports/pip-status')}
-                        tone="rose"
-                    />
-                </section>
+                </DashboardChartCard>
 
-                <section className="grid gap-3 xl:grid-cols-2">
-                    <Panel
-                        title="HR Operations"
-                        description="Core organization setup and workforce administration."
-                        actionLabel="Open employees"
-                        onAction={() => navigate('/hr/employee')}
-                    >
-                        <div className="grid gap-2.5">
-                            <ActionRow
-                                icon="people"
-                                title="Manage employees"
-                                description="Employee records, assignments, and workforce details."
-                                status="Ready"
-                                onClick={() => navigate('/hr/employee')}
-                            />
-                            <ActionRow
-                                icon="building"
-                                title="Maintain departments"
-                                description="Department structure and department-level records."
-                                status={stats.departments ? `${stats.departments} visible` : 'Setup'}
-                                onClick={() => navigate('/hr/department')}
-                            />
-                            <ActionRow
-                                icon="briefcase"
-                                title="Configure positions"
-                                description="Positions, levels, and permission-linked roles."
-                                status="Manage"
-                                onClick={() => navigate('/hr/position/table')}
-                            />
-                            <ActionRow
-                                icon="shield"
-                                title="Manage teams"
-                                description="Teams, leaders, members, and team history."
-                                status="Manage"
-                                onClick={() => navigate('/hr/team')}
-                            />
-                        </div>
-                    </Panel>
-
-                    <Panel title="Workflow Focus" description="HR workflows that usually need setup, monitoring, or follow-up.">
-                        <div className="space-y-2.5">
-                            <FocusRow
-                                icon="clipboard"
-                                title="Appraisals"
-                                description="Templates, cycles, manager checks, and HR approval follow-up."
-                                status="Monitor"
-                                onClick={() => navigate('/hr/appraisal/review-check')}
-                            />
-                            <FocusRow
-                                icon="message"
-                                title="360 Feedback"
-                                description="Question bank, rule sets, campaigns, and assignment monitoring."
-                                status="Configure"
-                                onClick={() => navigate('/hr/feedback/questions')}
-                            />
-                            <FocusRow
-                                icon="kpi"
-                                title="KPI Management"
-                                description="KPI items, templates, cycles, employee assignments, and history."
-                                status={stats.kpis ? `${stats.kpis} records` : 'Setup'}
-                                onClick={() => navigate('/hr/kpi-template')}
-                            />
-                            <FocusRow
-                                icon="document"
-                                title="Reports"
-                                description="Performance, department comparison, PIP, feedback, and recommendations."
-                                status="Available"
-                                onClick={() => navigate('/hr/reports/performance')}
-                            />
-                        </div>
-                    </Panel>
-                </section>
-
-                <section className="grid gap-4 xl:grid-cols-2">
-                    <Panel title="Recent KPIs" description="Latest KPI records available from the HR dashboard feed.">
-                        {recentKpis.length ? (
-                            <div className="space-y-2.5">
-                                {recentKpis.slice(0, 5).map((item, index) => (
-                                    <RecordRow
-                                        key={`${item.id ?? 'kpi'}-${index}`}
-                                        icon="kpi"
-                                        title={item.title || 'Untitled KPI'}
-                                        detail={`Weight ${item.weight ?? '—'}`}
-                                        onClick={() => navigate('/hr/kpi-template')}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <EmptyState
-                                icon="kpi"
-                                title="No KPI records yet"
-                                description="KPI templates and employee KPI records will appear after HR configures them."
-                                action="Create or review KPIs"
-                                onAction={() => navigate('/hr/kpi-template')}
-                            />
-                        )}
-                    </Panel>
-
-                    <Panel title="Recent Notifications" description="Latest HR-visible alerts and workflow messages.">
-                        {recentNotifications.length ? (
-                            <div className="space-y-2.5">
-                                {recentNotifications.slice(0, 6).map((item, index) => (
-                                    <RecordRow
-                                        key={`${item.id ?? 'notification'}-${index}`}
-                                        icon="bell"
-                                        title={item.title || 'Notification'}
-                                        detail={item.read ? 'Read' : 'Unread'}
-                                        status={item.read ? 'Read' : 'Unread'}
-                                        onClick={() => navigate('/notifications')}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <EmptyState
-                                icon="bell"
-                                title="No notifications yet"
-                                description="HR notifications, workflow alerts, and system updates will appear here."
-                                action="Open notifications"
-                                onAction={() => navigate('/notifications')}
-                            />
-                        )}
-                    </Panel>
-                </section>
-
-                <Panel title="Quick Setup" description="Common setup areas HR may need to open during configuration work.">
-                    <div className="grid gap-2.5 lg:grid-cols-2">
-                        <SetupRow
-                            icon="calendar"
-                            title="Assessment Forms"
-                            description="Create and maintain self-assessment forms."
-                            onClick={() => navigate('/hr/assessment-forms')}
+                <DashboardChartCard
+                    title="HR Attention Queue"
+                    subtitle="Operational areas HR should review first."
+                    action={makeRouteButton('Reports', () => navigate('/hr/reports/performance'))}
+                >
+                    <div className="grid gap-2.5">
+                        <ActionRow
+                            icon="bi-clipboard2-check"
+                            title="Pending appraisal reviews"
+                            description="Check manager, department head, and HR approval progress."
+                            status={`${formatNumber(stats.pendingAssessments)} pending`}
+                            tone={stats.pendingAssessments ? 'amber' : 'emerald'}
+                            onClick={() => navigate('/hr/appraisal/review-check')}
                         />
-                        <SetupRow
-                            icon="check"
-                            title="Assessment Scores"
-                            description="Review score tables and assessment records."
-                            onClick={() => navigate('/hr/assessment-scores')}
+                        <ActionRow
+                            icon="bi-exclamation-octagon"
+                            title="Active performance improvement plans"
+                            description="Review current PIP records and follow-up ownership."
+                            status={`${formatNumber(stats.pips)} active`}
+                            tone={stats.pips ? 'rose' : 'emerald'}
+                            onClick={() => navigate('/hr/reports/pip-status')}
                         />
-                        <SetupRow
-                            icon="flag"
-                            title="Department KPI"
-                            description="Manage department KPI templates and cycles."
-                            onClick={() => navigate('/hr/department-kpi-template')}
+                        <ActionRow
+                            icon="bi-chat-dots"
+                            title="360 feedback participation"
+                            description="Monitor active campaign completion and pending responses."
+                            status={feedbackSummary.assigned ? `${formatPercent(stats.feedbackCompletionRate)} complete` : 'No active campaign'}
+                            tone={stats.activeFeedbackCampaigns && stats.feedbackCompletionRate < 80 ? 'amber' : 'blue'}
+                            onClick={() => navigate('/hr/reports/feedback-completion')}
                         />
-                        <SetupRow
-                            icon="sparkles"
-                            title="Recommendations"
-                            description="Review HR performance recommendations."
-                            onClick={() => navigate('/hr/reports/recommendations')}
+                        <ActionRow
+                            icon="bi-person-gear"
+                            title="Employee setup coverage"
+                            description="Review missing department or position assignments."
+                            status={`${formatNumber(setupIssueCount)} issues`}
+                            tone={setupIssueCount ? 'amber' : 'emerald'}
+                            onClick={() => navigate('/hr/employee')}
                         />
                     </div>
-                </Panel>
-            </div>
-        </main>
+                </DashboardChartCard>
+            </section>
+
+            <section className="dashboard-grid dashboard-grid--two mb-4">
+                <DashboardChartCard
+                    title="Workforce Status"
+                    subtitle="Active and inactive employee visibility."
+                    action={makeRouteButton('Employees', () => navigate('/hr/employee'))}
+                    size="compact"
+                >
+                    <DonutSummaryChart
+                        data={workforceStatusData}
+                        totalLabel="Employees"
+                        height={185}
+                        emptyTitle="No employee data"
+                        emptyDescription="Employee records will appear after HR creates or imports employees."
+                    />
+                </DashboardChartCard>
+
+                <DashboardChartCard
+                    title="360 Feedback Completion"
+                    subtitle="Campaign completion percentage with submitted and pending responses."
+                    action={makeRouteButton('Feedback', () => navigate('/hr/feedback/analytics'))}
+                    size="compact"
+                >
+                    <HorizontalBarChart
+                        data={feedbackCompletionData}
+                        height={185}
+                        valueFormatter={(value) => formatDashboardPercent(value)}
+                        xAxisSuffix="%"
+                        maxBars={5}
+                        emptyTitle="No campaign completion data"
+                        emptyDescription="360 feedback participation will appear after campaign assignments are created."
+                    />
+                </DashboardChartCard>
+            </section>
+
+            <section className="dashboard-grid dashboard-grid--three mb-4">
+                <InsightCard
+                    tone={healthTone}
+                    icon={<i className="bi bi-activity" aria-hidden="true" />}
+                    title="Operating Health"
+                    description={
+                        attentionCount
+                            ? 'There are workflow or setup areas HR should review today.'
+                            : 'Core HR workflow indicators look healthy right now.'
+                    }
+                />
+                <InsightCard
+                    tone={stats.feedbackCompletionRate >= 80 ? 'success' : stats.activeFeedbackCampaigns ? 'warning' : 'neutral'}
+                    icon={<i className="bi bi-chat-square-text" aria-hidden="true" />}
+                    title="360 Feedback"
+                    description={
+                        feedbackSummary.assigned
+                            ? `${formatPercent(stats.feedbackCompletionRate)} complete · ${formatNumber(feedbackSummary.submitted)} submitted · ${formatNumber(feedbackSummary.pending)} pending.`
+                            : 'No active feedback campaign requiring action.'
+                    }
+                />
+                <InsightCard
+                    tone={setupIssueCount ? 'warning' : 'success'}
+                    icon={<i className="bi bi-person-check" aria-hidden="true" />}
+                    title="Setup Coverage"
+                    description={
+                        setupIssueCount
+                            ? `${formatNumber(setupIssueCount)} missing department or position assignment${setupIssueCount === 1 ? '' : 's'} need review.`
+                            : 'Departments and positions look assigned for visible employees.'
+                    }
+                />
+            </section>
+
+            {hasSecondaryAnalytics ? (
+                <section className="dashboard-grid dashboard-grid--two mb-4">
+                    {hasAssessmentStatus ? (
+                        <DashboardChartCard
+                            title="Appraisal Workflow Status"
+                            subtitle="Submitted, approved, and pending assessment state."
+                            action={makeRouteButton('Review Queue', () => navigate('/hr/appraisal/review-check'))}
+                            size="compact"
+                        >
+                            <StatusDistributionChart data={assessmentStatusData} />
+                        </DashboardChartCard>
+                    ) : null}
+
+                    {hasPerformanceBands ? (
+                        <DashboardChartCard
+                            title="Performance Bands"
+                            subtitle="Employee result distribution by performance label thresholds."
+                            action={makeRouteButton('Performance Report', () => navigate('/hr/reports/performance'))}
+                            size="compact"
+                        >
+                            <DonutSummaryChart data={performanceBands} totalLabel="Results" height={185} />
+                        </DashboardChartCard>
+                    ) : null}
+
+                    {hasDepartmentPerformance ? (
+                        <DashboardChartCard
+                            title="Department Performance Ranking"
+                            subtitle="Average appraisal score by department."
+                            action={makeRouteButton('Compare', () => navigate('/hr/department-comparison'))}
+                            size="compact"
+                        >
+                            <HorizontalBarChart
+                                data={departmentScoreBars}
+                                height={210}
+                                valueFormatter={(value) => formatDashboardPercent(value)}
+                                xAxisSuffix="%"
+                                maxBars={5}
+                            />
+                        </DashboardChartCard>
+                    ) : null}
+
+                    {hasPipStatus ? (
+                        <DashboardChartCard title="PIP Status" subtitle="Active and completed improvement plans." size="compact">
+                            <DonutSummaryChart data={pipStatusData} totalLabel="PIPs" height={185} />
+                        </DashboardChartCard>
+                    ) : null}
+
+                    {hasRecommendations ? (
+                        <DashboardChartCard title="Recommendations" subtitle="Promotion, increment, and watchlist actions." size="compact">
+                            <StatusDistributionChart data={recommendationData} />
+                        </DashboardChartCard>
+                    ) : null}
+                </section>
+            ) : (
+                <section className="dashboard-grid dashboard-grid--two mb-4">
+                    <DashboardChartCard title="Appraisal & Performance" subtitle="Analytics will appear after appraisal results are approved." size="compact">
+                        <EmptyChartState
+                            compact
+                            title="No finalized appraisal analytics yet"
+                            description="Start or approve appraisal reviews to unlock workflow status, performance bands, and department ranking."
+                        />
+                    </DashboardChartCard>
+                    <DashboardChartCard title="PIP & Recommendations" subtitle="Risk and recommendation analytics will appear when report data is available." size="compact">
+                        <EmptyChartState
+                            compact
+                            title="No performance action data yet"
+                            description="PIP status and recommendations will appear after improvement plans or finalized performance results exist."
+                        />
+                    </DashboardChartCard>
+                </section>
+            )}
+
+            <section className="dashboard-grid dashboard-grid--two mb-4">
+                <DashboardChartCard
+                    title="Position Coverage"
+                    subtitle="Position assignment health for visible employees."
+                    action={makeRouteButton('Positions', () => navigate('/hr/position/table'))}
+                    size="compact"
+                >
+                    {positionSetupIncomplete ? (
+                        <SetupWarningBlock
+                            icon="bi-person-badge"
+                            title="Position setup incomplete"
+                            description={`${formatNumber(unassignedPositionCount)} employees do not have a position assigned yet.`}
+                            actionLabel="Fix employee records"
+                            onClick={() => navigate('/hr/employee')}
+                        />
+                    ) : (
+                        <HorizontalBarChart
+                            data={positionBars}
+                            height={180}
+                            maxBars={6}
+                            emptyTitle="No position data"
+                            emptyDescription="Assign employees to positions to visualize role coverage."
+                        />
+                    )}
+                </DashboardChartCard>
+
+                <DashboardChartCard
+                    title="Recent Activity"
+                    subtitle="Latest KPI records and HR-visible notifications."
+                    size="compact"
+                >
+                    <div className="hr-recent-grid">
+                        <div>
+                            <h3 className="hr-mini-section-title">Recent KPIs</h3>
+                            {recentKpis.length ? (
+                                <div className="grid gap-2">
+                                    {recentKpis.slice(0, 3).map((item, index) => (
+                                        <SimpleRecordRow
+                                            key={`${item.id ?? 'kpi'}-${index}`}
+                                            icon="bi-bullseye"
+                                            title={textValue(item.title, 'Untitled KPI')}
+                                            detail={`Weight ${textValue(item.weight, '—')}`}
+                                            onClick={() => navigate('/hr/kpi-template')}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <EmptyChartState compact title="No KPI records yet" description="KPI records will appear after HR configures them." />
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="hr-mini-section-title">Recent Notifications</h3>
+                            {recentNotifications.length ? (
+                                <div className="grid gap-2">
+                                    {recentNotifications.slice(0, 3).map((item, index) => (
+                                        <SimpleRecordRow
+                                            key={`${item.id ?? 'notification'}-${index}`}
+                                            icon={item.read ? 'bi-bell' : 'bi-bell-fill'}
+                                            title={textValue(item.title, 'Notification')}
+                                            detail={item.read ? 'Read' : 'Unread'}
+                                            badge={item.read ? 'Read' : 'Unread'}
+                                            onClick={() => navigate('/notifications')}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <EmptyChartState compact title="No notifications yet" description="Workflow alerts and system updates will appear here." />
+                            )}
+                        </div>
+                    </div>
+                </DashboardChartCard>
+            </section>
+
+            <DashboardChartCard
+                title="Quick Setup"
+                subtitle="Common HR configuration shortcuts."
+                className="hr-quick-setup-card"
+                size="compact"
+            >
+                <div className="hr-quick-grid">
+                    <QuickSetupButton icon="bi-people" title="Employees" onClick={() => navigate('/hr/employee')} />
+                    <QuickSetupButton icon="bi-building" title="Departments" onClick={() => navigate('/hr/department')} />
+                    <QuickSetupButton icon="bi-diagram-3" title="Teams" onClick={() => navigate('/hr/team')} />
+                    <QuickSetupButton icon="bi-clipboard-data" title="Appraisals" onClick={() => navigate('/hr/appraisal')} />
+                    <QuickSetupButton icon="bi-bullseye" title="KPI Templates" onClick={() => navigate('/hr/kpi-template')} />
+                    <QuickSetupButton icon="bi-chat-square-text" title="360 Feedback" onClick={() => navigate('/hr/feedback/questions')} />
+                    <QuickSetupButton icon="bi-graph-up" title="Reports" onClick={() => navigate('/hr/reports/performance')} />
+                    <QuickSetupButton icon="bi-stars" title="Recommendations" onClick={() => navigate('/hr/reports/recommendations')} />
+                </div>
+            </DashboardChartCard>
+        </DashboardShell>
     );
-}
-
-const toneClasses: Record<Tone, { icon: string; badge: string }> = {
-    blue: { icon: 'bg-blue-50 text-blue-600 ring-blue-100', badge: 'bg-blue-50 text-blue-700 ring-blue-200' },
-    emerald: { icon: 'bg-emerald-50 text-emerald-600 ring-emerald-100', badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-    violet: { icon: 'bg-violet-50 text-violet-600 ring-violet-100', badge: 'bg-violet-50 text-violet-700 ring-violet-200' },
-    amber: { icon: 'bg-amber-50 text-amber-600 ring-amber-100', badge: 'bg-amber-50 text-amber-700 ring-amber-200' },
-    rose: { icon: 'bg-rose-50 text-rose-600 ring-rose-100', badge: 'bg-rose-50 text-rose-700 ring-rose-200' },
-    slate: { icon: 'bg-slate-50 text-slate-600 ring-slate-100', badge: 'bg-slate-50 text-slate-700 ring-slate-200' },
 };
 
-const SummaryChip = ({ icon, label, value }: { icon: IconName; label: string; value: string }) => (
-    <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm shadow-sm">
-        <Icon name={icon} className="h-4 w-4 shrink-0 text-blue-600" />
-        <span className="shrink-0 font-black text-slate-500">{label}:</span>
-        <span className="truncate font-black text-slate-950">{value}</span>
-    </div>
-);
-
-const MiniStatus = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-sm">
-        <span className="truncate text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
-        <strong className="shrink-0 text-sm font-black text-slate-950">{value}</strong>
-    </div>
-);
-
-const Notice = ({
-                    icon,
-                    title,
-                    message,
-                    tone,
-                }: {
-    icon: IconName;
-    title: string;
-    message: string;
-    tone: 'info' | 'warning';
-}) => (
-    <div
-        className={`flex items-start gap-3 rounded-3xl border px-4 py-3 shadow-sm ${
-            tone === 'warning'
-                ? 'border-amber-200 bg-amber-50 text-amber-900'
-                : 'border-blue-200 bg-blue-50 text-blue-900'
-        }`}
-    >
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white/80 shadow-sm">
-      <Icon name={icon} className="h-4.5 w-4.5" />
-    </span>
-        <div>
-            <p className="font-black">{title}</p>
-            <p className="mt-0.5 text-sm font-semibold leading-6 opacity-85">{message}</p>
-        </div>
-    </div>
-);
-
-const MetricCard = ({
-                        icon,
-                        title,
-                        value,
-                        description,
-                        action,
-                        onClick,
-                        tone = 'blue',
-                    }: {
-    icon: IconName;
-    title: string;
-    value: string;
-    description: string;
-    action: string;
-    onClick: () => void;
-    tone?: Tone;
-}) => (
-    <article className="group min-w-0 rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_50px_rgba(37,99,235,0.10)]">
-        <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-                <h2 className="truncate text-sm font-black text-slate-950">{title}</h2>
-                <strong className="mt-3 block text-3xl font-black tracking-[-0.055em] text-slate-950">{value}</strong>
-            </div>
-            <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ring-1 ${toneClasses[tone].icon}`}>
-        <Icon name={icon} className="h-5 w-5" />
-      </span>
-        </div>
-        <p className="mt-2 text-sm font-semibold leading-5 text-slate-600">{description}</p>
-        <button
-            type="button"
-            onClick={onClick}
-            className="mt-3 inline-flex max-w-full items-center gap-2 truncate text-sm font-black text-blue-600 transition group-hover:text-blue-700"
-        >
-            <span className="truncate">{action}</span>
-            <span className="shrink-0" aria-hidden="true">→</span>
-        </button>
-    </article>
-);
-
-const Panel = ({
-                   title,
-                   description,
-                   actionLabel,
-                   onAction,
-                   children,
-               }: {
-    title: string;
-    description: string;
-    actionLabel?: string;
-    onAction?: () => void;
-    children: ReactNode;
-}) => (
-    <section className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_38px_rgba(15,23,42,0.06)]">
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-                <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">{title}</h2>
-                <p className="mt-1.5 text-sm font-semibold leading-6 text-slate-600">{description}</p>
-            </div>
-            {actionLabel && onAction && (
-                <button
-                    type="button"
-                    onClick={onAction}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-black text-blue-700 transition hover:bg-blue-100"
-                >
-                    {actionLabel}
-                    <span aria-hidden="true">→</span>
-                </button>
-            )}
-        </div>
-        {children}
-    </section>
-);
-
-const ActionRow = ({
-                       icon,
-                       title,
-                       description,
-                       status,
-                       onClick,
-                   }: {
-    icon: IconName;
+type ActionRowProps = {
+    icon: string;
     title: string;
     description: string;
     status: string;
+    tone?: 'blue' | 'emerald' | 'amber' | 'rose';
     onClick: () => void;
-}) => (
-    <button
-        type="button"
-        onClick={onClick}
-        className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/70"
-    >
-    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-      <Icon name={icon} className="h-5 w-5" />
-    </span>
-        <span className="min-w-0 flex-1">
-      <span className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="text-sm font-black leading-5 text-slate-950">{title}</span>
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
-          {status}
-        </span>
-      </span>
-      <span className="mt-1 block text-sm font-semibold leading-5 text-slate-600">{description}</span>
-    </span>
-        <span className="shrink-0 text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true">→</span>
-    </button>
-);
+};
 
-const FocusRow = ({
-                      icon,
-                      title,
-                      description,
-                      status,
-                      onClick,
-                  }: {
-    icon: IconName;
-    title: string;
-    description: string;
-    status: string;
-    onClick: () => void;
-}) => (
-    <button
-        type="button"
-        onClick={onClick}
-        className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/70"
-    >
-    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-      <Icon name={icon} className="h-5 w-5" />
-    </span>
-        <span className="min-w-0 flex-1">
-      <span className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="text-sm font-black leading-5 text-slate-950">{title}</span>
-        <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
-          {status}
-        </span>
-      </span>
-      <span className="mt-1 block text-sm font-semibold leading-5 text-slate-600">{description}</span>
-    </span>
-        <span className="shrink-0 text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true">→</span>
-    </button>
-);
+const actionToneClass: Record<NonNullable<ActionRowProps['tone']>, string> = {
+    blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+    rose: 'bg-rose-50 text-rose-700 ring-rose-100',
+};
 
-const SetupRow = ({
-                      icon,
-                      title,
-                      description,
-                      onClick,
-                  }: {
-    icon: IconName;
-    title: string;
-    description: string;
-    onClick: () => void;
-}) => (
-    <button
-        type="button"
-        onClick={onClick}
-        className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/70"
-    >
-    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-      <Icon name={icon} className="h-5 w-5" />
+const ActionRow = ({ icon, title, description, status, tone = 'blue', onClick }: ActionRowProps) => (
+    <button type="button" onClick={onClick} className="hr-action-row group">
+    <span className="hr-action-row__icon">
+      <i className={`bi ${icon}`} aria-hidden="true" />
     </span>
         <span className="min-w-0 flex-1">
       <span className="block text-sm font-black leading-5 text-slate-950">{title}</span>
-      <span className="mt-1 block text-sm font-semibold leading-5 text-slate-600">{description}</span>
+      <span className="mt-0.5 block text-xs font-semibold leading-5 text-slate-600">{description}</span>
     </span>
-        <span className="shrink-0 text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true">→</span>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${actionToneClass[tone]}`}>
+      {status}
+    </span>
+        <i className="bi bi-arrow-right-short shrink-0 text-xl text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true" />
     </button>
 );
 
-const RecordRow = ({
-                       icon,
-                       title,
-                       detail,
-                       status,
-                       onClick,
-                   }: {
-    icon: IconName;
+type SimpleRecordRowProps = {
+    icon: string;
     title: string;
     detail: string;
-    status?: string;
+    badge?: string;
     onClick: () => void;
-}) => (
+};
+
+const SimpleRecordRow = ({ icon, title, detail, badge, onClick }: SimpleRecordRowProps) => (
     <button
         type="button"
         onClick={onClick}
-        className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-left transition hover:border-blue-200 hover:bg-blue-50/70"
+        className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-2.5 text-left transition hover:border-blue-200 hover:bg-blue-50/70"
     >
-    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-      <Icon name={icon} className="h-4.5 w-4.5" />
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
+      <i className={`bi ${icon}`} aria-hidden="true" />
     </span>
         <span className="min-w-0 flex-1">
       <span className="block truncate text-sm font-black text-slate-950">{title}</span>
-      <span className="mt-0.5 block truncate text-sm font-semibold text-slate-600">{detail}</span>
+      <span className="mt-0.5 block truncate text-xs font-semibold text-slate-600">{detail}</span>
     </span>
-        {status && (
+        {badge ? (
             <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${
-                    status === 'Unread'
-                        ? 'bg-rose-50 text-rose-700 ring-rose-100'
-                        : 'bg-slate-100 text-slate-600 ring-slate-200'
+                    badge === 'Unread' ? 'bg-rose-50 text-rose-700 ring-rose-100' : 'bg-slate-100 text-slate-600 ring-slate-200'
                 }`}
             >
-        {status}
+        {badge}
       </span>
-        )}
-        <span className="shrink-0 text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true">→</span>
+        ) : null}
+        <i className="bi bi-arrow-right-short shrink-0 text-lg text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true" />
     </button>
 );
 
-const EmptyState = ({
-                        icon,
-                        title,
-                        description,
-                        action,
-                        onAction,
-                    }: {
-    icon: IconName;
+type SetupWarningBlockProps = {
+    icon: string;
     title: string;
     description: string;
-    action?: string;
-    onAction?: () => void;
-}) => (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4">
-        <div className="flex items-start gap-3">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-        <Icon name={icon} className="h-5 w-5" />
-      </span>
-            <div className="min-w-0">
-                <h3 className="text-sm font-black text-slate-950">{title}</h3>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">{description}</p>
-                {action && onAction && (
-                    <button type="button" onClick={onAction} className="mt-2 text-sm font-black text-blue-600 hover:text-blue-700">
-                        {action} →
-                    </button>
-                )}
-            </div>
+    actionLabel: string;
+    onClick: () => void;
+};
+
+const SetupWarningBlock = ({ icon, title, description, actionLabel, onClick }: SetupWarningBlockProps) => (
+    <div className="hr-setup-warning">
+    <span className="hr-setup-warning__icon">
+      <i className={`bi ${icon}`} aria-hidden="true" />
+    </span>
+        <div>
+            <h3>{title}</h3>
+            <p>{description}</p>
+            <button type="button" onClick={onClick}>
+                {actionLabel} <i className="bi bi-arrow-right-short" aria-hidden="true" />
+            </button>
         </div>
     </div>
 );
 
-const Icon = ({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) => {
-    const common = {
-        className,
-        viewBox: '0 0 24 24',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 2,
-        strokeLinecap: 'round' as const,
-        strokeLinejoin: 'round' as const,
-        'aria-hidden': true,
-    };
-
-    switch (name) {
-        case 'activity':
-            return (
-                <svg {...common}>
-                    <path d="M3 12h4l3 7 4-14 3 7h4" />
-                </svg>
-            );
-        case 'alert':
-            return (
-                <svg {...common}>
-                    <path d="M10.3 4.3 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 4.3a2 2 0 0 0-3.4 0Z" />
-                    <path d="M12 9v4" />
-                    <path d="M12 17h.01" />
-                </svg>
-            );
-        case 'bell':
-            return (
-                <svg {...common}>
-                    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-                    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-                </svg>
-            );
-        case 'briefcase':
-            return (
-                <svg {...common}>
-                    <path d="M10 6V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1" />
-                    <rect x="3" y="6" width="18" height="14" rx="2" />
-                    <path d="M3 12h18" />
-                </svg>
-            );
-        case 'building':
-            return (
-                <svg {...common}>
-                    <path d="M4 21V5a2 2 0 0 1 2-2h8v18" />
-                    <path d="M14 8h4a2 2 0 0 1 2 2v11" />
-                    <path d="M8 7h2M8 11h2M8 15h2" />
-                </svg>
-            );
-        case 'calendar':
-            return (
-                <svg {...common}>
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-            );
-        case 'check':
-            return (
-                <svg {...common}>
-                    <path d="m5 12 4 4L19 6" />
-                </svg>
-            );
-        case 'clipboard':
-            return (
-                <svg {...common}>
-                    <rect x="8" y="3" width="8" height="4" rx="1" />
-                    <path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
-                    <path d="m9 14 2 2 4-4" />
-                </svg>
-            );
-        case 'document':
-            return (
-                <svg {...common}>
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <path d="M14 2v6h6" />
-                    <path d="M8 13h8M8 17h6" />
-                </svg>
-            );
-        case 'flag':
-            return (
-                <svg {...common}>
-                    <path d="M5 22V4" />
-                    <path d="M5 4h12l-2 5 2 5H5" />
-                </svg>
-            );
-        case 'grid':
-            return (
-                <svg {...common}>
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
-            );
-        case 'kpi':
-            return (
-                <svg {...common}>
-                    <path d="M4 19V5" />
-                    <path d="M4 19h16" />
-                    <path d="m7 15 4-4 3 3 5-7" />
-                </svg>
-            );
-        case 'message':
-            return (
-                <svg {...common}>
-                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-                </svg>
-            );
-        case 'people':
-            return (
-                <svg {...common}>
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-            );
-        case 'shield':
-            return (
-                <svg {...common}>
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                    <path d="m9 12 2 2 4-5" />
-                </svg>
-            );
-        case 'sparkles':
-            return (
-                <svg {...common}>
-                    <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
-                    <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" />
-                    <path d="M5 14l.7 1.8L7.5 16.5l-1.8.7L5 19l-.7-1.8-1.8-.7 1.8-.7L5 14z" />
-                </svg>
-            );
-        case 'user':
-            return (
-                <svg {...common}>
-                    <path d="M20 21a8 8 0 0 0-16 0" />
-                    <circle cx="12" cy="7" r="4" />
-                </svg>
-            );
-        default:
-            return null;
-    }
+type QuickSetupButtonProps = {
+    icon: string;
+    title: string;
+    onClick: () => void;
 };
+
+const QuickSetupButton = ({ icon, title, onClick }: QuickSetupButtonProps) => (
+    <button type="button" onClick={onClick} className="hr-quick-button group">
+    <span>
+      <i className={`bi ${icon}`} aria-hidden="true" />
+    </span>
+        <strong>{title}</strong>
+        <i className="bi bi-arrow-right-short text-lg text-blue-600 transition group-hover:translate-x-0.5" aria-hidden="true" />
+    </button>
+);
 
 export default Home;

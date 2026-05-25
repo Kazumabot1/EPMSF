@@ -5,10 +5,8 @@ import com.epms.dto.FeedbackSubmissionStatusResponse;
 import com.epms.entity.FeedbackAssignmentQuestion;
 import com.epms.entity.FeedbackCampaignCompetencyWeight;
 import com.epms.entity.FeedbackEvaluatorAssignment;
-import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackResponseItem;
-import com.epms.entity.FeedbackSection;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
@@ -20,8 +18,6 @@ import com.epms.exception.ResourceNotFoundException;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.FeedbackCampaignCompetencyWeightRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
-import com.epms.repository.FeedbackFormRepository;
-import com.epms.repository.FeedbackQuestionRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
@@ -50,7 +46,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -69,8 +64,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
-    private final FeedbackFormRepository feedbackFormRepository;
-    private final FeedbackQuestionRepository questionRepository;
     private final RatingScaleRepository ratingScaleRepository;
     private final UserRepository userRepository;
     private final FeedbackOperationalService feedbackOperationalService;

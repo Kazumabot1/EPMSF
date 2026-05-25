@@ -1,5 +1,6 @@
 import api from '../services/api';
 import { extractApiErrorMessage } from '../services/apiError';
+import { DEFAULT_EVALUATOR_CONFIG } from '../types/feedbackCampaign';
 import type {
     ApiEnvelope,
     EvaluatorConfigInput,
@@ -332,23 +333,6 @@ export interface AssignmentGenerationResponse {
     evaluatorConfig?: EvaluatorConfigInput;
     [key: string]: unknown;
 }
-
-export const DEFAULT_EVALUATOR_CONFIG: EvaluatorConfigInput = {
-    includeManager: true,
-    includePeers: true,
-    includeTeamPeers: true,
-    includeDepartmentPeers: true,
-    includeProjectPeers: false,
-    includeCrossTeamPeers: false,
-    includeSubordinates: true,
-    includeSelf: true,
-    peerMinCount: 1,
-    peerMaxCount: 3,
-    subordinateMinCount: 0,
-    subordinateMaxCount: 5,
-    flexibleMode: true,
-    peerCount: 3,
-};
 
 export const ratingScaleLabel = (scale: RatingScaleOption): string => {
     if (scale.scaleName) return `${scale.scaleName} (${scale.minScore ?? 1}-${scale.maxScore ?? scale.scales ?? 5})`;

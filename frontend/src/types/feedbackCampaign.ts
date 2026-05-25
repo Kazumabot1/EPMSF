@@ -218,20 +218,116 @@ export interface FeedbackTargetCandidateQuery {
 
 export interface EvaluatorConfigInput {
   includeManager: boolean;
-  includePeers?: boolean;
+  includePeers: boolean;
   includeSubordinates: boolean;
   includeSelf: boolean;
-  peerMinCount?: number;
-  peerMaxCount?: number;
-  subordinateMinCount?: number;
-  subordinateMaxCount?: number;
-  flexibleMode?: boolean;
-  includeTeamPeers?: boolean;
-  includeDepartmentPeers?: boolean;
-  includeProjectPeers?: boolean;
-  includeCrossTeamPeers?: boolean;
+  peerMinCount: number;
+  peerMaxCount: number;
+  subordinateMinCount: number;
+  subordinateMaxCount: number;
+  flexibleMode: boolean;
+  includeTeamPeers: boolean;
+  includeDepartmentPeers: boolean;
+  includeProjectPeers: boolean;
+  includeCrossTeamPeers: boolean;
+  /**
+   * @deprecated Backend compatibility alias only. New UI logic must use peerMinCount/peerMaxCount.
+   */
   peerCount?: number;
 }
+
+export const DEFAULT_EVALUATOR_CONFIG: EvaluatorConfigInput = {
+  includeManager: true,
+  includePeers: true,
+  includeSubordinates: true,
+  includeSelf: true,
+  peerMinCount: 1,
+  peerMaxCount: 3,
+  subordinateMinCount: 0,
+  subordinateMaxCount: 5,
+  flexibleMode: true,
+  includeTeamPeers: true,
+  includeDepartmentPeers: true,
+  includeProjectPeers: false,
+  includeCrossTeamPeers: false,
+  peerCount: 3,
+};
+
+const toSafeInteger = (value: unknown, fallback: number) => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+};
+
+const clampInteger = (value: unknown, fallback: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, toSafeInteger(value, fallback)));
+
+export const normalizeEvaluatorConfig = (input?: Partial<EvaluatorConfigInput> | null): EvaluatorConfigInput => {
+  const source = input ?? {};
+  const legacyPeerCount = source.peerCount;
+  const peerMaxCount = clampInteger(
+      source.peerMaxCount ?? legacyPeerCount,
+      DEFAULT_EVALUATOR_CONFIG.peerMaxCount,
+      1,
+      10,
+  );
+  const peerMinCount = clampInteger(
+      source.peerMinCount,
+      Math.min(DEFAULT_EVALUATOR_CONFIG.peerMinCount, peerMaxCount),
+      0,
+      peerMaxCount,
+  );
+  const subordinateMaxCount = clampInteger(
+      source.subordinateMaxCount,
+      DEFAULT_EVALUATOR_CONFIG.subordinateMaxCount,
+      0,
+      10,
+  );
+  const subordinateMinCount = clampInteger(
+      source.subordinateMinCount,
+      DEFAULT_EVALUATOR_CONFIG.subordinateMinCount,
+      0,
+      subordinateMaxCount,
+  );
+
+  const includeTeamPeers = source.includeTeamPeers ?? DEFAULT_EVALUATOR_CONFIG.includeTeamPeers;
+  const includeDepartmentPeers = source.includeDepartmentPeers ?? DEFAULT_EVALUATOR_CONFIG.includeDepartmentPeers;
+  const includeProjectPeers = source.includeProjectPeers ?? DEFAULT_EVALUATOR_CONFIG.includeProjectPeers;
+  const includeCrossTeamPeers = source.includeCrossTeamPeers ?? DEFAULT_EVALUATOR_CONFIG.includeCrossTeamPeers;
+  const hasSpecificPeerSource = includeTeamPeers || includeDepartmentPeers || includeProjectPeers || includeCrossTeamPeers;
+
+  return {
+    includeManager: source.includeManager ?? DEFAULT_EVALUATOR_CONFIG.includeManager,
+    includePeers: source.includePeers ?? hasSpecificPeerSource,
+    includeSubordinates: source.includeSubordinates ?? DEFAULT_EVALUATOR_CONFIG.includeSubordinates,
+    includeSelf: source.includeSelf ?? DEFAULT_EVALUATOR_CONFIG.includeSelf,
+    peerMinCount,
+    peerMaxCount,
+    subordinateMinCount,
+    subordinateMaxCount,
+    flexibleMode: source.flexibleMode ?? DEFAULT_EVALUATOR_CONFIG.flexibleMode,
+    includeTeamPeers,
+    includeDepartmentPeers,
+    includeProjectPeers,
+    includeCrossTeamPeers,
+    peerCount: peerMaxCount,
+  };
+};
+
+export const getPeerReviewerCount = (config?: Partial<EvaluatorConfigInput> | null) =>
+    normalizeEvaluatorConfig(config).peerMaxCount;
+
+export const hasAnyEvaluatorSource = (config?: Partial<EvaluatorConfigInput> | null) => {
+  const normalized = normalizeEvaluatorConfig(config);
+  return normalized.includeManager
+      || normalized.includeSelf
+      || normalized.includeSubordinates
+      || (normalized.includePeers && (
+          normalized.includeTeamPeers
+          || normalized.includeDepartmentPeers
+          || normalized.includeProjectPeers
+          || normalized.includeCrossTeamPeers
+      ));
+};
 
 export type FeedbackRelationshipType = 'MANAGER' | 'PEER' | 'SUBORDINATE' | 'SELF';
 

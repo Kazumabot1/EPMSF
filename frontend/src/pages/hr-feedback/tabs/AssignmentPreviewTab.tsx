@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
+import { DEFAULT_EVALUATOR_CONFIG, getPeerReviewerCount, normalizeEvaluatorConfig } from '../../../types/feedbackCampaign';
 import type {
   FeedbackCampaign,
   EvaluatorConfigInput,
@@ -19,17 +20,6 @@ interface Props {
 }
 
 const relationshipOptions: FeedbackRelationshipType[] = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'];
-
-const DEFAULT_EVAL_CONFIG: EvaluatorConfigInput = {
-  includeManager: true,
-  includeTeamPeers: true,
-  includeDepartmentPeers: true,
-  includeProjectPeers: false,
-  includeCrossTeamPeers: false,
-  includeSubordinates: true,
-  includeSelf: false,
-  peerCount: 3,
-};
 
 const formatCampaignOption = (campaign: FeedbackCampaign) =>
     `${campaign.name} (${campaign.status})${campaign.targetCount ? ` - ${campaign.targetCount} target(s)` : ''}`;
@@ -99,7 +89,10 @@ export default function AssignmentPreviewTab({
     return map;
   }, [employees]);
 
-  const effectiveConfig = result?.evaluatorConfig ?? evalConfig ?? DEFAULT_EVAL_CONFIG;
+  const effectiveConfig = useMemo(
+      () => normalizeEvaluatorConfig(result?.evaluatorConfig ?? evalConfig ?? DEFAULT_EVALUATOR_CONFIG),
+      [evalConfig, result?.evaluatorConfig],
+  );
 
   const knownTargetIds = useMemo(() => {
     if (targetIds.length > 0) return targetIds;
@@ -226,17 +219,18 @@ export default function AssignmentPreviewTab({
     effectiveConfig.includeManager && 'Manager',
     effectiveConfig.includeSelf && 'Self',
     effectiveConfig.includeSubordinates && 'Subordinates',
-    effectiveConfig.includeDepartmentPeers && 'Department Peers',
-    effectiveConfig.includeTeamPeers && 'Team Peers',
-    effectiveConfig.includeProjectPeers && 'Project Peers',
-    effectiveConfig.includeCrossTeamPeers && 'Other-Team Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeDepartmentPeers && 'Department Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeTeamPeers && 'Team Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeProjectPeers && 'Project Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeCrossTeamPeers && 'Other-Team Peers',
   ].filter(Boolean).join(', ');
 
+  const peerReviewerCount = getPeerReviewerCount(effectiveConfig);
   const estimatedPerTarget =
-      effectiveConfig.peerCount +
+      (effectiveConfig.includePeers ? peerReviewerCount : 0) +
       (effectiveConfig.includeManager ? 1 : 0) +
       (effectiveConfig.includeSelf ? 1 : 0) +
-      (effectiveConfig.includeSubordinates ? 1 : 0);
+      (effectiveConfig.includeSubordinates ? effectiveConfig.subordinateMaxCount : 0);
 
   const employeeName = (id: number, fallback?: string | null) => fallback ?? employeeMap.get(id)?.fullName ?? `Employee #${id}`;
 
@@ -415,7 +409,7 @@ export default function AssignmentPreviewTab({
 
                 <section className="hfd-review-card">
                   <div className="hfd-review-card-title"><i className="bi bi-sliders" /> Evaluator Rules</div>
-                  <h3>{effectiveConfig.peerCount} peer{effectiveConfig.peerCount === 1 ? '' : 's'} / target</h3>
+                  <h3>{peerReviewerCount} peer{peerReviewerCount === 1 ? '' : 's'} / target</h3>
                   <p>{configLabels || 'Default evaluator rules'} · est. {estimatedPerTarget} evaluator{estimatedPerTarget === 1 ? '' : 's'} each</p>
                 </section>
               </div>

@@ -2,6 +2,12 @@ import { type DragEvent, type FormEvent, useEffect, useMemo, useState } from 're
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { authStorage } from '../../../services/authStorage';
+import {
+  DEFAULT_EVALUATOR_CONFIG,
+  getPeerReviewerCount,
+  hasAnyEvaluatorSource,
+  normalizeEvaluatorConfig,
+} from '../../../types/feedbackCampaign';
 import type {
   CreateFeedbackCampaignInput,
   FeedbackCampaign,
@@ -241,23 +247,6 @@ const buildQuestionCompetencies = (questions: FeedbackCampaignQuestionGroup['que
   return Array.from(bySection.values()).sort((left, right) => left.sectionOrder - right.sectionOrder || left.sectionTitle.localeCompare(right.sectionTitle));
 };
 
-const defaultEvaluatorConfig: EvaluatorConfigInput = {
-  includeManager: true,
-  includePeers: true,
-  includeSubordinates: true,
-  includeSelf: true,
-  peerMinCount: 2,
-  peerMaxCount: 5,
-  subordinateMinCount: 0,
-  subordinateMaxCount: 5,
-  flexibleMode: true,
-  includeTeamPeers: true,
-  includeDepartmentPeers: true,
-  includeProjectPeers: false,
-  includeCrossTeamPeers: false,
-  peerCount: 5,
-};
-
 const emptyAssignmentPreview = (campaign?: FeedbackCampaign | null): FeedbackAssignmentGenerationResponse => ({
   campaignId: campaign?.id ?? 0,
   totalTargets: 0,
@@ -345,6 +334,7 @@ const activationCheckIcon = (status?: string | null) => {
 };
 
 const launchCheckLabels: Record<string, string> = {
+  LIFECYCLE: 'Lifecycle gate',
   CAMPAIGN_INFO: 'Campaign details',
   TARGETS: 'Recipients',
   EVALUATOR_ASSIGNMENTS: 'Evaluator assignments',
@@ -361,6 +351,7 @@ const launchCheckMessage = (key?: string | null, status?: string | null, fallbac
   const normalizedKey = String(key ?? '').toUpperCase();
   const normalizedStatus = String(status ?? '').toUpperCase();
   if (normalizedStatus === 'PASS') return fallback ?? 'Ready.';
+  if (normalizedKey === 'LIFECYCLE') return fallback ?? 'Validate setup before launching.';
   if (normalizedKey === 'QUESTION_SELECTION') return 'Save the question review before launching.';
   if (normalizedKey === 'RELATIONSHIP_WEIGHTS') return 'Evaluator role weights must total 100%.';
   if (normalizedKey === 'COMPETENCY_WEIGHTS') return 'Competency weights must total 100%.';
@@ -483,7 +474,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
-  const [evaluatorConfig, setEvaluatorConfig] = useState<EvaluatorConfigInput>(defaultEvaluatorConfig);
+  const [evaluatorConfig, setEvaluatorConfig] = useState<EvaluatorConfigInput>(() => normalizeEvaluatorConfig(DEFAULT_EVALUATOR_CONFIG));
   const [assignmentPreview, setAssignmentPreview] = useState<FeedbackAssignmentGenerationResponse>(emptyAssignmentPreview(null));
   const [previewingAssignments, setPreviewingAssignments] = useState(false);
   const [generatingAssignments, setGeneratingAssignments] = useState(false);
@@ -562,6 +553,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const hasAssignmentPreview = assignmentPreview.requests.length > 0;
   const assignmentDetails = assignmentPreview.assignmentDetails ?? [];
   const canEditEvaluators = selectedCampaign?.status === 'DRAFT';
+  const normalizedEvaluatorConfig = useMemo(() => normalizeEvaluatorConfig(evaluatorConfig), [evaluatorConfig]);
+  const peerReviewerCount = getPeerReviewerCount(normalizedEvaluatorConfig);
   const hasSavedEvaluatorAssignments = assignmentDetails.some(item => item.assignmentId != null);
   const savedAssignmentCount = selectedCampaign?.assignmentCount ?? 0;
   const employeeMap = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
@@ -678,9 +671,22 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const questionReviewReady = Boolean(questionReview.saved && questionReview.includedQuestionCount > 0 && competencyWeightsReady && questionGroups.every(group => group.includedQuestionCount > 0));
   const activationBlocked = activationReadiness.blockingIssues.length > 0;
   const activationWarnings = activationReadiness.warnings.length;
-  const canActivate = Boolean(selectedCampaign && activationReadiness.canActivate && !activationBlocked);
+  const setupReady = Boolean(selectedCampaign && activationReadiness.ready && !activationBlocked);
+  const campaignReadyToActivate = selectedCampaign?.status === 'READY_TO_ACTIVATE';
+  const canValidateSetup = Boolean(selectedCampaign && selectedCampaign.status === 'DRAFT' && activationReadiness.canMarkReady && setupReady);
+  const canActivate = Boolean(selectedCampaign && campaignReadyToActivate && activationReadiness.canActivate && setupReady);
   const campaignLaunched = Boolean(selectedCampaign && ['ACTIVE', 'CLOSED', 'PUBLISHED'].includes(selectedCampaign.status));
-  const launchReady = Boolean(selectedCampaign && activationReadiness.ready && !activationBlocked);
+  const launchReady = Boolean(selectedCampaign && campaignReadyToActivate && setupReady);
+  const launchBannerTitle = launchReady
+      ? 'Ready to launch'
+      : setupReady && selectedCampaign?.status === 'DRAFT'
+          ? 'Ready for final validation'
+          : 'Needs attention';
+  const launchBannerMessage = launchReady
+      ? 'Setup is validated and locked. Launching this campaign will open feedback collection.'
+      : setupReady && selectedCampaign?.status === 'DRAFT'
+          ? 'All setup checks pass. Validate the setup first, then launch the campaign.'
+          : 'Fix the items below before launching this campaign.';
   const launchTargetCount = activationReadiness.summary.targetCount || targetsResponse.targetCount || selectedCampaign?.targetCount || 0;
   const launchAssignmentCount = activationReadiness.summary.assignmentCount || selectedCampaign?.assignmentCount || savedAssignmentCount;
   const questionCountsByForm = questionGroups.map(group => Number(group.includedQuestionCount || group.questionCount || 0)).filter(count => count > 0);
@@ -767,13 +773,19 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const readyCampaigns = campaigns.filter(campaign => campaign.status === 'READY_TO_ACTIVATE').length;
   const publishedCampaigns = campaigns.filter(campaign => campaign.status === 'PUBLISHED').length;
 
-  const refreshCampaigns = async () => {
+  const refreshCampaigns = async (): Promise<FeedbackCampaign[]> => {
     try {
       setLoadingCampaigns(true);
       const data = await hrFeedbackApi.getAllCampaigns();
       setCampaigns(data);
+      setSelectedCampaignId(current => {
+        if (current === '') return current;
+        return data.some(campaign => campaign.id === current) ? current : '';
+      });
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load campaigns.');
+      return [];
     } finally {
       setLoadingCampaigns(false);
     }
@@ -861,6 +873,36 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     }
   };
 
+  const loadCampaignSnapshot = async (campaignId: number, fallback?: FeedbackCampaign | null): Promise<FeedbackCampaign | null> => {
+    try {
+      const [latestCampaign, latestTargets] = await Promise.all([
+        feedbackCampaignApi.getCampaign(campaignId).catch(() => fallback ?? null),
+        feedbackCampaignApi.getCampaignTargets(campaignId).catch(() => null),
+      ]);
+      const nextCampaign = latestCampaign ?? fallback ?? null;
+      if (nextCampaign) {
+        setCampaigns(current => {
+          const exists = current.some(item => item.id === nextCampaign.id);
+          return exists
+              ? current.map(item => item.id === nextCampaign.id ? nextCampaign : item)
+              : [nextCampaign, ...current];
+        });
+        applyForm(nextCampaign);
+        onCampaignCreated(nextCampaign);
+      }
+      if (latestTargets) {
+        setTargetsResponse(latestTargets);
+        setSelectedTargetIds(normalizeList(latestTargets.targets.map(target => target.employeeId)));
+      } else if (nextCampaign) {
+        setSelectedTargetIds(normalizeList(nextCampaign.targetEmployeeIds ?? []));
+      }
+      return nextCampaign;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh campaign workspace.');
+      return fallback ?? null;
+    }
+  };
+
   useEffect(() => {
     void refreshCampaigns();
     void loadDirectoryFilters();
@@ -930,23 +972,30 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     });
   };
 
-  const handleSelectCampaign = (value: string) => {
+  const handleSelectCampaign = async (value: string) => {
     setError('');
     setSuccess('');
     setErrors({});
+    setDraftRemovedEvaluatorKeys(new Set());
+    setDraftManualAdditions([]);
     if (!value) {
       setSelectedCampaignId('');
       setForm(defaultForm());
+      setTargetsResponse(emptyTargetsResponse(null));
+      setSelectedTargetIds([]);
+      setAssignmentPreview(emptyAssignmentPreview(null));
+      setQuestionReview(emptyQuestionReview(null));
+      setScoringConfig(emptyScoringConfig(null));
+      setActivationReadiness(emptyActivationReadiness(null));
       setCampaignInfoOpen(false);
       return;
     }
     const id = Number(value);
     setSelectedCampaignId(id);
-    const campaign = campaigns.find(item => item.id === id);
-    if (campaign) {
-      applyForm(campaign);
-      setCampaignInfoOpen(false);
-    }
+    const campaign = campaigns.find(item => item.id === id) ?? null;
+    if (campaign) applyForm(campaign);
+    setCampaignInfoOpen(false);
+    await loadCampaignSnapshot(id, campaign);
   };
 
   const validate = () => {
@@ -1075,6 +1124,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       setDraftManualAdditions([]);
       setSuccess(`${response.targetCount} feedback recipient${response.targetCount === 1 ? '' : 's'} saved for "${selectedCampaign.name}".`);
       setActiveStepKey('evaluators');
+      const latest = await loadCampaignSnapshot(selectedCampaign.id, selectedCampaign);
+      if (latest) setAssignmentPreview(emptyAssignmentPreview(latest));
       await refreshCampaigns();
       await loadActivationState(selectedCampaign.id);
     } catch (err) {
@@ -1086,40 +1137,16 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
 
   const setPeerReviewerCount = (value: number) => {
     const nextCount = Math.max(1, Math.min(8, value));
-    setEvaluatorConfig(current => ({
+    setEvaluatorConfig(current => normalizeEvaluatorConfig({
       ...current,
-      includeManager: true,
       includePeers: true,
-      includeSubordinates: true,
-      includeSelf: true,
-      peerMinCount: Math.min(2, nextCount),
+      peerMinCount: Math.min(current.peerMinCount ?? DEFAULT_EVALUATOR_CONFIG.peerMinCount, nextCount),
       peerMaxCount: nextCount,
       peerCount: nextCount,
-      flexibleMode: true,
-      includeTeamPeers: true,
-      includeDepartmentPeers: true,
-      includeProjectPeers: false,
-      includeCrossTeamPeers: false,
     }));
   };
 
-  const buildEvaluatorPayload = (): EvaluatorConfigInput => ({
-    ...evaluatorConfig,
-    includeManager: true,
-    includePeers: true,
-    includeSubordinates: true,
-    includeSelf: true,
-    flexibleMode: true,
-    includeTeamPeers: true,
-    includeDepartmentPeers: true,
-    includeProjectPeers: false,
-    includeCrossTeamPeers: false,
-    peerMinCount: Math.min(2, Number(evaluatorConfig.peerMaxCount ?? evaluatorConfig.peerCount ?? 3)),
-    peerMaxCount: Number(evaluatorConfig.peerMaxCount ?? evaluatorConfig.peerCount ?? 3),
-    peerCount: Number(evaluatorConfig.peerMaxCount ?? evaluatorConfig.peerCount ?? 3),
-    subordinateMinCount: 0,
-    subordinateMaxCount: Number(evaluatorConfig.subordinateMaxCount ?? 5),
-  });
+  const buildEvaluatorPayload = (): EvaluatorConfigInput => normalizeEvaluatorConfig(evaluatorConfig);
 
   const validateEvaluatorRules = () => {
     if (!selectedCampaign) {
@@ -1134,15 +1161,16 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       setError(hasUnsavedTargetChanges ? 'Save recipient changes before preparing evaluators.' : 'Select and save recipients before preparing evaluators.');
       return false;
     }
-    if (!evaluatorConfig.includeManager && !evaluatorConfig.includePeers && !evaluatorConfig.includeSubordinates && !evaluatorConfig.includeSelf) {
+    const payload = buildEvaluatorPayload();
+    if (!hasAnyEvaluatorSource(payload)) {
       setError('At least one evaluator group is required.');
       return false;
     }
-    if (evaluatorConfig.includePeers && evaluatorConfig.peerMinCount > evaluatorConfig.peerMaxCount) {
+    if (payload.includePeers && payload.peerMinCount > payload.peerMaxCount) {
       setError('Peer reviewer count is not valid.');
       return false;
     }
-    if (evaluatorConfig.includeSubordinates && evaluatorConfig.subordinateMinCount > evaluatorConfig.subordinateMaxCount) {
+    if (payload.includeSubordinates && payload.subordinateMinCount > payload.subordinateMaxCount) {
       setError('Direct report reviewer count is not valid.');
       return false;
     }
@@ -1210,6 +1238,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       setQuestionReview(emptyQuestionReview(selectedCampaign));
       setSelectedQuestionGroupKey('');
       setSuccess(`${response.totalEvaluatorsGenerated} evaluator${response.totalEvaluatorsGenerated === 1 ? '' : 's'} saved for review.`);
+      await loadCampaignSnapshot(selectedCampaign.id, selectedCampaign);
       await refreshCampaigns();
       await loadQuestionReview(selectedCampaign.id);
       await loadScoringConfig(selectedCampaign.id);
@@ -1280,9 +1309,11 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       setManualForm(current => ({ ...current, evaluatorEmployeeId: 0, reason: '' }));
       setEvaluatorSearch('');
       setSuccess('Evaluator added.');
+      await loadCampaignSnapshot(selectedCampaign.id, selectedCampaign);
       await refreshCampaigns();
       await loadQuestionReview(selectedCampaign.id);
       await loadScoringConfig(selectedCampaign.id);
+      await loadActivationState(selectedCampaign.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Evaluator could not be added.');
     } finally {
@@ -1315,9 +1346,11 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       const response = await feedbackCampaignApi.removeAssignment(selectedCampaign.id, assignment.assignmentId);
       setAssignmentPreview(response);
       setSuccess('Evaluator removed.');
+      await loadCampaignSnapshot(selectedCampaign.id, selectedCampaign);
       await refreshCampaigns();
       await loadQuestionReview(selectedCampaign.id);
       await loadScoringConfig(selectedCampaign.id);
+      await loadActivationState(selectedCampaign.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Evaluator could not be removed.');
     } finally {
@@ -1340,6 +1373,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       setQuestionReview(data);
       setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? '');
       setSuccess('Questions refreshed from active rules.');
+      await loadScoringConfig(selectedCampaign.id);
+      await loadActivationState(selectedCampaign.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Questions could not be prepared.');
     } finally {
@@ -1374,14 +1409,14 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   };
 
   const toggleQuestionIncluded = (groupKey: string, questionCode: string) => {
-    updateQuestionGroup(groupKey, questions =>
+    updateQuestionGroup(groupKey, (questions: FeedbackCampaignQuestionGroup['questions']) =>
         questions.map(question => question.questionCode === questionCode ? { ...question, included: !question.included } : question),
     );
   };
 
   const moveCompetency = (groupKey: string, fromSectionCode: string, toSectionCode: string) => {
     if (fromSectionCode === toSectionCode) return;
-    updateQuestionGroup(groupKey, questions => {
+    updateQuestionGroup(groupKey, (questions: FeedbackCampaignQuestionGroup['questions']) => {
       const sections = Array.from(new Map(sortQuestionItems(questions).map(question => [getQuestionSectionCode(question), question])).keys());
       const fromIndex = sections.indexOf(fromSectionCode);
       const toIndex = sections.indexOf(toSectionCode);
@@ -1399,7 +1434,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
 
   const moveQuestion = (groupKey: string, sectionCode: string, fromQuestionCode: string, toQuestionCode: string) => {
     if (fromQuestionCode === toQuestionCode) return;
-    updateQuestionGroup(groupKey, questions => {
+    updateQuestionGroup(groupKey, (questions: FeedbackCampaignQuestionGroup['questions']) => {
       const scoped = sortQuestionItems(questions.filter(question => (getQuestionSectionCode(question)) === sectionCode));
       const fromIndex = scoped.findIndex(question => question.questionCode === fromQuestionCode);
       const toIndex = scoped.findIndex(question => question.questionCode === toQuestionCode);
@@ -1408,10 +1443,12 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       const [moved] = ordered.splice(fromIndex, 1);
       ordered.splice(toIndex, 0, moved);
       const displayOrder = new Map(ordered.map((question, index) => [question.questionCode, (index + 1) * 10]));
-      return questions.map(question => displayOrder.has(question.questionCode)
-          ? { ...question, displayOrder: displayOrder.get(question.questionCode) }
-          : question,
-      );
+      return questions.map(question => {
+        const nextDisplayOrder = displayOrder.get(question.questionCode);
+        return typeof nextDisplayOrder === 'number'
+            ? { ...question, displayOrder: nextDisplayOrder }
+            : question;
+      });
     });
   };
 
@@ -1596,17 +1633,49 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   };
 
   const refreshActivationAfterLifecycle = async (campaignId: number) => {
+    await loadCampaignSnapshot(campaignId, selectedCampaign);
     await refreshCampaigns();
     await loadScoringConfig(campaignId);
     await loadActivationState(campaignId);
   };
 
+  const validateSelectedCampaignSetup = async () => {
+    if (!selectedCampaign) return;
+    const warningText = activationWarnings > 0
+        ? `
+
+There are ${activationWarnings} warning(s). Validation is allowed, but HR should review them first.`
+        : '';
+    const confirmed = window.confirm(`Validate setup for "${selectedCampaign.name}"?
+
+This will lock campaign setup and move it to Ready to activate. You can launch after validation.${warningText}`);
+    if (!confirmed) return;
+    setActivatingCampaign(true);
+    setError('');
+    setSuccess('');
+    try {
+      const updated = await feedbackCampaignApi.markReadyToActivate(selectedCampaign.id);
+      setSuccess(`Campaign "${updated.name}" is validated and ready to activate.`);
+      onCampaignCreated(updated);
+      await refreshActivationAfterLifecycle(updated.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Campaign setup could not be validated.');
+      await loadActivationState(selectedCampaign.id);
+    } finally {
+      setActivatingCampaign(false);
+    }
+  };
+
   const activateSelectedCampaign = async () => {
     if (!selectedCampaign) return;
     const warningText = activationWarnings > 0
-        ? `\n\nThere are ${activationWarnings} warning(s). Activation is allowed, but HR should review them first.`
+        ? `
+
+There are ${activationWarnings} warning(s). Activation is allowed, but HR should review them first.`
         : '';
-    const confirmed = window.confirm(`Activate "${selectedCampaign.name}"?\n\nThis will lock setup, generate final feedback question snapshots, notify evaluators, and move the campaign to ACTIVE.${warningText}`);
+    const confirmed = window.confirm(`Activate "${selectedCampaign.name}"?
+
+This will generate final feedback question snapshots, notify evaluators, and move the campaign to ACTIVE.${warningText}`);
     if (!confirmed) return;
     setActivatingCampaign(true);
     setError('');
@@ -2224,7 +2293,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                         </article>
                         <article className="hfde-reviewer-card peer featured">
                           <span className="hfde-role-icon peer"><i className="bi bi-people" /></span>
-                          <div><strong>Peer Review</strong><small>{Number(evaluatorConfig.peerMaxCount ?? evaluatorConfig.peerCount ?? 3)} reviewer{Number(evaluatorConfig.peerMaxCount ?? evaluatorConfig.peerCount ?? 3) === 1 ? '' : 's'} per recipient</small></div>
+                          <div><strong>Peer Review</strong><small>{peerReviewerCount} reviewer{peerReviewerCount === 1 ? '' : 's'} per recipient</small></div>
                         </article>
                         <article className="hfde-reviewer-card subordinate">
                           <span className="hfde-role-icon subordinate"><i className="bi bi-person-lines-fill" /></span>
@@ -2239,9 +2308,9 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                           <small>Choose how many peer reviewers should be suggested for each recipient.</small>
                         </div>
                         <div className="hfde-stepper-control">
-                          <button type="button" onClick={() => setPeerReviewerCount(Number(evaluatorConfig.peerMaxCount ?? 3) - 1)} disabled={!canEditEvaluators || Number(evaluatorConfig.peerMaxCount ?? 3) <= 1}>−</button>
-                          <span>{Number(evaluatorConfig.peerMaxCount ?? evaluatorConfig.peerCount ?? 3)}</span>
-                          <button type="button" onClick={() => setPeerReviewerCount(Number(evaluatorConfig.peerMaxCount ?? 3) + 1)} disabled={!canEditEvaluators || Number(evaluatorConfig.peerMaxCount ?? 3) >= 8}>+</button>
+                          <button type="button" onClick={() => setPeerReviewerCount(peerReviewerCount - 1)} disabled={!canEditEvaluators || peerReviewerCount <= 1}>−</button>
+                          <span>{peerReviewerCount}</span>
+                          <button type="button" onClick={() => setPeerReviewerCount(peerReviewerCount + 1)} disabled={!canEditEvaluators || peerReviewerCount >= 8}>+</button>
                         </div>
                       </div>
 
@@ -2731,8 +2800,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                     <div className={`hfda-launch-banner ${launchReady ? 'ready' : 'blocked'}`}>
                       <i className={`bi ${launchReady ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`} />
                       <div>
-                        <strong>{launchReady ? 'Ready to launch' : 'Needs attention'}</strong>
-                        <p>{launchReady ? 'All setup steps are complete. Launching this campaign will open feedback collection.' : 'Fix the items below before launching this campaign.'}</p>
+                        <strong>{launchBannerTitle}</strong>
+                        <p>{launchBannerMessage}</p>
                       </div>
                     </div>
 
@@ -2823,9 +2892,16 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                       <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => setActiveStepKey('questions')}>
                         <i className="bi bi-ui-checks-grid" /> Back to Question Review
                       </button>
-                      <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canActivate || activatingCampaign} onClick={() => void activateSelectedCampaign()}>
-                        <i className="bi bi-rocket-takeoff" /> {activatingCampaign ? 'Launching...' : 'Launch Campaign'}
-                      </button>
+                      {selectedCampaign.status === 'DRAFT' && (
+                          <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canValidateSetup || activatingCampaign} onClick={() => void validateSelectedCampaignSetup()}>
+                            <i className="bi bi-shield-check" /> {activatingCampaign ? 'Validating...' : 'Validate Setup'}
+                          </button>
+                      )}
+                      {selectedCampaign.status === 'READY_TO_ACTIVATE' && (
+                          <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canActivate || activatingCampaign} onClick={() => void activateSelectedCampaign()}>
+                            <i className="bi bi-rocket-takeoff" /> {activatingCampaign ? 'Launching...' : 'Launch Campaign'}
+                          </button>
+                      )}
                     </div>
                   </div>
               )}

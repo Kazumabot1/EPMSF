@@ -359,7 +359,15 @@ const EmployeeFeedbackDashboardPage = () => {
     const ownResults = dashboardQuery.data?.ownFeedbackResults ?? [];
     const resultSummaries = resultSummaryQuery.data?.results ?? [];
 
-    const taskCampaignOptions = useMemo(() => Array.from(new Set(tasks.map((task) => task.campaignName).filter(Boolean))).sort(), [tasks]);
+    const taskCampaignOptions = useMemo(() => {
+        const campaigns = new Map<number, string>();
+        tasks.forEach((task) => {
+            campaigns.set(task.campaignId, task.campaignName || `Campaign #${task.campaignId}`);
+        });
+        return Array.from(campaigns.entries())
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
+    }, [tasks]);
 
     const taskStats = useMemo(() => {
         const open = tasks.filter((task) => task.status !== 'SUBMITTED' && task.status !== 'CANCELLED' && task.status !== 'DECLINED').length;
@@ -373,7 +381,7 @@ const EmployeeFeedbackDashboardPage = () => {
         const search = taskSearch.trim().toLowerCase();
         return tasks.filter((task) => {
             if (taskStatusFilter !== 'ALL' && task.status !== taskStatusFilter) return false;
-            if (taskCampaignFilter !== 'ALL' && task.campaignName !== taskCampaignFilter) return false;
+            if (taskCampaignFilter !== 'ALL' && String(task.campaignId) !== taskCampaignFilter) return false;
             if (taskRelationshipFilter !== 'ALL' && task.relationshipType !== taskRelationshipFilter) return false;
             if (search && !buildSearchText(task).includes(search)) return false;
             return true;
@@ -642,7 +650,7 @@ const EmployeeFeedbackDashboardPage = () => {
                         <input type="search" placeholder="Search employee or campaign" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} />
                         <select value={taskCampaignFilter} onChange={(event) => setTaskCampaignFilter(event.target.value)}>
                             <option value="ALL">All campaigns</option>
-                            {taskCampaignOptions.map((campaign) => <option key={campaign} value={campaign}>{campaign}</option>)}
+                            {taskCampaignOptions.map((campaign) => <option key={`task-campaign-${campaign.id}`} value={String(campaign.id)}>{campaign.name}</option>)}
                         </select>
                         <select value={taskRelationshipFilter} onChange={(event) => setTaskRelationshipFilter(event.target.value as RelationshipFilter)}>
                             <option value="ALL">All relationships</option>
