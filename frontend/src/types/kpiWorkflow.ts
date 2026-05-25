@@ -20,6 +20,7 @@ export type ManagerKpiTemplateSummary = {
 export type ManagerKpiScoreLine = {
   kpiFormItemId: number;
   kpiLabel: string | null;
+  kpiCategoryName?: string | null;
   weight: number | null;
   target: number | null;
   unitName: string | null;
@@ -33,6 +34,7 @@ export type ManagerKpiAssignment = {
   employeeKpiFormId: number;
   employeeId: number;
   employeeName: string;
+  departmentName?: string | null;
   positionTitle?: string | null;
   kpiFormId?: number | null;
   cyclePeriodId?: number | null;

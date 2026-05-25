@@ -1,6 +1,7 @@
 package com.epms.service.impl;
 
 import com.epms.dto.ManagerKpiAssignmentDto;
+import com.epms.dto.UpdateEmployeeKpiScoresRequest;
 import com.epms.dto.UseKpiDepartmentRequest;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
@@ -39,12 +40,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -403,6 +406,61 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(saved.getValue().getScores())
                 .extracting(score -> score.getKpiFormItem().getId())
                 .containsExactlyInAnyOrder(501, 502, 503);
+    }
+
+    @Test
+    void updateScoresAllowsActualEqualToTargetAndCapsWeightScoreAtWeight() {
+        User projectManager = user(1, 7, null, true);
+        Position engineer = position(10, "Engineer");
+        KpiForm form = form(100, engineer, item(501, "Delivery", 80.0, 40, 0));
+        Employee employee = employee(11, engineer, true);
+        EmployeeKpiForm assignment = employeeAssignment(700, form, employee, EmployeeKpiStatus.ASSIGNED, form.getItems().get(0));
+        authenticate(projectManager);
+        stubManagerScoreScope(projectManager, employee, assignment);
+
+        ManagerKpiAssignmentDto result = service.updateScores(700, employeeScoreRequest(501, 80.0));
+
+        assertThat(result.getLines()).singleElement().satisfies(line -> {
+            assertThat(line.getActualValue()).isEqualTo(80.0);
+            assertThat(line.getScore()).isEqualTo(100.0);
+            assertThat(line.getWeightedScore()).isEqualTo(40.0);
+        });
+    }
+
+    @Test
+    void updateScoresRejectsActualGreaterThanTarget() {
+        User projectManager = user(1, 7, null, true);
+        Position engineer = position(10, "Engineer");
+        KpiForm form = form(100, engineer, item(501, "Delivery", 80.0, 40, 0));
+        Employee employee = employee(11, engineer, true);
+        EmployeeKpiForm assignment = employeeAssignment(700, form, employee, EmployeeKpiStatus.ASSIGNED, form.getItems().get(0));
+        authenticate(projectManager);
+        stubManagerScoreScope(projectManager, employee, assignment);
+
+        assertThatThrownBy(() -> service.updateScores(700, employeeScoreRequest(501, 81.0)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Actual % must be less than or equal to Target %");
+    }
+
+    private void stubManagerScoreScope(User projectManager, Employee employee, EmployeeKpiForm assignment) {
+        when(userRepository.findById(projectManager.getId())).thenReturn(Optional.of(projectManager));
+        when(employeeKpiFormEvaluatorRepository.findEmployeeIdsByEvaluatorUserId(projectManager.getId()))
+                .thenReturn(List.of(employee.getId()));
+        when(employeeRepository.findCurrentByWorkingDepartmentId(projectManager.getDepartmentId(), false)).thenReturn(List.of());
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(projectManager.getDepartmentId(), "Active")).thenReturn(List.of());
+        when(userRepository.findActiveManagersByDepartmentId(projectManager.getDepartmentId())).thenReturn(List.of());
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(userRepository.findActiveByEmployeeId(employee.getId())).thenReturn(Optional.of(user(1000 + employee.getId(), projectManager.getDepartmentId(), employee.getId(), true)));
+        when(employeeKpiFormRepository.findWithScoresForUpdate(assignment.getId())).thenReturn(Optional.of(assignment));
+    }
+
+    private static UpdateEmployeeKpiScoresRequest employeeScoreRequest(Integer itemId, Double actualValue) {
+        return UpdateEmployeeKpiScoresRequest.builder()
+                .scores(List.of(UpdateEmployeeKpiScoresRequest.EmployeeKpiScoreUpdateDto.builder()
+                        .kpiFormItemId(itemId)
+                        .actualValue(actualValue)
+                        .build()))
+                .build();
     }
 
     private static UseKpiDepartmentRequest departmentRequest(Integer departmentId) {

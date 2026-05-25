@@ -218,11 +218,18 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
             if (target == null || target <= 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI row has no valid target.");
             }
+            if (actual > target) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Row " + rowNumber(result, score) + ": Actual % must be less than or equal to Target %."
+                );
+            }
             score.setActualValue(actual);
             score.setScore((actual / target) * 100.0);
             score.setEvaluatedByUser(evaluator);
             score.setEvaluatedAt(LocalDateTime.now());
             score.calculateWeightedScore();
+            validateWeightScoreWithinWeight(result, score);
         }
         result.calculateTotals();
         if (result.getStatus() == DepartmentKpiResultStatus.ASSIGNED) {
@@ -303,6 +310,37 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         result.setStatus(DepartmentKpiResultStatus.FINALIZED);
         result.setFinalizedAt(now);
         result.setFinalizedByUser(currentUser());
+    }
+
+    private void validateWeightScoreWithinWeight(DepartmentKpiResult result, DepartmentKpiScore score) {
+        Double weightScore = score.getWeightedScore();
+        DepartmentKpiTemplateRow row = score.getTemplateRow();
+        Integer weight = row == null ? null : row.getWeight();
+        if (weightScore != null && weight != null && weightScore > weight) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Row " + rowNumber(result, score) + ": Weight Score must be less than or equal to Weight %."
+            );
+        }
+    }
+
+    private int rowNumber(DepartmentKpiResult result, DepartmentKpiScore score) {
+        if (result == null || result.getScores() == null || score == null || score.getTemplateRow() == null) {
+            return 1;
+        }
+        List<DepartmentKpiScore> ordered = result.getScores().stream()
+                .sorted(Comparator.comparing(s -> {
+                    DepartmentKpiTemplateRow row = s.getTemplateRow();
+                    return row == null || row.getSortOrder() == null ? 0 : row.getSortOrder();
+                }))
+                .toList();
+        for (int i = 0; i < ordered.size(); i++) {
+            DepartmentKpiTemplateRow row = ordered.get(i).getTemplateRow();
+            if (row != null && row.getId() != null && row.getId().equals(score.getTemplateRow().getId())) {
+                return i + 1;
+            }
+        }
+        return 1;
     }
 
     private void createResultsForCyclePeriod(DepartmentKpiCycle cycle, DepartmentKpiCyclePeriod period) {

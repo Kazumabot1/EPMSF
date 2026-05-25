@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class ManagerKpiScoreLineDto {
     private Integer kpiFormItemId;
     private String kpiLabel;
+    private String kpiCategoryName;
     private Integer weight;
     private Double target;
     private String unitName;
