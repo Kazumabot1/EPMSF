@@ -1,6 +1,8 @@
 package com.epms.entity;
 
 import com.epms.entity.enums.KpiTemplateCycleStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
+import com.epms.entity.enums.KpiGraceExtension;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,8 +35,13 @@ public class KpiTemplateCycle {
     @Column(name = "duration_months", nullable = false)
     private Integer durationMonths;
 
+    @Column(name = "duration_years", nullable = false)
+    @Builder.Default
+    private Integer durationYears = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
+    @Builder.Default
     private KpiTemplateCycleStatus status = KpiTemplateCycleStatus.DRAFT;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -62,6 +69,39 @@ public class KpiTemplateCycle {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    @Column(name = "early_close_reason", length = 1000)
+    private String earlyCloseReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "grace_extension", length = 30)
+    private KpiGraceExtension graceExtension;
+
+    @Column(name = "early_close_requested_at")
+    private LocalDateTime earlyCloseRequestedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "early_close_requested_by", referencedColumnName = "id")
+    @EqualsAndHashCode.Exclude
+    private User earlyCloseRequestedByUser;
+
+    @Column(name = "early_close_reviewed_at")
+    private LocalDateTime earlyCloseReviewedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "early_close_reviewed_by", referencedColumnName = "id")
+    @EqualsAndHashCode.Exclude
+    private User earlyCloseReviewedByUser;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "early_close_review_decision", length = 30)
+    private KpiEarlyCloseReviewDecision earlyCloseReviewDecision;
+
+    @Column(name = "early_close_review_reason", length = 1000)
+    private String earlyCloseReviewReason;
+
+    @Column(name = "last_edit_reason", length = 1000)
+    private String lastEditReason;
+
     @Builder.Default
     @OneToMany(mappedBy = "cycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude
@@ -74,6 +114,12 @@ public class KpiTemplateCycle {
         }
         if (status == null) {
             status = KpiTemplateCycleStatus.DRAFT;
+        }
+        if (durationYears == null) {
+            durationYears = 1;
+        }
+        if (durationMonths == null) {
+            durationMonths = durationYears * 12;
         }
     }
 

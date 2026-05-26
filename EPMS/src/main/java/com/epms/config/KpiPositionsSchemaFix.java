@@ -42,6 +42,7 @@ public class KpiPositionsSchemaFix implements ApplicationRunner {
             relaxLegacyKpiIdColumn(conn);
             ensureStatusColumn(conn);
             ensureAssignedAtColumn(conn);
+            ensureDurationMonthsColumn(conn);
             ensureOptionalLinkColumns(conn);
             normalizeStatusValues(conn);
         } catch (SQLException e) {
@@ -91,6 +92,18 @@ public class KpiPositionsSchemaFix implements ApplicationRunner {
                     "ALTER TABLE kpi_positions ADD COLUMN assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
             );
             log.info("Added kpi_positions.assigned_at column.");
+        }
+    }
+
+    private void ensureDurationMonthsColumn(Connection conn) throws SQLException {
+        if (columnExists(conn, "kpi_positions", "duration_months")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "ALTER TABLE kpi_positions ADD COLUMN duration_months INT NOT NULL DEFAULT 12"
+            );
+            log.info("Added kpi_positions.duration_months column.");
         }
     }
 
