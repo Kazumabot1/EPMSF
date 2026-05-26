@@ -1,7 +1,7 @@
 import type { KpiFormStatus, KpiTemplateItem } from './kpiTemplate';
 import type { KpiEarlyCloseReviewDecision, KpiGraceExtension, KpiTemplateCycleStatus } from './kpiTemplateCycle';
 
-export type DepartmentKpiResultStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'FINALIZED' | 'CLOSED';
+export type DepartmentKpiResultStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_APPROVAL' | 'FINALIZED' | 'CLOSED';
 
 export interface DepartmentKpiTemplateDepartment {
   id: number;
@@ -116,5 +116,14 @@ export interface DepartmentKpiResult {
   finalizedAt?: string | null;
   periodStartDate?: string | null;
   periodEndDate?: string | null;
+  finalizationRequestReason?: string | null;
+  finalizationRequestedAt?: string | null;
+  finalizationRequestedByUserId?: number | null;
+  finalizationRequestedByName?: string | null;
+  finalizationReviewDecision?: KpiEarlyCloseReviewDecision | null;
+  finalizationReviewReason?: string | null;
+  finalizationReviewedAt?: string | null;
+  finalizationReviewedByUserId?: number | null;
+  finalizationReviewedByName?: string | null;
   lines: DepartmentKpiResultLine[];
 }

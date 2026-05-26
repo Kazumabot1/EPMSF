@@ -23,9 +23,13 @@ public interface DepartmentKpiService {
     List<DepartmentKpiTemplateSummaryDto> listWorkflowTemplates();
     List<DepartmentKpiResultDto> listAssignments(Integer templateId, Integer cyclePeriodId);
     DepartmentKpiResultDto updateScores(Integer resultId, UpdateDepartmentKpiScoresRequest request);
+    DepartmentKpiResultDto requestFinalization(Integer resultId, DepartmentKpiFinalizationRequestDto request);
     DepartmentKpiResultDto finalizeResult(Integer resultId);
     int finalizeTemplate(Integer templateId, Integer cyclePeriodId);
     List<DepartmentKpiResultDto> listFinalizedResults();
     List<DepartmentKpiResultDto> listInProgressResults();
     List<DepartmentKpiResultDto> listDepartmentHeadResults();
+    List<DepartmentKpiResultDto> listPendingFinalizationRequests();
+    DepartmentKpiResultDto approveFinalization(Integer resultId, String reviewReason);
+    DepartmentKpiResultDto rejectFinalization(Integer resultId, String reviewReason);
 }

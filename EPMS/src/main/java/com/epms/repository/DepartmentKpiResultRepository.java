@@ -17,6 +17,7 @@ public interface DepartmentKpiResultRepository extends JpaRepository<DepartmentK
 
     @EntityGraph(attributePaths = {
             "department", "template", "cycle", "cyclePeriod",
+            "finalizationRequestedByUser", "finalizationReviewedByUser",
             "scores", "scores.templateRow", "scores.templateRow.kpiItem",
             "scores.templateRow.kpiUnit", "scores.templateRow.kpiCategory"
     })
@@ -24,6 +25,7 @@ public interface DepartmentKpiResultRepository extends JpaRepository<DepartmentK
 
     @EntityGraph(attributePaths = {
             "department", "template", "cycle", "cyclePeriod",
+            "finalizationRequestedByUser", "finalizationReviewedByUser",
             "scores", "scores.templateRow", "scores.templateRow.kpiItem",
             "scores.templateRow.kpiUnit", "scores.templateRow.kpiCategory"
     })
@@ -37,10 +39,19 @@ public interface DepartmentKpiResultRepository extends JpaRepository<DepartmentK
 
     @EntityGraph(attributePaths = {
             "department", "template", "cycle", "cyclePeriod",
+            "finalizationRequestedByUser", "finalizationReviewedByUser",
             "scores", "scores.templateRow", "scores.templateRow.kpiItem",
             "scores.templateRow.kpiUnit", "scores.templateRow.kpiCategory"
     })
     List<DepartmentKpiResult> findByStatusInOrderByAssignedAtDesc(Collection<DepartmentKpiResultStatus> statuses);
+
+    @EntityGraph(attributePaths = {
+            "department", "template", "cycle", "cyclePeriod",
+            "finalizationRequestedByUser", "finalizationReviewedByUser",
+            "scores", "scores.templateRow", "scores.templateRow.kpiItem",
+            "scores.templateRow.kpiUnit", "scores.templateRow.kpiCategory"
+    })
+    List<DepartmentKpiResult> findByStatusOrderByFinalizationRequestedAtAsc(DepartmentKpiResultStatus status);
 
     @EntityGraph(attributePaths = {
             "department", "template", "cycle", "cyclePeriod",

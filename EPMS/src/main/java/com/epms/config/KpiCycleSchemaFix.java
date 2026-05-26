@@ -41,6 +41,7 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             alignCyclePeriodTemplateColumn(conn);
             alignCycleStatusEnum(conn);
             alignDepartmentKpiCycleStatusEnum(conn);
+            alignDepartmentKpiResultFinalizationApproval(conn);
             alignEmployeeKpiStatusEnum(conn);
         } catch (SQLException e) {
             log.warn("KPI cycle schema fix skipped: {}", e.getMessage());
@@ -161,6 +162,37 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
                             + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
             );
             log.info("Aligned department_kpi_cycle.status enum with early close approval status.");
+        }
+    }
+
+    private void alignDepartmentKpiResultFinalizationApproval(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_result")) {
+            return;
+        }
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_request_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_requested_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_requested_by_user_id", "INT NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_review_decision", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_review_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_reviewed_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_reviewed_by_user_id", "INT NULL");
+
+        if (!columnExists(conn, "department_kpi_result", "status")) {
+            return;
+        }
+        String columnType = columnType(conn, "department_kpi_result", "status");
+        if (columnType == null || !columnType.toLowerCase(Locale.ROOT).contains("enum")) {
+            return;
+        }
+        if (columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "ALTER TABLE department_kpi_result "
+                            + "MODIFY COLUMN status ENUM('ASSIGNED','IN_PROGRESS','PENDING_APPROVAL','FINALIZED','CLOSED') NOT NULL"
+            );
+            log.info("Aligned department_kpi_result.status enum with finalization approval status.");
         }
     }
 

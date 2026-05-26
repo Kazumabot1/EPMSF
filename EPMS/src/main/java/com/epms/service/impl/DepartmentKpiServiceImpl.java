@@ -32,6 +32,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
     private static final Set<Integer> ALLOWED_DURATION_YEARS = Set.of(1, 2, 3, 4, 5);
     private static final String TYPE_DEPARTMENT_KPI_FINALIZED = "DEPARTMENT_KPI_FINALIZED";
+    private static final String TYPE_DEPARTMENT_KPI_FINALIZATION_APPROVAL = "DEPARTMENT_KPI_FINALIZATION_APPROVAL";
 
     private final DepartmentKpiTemplateRepository templateRepository;
     private final DepartmentKpiCycleRepository cycleRepository;
@@ -284,6 +285,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Scores cannot be changed after finalization.");
         }
+        if (result.getStatus() == DepartmentKpiResultStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Scores cannot be changed while CEO approval is pending.");
+        }
         Map<Integer, DepartmentKpiScore> byRow = result.getScores().stream()
                 .collect(Collectors.toMap(s -> s.getTemplateRow().getId(), s -> s));
         User evaluator = currentUser();
@@ -332,33 +336,45 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     @Override
     @Transactional
-    public DepartmentKpiResultDto finalizeResult(Integer resultId) {
+    public DepartmentKpiResultDto requestFinalization(Integer resultId, DepartmentKpiFinalizationRequestDto request) {
         DepartmentKpiResult result = resultRepository.findDetailById(resultId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
-        finalizeOne(result, LocalDateTime.now());
-        resultRepository.saveAndFlush(result);
-        notifyDepartmentHeads(result);
-        return toResultDto(result);
+        if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Department KPI result is already finalized.");
+        }
+        if (result.getStatus() == DepartmentKpiResultStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Department KPI finalization is already pending CEO approval.");
+        }
+        String reason = request == null || request.getReason() == null ? "" : request.getReason().trim();
+        if (reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Finalization reason is required.");
+        }
+        ensureResultComplete(result);
+        result.calculateTotals();
+        User requester = currentUser();
+        result.setStatus(DepartmentKpiResultStatus.PENDING_APPROVAL);
+        result.setFinalizationRequestReason(reason);
+        result.setFinalizationRequestedAt(LocalDateTime.now(clock));
+        result.setFinalizationRequestedByUser(requester);
+        result.setFinalizationReviewDecision(null);
+        result.setFinalizationReviewReason(null);
+        result.setFinalizationReviewedAt(null);
+        result.setFinalizationReviewedByUser(null);
+        DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
+        notifyExecutivesOfFinalizationRequest(saved);
+        return toResultDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiResultDto finalizeResult(Integer resultId) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Submit Department KPI finalization for CEO approval.");
     }
 
     @Override
     @Transactional
     public int finalizeTemplate(Integer templateId, Integer cyclePeriodId) {
-        List<DepartmentKpiResult> results = resultRepository.findByTemplateAndPeriod(templateId, cyclePeriodId);
-        if (results.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No Department KPI results found for this template.");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        int count = 0;
-        for (DepartmentKpiResult result : results) {
-            if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED) continue;
-            finalizeOne(result, now);
-            resultRepository.save(result);
-            notifyDepartmentHeads(result);
-            count++;
-        }
-        resultRepository.flush();
-        return count;
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bulk Department KPI finalization is not available. Submit each result for CEO approval.");
     }
 
     @Override
@@ -374,6 +390,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         return resultRepository.findByStatusInOrderByAssignedAtDesc(List.of(
                 DepartmentKpiResultStatus.ASSIGNED,
                 DepartmentKpiResultStatus.IN_PROGRESS,
+                DepartmentKpiResultStatus.PENDING_APPROVAL,
                 DepartmentKpiResultStatus.CLOSED
         )).stream().map(this::toResultDto).toList();
     }
@@ -389,18 +406,67 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .stream().map(this::toResultDto).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepartmentKpiResultDto> listPendingFinalizationRequests() {
+        return resultRepository.findByStatusOrderByFinalizationRequestedAtAsc(DepartmentKpiResultStatus.PENDING_APPROVAL)
+                .stream().map(this::toResultDto).toList();
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiResultDto approveFinalization(Integer resultId, String reviewReason) {
+        DepartmentKpiResult result = requirePendingFinalization(resultId);
+        result.setFinalizationReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        result.setFinalizationReviewReason(cleanOptionalText(reviewReason));
+        result.setFinalizationReviewedAt(LocalDateTime.now(clock));
+        result.setFinalizationReviewedByUser(currentUser());
+        finalizeOne(result, LocalDateTime.now(clock));
+        DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
+        notifyDepartmentHeads(saved);
+        notifyFinalizationRequester(saved, true);
+        return toResultDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiResultDto rejectFinalization(Integer resultId, String reviewReason) {
+        DepartmentKpiResult result = requirePendingFinalization(resultId);
+        result.setStatus(DepartmentKpiResultStatus.IN_PROGRESS);
+        result.setFinalizationReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        result.setFinalizationReviewReason(cleanOptionalText(reviewReason));
+        result.setFinalizationReviewedAt(LocalDateTime.now(clock));
+        result.setFinalizationReviewedByUser(currentUser());
+        DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
+        notifyFinalizationRequester(saved, false);
+        return toResultDto(saved);
+    }
+
     private void finalizeOne(DepartmentKpiResult result, LocalDateTime now) {
         if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Department KPI result is already closed.");
         }
-        if (result.getScores() == null || result.getScores().isEmpty()
-                || result.getScores().stream().anyMatch(s -> s.getScore() == null)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Complete all KPI rows before finalizing.");
-        }
+        ensureResultComplete(result);
         result.calculateTotals();
         result.setStatus(DepartmentKpiResultStatus.FINALIZED);
         result.setFinalizedAt(now);
         result.setFinalizedByUser(currentUser());
+    }
+
+    private void ensureResultComplete(DepartmentKpiResult result) {
+        if (result.getScores() == null || result.getScores().isEmpty()
+                || result.getScores().stream().anyMatch(s -> s.getScore() == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Complete all KPI rows before finalizing.");
+        }
+    }
+
+    private DepartmentKpiResult requirePendingFinalization(Integer resultId) {
+        DepartmentKpiResult result = resultRepository.findDetailById(resultId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
+        if (result.getStatus() != DepartmentKpiResultStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending Department KPI finalization request exists for this result.");
+        }
+        return result;
     }
 
     private void validateWeightScoreWithinWeight(DepartmentKpiResult result, DepartmentKpiScore score) {
@@ -651,6 +717,10 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
     }
 
+    private String cleanOptionalText(String value) {
+        return normalizeEditReason(value);
+    }
+
     private void applyCycleTemplates(DepartmentKpiCycle cycle, List<Integer> templateIds) {
         List<Integer> distinctIds = templateIds.stream().distinct().toList();
         assertTemplatesNotUsedByOtherActiveCycles(cycle.getId(), distinctIds);
@@ -765,6 +835,15 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .finalizedAt(r.getFinalizedAt())
                 .periodStartDate(r.getCyclePeriod() != null ? r.getCyclePeriod().getStartDate() : r.getTemplate().getStartDate())
                 .periodEndDate(r.getCyclePeriod() != null ? r.getCyclePeriod().getEndDate() : r.getTemplate().getEndDate())
+                .finalizationRequestReason(r.getFinalizationRequestReason())
+                .finalizationRequestedAt(r.getFinalizationRequestedAt())
+                .finalizationRequestedByUserId(r.getFinalizationRequestedByUser() == null ? null : r.getFinalizationRequestedByUser().getId())
+                .finalizationRequestedByName(r.getFinalizationRequestedByUser() == null ? null : displayUser(r.getFinalizationRequestedByUser()))
+                .finalizationReviewDecision(r.getFinalizationReviewDecision())
+                .finalizationReviewReason(r.getFinalizationReviewReason())
+                .finalizationReviewedAt(r.getFinalizationReviewedAt())
+                .finalizationReviewedByUserId(r.getFinalizationReviewedByUser() == null ? null : r.getFinalizationReviewedByUser().getId())
+                .finalizationReviewedByName(r.getFinalizationReviewedByUser() == null ? null : displayUser(r.getFinalizationReviewedByUser()))
                 .lines(r.getScores().stream()
                         .sorted(Comparator.comparing(s -> s.getTemplateRow().getSortOrder() == null ? 0 : s.getTemplateRow().getSortOrder()))
                         .map(s -> DepartmentKpiResultDto.Line.builder()
@@ -810,6 +889,35 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                     result.getId()
             );
         }
+    }
+
+    private void notifyExecutivesOfFinalizationRequest(DepartmentKpiResult result) {
+        for (User executive : userRepository.findActiveUsersByNormalizedRoleNames(List.of("CEO", "EXECUTIVE"))) {
+            notificationService.send(
+                    executive.getId(),
+                    "Department KPI finalization approval needed",
+                    "HR requested final approval for Department KPI \"" + result.getTemplate().getTitle() + "\" for "
+                            + result.getDepartment().getDepartmentName() + ".",
+                    TYPE_DEPARTMENT_KPI_FINALIZATION_APPROVAL,
+                    result.getId()
+            );
+        }
+    }
+
+    private void notifyFinalizationRequester(DepartmentKpiResult result, boolean approved) {
+        User requester = result.getFinalizationRequestedByUser();
+        if (requester == null || requester.getId() == null) {
+            return;
+        }
+        notificationService.send(
+                requester.getId(),
+                approved ? "Department KPI finalization approved" : "Department KPI finalization rejected",
+                approved
+                        ? "CEO approved Department KPI finalization for " + result.getDepartment().getDepartmentName() + "."
+                        : "CEO rejected Department KPI finalization for " + result.getDepartment().getDepartmentName() + ". You can continue scoring.",
+                TYPE_DEPARTMENT_KPI_FINALIZATION_APPROVAL,
+                result.getId()
+        );
     }
 
     private Integer normalizedDurationYears(DepartmentKpiCycleRequestDto request) {

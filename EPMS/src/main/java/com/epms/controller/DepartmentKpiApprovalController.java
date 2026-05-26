@@ -1,6 +1,7 @@
 package com.epms.controller;
 
 import com.epms.dto.DepartmentKpiCycleResponseDto;
+import com.epms.dto.DepartmentKpiResultDto;
 import com.epms.dto.KpiEarlyCloseReviewRequestDTO;
 import com.epms.service.DepartmentKpiService;
 import jakarta.validation.Valid;
@@ -20,6 +21,33 @@ public class DepartmentKpiApprovalController {
     @GetMapping
     public ResponseEntity<List<DepartmentKpiCycleResponseDto>> listPending() {
         return ResponseEntity.ok(departmentKpiService.listPendingEarlyCloseRequests());
+    }
+
+    @GetMapping("/finalization-requests")
+    public ResponseEntity<List<DepartmentKpiResultDto>> listPendingFinalizationRequests() {
+        return ResponseEntity.ok(departmentKpiService.listPendingFinalizationRequests());
+    }
+
+    @PostMapping("/finalization-requests/{resultId}/approve")
+    public ResponseEntity<DepartmentKpiResultDto> approveFinalization(
+            @PathVariable Integer resultId,
+            @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
+    ) {
+        return ResponseEntity.ok(departmentKpiService.approveFinalization(
+                resultId,
+                request == null ? null : request.getReviewReason()
+        ));
+    }
+
+    @PostMapping("/finalization-requests/{resultId}/reject")
+    public ResponseEntity<DepartmentKpiResultDto> rejectFinalization(
+            @PathVariable Integer resultId,
+            @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
+    ) {
+        return ResponseEntity.ok(departmentKpiService.rejectFinalization(
+                resultId,
+                request == null ? null : request.getReviewReason()
+        ));
     }
 
     @PostMapping("/{id}/approve")

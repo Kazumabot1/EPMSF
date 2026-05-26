@@ -1,6 +1,7 @@
 package com.epms.dto;
 
 import com.epms.entity.enums.DepartmentKpiResultStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -25,6 +26,15 @@ public class DepartmentKpiResultDto {
     private LocalDateTime finalizedAt;
     private LocalDate periodStartDate;
     private LocalDate periodEndDate;
+    private String finalizationRequestReason;
+    private LocalDateTime finalizationRequestedAt;
+    private Integer finalizationRequestedByUserId;
+    private String finalizationRequestedByName;
+    private KpiEarlyCloseReviewDecision finalizationReviewDecision;
+    private String finalizationReviewReason;
+    private LocalDateTime finalizationReviewedAt;
+    private Integer finalizationReviewedByUserId;
+    private String finalizationReviewedByName;
     @Builder.Default
     private List<Line> lines = new ArrayList<>();
 
