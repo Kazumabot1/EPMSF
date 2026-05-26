@@ -1,5 +1,5 @@
 import type { KpiFormStatus, KpiTemplateItem } from './kpiTemplate';
-import type { KpiTemplateCycleStatus } from './kpiTemplateCycle';
+import type { KpiEarlyCloseReviewDecision, KpiGraceExtension, KpiTemplateCycleStatus } from './kpiTemplateCycle';
 
 export type DepartmentKpiResultStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'FINALIZED' | 'CLOSED';
 
@@ -48,9 +48,28 @@ export interface DepartmentKpiCycle {
   currentPeriodNumber: number | null;
   currentPeriodStartDate: string | null;
   currentPeriodEndDate: string | null;
+  closingRequestedAt: string | null;
+  graceEndsAt: string | null;
+  closedAt: string | null;
+  earlyCloseReason: string | null;
+  graceExtension: KpiGraceExtension | null;
+  earlyCloseRequestedAt: string | null;
+  earlyCloseRequestedByUserId: number | null;
+  earlyCloseRequestedByName: string | null;
+  earlyCloseReviewedAt: string | null;
+  earlyCloseReviewedByUserId: number | null;
+  earlyCloseReviewedByName: string | null;
+  earlyCloseReviewDecision: KpiEarlyCloseReviewDecision | null;
+  earlyCloseReviewReason: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   templates: DepartmentKpiCycleTemplateSummary[];
+}
+
+export interface DepartmentKpiCycleStatusRequest {
+  active: boolean;
+  reason?: string;
+  graceExtension?: KpiGraceExtension;
 }
 
 export interface DepartmentKpiCycleRequest {

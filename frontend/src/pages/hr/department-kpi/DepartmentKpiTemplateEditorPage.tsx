@@ -34,6 +34,7 @@ const DepartmentKpiTemplateEditorPage = () => {
   const [items, setItems] = useState<KpiItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [departmentMenuOpen, setDepartmentMenuOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -78,6 +79,23 @@ const DepartmentKpiTemplateEditorPage = () => {
   }, [isEdit, templateId]);
 
   const totalWeight = useMemo(() => rows.reduce((sum, row) => sum + (row.weight ?? 0), 0), [rows]);
+  const selectedDepartmentLabel = useMemo(() => {
+    const selectedNames = departments
+      .filter((department) => departmentIds.includes(department.id))
+      .map((department) => department.departmentName);
+
+    if (selectedNames.length === 0) return 'Select departments';
+    if (selectedNames.length <= 2) return selectedNames.join(', ');
+    return `${selectedNames.slice(0, 2).join(', ')} +${selectedNames.length - 2} more`;
+  }, [departmentIds, departments]);
+
+  const toggleDepartment = (departmentId: number) => {
+    setDepartmentIds((prev) => (
+      prev.includes(departmentId)
+        ? prev.filter((id) => id !== departmentId)
+        : [...prev, departmentId]
+    ));
+  };
 
   const validate = () => {
     if (!title.trim()) return 'Title is required.';
@@ -176,22 +194,38 @@ const DepartmentKpiTemplateEditorPage = () => {
                 </select>
               </label>
             </div>
-            <div className="mt-5">
+            <div className="relative mt-5 max-w-xl">
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Departments</span>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {departments.map((department) => (
-                  <label key={department.id} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={departmentIds.includes(department.id)}
-                      onChange={(e) => {
-                        setDepartmentIds((prev) => e.target.checked ? [...prev, department.id] : prev.filter((id) => id !== department.id));
-                      }}
-                    />
-                    {department.departmentName}
-                  </label>
-                ))}
-              </div>
+              <button
+                type="button"
+                disabled={departments.length === 0}
+                className={`${fieldClass} mt-2 flex items-center justify-between gap-3 text-left disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500`}
+                aria-expanded={departmentMenuOpen}
+                onClick={() => setDepartmentMenuOpen((open) => !open)}
+              >
+                <span className="truncate">{departments.length === 0 ? 'No active departments available' : selectedDepartmentLabel}</span>
+                <span className="text-xs text-gray-500">{departmentMenuOpen ? '^' : 'v'}</span>
+              </button>
+              {departmentMenuOpen && departments.length > 0 && (
+                <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                  {departments.map((department) => {
+                    const checked = departmentIds.includes(department.id);
+                    return (
+                      <button
+                        key={department.id}
+                        type="button"
+                        className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm ${checked ? 'bg-violet-50 text-violet-800' : 'text-gray-700 hover:bg-gray-50'}`}
+                        onClick={() => toggleDepartment(department.id)}
+                      >
+                        <span className="truncate">{department.departmentName}</span>
+                        <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${checked ? 'border-violet-600 bg-violet-600 text-white' : 'border-gray-300 text-transparent'}`}>
+                          x
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </section>
 

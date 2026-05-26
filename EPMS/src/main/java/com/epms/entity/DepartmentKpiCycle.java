@@ -1,6 +1,8 @@
 package com.epms.entity;
 
 import com.epms.entity.enums.KpiTemplateCycleStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
+import com.epms.entity.enums.KpiGraceExtension;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -59,6 +61,45 @@ public class DepartmentKpiCycle {
 
     @Column(name = "last_edit_reason", length = 1000)
     private String lastEditReason;
+
+    @Column(name = "closing_requested_at")
+    private LocalDateTime closingRequestedAt;
+
+    @Column(name = "grace_ends_at")
+    private LocalDateTime graceEndsAt;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
+    @Column(name = "early_close_reason", length = 1000)
+    private String earlyCloseReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "grace_extension", length = 30)
+    private KpiGraceExtension graceExtension;
+
+    @Column(name = "early_close_requested_at")
+    private LocalDateTime earlyCloseRequestedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "early_close_requested_by", referencedColumnName = "id")
+    @EqualsAndHashCode.Exclude
+    private User earlyCloseRequestedByUser;
+
+    @Column(name = "early_close_reviewed_at")
+    private LocalDateTime earlyCloseReviewedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "early_close_reviewed_by", referencedColumnName = "id")
+    @EqualsAndHashCode.Exclude
+    private User earlyCloseReviewedByUser;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "early_close_review_decision", length = 30)
+    private KpiEarlyCloseReviewDecision earlyCloseReviewDecision;
+
+    @Column(name = "early_close_review_reason", length = 1000)
+    private String earlyCloseReviewReason;
 
     @Builder.Default
     @OneToMany(mappedBy = "cycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

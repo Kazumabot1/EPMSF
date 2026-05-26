@@ -3,7 +3,9 @@ package com.epms.service.impl;
 import com.epms.dto.*;
 import com.epms.entity.*;
 import com.epms.entity.enums.DepartmentKpiResultStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiGraceExtension;
 import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.*;
@@ -129,9 +131,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         validateCycleRequest(request);
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
-        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
-        }
+        ensureCycleEditable(cycle);
         String editReason = normalizeEditReason(request.getEditReason());
         if (editReason == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
@@ -166,17 +166,94 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     @Override
     @Transactional
-    public DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, boolean active) {
+    public DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, DepartmentKpiCycleStatusRequestDTO request) {
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        boolean active = Boolean.TRUE.equals(request.getActive());
         if (active) {
+            if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+                return getCycle(id);
+            }
+            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
+            }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+            cycle.setClosingRequestedAt(null);
+            cycle.setGraceEndsAt(null);
+            cycle.setClosedAt(null);
             DepartmentKpiCyclePeriod period = ensureLatestPeriod(cycle);
             createResultsForCyclePeriod(cycle, period);
         } else {
+            if (cycle.getStatus() != KpiTemplateCycleStatus.ACTIVE) {
+                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
+                    return getCycle(id);
+                }
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only active cycles can be deactivated.");
+            }
+            if (isBeforeOfficialEndDate(cycle)) {
+                requestEarlyClose(cycle, request);
+                cycleRepository.saveAndFlush(cycle);
+                return getCycle(id);
+            }
+            LocalDateTime now = LocalDateTime.now(clock);
             cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
+            cycle.setClosingRequestedAt(now);
+            cycle.setGraceEndsAt(null);
+            cycle.setClosedAt(now);
         }
         cycle.setUpdatedByUser(currentUser());
+        cycleRepository.saveAndFlush(cycle);
+        return getCycle(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepartmentKpiCycleResponseDto> listPendingEarlyCloseRequests() {
+        return cycleRepository
+                .findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus.PENDING_APPROVAL)
+                .stream()
+                .map(this::toCycleDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiCycleResponseDto approveEarlyClose(Integer id, String reviewReason) {
+        DepartmentKpiCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        LocalDateTime now = LocalDateTime.now(clock);
+        KpiGraceExtension extension = cycle.getGraceExtension();
+        if (extension == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
+        }
+        cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
+        cycle.setClosingRequestedAt(now);
+        cycle.setGraceEndsAt(extension.addTo(now));
+        cycle.setClosedAt(null);
+        cycle.setEarlyCloseReviewedAt(now);
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        cycle.setEarlyCloseReviewReason(normalizeEditReason(reviewReason));
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.saveAndFlush(cycle);
+        return getCycle(id);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiCycleResponseDto rejectEarlyClose(Integer id, String reviewReason) {
+        DepartmentKpiCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+        cycle.setEarlyCloseReviewedAt(LocalDateTime.now(clock));
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        cycle.setEarlyCloseReviewReason(normalizeEditReason(reviewReason));
+        cycle.setClosingRequestedAt(null);
+        cycle.setGraceEndsAt(null);
+        cycle.setClosedAt(null);
+        cycle.setUpdatedByUser(reviewer);
         cycleRepository.saveAndFlush(cycle);
         return getCycle(id);
     }
@@ -395,6 +472,67 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                         .build()));
     }
 
+    private DepartmentKpiCycle requirePendingApproval(Integer id) {
+        DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        if (cycle.getStatus() != KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending Department KPI early close request exists for this cycle.");
+        }
+        return cycle;
+    }
+
+    private void requestEarlyClose(DepartmentKpiCycle cycle, DepartmentKpiCycleStatusRequestDTO request) {
+        String reason = normalizeEditReason(request.getReason());
+        if (reason == null || reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required to request early cycle closure.");
+        }
+        if (request.getGraceExtension() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is required.");
+        }
+        User requester = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        cycle.setEarlyCloseReason(reason);
+        cycle.setGraceExtension(request.getGraceExtension());
+        cycle.setEarlyCloseRequestedAt(LocalDateTime.now(clock));
+        cycle.setEarlyCloseRequestedByUser(requester);
+        cycle.setEarlyCloseReviewedAt(null);
+        cycle.setEarlyCloseReviewedByUser(null);
+        cycle.setEarlyCloseReviewDecision(null);
+        cycle.setEarlyCloseReviewReason(null);
+        cycle.setUpdatedByUser(requester);
+    }
+
+    private boolean isBeforeOfficialEndDate(DepartmentKpiCycle cycle) {
+        LocalDate officialEnd = cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .map(DepartmentKpiCyclePeriod::getEndDate)
+                .orElse(cycle.getEndDate());
+        return officialEnd != null && LocalDate.now(clock).isBefore(officialEnd);
+    }
+
+    private void ensureCycleEditable(DepartmentKpiCycle cycle) {
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cycles pending CEO approval cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getEarlyCloseReviewDecision() == KpiEarlyCloseReviewDecision.APPROVED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "CEO approved closure; this cycle can no longer be edited."
+            );
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getGraceEndsAt() != null
+                && !cycle.getGraceEndsAt().isAfter(LocalDateTime.now(clock))) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Grace period has ended; this cycle can no longer be edited."
+            );
+        }
+    }
+
     private void validateTemplateRequest(DepartmentKpiTemplateRequestDto request) {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Template title is required.");
@@ -594,6 +732,19 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .currentPeriodNumber(period == null ? null : period.getPeriodNumber())
                 .currentPeriodStartDate(period == null ? null : period.getStartDate())
                 .currentPeriodEndDate(period == null ? null : period.getEndDate())
+                .closingRequestedAt(c.getClosingRequestedAt())
+                .graceEndsAt(c.getGraceEndsAt())
+                .closedAt(c.getClosedAt())
+                .earlyCloseReason(c.getEarlyCloseReason())
+                .graceExtension(c.getGraceExtension())
+                .earlyCloseRequestedAt(c.getEarlyCloseRequestedAt())
+                .earlyCloseRequestedByUserId(c.getEarlyCloseRequestedByUser() == null ? null : c.getEarlyCloseRequestedByUser().getId())
+                .earlyCloseRequestedByName(c.getEarlyCloseRequestedByUser() == null ? null : displayUser(c.getEarlyCloseRequestedByUser()))
+                .earlyCloseReviewedAt(c.getEarlyCloseReviewedAt())
+                .earlyCloseReviewedByUserId(c.getEarlyCloseReviewedByUser() == null ? null : c.getEarlyCloseReviewedByUser().getId())
+                .earlyCloseReviewedByName(c.getEarlyCloseReviewedByUser() == null ? null : displayUser(c.getEarlyCloseReviewedByUser()))
+                .earlyCloseReviewDecision(c.getEarlyCloseReviewDecision())
+                .earlyCloseReviewReason(c.getEarlyCloseReviewReason())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .templates(templates)

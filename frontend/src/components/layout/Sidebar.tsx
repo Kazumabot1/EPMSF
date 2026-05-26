@@ -355,6 +355,7 @@ const roleLabel =
         icon: 'bi bi-shield-check',
         children: [
           { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+          { to: '/executive/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check', end: true },
         ],
       },
       {

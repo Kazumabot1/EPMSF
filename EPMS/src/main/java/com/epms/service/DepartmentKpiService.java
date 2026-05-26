@@ -15,7 +15,10 @@ public interface DepartmentKpiService {
     DepartmentKpiCycleResponseDto updateCycle(Integer id, DepartmentKpiCycleRequestDto request);
     List<DepartmentKpiCycleResponseDto> listCycles();
     DepartmentKpiCycleResponseDto getCycle(Integer id);
-    DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, boolean active);
+    DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, DepartmentKpiCycleStatusRequestDTO request);
+    List<DepartmentKpiCycleResponseDto> listPendingEarlyCloseRequests();
+    DepartmentKpiCycleResponseDto approveEarlyClose(Integer id, String reviewReason);
+    DepartmentKpiCycleResponseDto rejectEarlyClose(Integer id, String reviewReason);
 
     List<DepartmentKpiTemplateSummaryDto> listWorkflowTemplates();
     List<DepartmentKpiResultDto> listAssignments(Integer templateId, Integer cyclePeriodId);

@@ -2,7 +2,7 @@ package com.epms.controller;
 
 import com.epms.dto.DepartmentKpiCycleRequestDto;
 import com.epms.dto.DepartmentKpiCycleResponseDto;
-import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
+import com.epms.dto.DepartmentKpiCycleStatusRequestDTO;
 import com.epms.service.DepartmentKpiService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +39,7 @@ public class DepartmentKpiCycleController {
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<DepartmentKpiCycleResponseDto> updateStatus(@PathVariable Integer id, @Valid @RequestBody KpiTemplateCycleStatusRequestDTO request) {
-        return ResponseEntity.ok(service.updateCycleStatus(id, Boolean.TRUE.equals(request.getActive())));
+    public ResponseEntity<DepartmentKpiCycleResponseDto> updateStatus(@PathVariable Integer id, @Valid @RequestBody DepartmentKpiCycleStatusRequestDTO request) {
+        return ResponseEntity.ok(service.updateCycleStatus(id, request));
     }
 }
