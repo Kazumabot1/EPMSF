@@ -32,12 +32,17 @@ export type AssessmentFormPayload = {
   formName: string;
   companyName?: string;
   description?: string;
-  startDate: string;
-  endDate: string;
+  startDate?: string | null;
+  endDate?: string | null;
   targetRoles: AssessmentTargetRole[];
   targetDepartmentIds: number[];
   sections: AssessmentSectionPayload[];
   scoreBands: AssessmentScoreBandPayload[];
+};
+
+export type AssessmentFormActivationPayload = {
+  startDate: string;
+  endDate: string;
 };
 
 export type AssessmentFormResponse = {
@@ -45,8 +50,8 @@ export type AssessmentFormResponse = {
   formName: string;
   companyName?: string;
   description?: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | null;
+  endDate?: string | null;
   isActive: boolean;
   targetRoles: AssessmentTargetRole[];
   targetDepartmentIds: number[];
@@ -57,6 +62,7 @@ export type AssessmentFormResponse = {
 };
 
 const SELF_ASSESSMENT_RESPONSE_TYPE: AssessmentResponseType = 'YES_NO_RATING';
+const HIDDEN_SECTION_TITLE = 'Assessment Subjects';
 
 const unwrap = <T,>(payload: any, fallback: T): T => {
   return payload?.data?.data ?? payload?.data ?? fallback;
@@ -160,17 +166,25 @@ const normalizeQuestions = (questions: any[]): AssessmentQuestionPayload[] => {
     id: question.id,
     questionText: question.questionText ?? question.text ?? '',
     responseType: SELF_ASSESSMENT_RESPONSE_TYPE,
-    isRequired: question.isRequired ?? question.required ?? true,
+    isRequired: true,
     weight: 1,
   }));
 };
 
 const normalizeSections = (sections: any[]): AssessmentSectionPayload[] => {
-  if (!Array.isArray(sections)) return [];
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return [
+      {
+        title: HIDDEN_SECTION_TITLE,
+        orderNo: 1,
+        questions: [],
+      },
+    ];
+  }
 
   return sections.map((section, index) => ({
     id: section.id,
-    title: section.title ?? `Section ${index + 1}`,
+    title: section.title ?? HIDDEN_SECTION_TITLE,
     orderNo: Number(section.orderNo ?? index + 1),
     questions: normalizeQuestions(section.questions ?? section.items ?? []),
   }));
@@ -186,9 +200,9 @@ const normalizeForm = (item: any): AssessmentFormResponse => {
     formName: item.formName ?? 'Employee Self-assessment Form',
     companyName: item.companyName ?? 'ACE Data Systems Ltd.',
     description: item.description ?? '',
-    startDate: item.startDate,
-    endDate: item.endDate,
-    isActive: item.isActive ?? item.active ?? true,
+    startDate: item.startDate ?? null,
+    endDate: item.endDate ?? null,
+    isActive: item.isActive ?? item.active ?? false,
     targetRoles: targetRoles.length ? targetRoles : ['Employee'],
     targetDepartmentIds: normalizeDepartmentIds(item.targetDepartmentIds),
     createdAt: item.createdAt,
@@ -198,22 +212,43 @@ const normalizeForm = (item: any): AssessmentFormResponse => {
   };
 };
 
-const sanitizePayload = (payload: AssessmentFormPayload): AssessmentFormPayload => ({
-  ...payload,
-  targetRoles: payload.targetRoles?.length ? payload.targetRoles : ['Employee'],
-  targetDepartmentIds: normalizeDepartmentIds(payload.targetDepartmentIds),
-  scoreBands: normalizeScoreBands(payload.scoreBands),
-  sections: (payload.sections ?? []).map((section, sectionIndex) => ({
-    ...section,
-    orderNo: section.orderNo ?? sectionIndex + 1,
-    questions: (section.questions ?? []).map((question) => ({
-      ...question,
+const flattenSubjects = (sections: AssessmentSectionPayload[]): AssessmentQuestionPayload[] => {
+  return (sections ?? [])
+    .flatMap((section) => section.questions ?? [])
+    .map((question) => ({
+      id: question.id,
+      questionText: question.questionText ?? '',
       responseType: SELF_ASSESSMENT_RESPONSE_TYPE,
-      isRequired: question.isRequired ?? true,
+      isRequired: true,
       weight: 1,
-    })),
-  })),
-});
+    }));
+};
+
+const sanitizePayload = (payload: AssessmentFormPayload): AssessmentFormPayload => {
+  const subjects = flattenSubjects(payload.sections).filter((item) => item.questionText.trim());
+
+  return {
+    ...payload,
+    startDate: null,
+    endDate: null,
+    targetRoles: ['Employee'],
+    targetDepartmentIds: normalizeDepartmentIds(payload.targetDepartmentIds),
+    scoreBands: normalizeScoreBands(payload.scoreBands),
+    sections: [
+      {
+        title: HIDDEN_SECTION_TITLE,
+        orderNo: 1,
+        questions: subjects.map((question) => ({
+          ...question,
+          questionText: question.questionText.trim(),
+          responseType: SELF_ASSESSMENT_RESPONSE_TYPE,
+          isRequired: true,
+          weight: 1,
+        })),
+      },
+    ],
+  };
+};
 
 export const assessmentFormService = {
   async getAll(): Promise<AssessmentFormResponse[]> {
@@ -237,7 +272,20 @@ export const assessmentFormService = {
     return normalizeForm(unwrap<any>(res, {}));
   },
 
-  async deactivate(id: number): Promise<void> {
-    await api.delete(`/appraisal-forms/${id}`);
+async activate(id: number, payload: AssessmentFormActivationPayload): Promise<AssessmentFormResponse> {
+  const response = await api.patch(`/appraisal-forms/${id}/activation`, {
+    active: true,
+    startDate: payload.startDate,
+    endDate: payload.endDate,
+  });
+
+  return normalizeForm(unwrap<any>(response, {}));
+},
+
+  async deactivate(id: number): Promise<AssessmentFormResponse> {
+    const res = await api.patch(`/appraisal-forms/${id}/activation`, {
+      active: false,
+    });
+    return normalizeForm(unwrap<any>(res, {}));
   },
 };

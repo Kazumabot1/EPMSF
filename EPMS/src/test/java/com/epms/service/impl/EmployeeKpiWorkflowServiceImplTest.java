@@ -1,6 +1,7 @@
 package com.epms.service.impl;
 
 import com.epms.dto.ManagerKpiAssignmentDto;
+import com.epms.dto.UpdateEmployeeKpiScoresRequest;
 import com.epms.dto.UseKpiDepartmentRequest;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
@@ -39,12 +40,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -138,6 +141,7 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
         when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
         when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(anyInt(), eq(100))).thenReturn(Optional.empty());
+        when(employeeKpiFormRepository.save(any(EmployeeKpiForm.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.useTemplateForDepartment(100, departmentRequest(7));
 
@@ -173,6 +177,7 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
         when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
         when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(anyInt(), eq(100))).thenReturn(Optional.empty());
+        when(employeeKpiFormRepository.save(any(EmployeeKpiForm.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.useTemplateForDepartment(100, departmentRequest(7));
 
@@ -181,6 +186,43 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(saved.getAllValues())
                 .extracting(ekf -> ekf.getEmployee().getId())
                 .containsExactlyInAnyOrder(11, 12);
+        verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+    }
+
+    @Test
+    void useTemplateForDepartmentRoutesTeamLeaderAssignmentsToAllDepartmentManagers() {
+        Position teamLeaderPosition = position(53, "Team Leader");
+        KpiForm form = form(100, teamLeaderPosition);
+        Department department = department(7);
+        User managerA = user(1, 7, 101, true);
+        User managerB = user(2, 7, 102, true);
+        User teamLeaderUser = user(31, 7, 11, true);
+        Employee teamLeaderEmployee = employee(11, teamLeaderPosition, true);
+
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form));
+        when(kpiPositionRepository.findWithPositionByKpiForm_Id(100)).thenReturn(List.of(kpiPosition(form, teamLeaderPosition)));
+        when(departmentRepository.findById(7)).thenReturn(Optional.of(department));
+        when(employeeRepository.findCurrentByWorkingDepartmentId(7, false)).thenReturn(List.of(teamLeaderEmployee));
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active"))
+                .thenReturn(List.of(team(21, department, managerA, teamLeaderUser)));
+        when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(teamLeaderUser));
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(managerA, managerB));
+        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(userRepository.findById(1)).thenReturn(Optional.of(managerA));
+        when(userRepository.findById(2)).thenReturn(Optional.of(managerB));
+        when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(11, 100)).thenReturn(Optional.empty());
+        when(employeeKpiFormRepository.save(any(EmployeeKpiForm.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.useTemplateForDepartment(100, departmentRequest(7));
+
+        ArgumentCaptor<EmployeeKpiForm> saved = ArgumentCaptor.forClass(EmployeeKpiForm.class);
+        verify(employeeKpiFormRepository).save(saved.capture());
+        assertThat(saved.getValue().getEmployee().getId()).isEqualTo(11);
+        assertThat(saved.getValue().getEvaluators())
+                .extracting(evaluator -> evaluator.getEvaluatorUser().getId())
+                .containsExactlyInAnyOrder(1, 2);
         verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
         verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
     }
@@ -204,6 +246,35 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(projectManager, user(2, 7, null, true)));
         when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
         when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, engineer)));
+        when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
+
+        List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
+
+        assertThat(result).isEmpty();
+        ArgumentCaptor<Collection<Integer>> employeeIds = ArgumentCaptor.forClass(Collection.class);
+        verify(employeeKpiFormRepository).findByKpiFormIdAndEmployeeIdIn(eq(100), employeeIds.capture());
+        assertThat(employeeIds.getValue()).containsExactly(11);
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void managerAssignmentListIncludesTeamLeaderForEveryDepartmentManager() {
+        Position teamLeaderPosition = position(53, "Team Leader");
+        Department department = department(7);
+        User managerA = user(1, 7, 101, true);
+        User managerB = user(2, 7, 102, true);
+        User teamLeaderUser = user(31, 7, 11, true);
+        Employee teamLeaderEmployee = employee(11, teamLeaderPosition, true);
+        authenticate(managerB);
+
+        when(userRepository.findById(2)).thenReturn(Optional.of(managerB));
+        when(employeeRepository.findCurrentByWorkingDepartmentId(7, false)).thenReturn(List.of(teamLeaderEmployee));
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active"))
+                .thenReturn(List.of(team(21, department, managerA, teamLeaderUser)));
+        when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(teamLeaderUser));
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(managerA, managerB));
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, teamLeaderPosition)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
         List<ManagerKpiAssignmentDto> result = service.listDepartmentAssignmentsForManager(100);
@@ -405,6 +476,61 @@ class EmployeeKpiWorkflowServiceImplTest {
                 .containsExactlyInAnyOrder(501, 502, 503);
     }
 
+    @Test
+    void updateScoresAllowsActualEqualToTargetAndCapsWeightScoreAtWeight() {
+        User projectManager = user(1, 7, null, true);
+        Position engineer = position(10, "Engineer");
+        KpiForm form = form(100, engineer, item(501, "Delivery", 80.0, 40, 0));
+        Employee employee = employee(11, engineer, true);
+        EmployeeKpiForm assignment = employeeAssignment(700, form, employee, EmployeeKpiStatus.ASSIGNED, form.getItems().get(0));
+        authenticate(projectManager);
+        stubManagerScoreScope(projectManager, employee, assignment);
+
+        ManagerKpiAssignmentDto result = service.updateScores(700, employeeScoreRequest(501, 80.0));
+
+        assertThat(result.getLines()).singleElement().satisfies(line -> {
+            assertThat(line.getActualValue()).isEqualTo(80.0);
+            assertThat(line.getScore()).isEqualTo(100.0);
+            assertThat(line.getWeightedScore()).isEqualTo(40.0);
+        });
+    }
+
+    @Test
+    void updateScoresRejectsActualGreaterThanTarget() {
+        User projectManager = user(1, 7, null, true);
+        Position engineer = position(10, "Engineer");
+        KpiForm form = form(100, engineer, item(501, "Delivery", 80.0, 40, 0));
+        Employee employee = employee(11, engineer, true);
+        EmployeeKpiForm assignment = employeeAssignment(700, form, employee, EmployeeKpiStatus.ASSIGNED, form.getItems().get(0));
+        authenticate(projectManager);
+        stubManagerScoreScope(projectManager, employee, assignment);
+
+        assertThatThrownBy(() -> service.updateScores(700, employeeScoreRequest(501, 81.0)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Actual % must be less than or equal to Target %");
+    }
+
+    private void stubManagerScoreScope(User projectManager, Employee employee, EmployeeKpiForm assignment) {
+        when(userRepository.findById(projectManager.getId())).thenReturn(Optional.of(projectManager));
+        when(employeeKpiFormEvaluatorRepository.findEmployeeIdsByEvaluatorUserId(projectManager.getId()))
+                .thenReturn(List.of(employee.getId()));
+        when(employeeRepository.findCurrentByWorkingDepartmentId(projectManager.getDepartmentId(), false)).thenReturn(List.of());
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(projectManager.getDepartmentId(), "Active")).thenReturn(List.of());
+        when(userRepository.findActiveManagersByDepartmentId(projectManager.getDepartmentId())).thenReturn(List.of());
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(userRepository.findActiveByEmployeeId(employee.getId())).thenReturn(Optional.of(user(1000 + employee.getId(), projectManager.getDepartmentId(), employee.getId(), true)));
+        when(employeeKpiFormRepository.findWithScoresForUpdate(assignment.getId())).thenReturn(Optional.of(assignment));
+    }
+
+    private static UpdateEmployeeKpiScoresRequest employeeScoreRequest(Integer itemId, Double actualValue) {
+        return UpdateEmployeeKpiScoresRequest.builder()
+                .scores(List.of(UpdateEmployeeKpiScoresRequest.EmployeeKpiScoreUpdateDto.builder()
+                        .kpiFormItemId(itemId)
+                        .actualValue(actualValue)
+                        .build()))
+                .build();
+    }
+
     private static UseKpiDepartmentRequest departmentRequest(Integer departmentId) {
         UseKpiDepartmentRequest request = new UseKpiDepartmentRequest();
         request.setDepartmentId(departmentId);
@@ -509,10 +635,15 @@ class EmployeeKpiWorkflowServiceImplTest {
     }
 
     private static Team team(Integer id, Department department, User manager, TeamMember... members) {
+        return team(id, department, manager, null, members);
+    }
+
+    private static Team team(Integer id, Department department, User manager, User teamLeader, TeamMember... members) {
         Team team = new Team();
         team.setId(id);
         team.setDepartment(department);
         team.setProjectManager(manager);
+        team.setTeamLeader(teamLeader);
         team.setStatus("Active");
         team.setTeamMembers(new java.util.ArrayList<>());
         for (TeamMember member : members) {

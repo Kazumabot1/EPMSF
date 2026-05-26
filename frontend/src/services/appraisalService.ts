@@ -257,6 +257,46 @@ export const appraisalWorkflowService = {
     const response = await api.get<ApiEnvelope<EmployeeAppraisalFormResponse[]>>('/appraisal/workflow/employee/forms');
     return unwrap<EmployeeAppraisalFormResponse[]>(response);
   },
+
+  exportHrEmployeeReviewPdf: async (formId: number) => {
+    try {
+      const response = await api.get<ArrayBuffer>(`/appraisal/reports/hr/forms/${formId}/pdf`, {
+        responseType: 'arraybuffer',
+      });
+      const bytes = new Uint8Array(response.data);
+      const firstBytes = Array.from(bytes.slice(0, 8)).map((item) => String.fromCharCode(item)).join('');
+      if (!firstBytes.startsWith('%PDF')) {
+        const text = new TextDecoder('utf-8').decode(bytes);
+        try {
+          const parsed = JSON.parse(text) as { message?: string; error?: string };
+          throw new Error(parsed.message || parsed.error || 'The exported file is not a valid PDF.');
+        } catch (parseError) {
+          if (parseError instanceof SyntaxError) {
+            throw new Error(text || 'The exported file is not a valid PDF.');
+          }
+          throw parseError;
+        }
+      }
+      return new Blob([bytes], { type: 'application/pdf' });
+    } catch (error) {
+      const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+      if (responseData instanceof ArrayBuffer) {
+        const text = new TextDecoder('utf-8').decode(new Uint8Array(responseData));
+        if (text) {
+          try {
+            const parsed = JSON.parse(text) as { message?: string; error?: string };
+            throw new Error(parsed.message || parsed.error || text);
+          } catch (parseError) {
+            if (parseError instanceof SyntaxError) {
+              throw new Error(text);
+            }
+            throw parseError;
+          }
+        }
+      }
+      throw error;
+    }
+  },
 };
 
 export const appraisalScoreBandService = {

@@ -1,13 +1,11 @@
-import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import HrEmployeeAccountImport from './pages/employee/HrEmployeeAccountImport';
 import Home from './components/Home';
 import Login from './components/Login';
 import Register from './components/Register';
-import Permissions from './components/Permissions';
-import UserRoles from './components/UserRoles';
-import RolePermissions from './components/RolePermissions';
 import PositionPermissions from './pages/admin/PositionPermissions';
 import PipUpdates from './components/PipUpdates';
 import NotificationTemplates from './components/NotificationTemplates';
@@ -38,6 +36,7 @@ import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import CeoDashboard from './pages/ceo/CeoDashboard';
+import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -82,6 +81,27 @@ import EmployeePerformanceReviewPage from './pages/appraisal/EmployeePerformance
 import AppraisalHistoryListPage from './pages/appraisal/AppraisalHistoryListPage';
 import AppraisalReviewQueuePage from './pages/appraisal/AppraisalReviewQueuePage';
 import { appraisalRoutes } from './routes/appraisalRoutes';
+import { useAuth } from './contexts/AuthContext';
+import { dashboardPathByRole, resolveUserRole } from './config/roleNavigation';
+
+import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
+
+
+type RedirectWithMessageProps = {
+  message: string;
+  to?: string;
+};
+
+const RedirectWithMessage = ({ message, to }: RedirectWithMessageProps) => {
+  const { user } = useAuth();
+  const destination = to ?? dashboardPathByRole[resolveUserRole(user)];
+
+  useEffect(() => {
+    toast.error(message);
+  }, [message]);
+
+  return <Navigate to={destination} replace />;
+};
 
 function App() {
   return (
@@ -100,6 +120,24 @@ function App() {
             <Route path="/employee/notifications" element={<Notifications />} />
             <Route path="/my-kpis" element={<EmployeeKpiResultsPage />} />
             <Route path="/pip/past-plans" element={<PipPastPlansPage />} />
+              <Route
+                path="/permissions"
+                element={
+                  <RedirectWithMessage message="Permission management has been moved to Position Permissions." />
+                }
+              />
+              <Route
+                path="/user-roles"
+                element={
+                  <RedirectWithMessage message="User Roles is no longer available. Position roles now control dashboard access." />
+                }
+              />
+              <Route
+                path="/role-permissions"
+                element={
+                  <RedirectWithMessage message="Role Permissions is no longer available. Use Position Permissions instead." />
+                }
+              />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['HR', 'DepartmentHead', 'Manager']} />}>
@@ -128,9 +166,6 @@ function App() {
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminDashboard />} />
               <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
-              <Route path="/permissions" element={<Permissions />} />
-              <Route path="/user-roles" element={<UserRoles />} />
-              <Route path="/role-permissions" element={<RolePermissions />} />
               <Route path="/position-permissions" element={<PositionPermissions />} />
             </Route>
           </Route>
@@ -188,6 +223,8 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<CeoDashboard />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/approval/kpi" element={<KpiApprovalPage />} />
+              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
               <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />
               <Route path="/executive/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />
@@ -210,7 +247,15 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
               <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
-              <Route path="/department-head/self-assessment" element={<EmployeeSelfAssessmentPage />} />
+<Route
+  path="/department-head/self-assessment"
+  element={<Navigate to="/department-head/self-assessment-forms" replace />}
+/>
+
+<Route
+  path="/department-head/self-assessment-forms"
+  element={<DepartmentHeadSelfAssessmentViewPage />}
+/>
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
@@ -228,6 +273,9 @@ function App() {
               <Route path="/department-head/kpi/history" element={<ManagerKpiHistoryPage />} />
               <Route path="/department-head/kpi-scoring" element={<ManagerKpiScoringPage />} />
               <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
+              <Route path="/department-head/teams" element={<TeamManagement />} />
+              <Route path="/department-head/teams/create" element={<TeamCreate />} />
+              <Route path="/department-head/team-history" element={<TeamHistoryPage />} />
 
               <Route path="/pip/create" element={<PipCreatePage />} />
             </Route>
@@ -244,7 +292,15 @@ function App() {
               <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
               <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
               <Route path="/hr/team" element={<TeamManagement />} />
-              <Route path="/hr/team/create" element={<TeamCreate />} />
+              <Route
+                path="/hr/team/create"
+                element={
+                  <RedirectWithMessage
+                    to="/dashboard"
+                    message="HR users can view teams and team history only. Team creation is handled by Department Heads for their own departments."
+                  />
+                }
+              />
               <Route path="/hr/team/history" element={<TeamHistoryPage />} />
               <Route path="/hr/department" element={<DepartmentManagement />} />
               <Route path="/hr/department-comparison" element={<DepartmentComparisonPage />} />
@@ -260,9 +316,6 @@ function App() {
               <Route path="/hr/feedback/dashboard" element={<Navigate to="/hr/feedback/questions" replace />} />
               <Route path="/hr/feedback/*" element={<FeedbackLayoutPage />} />
               {appraisalRoutes}
-              <Route path="/permissions" element={<Permissions />} />
-              <Route path="/user-roles" element={<UserRoles />} />
-              <Route path="/role-permissions" element={<RolePermissions />} />
               <Route path="/pip-updates" element={<PipUpdates />} />
               <Route path="/notification-templates" element={<NotificationTemplates />} />
               <Route path="/hr/position/create" element={<PositionCreate />} />

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import api from '../../services/api';
 import {
   defaultDashboardForRole,
-  normalizeDashboard,
-  type DashboardValue,
+  dashboardDisplayName,
+  roleDisplayName,
 } from '../../utils/dashboardOptions';
 
 type ModalMode = 'create' | 'edit';
@@ -29,20 +29,12 @@ type PositionOption = {
   positionName?: string;
   name?: string;
   levelCode?: string;
-  roleName?: string;
+  roleId?: number | null;
+  roleName?: string | null;
   role?: {
-    name?: string;
+    id?: number | null;
+    name?: string | null;
   } | string | null;
-};
-
-
-type EmployeeIdentityOption = {
-  id?: number | null;
-  employeeId?: number | null;
-  email?: string | null;
-  workEmail?: string | null;
-  staffNrc?: string | null;
-  nrc?: string | null;
 };
 
 type EmployeeFormState = {
@@ -58,7 +50,8 @@ type EmployeeFormState = {
   gender: string;
   dateOfBirth: string;
 
-  dashboard: DashboardValue;
+  createLoginAccount: boolean;
+  sendTemporaryPasswordEmail: boolean;
 
   race: string;
   religion: string;
@@ -84,7 +77,8 @@ const emptyForm: EmployeeFormState = {
   gender: '',
   dateOfBirth: '',
 
-  dashboard: 'EMPLOYEE_DASHBOARD',
+  createLoginAccount: true,
+  sendTemporaryPasswordEmail: true,
 
   race: '',
   religion: '',
@@ -104,21 +98,38 @@ const unwrap = <T,>(payload: any, fallback: T): T => {
 };
 
 const getDepartmentName = (department: DepartmentOption) =>
-    department.departmentName || department.department_name || department.name || `Department #${department.id}`;
+  department.departmentName ||
+  department.department_name ||
+  department.name ||
+  `Department #${department.id}`;
 
 const getPositionName = (position: PositionOption) =>
-    position.positionTitle || position.positionName || position.name || `Position #${position.id}`;
+  position.positionTitle ||
+  position.positionName ||
+  position.name ||
+  `Position #${position.id}`;
 
 const getRoleNameFromPosition = (position?: PositionOption | null) => {
-  if (!position) return 'EMPLOYEE';
+  if (!position) return '';
 
-  if (position.roleName) return position.roleName;
+  if (position.roleName && String(position.roleName).trim()) {
+    return String(position.roleName).trim();
+  }
 
-  if (typeof position.role === 'string') return position.role;
+  if (typeof position.role === 'string' && position.role.trim()) {
+    return position.role.trim();
+  }
 
-  if (position.role?.name) return position.role.name;
+  if (position.role?.name && String(position.role.name).trim()) {
+    return String(position.role.name).trim();
+  }
 
-  return 'EMPLOYEE';
+  return '';
+};
+
+const positionHasRole = (position?: PositionOption | null) => {
+  if (!position) return false;
+  return Boolean(position.roleId || getRoleNameFromPosition(position));
 };
 
 const toDateInput = (value?: string | null) => {
@@ -143,89 +154,37 @@ const firstValue = (...values: any[]) => {
   return '';
 };
 
-const normalizeUniqueValue = (value?: string | null) =>
-    String(value ?? '').trim().toLowerCase();
-
-const getEmployeeIdentityId = (employee?: EmployeeIdentityOption | null) => {
-  const raw = employee?.id ?? employee?.employeeId;
-  const parsed = Number(raw);
-
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const isSameEmployeeIdentity = (
-    employee: EmployeeIdentityOption,
-    currentEmployeeId: number | null,
-) => currentEmployeeId !== null && getEmployeeIdentityId(employee) === currentEmployeeId;
-
-const hasDuplicateEmail = (
-    employees: EmployeeIdentityOption[],
-    email: string,
-    currentEmployeeId: number | null,
-) => {
-  const target = normalizeUniqueValue(email);
-
-  if (!target) return false;
-
-  return employees.some((employee) => {
-    if (isSameEmployeeIdentity(employee, currentEmployeeId)) return false;
-
-    return [employee.email, employee.workEmail].some(
-        (value) => normalizeUniqueValue(value) === target,
-    );
-  });
-};
-
-const hasDuplicateStaffNrc = (
-    employees: EmployeeIdentityOption[],
-    staffNrc: string,
-    currentEmployeeId: number | null,
-) => {
-  const target = normalizeUniqueValue(staffNrc);
-
-  if (!target) return false;
-
-  return employees.some((employee) => {
-    if (isSameEmployeeIdentity(employee, currentEmployeeId)) return false;
-
-    return [employee.staffNrc, employee.nrc].some(
-        (value) => normalizeUniqueValue(value) === target,
-    );
-  });
-};
-
-const isValidEmailFormat = (value: string) =>
-    !value.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-
 const EmployeeFormModal = ({
-                             open,
-                             mode,
-                             employee,
-                             onClose,
-                             onSaved,
-                           }: EmployeeFormModalProps) => {
+  open,
+  mode,
+  employee,
+  onClose,
+  onSaved,
+}: EmployeeFormModalProps) => {
   const [form, setForm] = useState<EmployeeFormState>(emptyForm);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [positions, setPositions] = useState<PositionOption[]>([]);
-  const [existingEmployees, setExistingEmployees] = useState<EmployeeIdentityOption[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const selectedPosition = useMemo(
-      () =>
-          positions.find((position) => String(position.id) === String(form.positionId)) ??
-          null,
-      [positions, form.positionId],
+    () =>
+      positions.find((position) => String(position.id) === String(form.positionId)) ??
+      null,
+    [positions, form.positionId],
   );
 
   const selectedRoleName = getRoleNameFromPosition(selectedPosition);
+  const derivedDashboard = selectedRoleName
+    ? defaultDashboardForRole(selectedRoleName)
+    : null;
 
   const parentDepartmentOptions = useMemo(() => {
     if (!form.currentDepartmentId) return [];
 
     return departments.filter(
-        (department) => String(department.id) !== String(form.currentDepartmentId),
+      (department) => String(department.id) !== String(form.currentDepartmentId),
     );
   }, [departments, form.currentDepartmentId]);
 
@@ -237,40 +196,19 @@ const EmployeeFormModal = ({
         setLoadingLookups(true);
         setError('');
 
-        const [departmentsResponse, positionsResponse, employeesResponse] =
-            await Promise.allSettled([
-              api.get('/departments'),
-              api.get('/positions'),
-              api.get('/employees', { params: { includeInactive: 'true' } }),
-            ]);
+        const [departmentsResponse, positionsResponse] = await Promise.all([
+          api.get('/departments'),
+          api.get('/positions'),
+        ]);
 
-        if (departmentsResponse.status === 'fulfilled') {
-          const departmentData = unwrap<DepartmentOption[]>(departmentsResponse.value, []);
-          setDepartments(Array.isArray(departmentData) ? departmentData : []);
-        } else {
-          setDepartments([]);
-        }
+        const departmentData = unwrap<DepartmentOption[]>(departmentsResponse, []);
+        const positionData = unwrap<PositionOption[]>(positionsResponse, []);
 
-        if (positionsResponse.status === 'fulfilled') {
-          const positionData = unwrap<PositionOption[]>(positionsResponse.value, []);
-          setPositions(Array.isArray(positionData) ? positionData : []);
-        } else {
-          setPositions([]);
-        }
-
-        if (employeesResponse.status === 'fulfilled') {
-          const employeeData = unwrap<EmployeeIdentityOption[]>(employeesResponse.value, []);
-          setExistingEmployees(Array.isArray(employeeData) ? employeeData : []);
-        } else {
-          setExistingEmployees([]);
-        }
-
-        if (departmentsResponse.status === 'rejected' || positionsResponse.status === 'rejected') {
-          setError('Failed to load employee form options.');
-        }
+        setDepartments(Array.isArray(departmentData) ? departmentData : []);
+        setPositions(Array.isArray(positionData) ? positionData : []);
       } catch (err: any) {
         setError(
-            err?.response?.data?.message ||
+          err?.response?.data?.message ||
             err?.response?.data?.error ||
             'Failed to load employee form options.',
         );
@@ -286,26 +224,19 @@ const EmployeeFormModal = ({
     if (!open) return;
 
     if (mode === 'edit' && employee) {
-      const roleName =
-          employee.roleName ||
-          employee.positionRoleName ||
-          employee.position?.roleName ||
-          employee.position?.role?.name ||
-          'EMPLOYEE';
-
       setForm({
         firstName: firstValue(employee.firstName),
         lastName: firstValue(employee.lastName),
         positionId: firstValue(employee.positionId, employee.position?.id),
         currentDepartmentId: firstValue(
-            employee.currentDepartmentId,
-            employee.departmentId,
-            employee.department?.id,
+          employee.currentDepartmentId,
+          employee.departmentId,
+          employee.department?.id,
         ),
         parentDepartmentId: firstValue(
-            employee.parentDepartmentId,
-            employee.workingDepartmentId,
-            employee.parentDepartment?.id,
+          employee.parentDepartmentId,
+          employee.workingDepartmentId,
+          employee.parentDepartment?.id,
         ),
 
         phoneNumber: firstValue(employee.phoneNumber, employee.phone),
@@ -314,7 +245,8 @@ const EmployeeFormModal = ({
         gender: firstValue(employee.gender),
         dateOfBirth: toDateInput(employee.dateOfBirth),
 
-        dashboard: normalizeDashboard(employee.dashboard, roleName),
+        createLoginAccount: Boolean(employee.email || employee.workEmail || employee.userId),
+        sendTemporaryPasswordEmail: false,
 
         race: firstValue(employee.race),
         religion: firstValue(employee.religion),
@@ -338,77 +270,57 @@ const EmployeeFormModal = ({
   }
 
   const validate = () => {
-    const currentEmployeeId = mode === 'edit' ? getEmployeeIdentityId(employee) : null;
-    const workEmail = form.email.trim();
-    const staffNrc = form.staffNrc.trim();
-
     if (!form.firstName.trim()) return 'First name is required.';
     if (!form.lastName.trim()) return 'Last name is required.';
+    if (!form.positionId) return 'Position is required.';
+    if (!selectedPosition) return 'Selected position was not found. Please refresh and try again.';
+    if (!positionHasRole(selectedPosition)) {
+      return 'This position does not have a role connected yet. Please connect this position with a role before assigning it to an employee.';
+    }
     if (!form.currentDepartmentId) return 'Current Department is required.';
 
-    if (workEmail && !isValidEmailFormat(workEmail)) {
-      return 'Work email format is invalid.';
-    }
-
-    if (workEmail && hasDuplicateEmail(existingEmployees, workEmail, currentEmployeeId)) {
-      return 'Work email is already used by another employee.';
-    }
-
-    if (staffNrc && hasDuplicateStaffNrc(existingEmployees, staffNrc, currentEmployeeId)) {
-      return 'Staff NRC is already used by another employee.';
-    }
-
-    if (mode === 'create' && workEmail && !form.dashboard) {
-      return 'Dashboard is required when creating a login account.';
+    if (form.createLoginAccount && !form.email.trim()) {
+      return 'Work email is required when creating a login account.';
     }
 
     return '';
   };
 
+  const buildPayload = () => ({
+    firstName: form.firstName.trim(),
+    lastName: form.lastName.trim(),
 
-  const buildPayload = () => {
-    const shouldCreateLoginAccount = mode === 'create' && Boolean(form.email.trim());
+    positionId: form.positionId ? Number(form.positionId) : null,
+    currentDepartmentId: form.currentDepartmentId
+      ? Number(form.currentDepartmentId)
+      : null,
+    departmentId: form.currentDepartmentId ? Number(form.currentDepartmentId) : null,
+    parentDepartmentId: form.parentDepartmentId
+      ? Number(form.parentDepartmentId)
+      : null,
 
-    return {
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
+    phoneNumber: form.phoneNumber.trim() || null,
+    phone: form.phoneNumber.trim() || null,
+    email: form.email.trim() || null,
+    workEmail: form.email.trim() || null,
+    staffNrc: form.staffNrc.trim() || null,
+    nrc: form.staffNrc.trim() || null,
+    gender: form.gender || null,
+    dateOfBirth: form.dateOfBirth || null,
 
-      positionId: form.positionId ? Number(form.positionId) : null,
-      currentDepartmentId: form.currentDepartmentId
-          ? Number(form.currentDepartmentId)
-          : null,
-      departmentId: form.currentDepartmentId ? Number(form.currentDepartmentId) : null,
-      parentDepartmentId: form.parentDepartmentId
-          ? Number(form.parentDepartmentId)
-          : null,
+    createLoginAccount: form.createLoginAccount,
+    sendTemporaryPasswordEmail: form.sendTemporaryPasswordEmail,
 
-      phoneNumber: form.phoneNumber.trim() || null,
-      phone: form.phoneNumber.trim() || null,
-      email: form.email.trim() || null,
-      workEmail: form.email.trim() || null,
-      staffNrc: form.staffNrc.trim() || null,
-      nrc: form.staffNrc.trim() || null,
-      gender: form.gender || null,
-      dateOfBirth: form.dateOfBirth || null,
-
-      createLoginAccount: shouldCreateLoginAccount,
-      sendTemporaryPasswordEmail: shouldCreateLoginAccount,
-      dashboard: shouldCreateLoginAccount
-          ? normalizeDashboard(form.dashboard, selectedRoleName)
-          : null,
-
-      race: form.race.trim() || null,
-      religion: form.religion.trim() || null,
-      contactAddress: form.contactAddress.trim() || null,
-      permanentAddress: form.permanentAddress.trim() || null,
-      maritalStatus: form.maritalStatus || null,
-      spouseName: form.spouseName.trim() || null,
-      spouseNrc: form.spouseNrc.trim() || null,
-      fatherName: form.fatherName.trim() || null,
-      fatherNrc: form.fatherNrc.trim() || null,
-    };
-  };
-
+    race: form.race.trim() || null,
+    religion: form.religion.trim() || null,
+    contactAddress: form.contactAddress.trim() || null,
+    permanentAddress: form.permanentAddress.trim() || null,
+    maritalStatus: form.maritalStatus || null,
+    spouseName: form.spouseName.trim() || null,
+    spouseNrc: form.spouseNrc.trim() || null,
+    fatherName: form.fatherName.trim() || null,
+    fatherNrc: form.fatherNrc.trim() || null,
+  });
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -436,7 +348,7 @@ const EmployeeFormModal = ({
       onClose();
     } catch (err: any) {
       setError(
-          err?.response?.data?.message ||
+        err?.response?.data?.message ||
           err?.response?.data?.error ||
           err?.message ||
           'Employee could not be saved.',
@@ -447,347 +359,435 @@ const EmployeeFormModal = ({
   };
 
   return (
-      <div className="epms-emp-modal-overlay">
-        <div className="epms-emp-modal epms-emp-modal--wide">
-          <div className="employee-modal-header">
-            <div>
-              <h2>{mode === 'edit' ? 'Edit employee' : 'Add employee'}</h2>
-              <p>
-                {mode === 'edit'
-                    ? 'Update employee master data.'
-                    : 'Create employee master data and first-time login account.'}
-              </p>
-            </div>
-
-            <button type="button" className="employee-modal-close" onClick={onClose}>
-              ×
-            </button>
+    <div className="epms-emp-modal-overlay">
+      <div className="epms-emp-modal epms-emp-modal--wide">
+        <div className="employee-modal-header">
+          <div>
+            <h2>{mode === 'edit' ? 'Edit employee' : 'Add employee'}</h2>
+            <p>
+              {mode === 'edit'
+                ? 'Update employee master data. Dashboard is assigned automatically from the selected position.'
+                : 'Create employee master data. Dashboard is assigned automatically from the selected position.'}
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="employee-form">
-            <div className="employee-form-grid">
-              <div className="employee-field">
-                <label>
-                  First name <span className="employee-required">*</span>
-                </label>
-                <input
-                    className="employee-input"
-                    value={form.firstName}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, firstName: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>
-                  Last name <span className="employee-required">*</span>
-                </label>
-                <input
-                    className="employee-input"
-                    value={form.lastName}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, lastName: event.target.value }))
-                    }
-                />
-              </div>
-            </div>
-
-            <div className="employee-form-grid">
-              <div className="employee-field">
-                <label>Position</label>
-                <select
-                    className="employee-input"
-                    value={form.positionId}
-                    disabled={loadingLookups}
-                    onChange={(event) => {
-                      const nextPositionId = event.target.value;
-                      const nextPosition =
-                          positions.find(
-                              (position) => String(position.id) === String(nextPositionId),
-                          ) ?? null;
-
-                      const nextRoleName = getRoleNameFromPosition(nextPosition);
-
-                      setForm((prev) => ({
-                        ...prev,
-                        positionId: nextPositionId,
-                        dashboard: defaultDashboardForRole(nextRoleName),
-                      }));
-                    }}
-                >
-                  <option value="">—</option>
-                  {positions.map((position) => (
-                      <option key={position.id} value={position.id}>
-                        {getPositionName(position)}
-                        {position.levelCode ? ` (${position.levelCode})` : ''}
-                      </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="employee-field">
-                <label>
-                  Current Department <span className="employee-required">*</span>
-                </label>
-                <select
-                    className="employee-input"
-                    value={form.currentDepartmentId}
-                    disabled={loadingLookups}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          currentDepartmentId: event.target.value,
-                          parentDepartmentId:
-                              prev.parentDepartmentId === event.target.value
-                                  ? ''
-                                  : prev.parentDepartmentId,
-                        }))
-                    }
-                >
-                  <option value="">— Select Current Department —</option>
-                  {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {getDepartmentName(department)}
-                      </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="employee-field">
-                <label>Parent Department / Working Department</label>
-                <select
-                    className="employee-input"
-                    value={form.parentDepartmentId}
-                    disabled={!form.currentDepartmentId || loadingLookups}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          parentDepartmentId: event.target.value,
-                        }))
-                    }
-                >
-                  <option value="">
-                    {form.currentDepartmentId
-                        ? '— Same as Current Department —'
-                        : '— Select Current Department first —'}
-                  </option>
-                  {parentDepartmentOptions.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {getDepartmentName(department)}
-                      </option>
-                  ))}
-                </select>
-                <small>
-                  Blank means the employee works in their Current Department. Select Parent
-                  Department only when the employee is working under another department.
-                </small>
-              </div>
-            </div>
-
-            <h3 className="employee-form-section-title">Contact & identity</h3>
-
-            <div className="employee-form-grid">
-              <div className="employee-field">
-                <label>Phone</label>
-                <input
-                    className="employee-input"
-                    value={form.phoneNumber}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, phoneNumber: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Work email</label>
-                <input
-                    className="employee-input"
-                    type="email"
-                    value={form.email}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, email: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Staff NRC</label>
-                <input
-                    className="employee-input"
-                    value={form.staffNrc}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, staffNrc: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Gender</label>
-                <select
-                    className="employee-input"
-                    value={form.gender}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, gender: event.target.value }))
-                    }
-                >
-                  <option value="">—</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className="employee-field">
-                <label>Date of birth</label>
-                <input
-                    className="employee-input"
-                    type="date"
-                    value={form.dateOfBirth}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))
-                    }
-                />
-              </div>
-            </div>
-
-
-            <h3 className="employee-form-section-title">Background</h3>
-
-            <div className="employee-form-grid">
-              <div className="employee-field">
-                <label>Race</label>
-                <input
-                    className="employee-input"
-                    value={form.race}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, race: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Religion</label>
-                <input
-                    className="employee-input"
-                    value={form.religion}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, religion: event.target.value }))
-                    }
-                />
-              </div>
-            </div>
-
-            <div className="employee-field">
-              <label>Contact address</label>
-              <textarea
-                  className="employee-input employee-textarea"
-                  value={form.contactAddress}
-                  onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        contactAddress: event.target.value,
-                      }))
-                  }
-              />
-            </div>
-
-            <div className="employee-field">
-              <label>Permanent address</label>
-              <textarea
-                  className="employee-input employee-textarea"
-                  value={form.permanentAddress}
-                  onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        permanentAddress: event.target.value,
-                      }))
-                  }
-              />
-            </div>
-
-            <h3 className="employee-form-section-title">Family</h3>
-
-            <div className="employee-form-grid">
-              <div className="employee-field">
-                <label>Marital status</label>
-                <select
-                    className="employee-input"
-                    value={form.maritalStatus}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          maritalStatus: event.target.value,
-                        }))
-                    }
-                >
-                  <option value="">—</option>
-                  <option value="Single">Single</option>
-                  <option value="Married">Married</option>
-                  <option value="Divorced">Divorced</option>
-                  <option value="Widowed">Widowed</option>
-                </select>
-              </div>
-
-              <div className="employee-field">
-                <label>Spouse name</label>
-                <input
-                    className="employee-input"
-                    value={form.spouseName}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, spouseName: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Spouse NRC</label>
-                <input
-                    className="employee-input"
-                    value={form.spouseNrc}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, spouseNrc: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Father name</label>
-                <input
-                    className="employee-input"
-                    value={form.fatherName}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, fatherName: event.target.value }))
-                    }
-                />
-              </div>
-
-              <div className="employee-field">
-                <label>Father NRC</label>
-                <input
-                    className="employee-input"
-                    value={form.fatherNrc}
-                    onChange={(event) =>
-                        setForm((prev) => ({ ...prev, fatherNrc: event.target.value }))
-                    }
-                />
-              </div>
-            </div>
-
-            {error && <div className="employee-alert error">{error}</div>}
-
-            <div className="employee-form-actions">
-              <button type="button" className="employee-btn secondary" onClick={onClose}>
-                Cancel
-              </button>
-
-              <button type="submit" className="employee-btn primary" disabled={saving}>
-                {saving ? 'Saving...' : mode === 'edit' ? 'Save Changes' : 'Create'}
-              </button>
-            </div>
-          </form>
+          <button type="button" className="employee-modal-close" onClick={onClose}>
+            ×
+          </button>
         </div>
+
+        <form onSubmit={handleSubmit} className="employee-form">
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>
+                First name <span className="employee-required">*</span>
+              </label>
+              <input
+                className="employee-input"
+                value={form.firstName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, firstName: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>
+                Last name <span className="employee-required">*</span>
+              </label>
+              <input
+                className="employee-input"
+                value={form.lastName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, lastName: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>
+                Position <span className="employee-required">*</span>
+              </label>
+              <select
+                className="employee-input"
+                value={form.positionId}
+                disabled={loadingLookups}
+                onChange={(event) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    positionId: event.target.value,
+                  }));
+                }}
+              >
+                <option value="">— Select Position —</option>
+                {positions.map((position) => {
+                  const roleName = getRoleNameFromPosition(position);
+                  return (
+                    <option key={position.id} value={position.id}>
+                      {getPositionName(position)}
+                      {position.levelCode ? ` (${position.levelCode})` : ''}
+                      {roleName ? ` — ${roleDisplayName(roleName)}` : ' — No role connected'}
+                    </option>
+                  );
+                })}
+              </select>
+              <small>
+                Position role decides the employee dashboard and access.
+              </small>
+            </div>
+
+            <div className="employee-field">
+              <label>
+                Assigned Dashboard <span className="employee-required">*</span>
+              </label>
+              <div
+                className="employee-input"
+                style={{
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: selectedPosition && !positionHasRole(selectedPosition)
+                    ? '#fef2f2'
+                    : '#f8fafc',
+                  color: selectedPosition && !positionHasRole(selectedPosition)
+                    ? '#b91c1c'
+                    : '#334155',
+                  fontWeight: 800,
+                }}
+              >
+                {!selectedPosition
+                  ? 'Select a position first'
+                  : !positionHasRole(selectedPosition)
+                    ? 'No dashboard available. Connect this position with a role first.'
+                    : dashboardDisplayName(derivedDashboard, selectedRoleName)}
+              </div>
+              <small>
+                This field is read-only. It is calculated from the selected position role.
+              </small>
+            </div>
+
+            <div className="employee-field">
+              <label>
+                Current Department <span className="employee-required">*</span>
+              </label>
+              <select
+                className="employee-input"
+                value={form.currentDepartmentId}
+                disabled={loadingLookups}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    currentDepartmentId: event.target.value,
+                    parentDepartmentId:
+                      prev.parentDepartmentId === event.target.value
+                        ? ''
+                        : prev.parentDepartmentId,
+                  }))
+                }
+              >
+                <option value="">— Select Current Department —</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {getDepartmentName(department)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="employee-field">
+              <label>Parent Department / Working Department</label>
+              <select
+                className="employee-input"
+                value={form.parentDepartmentId}
+                disabled={!form.currentDepartmentId || loadingLookups}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    parentDepartmentId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">
+                  {form.currentDepartmentId
+                    ? '— Same as Current Department —'
+                    : '— Select Current Department first —'}
+                </option>
+                {parentDepartmentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {getDepartmentName(department)}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Blank means the employee works in their Current Department. Select Parent
+                Department only when the employee is working under another department.
+              </small>
+            </div>
+          </div>
+
+          <h3 className="employee-form-section-title">Contact & identity</h3>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>Phone</label>
+              <input
+                className="employee-input"
+                value={form.phoneNumber}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, phoneNumber: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Work email</label>
+              <input
+                className="employee-input"
+                type="email"
+                value={form.email}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                    createLoginAccount: event.target.value.trim()
+                      ? prev.createLoginAccount
+                      : false,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Staff NRC</label>
+              <input
+                className="employee-input"
+                value={form.staffNrc}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, staffNrc: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Gender</label>
+              <select
+                className="employee-input"
+                value={form.gender}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, gender: event.target.value }))
+                }
+              >
+                <option value="">—</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="employee-field">
+              <label>Date of birth</label>
+              <input
+                className="employee-input"
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="employee-login-box">
+            <label className="employee-checkbox">
+              <input
+                type="checkbox"
+                checked={form.createLoginAccount}
+                disabled={!form.email.trim()}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    createLoginAccount: event.target.checked,
+                  }))
+                }
+              />
+              Create login account automatically when email is provided
+            </label>
+
+            <label className="employee-checkbox">
+              <input
+                type="checkbox"
+                checked={form.sendTemporaryPasswordEmail}
+                disabled={!form.createLoginAccount}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    sendTemporaryPasswordEmail: event.target.checked,
+                  }))
+                }
+              />
+              Send temporary password onboarding email
+            </label>
+
+            <div className="employee-field" style={{ marginTop: 12 }}>
+              <label>Login dashboard</label>
+              <div
+                className="employee-input"
+                style={{
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                  fontWeight: 800,
+                }}
+              >
+                {selectedPosition && positionHasRole(selectedPosition)
+                  ? dashboardDisplayName(derivedDashboard, selectedRoleName)
+                  : 'Dashboard will appear after selecting a position with a connected role.'}
+              </div>
+              <small>
+                HR cannot manually choose a dashboard here. The selected position decides it.
+              </small>
+            </div>
+          </div>
+
+          <h3 className="employee-form-section-title">Background</h3>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>Race</label>
+              <input
+                className="employee-input"
+                value={form.race}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, race: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Religion</label>
+              <input
+                className="employee-input"
+                value={form.religion}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, religion: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="employee-field">
+            <label>Contact address</label>
+            <textarea
+              className="employee-input employee-textarea"
+              value={form.contactAddress}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  contactAddress: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="employee-field">
+            <label>Permanent address</label>
+            <textarea
+              className="employee-input employee-textarea"
+              value={form.permanentAddress}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  permanentAddress: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <h3 className="employee-form-section-title">Family</h3>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>Marital status</label>
+              <select
+                className="employee-input"
+                value={form.maritalStatus}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    maritalStatus: event.target.value,
+                  }))
+                }
+              >
+                <option value="">—</option>
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+              </select>
+            </div>
+
+            <div className="employee-field">
+              <label>Spouse name</label>
+              <input
+                className="employee-input"
+                value={form.spouseName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, spouseName: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Spouse NRC</label>
+              <input
+                className="employee-input"
+                value={form.spouseNrc}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, spouseNrc: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Father name</label>
+              <input
+                className="employee-input"
+                value={form.fatherName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, fatherName: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Father NRC</label>
+              <input
+                className="employee-input"
+                value={form.fatherNrc}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, fatherNrc: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          {error && <div className="employee-alert error">{error}</div>}
+
+          <div className="employee-form-actions">
+            <button type="button" className="employee-btn secondary" onClick={onClose}>
+              Cancel
+            </button>
+
+            <button type="submit" className="employee-btn primary" disabled={saving}>
+              {saving ? 'Saving...' : mode === 'edit' ? 'Save Changes' : 'Create'}
+            </button>
+          </div>
+        </form>
       </div>
+    </div>
   );
 };
 

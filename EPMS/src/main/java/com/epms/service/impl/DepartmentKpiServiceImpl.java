@@ -125,6 +125,14 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         validateCycleRequest(request);
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        String editReason = normalizeEditReason(request.getEditReason());
+        if (editReason == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
+        }
+        cycle.setLastEditReason(editReason);
         cycle.setCycleName(request.getCycleName().trim());
         cycle.setStartDate(request.getStartDate());
         cycle.setDurationMonths(request.getDurationMonths());
@@ -218,11 +226,18 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
             if (target == null || target <= 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI row has no valid target.");
             }
+            if (actual > target) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Row " + rowNumber(result, score) + ": Actual % must be less than or equal to Target %."
+                );
+            }
             score.setActualValue(actual);
             score.setScore((actual / target) * 100.0);
             score.setEvaluatedByUser(evaluator);
             score.setEvaluatedAt(LocalDateTime.now());
             score.calculateWeightedScore();
+            validateWeightScoreWithinWeight(result, score);
         }
         result.calculateTotals();
         if (result.getStatus() == DepartmentKpiResultStatus.ASSIGNED) {
@@ -303,6 +318,37 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         result.setStatus(DepartmentKpiResultStatus.FINALIZED);
         result.setFinalizedAt(now);
         result.setFinalizedByUser(currentUser());
+    }
+
+    private void validateWeightScoreWithinWeight(DepartmentKpiResult result, DepartmentKpiScore score) {
+        Double weightScore = score.getWeightedScore();
+        DepartmentKpiTemplateRow row = score.getTemplateRow();
+        Integer weight = row == null ? null : row.getWeight();
+        if (weightScore != null && weight != null && weightScore > weight) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Row " + rowNumber(result, score) + ": Weight Score must be less than or equal to Weight %."
+            );
+        }
+    }
+
+    private int rowNumber(DepartmentKpiResult result, DepartmentKpiScore score) {
+        if (result == null || result.getScores() == null || score == null || score.getTemplateRow() == null) {
+            return 1;
+        }
+        List<DepartmentKpiScore> ordered = result.getScores().stream()
+                .sorted(Comparator.comparing(s -> {
+                    DepartmentKpiTemplateRow row = s.getTemplateRow();
+                    return row == null || row.getSortOrder() == null ? 0 : row.getSortOrder();
+                }))
+                .toList();
+        for (int i = 0; i < ordered.size(); i++) {
+            DepartmentKpiTemplateRow row = ordered.get(i).getTemplateRow();
+            if (row != null && row.getId() != null && row.getId().equals(score.getTemplateRow().getId())) {
+                return i + 1;
+            }
+        }
+        return 1;
     }
 
     private void createResultsForCyclePeriod(DepartmentKpiCycle cycle, DepartmentKpiCyclePeriod period) {
@@ -422,8 +468,42 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         }
     }
 
+    private void assertTemplatesNotUsedByOtherActiveCycles(Integer excludeCycleId, List<Integer> templateIds) {
+        if (templateIds == null || templateIds.isEmpty()) {
+            return;
+        }
+        List<DepartmentKpiCycleTemplate> conflicts = cycleTemplateRepository.findConflictingLinks(
+                KpiTemplateCycleStatus.ACTIVE,
+                excludeCycleId,
+                templateIds
+        );
+        if (conflicts == null || conflicts.isEmpty()) {
+            return;
+        }
+        DepartmentKpiCycleTemplate conflict = conflicts.get(0);
+        String templateTitle = conflict.getTemplate().getTitle();
+        String cycleName = conflict.getCycle().getCycleName();
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Department KPI template \"" + templateTitle + "\" is already used by the active cycle \"" + cycleName + "\"."
+        );
+    }
+
+    private String normalizeEditReason(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
+    }
+
     private void applyCycleTemplates(DepartmentKpiCycle cycle, List<Integer> templateIds) {
-        for (Integer id : templateIds.stream().distinct().toList()) {
+        List<Integer> distinctIds = templateIds.stream().distinct().toList();
+        assertTemplatesNotUsedByOtherActiveCycles(cycle.getId(), distinctIds);
+        for (Integer id : distinctIds) {
             DepartmentKpiTemplate template = templateRepository.findById(id)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department KPI template not found: " + id));
             if (template.getStatus() != KpiFormStatus.ACTIVE && template.getStatus() != KpiFormStatus.FINALIZED) {

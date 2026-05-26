@@ -256,6 +256,8 @@ public class SecurityConfig {
                                 "/api/kpi-items/**",
                                 "/api/hr/kpi-templates",
                                 "/api/hr/kpi-templates/**",
+                                "/api/hr/kpi-template-cycles",
+                                "/api/hr/kpi-template-cycles/**",
                                 "/api/hr/department-kpi-templates",
                                 "/api/hr/department-kpi-templates/**",
                                 "/api/hr/department-kpi-cycles",
@@ -365,10 +367,11 @@ public class SecurityConfig {
                                 hasRoleDashboardOrPosition(authentication.get(), SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS)
                         )
 
-                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/*")
+                   /*     .requestMatchers(HttpMethod.GET, "/api/employee-assessments/*")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS)
-                        )
+                        )*/
+                        .requestMatchers(HttpMethod.GET, "/api/employee-assessments/*").authenticated()
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/manager-remark")
                         .access((authentication, context) ->
@@ -376,6 +379,11 @@ public class SecurityConfig {
                         )
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/manager-sign")
+                        .access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), MANAGER_ROLES, MANAGER_DASHBOARDS)
+                        )
+
+                        .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/manager-decline")
                         .access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), MANAGER_ROLES, MANAGER_DASHBOARDS)
                         )

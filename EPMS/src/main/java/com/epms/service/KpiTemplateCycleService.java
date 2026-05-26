@@ -2,6 +2,7 @@ package com.epms.service;
 
 import com.epms.dto.KpiTemplateCycleRequestDTO;
 import com.epms.dto.KpiTemplateCycleResponseDTO;
+import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 
 import java.util.List;
 
@@ -15,5 +16,11 @@ public interface KpiTemplateCycleService {
 
     KpiTemplateCycleResponseDTO getById(Integer id);
 
-    KpiTemplateCycleResponseDTO updateStatus(Integer id, boolean active);
+    KpiTemplateCycleResponseDTO updateStatus(Integer id, KpiTemplateCycleStatusRequestDTO request);
+
+    List<KpiTemplateCycleResponseDTO> listPendingEarlyCloseRequests();
+
+    KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason);
+
+    KpiTemplateCycleResponseDTO rejectEarlyClose(Integer id, String reviewReason);
 }

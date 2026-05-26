@@ -91,6 +91,7 @@ public class TeamServiceImpl implements TeamService {
     public TeamResponseDto createTeam(TeamRequestDto request) {
         assertCurrentUserCanCreateTeams();
         validateCreateRequest(request);
+        assertDepartmentHeadRequestInsideOwnDepartment(request.getDepartmentId());
 
         Department department = getDepartmentOrThrow(request.getDepartmentId());
         User teamLeader = getActiveUserOrThrow(request.getTeamLeaderId(), "Team Leader");
@@ -162,6 +163,8 @@ public class TeamServiceImpl implements TeamService {
         Department department = request.getDepartmentId() != null
                 ? getDepartmentOrThrow(request.getDepartmentId())
                 : team.getDepartment();
+
+        assertDepartmentHeadCanUpdateTeam(team, department != null ? department.getId() : null);
 
         User oldLeader = team.getTeamLeader();
         User oldProjectManager = team.getProjectManager();
@@ -338,7 +341,7 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional
     public void deleteTeam(Integer id) {
-        assertCurrentUserCanEditTeams();
+        assertCurrentUserCanDeleteTeams();
         Team team = getTeamOrThrow(id);
         teamRepository.delete(team);
     }
@@ -693,46 +696,54 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private void assertCurrentUserCanManageTeams() {
-        if (currentUserIsHrOrAdmin()) {
+        if (currentUserIsHr()) {
+            throw new AccessDeniedException("HR users can view teams and team history only.");
+        }
+
+        if (currentUserIsDepartmentHead()
+                && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        if (positionPermissionService.currentUserHasPermission("teamCreate")
-                || positionPermissionService.currentUserHasPermission("teamEdit")
-                || positionPermissionService.currentUserHasPermission("teamHistory")
-                || positionPermissionService.currentUserHasPermission("teamView")) {
-            return;
-        }
-
-        throw new AccessDeniedException("Your position does not have permission to manage teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can manage teams.");
     }
 
     private void assertCurrentUserCanCreateTeams() {
-        if (currentUserIsHrOrAdmin()) {
+        if (currentUserIsHr()) {
+            throw new AccessDeniedException("HR users can view teams and team history only. Team creation is handled by Department Heads.");
+        }
+
+        if (currentUserIsDepartmentHead()
+                && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        if (positionPermissionService.currentUserHasPermission("teamCreate")) {
-            return;
-        }
-
-        throw new AccessDeniedException("Your position does not have permission to create teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can create teams.");
     }
 
     private void assertCurrentUserCanEditTeams() {
-        if (currentUserIsHrOrAdmin()) {
+        if (currentUserIsHr()) {
+            throw new AccessDeniedException("HR users can view teams and team history only.");
+        }
+
+        if (currentUserIsDepartmentHead()
+                && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        if (positionPermissionService.currentUserHasPermission("teamEdit")) {
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can edit teams.");
+    }
+
+    private void assertCurrentUserCanDeleteTeams() {
+        if (currentUserIsAdmin()) {
             return;
         }
 
-        throw new AccessDeniedException("Your position does not have permission to edit teams.");
+        throw new AccessDeniedException("Only Admin can delete teams.");
     }
 
     private void assertCurrentUserCanViewTeamHistory() {
-        if (currentUserIsHrOrAdmin()) {
+        if (currentUserIsHr() || currentUserIsAdmin()) {
             return;
         }
 
@@ -743,7 +754,33 @@ public class TeamServiceImpl implements TeamService {
         throw new AccessDeniedException("Your position does not have permission to view team history.");
     }
 
-    private boolean currentUserIsHrOrAdmin() {
+    private void assertDepartmentHeadRequestInsideOwnDepartment(Integer departmentId) {
+        if (!currentUserIsDepartmentHead()) {
+            return;
+        }
+
+        Integer ownDepartmentId = requireCurrentUserDepartmentId();
+
+        if (!Objects.equals(ownDepartmentId, departmentId)) {
+            throw new AccessDeniedException("Department Heads can create teams only for their own department.");
+        }
+    }
+
+    private void assertDepartmentHeadCanUpdateTeam(Team team, Integer requestedDepartmentId) {
+        if (!currentUserIsDepartmentHead()) {
+            return;
+        }
+
+        Integer ownDepartmentId = requireCurrentUserDepartmentId();
+        Integer currentTeamDepartmentId = team.getDepartment() != null ? team.getDepartment().getId() : null;
+
+        if (!Objects.equals(ownDepartmentId, currentTeamDepartmentId)
+                || !Objects.equals(ownDepartmentId, requestedDepartmentId)) {
+            throw new AccessDeniedException("Department Heads can edit only teams inside their own department.");
+        }
+    }
+
+    private boolean currentUserIsHr() {
         User currentUser = getCurrentUserOrNull();
 
         if (currentUser == null) {
@@ -751,9 +788,31 @@ public class TeamServiceImpl implements TeamService {
         }
 
         return hasRole(currentUser, "HR")
-                || hasRole(currentUser, "ADMIN")
                 || hasRole(currentUser, "HUMAN_RESOURCE")
                 || hasRole(currentUser, "HUMAN_RESOURCES");
+    }
+
+    private boolean currentUserIsAdmin() {
+        User currentUser = getCurrentUserOrNull();
+
+        if (currentUser == null) {
+            return false;
+        }
+
+        return hasRole(currentUser, "ADMIN");
+    }
+
+    private boolean currentUserIsDepartmentHead() {
+        User currentUser = getCurrentUserOrNull();
+
+        if (currentUser == null) {
+            return false;
+        }
+
+        return hasRole(currentUser, "DEPARTMENT_HEAD")
+                || hasRole(currentUser, "DEPARTMENTHEAD")
+                || hasRole(currentUser, "DEPT_HEAD")
+                || hasRole(currentUser, "HEAD_OF_DEPARTMENT");
     }
 
     private void applyMemberChanges(Team team, Set<Integer> oldMemberIds, Set<Integer> newMemberIds) {

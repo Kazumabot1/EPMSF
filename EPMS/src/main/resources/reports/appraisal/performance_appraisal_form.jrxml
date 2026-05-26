@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="performance_appraisal_form"
+              language="java"
+              pageWidth="595"
+              pageHeight="842"
+              orientation="Portrait"
+              columnWidth="559"
+              leftMargin="18"
+              rightMargin="18"
+              topMargin="14"
+              bottomMargin="12"
+              whenNoDataType="AllSectionsNoDetail">
+
+    <property name="net.sf.jasperreports.default.font.name" value="SansSerif"/>
+
+    <style name="Base" fontName="SansSerif" fontSize="6.8" pdfFontName="Helvetica" pdfEncoding="Cp1252" isPdfEmbedded="false"/>
+    <style name="Title" style="Base" fontSize="12.5" isBold="true" forecolor="#000000"/>
+    <style name="Header" style="Base" fontSize="7.4" isBold="true" forecolor="#000000"/>
+    <style name="Cell" style="Base" fontSize="6.8" forecolor="#000000"/>
+    <style name="Small" style="Base" fontSize="5.8" forecolor="#000000"/>
+    <style name="Rating" style="Base" fontSize="6.9" isBold="true" forecolor="#000000"/>
+
+    <parameter name="reportTitle" class="java.lang.String"/>
+    <parameter name="companyName" class="java.lang.String"/>
+    <parameter name="generatedAt" class="java.lang.String"/>
+    <parameter name="cycleName" class="java.lang.String"/>
+    <parameter name="cycleType" class="java.lang.String"/>
+    <parameter name="cycleYear" class="java.lang.String"/>
+    <parameter name="cycleStartDate" class="java.lang.String"/>
+    <parameter name="cycleEndDate" class="java.lang.String"/>
+    <parameter name="employeeName" class="java.lang.String"/>
+    <parameter name="employeeCode" class="java.lang.String"/>
+    <parameter name="departmentName" class="java.lang.String"/>
+    <parameter name="positionName" class="java.lang.String"/>
+    <parameter name="assessmentDate" class="java.lang.String"/>
+    <parameter name="effectiveDate" class="java.lang.String"/>
+    <parameter name="totalPoints" class="java.lang.String"/>
+    <parameter name="answeredCriteriaCount" class="java.lang.String"/>
+    <parameter name="scorePercent" class="java.lang.String"/>
+    <parameter name="performanceLabel" class="java.lang.String"/>
+    <parameter name="status" class="java.lang.String"/>
+    <parameter name="scoreBandsText" class="java.lang.String"/>
+    <parameter name="scoreBand1Score" class="java.lang.String"/>
+    <parameter name="scoreBand1Label" class="java.lang.String"/>
+    <parameter name="scoreBand1Description" class="java.lang.String"/>
+    <parameter name="scoreBand2Score" class="java.lang.String"/>
+    <parameter name="scoreBand2Label" class="java.lang.String"/>
+    <parameter name="scoreBand2Description" class="java.lang.String"/>
+    <parameter name="scoreBand3Score" class="java.lang.String"/>
+    <parameter name="scoreBand3Label" class="java.lang.String"/>
+    <parameter name="scoreBand3Description" class="java.lang.String"/>
+    <parameter name="scoreBand4Score" class="java.lang.String"/>
+    <parameter name="scoreBand4Label" class="java.lang.String"/>
+    <parameter name="scoreBand4Description" class="java.lang.String"/>
+    <parameter name="scoreBand5Score" class="java.lang.String"/>
+    <parameter name="scoreBand5Label" class="java.lang.String"/>
+    <parameter name="scoreBand5Description" class="java.lang.String"/>
+    <parameter name="otherRemarksText" class="java.lang.String"/>
+    <parameter name="managerReviewText" class="java.lang.String"/>
+    <parameter name="deptHeadReviewText" class="java.lang.String"/>
+    <parameter name="hrReviewText" class="java.lang.String"/>
+    <parameter name="appraiserSignatureCaption" class="java.lang.String"/>
+    <parameter name="deptHeadSignatureCaption" class="java.lang.String"/>
+    <parameter name="hrSignatureCaption" class="java.lang.String"/>
+    <parameter name="managerSignatureImage" class="java.awt.Image"/>
+    <parameter name="deptHeadSignatureImage" class="java.awt.Image"/>
+    <parameter name="hrSignatureImage" class="java.awt.Image"/>
+
+    <field name="sectionName" class="java.lang.String"/>
+    <field name="criteriaNumber" class="java.lang.String"/>
+    <field name="criteriaText" class="java.lang.String"/>
+    <field name="rating5" class="java.lang.String"/>
+    <field name="rating4" class="java.lang.String"/>
+    <field name="rating3" class="java.lang.String"/>
+    <field name="rating2" class="java.lang.String"/>
+    <field name="rating1" class="java.lang.String"/>
+    <field name="ratingComment" class="java.lang.String"/>
+
+    <title>
+        <band height="122">
+            <rectangle>
+                <reportElement x="0" y="0" width="559" height="20" mode="Opaque" backcolor="#FCE4D6"/>
+                <graphicElement><pen lineWidth="0"/></graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement x="4" y="3" width="320" height="14" style="Title"/>
+                <textElement verticalAlignment="Middle"/>
+                <text><![CDATA[Performance Appraisal Form]]></text>
+            </staticText>
+            <staticText>
+                <reportElement x="0" y="29" width="559" height="9" style="Header"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle"/>
+                <text><![CDATA[Performance Evaluation Form]]></text>
+            </staticText>
+            <textField isBlankWhenNull="true">
+                <reportElement x="0" y="38" width="559" height="9" style="Header"/>
+                <textElement textAlignment="Center" verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA[$P{companyName}]]></textFieldExpression>
+            </textField>
+
+            <staticText><reportElement x="0" y="52" width="168" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[Employee Name :]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="168" y="52" width="391" height="10" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{employeeName}]]></textFieldExpression></textField>
+            <staticText><reportElement x="0" y="62" width="168" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[Employee ID :]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="168" y="62" width="391" height="10" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{employeeCode}]]></textFieldExpression></textField>
+            <staticText><reportElement x="0" y="72" width="168" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[Current Position :]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="168" y="72" width="391" height="10" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{positionName}]]></textFieldExpression></textField>
+            <staticText><reportElement x="0" y="82" width="168" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[Department :]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="168" y="82" width="391" height="10" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{departmentName}]]></textFieldExpression></textField>
+            <staticText><reportElement x="0" y="92" width="168" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[Assessment Date :]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="168" y="92" width="391" height="10" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{assessmentDate}]]></textFieldExpression></textField>
+            <staticText><reportElement x="0" y="102" width="168" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[Effective Date :]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="168" y="102" width="391" height="10" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{effectiveDate}]]></textFieldExpression></textField>
+        </band>
+    </title>
+
+    <columnHeader>
+        <band height="18">
+            <staticText><reportElement x="0" y="0" width="559" height="7" style="Cell"/><textElement verticalAlignment="Middle"/><text><![CDATA[Evaluations]]></text></staticText>
+            <staticText><reportElement x="0" y="8" width="75" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[]]></text></staticText>
+            <staticText><reportElement x="75" y="8" width="22" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[]]></text></staticText>
+            <staticText><reportElement x="97" y="8" width="292" height="10" style="Header"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><text><![CDATA[]]></text></staticText>
+            <staticText><reportElement x="389" y="8" width="34" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[1]]></text></staticText>
+            <staticText><reportElement x="423" y="8" width="34" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[2]]></text></staticText>
+            <staticText><reportElement x="457" y="8" width="34" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[3]]></text></staticText>
+            <staticText><reportElement x="491" y="8" width="34" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[4]]></text></staticText>
+            <staticText><reportElement x="525" y="8" width="34" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[5]]></text></staticText>
+        </band>
+    </columnHeader>
+
+    <detail>
+        <band height="8">
+            <textField isBlankWhenNull="true" textAdjust="ScaleFont"><reportElement x="0" y="0" width="75" height="8" style="Cell"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle" rotation="Left"/><textFieldExpression><![CDATA[$F{sectionName}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="75" y="0" width="22" height="8" style="Cell"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{criteriaNumber}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true" textAdjust="ScaleFont"><reportElement x="97" y="0" width="292" height="8" style="Cell"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{criteriaText}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="389" y="0" width="34" height="8" style="Rating"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="423" y="0" width="34" height="8" style="Rating"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="457" y="0" width="34" height="8" style="Rating"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="491" y="0" width="34" height="8" style="Rating"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="525" y="0" width="34" height="8" style="Rating"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+            <line>
+                <reportElement key="rating1-check-a" x="403" y="4" width="3" height="2">
+                    <printWhenExpression><![CDATA[$F{rating1} != null && !$F{rating1}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line direction="BottomUp">
+                <reportElement key="rating1-check-b" x="406" y="2" width="6" height="4">
+                    <printWhenExpression><![CDATA[$F{rating1} != null && !$F{rating1}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line>
+                <reportElement key="rating2-check-a" x="437" y="4" width="3" height="2">
+                    <printWhenExpression><![CDATA[$F{rating2} != null && !$F{rating2}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line direction="BottomUp">
+                <reportElement key="rating2-check-b" x="440" y="2" width="6" height="4">
+                    <printWhenExpression><![CDATA[$F{rating2} != null && !$F{rating2}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line>
+                <reportElement key="rating3-check-a" x="471" y="4" width="3" height="2">
+                    <printWhenExpression><![CDATA[$F{rating3} != null && !$F{rating3}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line direction="BottomUp">
+                <reportElement key="rating3-check-b" x="474" y="2" width="6" height="4">
+                    <printWhenExpression><![CDATA[$F{rating3} != null && !$F{rating3}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line>
+                <reportElement key="rating4-check-a" x="505" y="4" width="3" height="2">
+                    <printWhenExpression><![CDATA[$F{rating4} != null && !$F{rating4}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line direction="BottomUp">
+                <reportElement key="rating4-check-b" x="508" y="2" width="6" height="4">
+                    <printWhenExpression><![CDATA[$F{rating4} != null && !$F{rating4}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line>
+                <reportElement key="rating5-check-a" x="539" y="4" width="3" height="2">
+                    <printWhenExpression><![CDATA[$F{rating5} != null && !$F{rating5}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+            <line direction="BottomUp">
+                <reportElement key="rating5-check-b" x="542" y="2" width="6" height="4">
+                    <printWhenExpression><![CDATA[$F{rating5} != null && !$F{rating5}.trim().isEmpty()]]></printWhenExpression>
+                </reportElement>
+                <graphicElement><pen lineWidth="0.7" lineColor="#000000"/></graphicElement>
+            </line>
+        </band>
+    </detail>
+
+    <summary>
+        <band height="210">
+            <staticText><reportElement x="0" y="0" width="389" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Total Points]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="389" y="0" width="170" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{totalPoints}]]></textFieldExpression></textField>
+
+            <staticText><reportElement x="0" y="15" width="170" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Arial]]></text></staticText>
+            <staticText><reportElement x="170" y="15" width="230" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Formula]]></text></staticText>
+            <staticText><reportElement x="400" y="15" width="159" height="10" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Score]]></text></staticText>
+            <staticText><reportElement x="0" y="25" width="170" height="24" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Total Points]]></text></staticText>
+            <staticText><reportElement x="170" y="25" width="230" height="24" style="Small"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Total Point  X 100 / Number of Questions Answered X 5]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="400" y="25" width="159" height="24" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scorePercent} + "  " + $P{performanceLabel}]]></textFieldExpression></textField>
+
+            <staticText><reportElement x="0" y="55" width="63" height="8" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Score]]></text></staticText>
+            <staticText><reportElement x="63" y="55" width="130" height="8" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Rating]]></text></staticText>
+            <staticText><reportElement x="193" y="55" width="366" height="8" style="Header"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[Description]]></text></staticText>
+            <textField isBlankWhenNull="true"><reportElement x="0" y="63" width="63" height="9" style="Small"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand1Score}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="63" y="63" width="130" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand1Label}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="193" y="63" width="366" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand1Description}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="0" y="72" width="63" height="9" style="Small"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand2Score}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="63" y="72" width="130" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand2Label}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="193" y="72" width="366" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand2Description}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="0" y="81" width="63" height="9" style="Small"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand3Score}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="63" y="81" width="130" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand3Label}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="193" y="81" width="366" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand3Description}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="0" y="90" width="63" height="9" style="Small"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand4Score}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="63" y="90" width="130" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand4Label}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="193" y="90" width="366" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand4Description}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="0" y="99" width="63" height="9" style="Small"/><box><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand5Score}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="63" y="99" width="130" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand5Label}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true"><reportElement x="193" y="99" width="366" height="9" style="Small"/><box leftPadding="2"><pen lineWidth="0.6" lineColor="#000000"/></box><textElement textAlignment="Left" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$P{scoreBand5Description}]]></textFieldExpression></textField>
+            <staticText><reportElement x="0" y="114" width="80" height="7" style="Cell"/><text><![CDATA[Other remarks:]]></text></staticText>
+            <textField isBlankWhenNull="true" textAdjust="ScaleFont"><reportElement x="0" y="122" width="559" height="19" style="Cell"/><textElement verticalAlignment="Top"/><textFieldExpression><![CDATA[$P{otherRemarksText} == null || $P{otherRemarksText}.trim().isEmpty() ? "Appraiser's Comment for Discussion;" : $P{otherRemarksText}]]></textFieldExpression></textField>
+            <line><reportElement x="0" y="144" width="559" height="1"/><graphicElement><pen lineWidth="0.5" lineColor="#000000" lineStyle="Dotted"/></graphicElement></line>
+
+            <image scaleImage="RetainShape" onErrorType="Blank"><reportElement x="45" y="149" width="105" height="17"/><imageExpression class="java.awt.Image"><![CDATA[$P{managerSignatureImage}]]></imageExpression></image>
+            <image scaleImage="RetainShape" onErrorType="Blank"><reportElement x="352" y="149" width="105" height="17"/><imageExpression class="java.awt.Image"><![CDATA[$P{deptHeadSignatureImage}]]></imageExpression></image>
+            <line><reportElement x="0" y="167" width="245" height="1"/><graphicElement><pen lineWidth="0.6" lineColor="#000000"/></graphicElement></line>
+            <line><reportElement x="314" y="167" width="245" height="1"/><graphicElement><pen lineWidth="0.6" lineColor="#000000"/></graphicElement></line>
+            <textField isBlankWhenNull="true" textAdjust="ScaleFont"><reportElement x="0" y="169" width="245" height="9" style="Cell"/><textFieldExpression><![CDATA[$P{appraiserSignatureCaption}]]></textFieldExpression></textField>
+            <textField isBlankWhenNull="true" textAdjust="ScaleFont"><reportElement x="314" y="169" width="245" height="9" style="Cell"/><textFieldExpression><![CDATA[$P{deptHeadSignatureCaption}]]></textFieldExpression></textField>
+
+            <staticText><reportElement x="0" y="181" width="60" height="7" style="Cell"/><text><![CDATA[Review by]]></text></staticText>
+            <image scaleImage="RetainShape" onErrorType="Blank"><reportElement x="45" y="190" width="105" height="14"/><imageExpression class="java.awt.Image"><![CDATA[$P{hrSignatureImage}]]></imageExpression></image>
+            <line><reportElement x="0" y="205" width="245" height="1"/><graphicElement><pen lineWidth="0.6" lineColor="#000000"/></graphicElement></line>
+            <textField isBlankWhenNull="true" textAdjust="ScaleFont"><reportElement x="0" y="207" width="270" height="9" style="Cell"/><textFieldExpression><![CDATA[$P{hrSignatureCaption}]]></textFieldExpression></textField>
+        </band>
+    </summary>
+</jasperReport>

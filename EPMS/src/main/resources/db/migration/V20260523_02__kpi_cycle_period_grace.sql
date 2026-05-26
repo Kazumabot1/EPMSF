@@ -17,6 +17,9 @@ ALTER TABLE kpi_template_cycle
     ADD COLUMN grace_ends_at DATETIME(6) NULL,
     ADD COLUMN closed_at DATETIME(6) NULL;
 
+ALTER TABLE kpi_template_cycle
+    MODIFY COLUMN status ENUM('DRAFT', 'ACTIVE', 'CLOSING', 'DEACTIVATED') NOT NULL;
+
 ALTER TABLE employee_kpi_forms
     ADD COLUMN cycle_period_id INT NULL,
     ADD COLUMN position_id_at_assignment INT NULL,
@@ -28,6 +31,9 @@ ALTER TABLE employee_kpi_forms
 ALTER TABLE employee_kpi_forms
     ADD CONSTRAINT fk_employee_kpi_forms_cycle_period
         FOREIGN KEY (cycle_period_id) REFERENCES kpi_template_cycle_period(id);
+
+ALTER TABLE employee_kpi_forms
+    MODIFY COLUMN status ENUM('ASSIGNED', 'IN_PROGRESS', 'FINALIZED', 'CLOSED', 'SENT_TO_EMPLOYEE', 'ACKNOWLEDGED') NOT NULL;
 
 CREATE TABLE IF NOT EXISTS employee_kpi_form_evaluators (
     id INT AUTO_INCREMENT PRIMARY KEY,

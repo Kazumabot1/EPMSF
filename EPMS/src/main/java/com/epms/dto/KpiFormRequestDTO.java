@@ -29,6 +29,8 @@ public class KpiFormRequestDTO {
 
     private LocalDate endDate;
 
+    private Integer positionDurationMonths;
+
     @NotEmpty
     @Builder.Default
     private List<Integer> positionIds = new ArrayList<>();

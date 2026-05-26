@@ -1,7 +1,6 @@
-
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { positionPermissionService } from '../../services/positionPermissionService';
 import { useNavigate } from 'react-router-dom';
+import { positionPermissionService } from '../../services/positionPermissionService';
 import {
   deleteTeam,
   fetchDepartments,
@@ -24,6 +23,7 @@ const normalizeRole = (role?: string | null) =>
 
 const isEmployeeUser = (user: any) => {
   const dashboard = String(user?.dashboard ?? '').toUpperCase();
+
   if (dashboard === 'EMPLOYEE_DASHBOARD') {
     return true;
   }
@@ -40,7 +40,14 @@ const isDepartmentHeadUser = (user: any) => {
 
   return (user?.roles ?? []).some((role: string) => {
     const normalized = normalizeRole(role);
-    return normalized === 'DEPARTMENTHEAD';
+
+    return (
+      normalized === 'DEPARTMENTHEAD' ||
+      normalized === 'DEPARTMENT_HEAD' ||
+      normalized === 'DEPTHEAD' ||
+      normalized === 'DEPT_HEAD' ||
+      normalized === 'HEADOFDEPARTMENT'
+    );
   });
 };
 
@@ -89,12 +96,28 @@ const TeamManagement: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<TeamResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [canCreateTeam, setCanCreateTeam] = useState(false);
+  const [canEditTeam, setCanEditTeam] = useState(false);
+  const [canHistoryTeam, setCanHistoryTeam] = useState(false);
+
+  const createPath = isDepartmentHead ? '/department-head/teams/create' : '/hr/team/create';
+  const historyPath = isDepartmentHead ? '/department-head/team-history' : '/hr/team/history';
+
+  const canShowCreateTeam = isDepartmentHead && canCreateTeam;
+  const canShowEditTeam = isDepartmentHead && canEditTeam;
+  const canShowTeamHistory = !isEmployee && canHistoryTeam;
+
   const loadTeams = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const data = isEmployee ? await fetchMyTeams() : isDepartmentHead ? await fetchMyDepartmentTeams() : await fetchTeams();
+      const data = isEmployee
+        ? await fetchMyTeams()
+        : isDepartmentHead
+          ? await fetchMyDepartmentTeams()
+          : await fetchTeams();
+
       setTeams(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setTeams([]);
@@ -119,35 +142,36 @@ const TeamManagement: React.FC = () => {
   }, [isDepartmentHead, isEmployee]);
 
   useEffect(() => {
-    loadTeams();
-    loadDepartments();
+    void loadTeams();
+    void loadDepartments();
   }, [loadTeams, loadDepartments]);
 
+  useEffect(() => {
+    let cancelled = false;
 
-useEffect(() => {
-  let cancelled = false;
+    positionPermissionService
+      .getMyPermissions()
+      .then((permissions) => {
+        if (!cancelled) {
+          const canCreate = Boolean(permissions.teamCreate);
 
-  positionPermissionService
-    .getMyPermissions()
-    .then((permissions) => {
-      if (!cancelled) {
-        setCanCreateTeam(Boolean(permissions.teamCreate));
-        setCanEditTeam(Boolean(permissions.teamEdit));
-        setCanHistoryTeam(Boolean(permissions.teamHistory));
-      }
-    })
-    .catch(() => {
-      if (!cancelled) {
-        setCanCreateTeam(false);
-        setCanEditTeam(false);
-        setCanHistoryTeam(false);
-      }
-    });
+          setCanCreateTeam(canCreate);
+          setCanEditTeam(canCreate);
+          setCanHistoryTeam(Boolean(permissions.teamHistory));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCanCreateTeam(false);
+          setCanEditTeam(false);
+          setCanHistoryTeam(false);
+        }
+      });
 
-  return () => {
-    cancelled = true;
-  };
-}, []);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredTeams = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
@@ -172,16 +196,13 @@ useEffect(() => {
 
   const activeCount = useMemo(
     () => teams.filter((team) => team.status?.toLowerCase() === 'active').length,
-    [teams]
+    [teams],
   );
 
   const inactiveCount = useMemo(
     () => teams.filter((team) => team.status?.toLowerCase() === 'inactive').length,
-    [teams]
+    [teams],
   );
-
-  const createPath = isDepartmentHead ? '/department-head/teams/create' : '/hr/team/create';
-  const historyPath = isDepartmentHead ? '/department-head/team-history' : '/hr/team/history';
 
   const handleDelete = async () => {
     if (!showDeleteConfirm) {
@@ -201,68 +222,37 @@ useEffect(() => {
     }
   };
 
-const [canCreateTeam, setCanCreateTeam] = useState(false);
-const [canEditTeam, setCanEditTeam] = useState(false);
-const [canHistoryTeam, setCanHistoryTeam] = useState(false);
-const disabledMessage = `Your position (${user?.position || 'your position'}) has this feature disabled!`;
-
-
-
-
-
-
-
-
-
   return (
     <div className="team-page">
       <div className="team-header">
         <div>
           <p className="team-eyebrow">Team Organization</p>
           <h1>Team Management</h1>
-          <p>
-            Manage teams, leaders, project managers, members, and team status.
-          </p>
+          <p>Manage teams, leaders, project managers, members, and team status.</p>
         </div>
 
         {!isEmployee && (
-        <div className="team-header-actions">
-  <button
-    type="button"
-    className="team-btn team-btn-secondary"
-    disabled={!canHistoryTeam}
-    title={canHistoryTeam ? undefined : disabledMessage}
-    onClick={() => {
-      if (!canHistoryTeam) {
-        setError(disabledMessage);
-        return;
-      }
+          <div className="team-header-actions">
+            {canShowTeamHistory && (
+              <button
+                type="button"
+                className="team-btn team-btn-secondary"
+                onClick={() => navigate(historyPath)}
+              >
+                Team History
+              </button>
+            )}
 
-      navigate(historyPath);
-    }}
-  >
-    Team History
-  </button>
-
-  <button
-    type="button"
-    className="team-btn team-btn-primary"
-    disabled={!canCreateTeam}
-    title={canCreateTeam ? undefined : disabledMessage}
-    onClick={() => {
-      if (!canCreateTeam) {
-        setError(disabledMessage);
-        return;
-      }
-
-      navigate(createPath);
-    }}
-  >
-    Create Team
-  </button>
-
-
-        </div>
+            {canShowCreateTeam && (
+              <button
+                type="button"
+                className="team-btn team-btn-primary"
+                onClick={() => navigate(createPath)}
+              >
+                Create Team
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -368,7 +358,11 @@ const disabledMessage = `Your position (${user?.position || 'your position'}) ha
                             fullName: team.projectManagerName,
                             departmentName: team.departmentName,
                           }}
-                          subtitle={team.projectManagerTeams ? `Also PM in ${team.projectManagerTeams}` : 'Project Manager'}
+                          subtitle={
+                            team.projectManagerTeams
+                              ? `Also PM in ${team.projectManagerTeams}`
+                              : 'Project Manager'
+                          }
                         />
                       ) : (
                         '—'
@@ -392,44 +386,18 @@ const disabledMessage = `Your position (${user?.position || 'your position'}) ha
                     <td>{formatDate(team.createdDate)}</td>
 
                     <td>
-                      {isEmployee ? (
-                        <span className="team-muted">View only</span>
-                      ) : (
-                      <div className="team-row-actions">
-                        <button
-                          type="button"
-                          className="team-action-btn"
-                          disabled={!canEditTeam}
-                          title={canEditTeam ? undefined : disabledMessage}
-                          onClick={() => {
-                            if (!canEditTeam) {
-                              setError(disabledMessage);
-                              return;
-                            }
-                            setEditingTeam(team);
-                          }}
-                        >
-                          Edit
-                        </button>
-
-                        {!isDepartmentHead && !isEmployee && (
+                      {canShowEditTeam ? (
+                        <div className="team-row-actions">
                           <button
                             type="button"
-                            className="team-action-btn danger"
-                            disabled={!canEditTeam}
-                            title={canEditTeam ? undefined : disabledMessage}
-                            onClick={() => {
-                              if (!canEditTeam) {
-                                setError(disabledMessage);
-                                return;
-                              }
-                              setShowDeleteConfirm(team);
-                            }}
+                            className="team-action-btn"
+                            onClick={() => setEditingTeam(team)}
                           >
-                            Delete
+                            Edit
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <span className="team-muted">View only</span>
                       )}
                     </td>
                   </tr>
@@ -451,7 +419,10 @@ const disabledMessage = `Your position (${user?.position || 'your position'}) ha
 
       {showDeleteConfirm && (
         <div className="team-modal-overlay" onClick={() => setShowDeleteConfirm(null)}>
-          <div className="team-modal team-modal-small" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="team-modal team-modal-small"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="team-modal-header">
               <div>
                 <p className="team-eyebrow">Confirm Delete</p>

@@ -23,4 +23,7 @@ public class DepartmentKpiCycleRequestDto {
     @NotEmpty
     @Builder.Default
     private List<Integer> templateIds = new ArrayList<>();
+
+    /** Required when updating a cycle; ignored on create. */
+    private String editReason;
 }

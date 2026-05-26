@@ -77,14 +77,9 @@ public class EmployeeRequestDto {
     private Boolean sendTemporaryPasswordEmail;
 
     /*
-     * Selected from HR → Employee → Add/Edit employee.
-     *
-     * EMPLOYEE_DASHBOARD
-     * MANAGER_DASHBOARD
-     * DEPARTMENT_HEAD_DASHBOARD
-     * HR_DASHBOARD
-     * EXECUTIVE_DASHBOARD
-     * ADMIN_DASHBOARD
+     * Legacy field only.
+     * New employee creation/edit flow ignores manual dashboard input.
+     * Dashboard is always derived from the selected Position's Role.
      */
     private String dashboard;
 
