@@ -8,31 +8,18 @@ const api = axios.create({
 
 const TOKEN_FREE_ENDPOINTS = [
   '/auth/login',
+  '/auth/refresh',
+  '/auth/logout',
+  '/auth/forgot-password',
   '/auth/forgot-password/request',
   '/auth/forgot-password/verify',
   '/auth/forgot-password/reset',
+  '/auth/reset-password',
+  '/auth/change-password',
 ];
 
 const normalizeUrl = (url?: string) => {
   if (!url) return '';
-
-const normalizeErrorResponseData = async (data: unknown): Promise<unknown> => {
-  if (typeof Blob !== 'undefined' && data instanceof Blob) {
-    const text = await data.text();
-    if (!text) return data;
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { message: text };
-    }
-  }
-
-  return data;
-};
-
-const isAuthEndpoint = (url?: string) => {
-  if (!url) return false;
 
   let normalized = url;
 
@@ -48,7 +35,26 @@ const isAuthEndpoint = (url?: string) => {
     normalized = normalized.substring('/api'.length);
   }
 
+  if (!normalized.startsWith('/')) {
+    normalized = `/${normalized}`;
+  }
+
   return normalized;
+};
+
+const normalizeErrorResponseData = async (data: unknown): Promise<unknown> => {
+  if (typeof Blob !== 'undefined' && data instanceof Blob) {
+    const text = await data.text();
+    if (!text) return data;
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { message: text };
+    }
+  }
+
+  return data;
 };
 
 const isTokenFreeEndpoint = (url?: string) => {
@@ -85,7 +91,11 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    if (error?.response) {
+      error.response.data = await normalizeErrorResponseData(error.response.data);
+    }
+
     const status = error?.response?.status;
     const url = error?.config?.url ?? '';
     const hasToken = Boolean(authStorage.getAccessToken());
