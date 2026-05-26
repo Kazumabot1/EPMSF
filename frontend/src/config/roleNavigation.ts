@@ -85,12 +85,16 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
+    { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Access Control',
       path: '/position-permissions',
       icon: 'bi-shield-lock',
       children: [
+        { label: 'User Roles', path: '/user-roles', icon: 'bi-person-gear' },
+        { label: 'Role Permissions', path: '/role-permissions', icon: 'bi-shield-check' },
+        { label: 'Permissions', path: '/permissions', icon: 'bi-key' },
         { label: 'Position Permissions', path: '/position-permissions', icon: 'bi-sliders2-vertical' },
       ],
     },

@@ -4,17 +4,16 @@ import com.epms.entity.Employee;
 import com.epms.entity.FeedbackAssignmentQuestion;
 import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackCampaignQuestionSelection;
-import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackQuestionApplicabilityRule;
 import com.epms.entity.FeedbackQuestionBank;
 import com.epms.entity.FeedbackQuestionVersion;
-import com.epms.entity.FeedbackSection;
+import com.epms.entity.enums.FeedbackCampaignStatus;
+import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.FeedbackAssignmentQuestionRepository;
 import com.epms.repository.FeedbackCampaignQuestionSelectionRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
-import com.epms.repository.FeedbackFormRepository;
 import com.epms.repository.FeedbackQuestionApplicabilityRuleRepository;
 import com.epms.repository.FeedbackQuestionVersionRepository;
 import com.epms.service.FeedbackQuestionResolverService;
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,7 +32,6 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionResolverService {
 
-    private static final String LEGACY_COMPETENCY = "LEGACY_FORM";
     private static final String DEFAULT_RESPONSE_TYPE = "RATING_WITH_COMMENT";
     private static final String RESPONSE_RATING_WITH_COMMENT = "RATING_WITH_COMMENT";
     private static final String RESPONSE_RATING = "RATING";
@@ -49,7 +46,6 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
     private final FeedbackQuestionApplicabilityRuleRepository ruleRepository;
     private final FeedbackQuestionVersionRepository questionVersionRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
-    private final FeedbackFormRepository feedbackFormRepository;
     private final EmployeeRepository employeeRepository;
 
     @Override
@@ -109,6 +105,9 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
             if (!selections.isEmpty()) {
                 return snapshotCampaignSelectionQuestions(assignment, selections);
             }
+            if (isLockedCampaignStatus(assignment.getFeedbackRequest().getCampaign().getStatus())) {
+                throw new BusinessValidationException(noQuestionConfigurationMessage(assignment, targetLevelCode));
+            }
         }
 
         List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findApplicableRules(
@@ -123,7 +122,20 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
             return snapshotRuleQuestions(assignment, rules);
         }
 
-        return snapshotLegacyFormQuestions(assignment);
+        throw new BusinessValidationException(noQuestionConfigurationMessage(assignment, targetLevelCode));
+    }
+
+    private boolean isLockedCampaignStatus(FeedbackCampaignStatus status) {
+        return status != null && status != FeedbackCampaignStatus.DRAFT;
+    }
+
+    private String noQuestionConfigurationMessage(FeedbackEvaluatorAssignment assignment, String targetLevelCode) {
+        String relationship = assignment == null || assignment.getRelationshipType() == null
+                ? "this evaluator role"
+                : assignment.getRelationshipType().name();
+        return "No campaign question snapshot or active Question Rule matched " + relationship
+                + " for target level " + firstNonBlank(targetLevelCode, "UNSPECIFIED")
+                + ". Resolve and save Campaign Question Review before activation.";
     }
 
 
@@ -226,48 +238,6 @@ public class FeedbackQuestionResolverServiceImpl implements FeedbackQuestionReso
         }
         return questionVersionRepository.findTopByQuestionBank_IdAndActiveTrueOrderByVersionNumberDesc(bank.getId()).orElse(null);
     }
-
-    private List<FeedbackAssignmentQuestion> snapshotLegacyFormQuestions(FeedbackEvaluatorAssignment assignment) {
-        if (assignment.getFeedbackRequest() == null || assignment.getFeedbackRequest().getForm() == null) {
-            return List.of();
-        }
-        Long formId = assignment.getFeedbackRequest().getForm().getId();
-        List<FeedbackSection> sections = feedbackFormRepository.findSectionsWithQuestionsByFormId(formId);
-        if (sections == null || sections.isEmpty()) {
-            return List.of();
-        }
-
-        List<FeedbackAssignmentQuestion> snapshots = new ArrayList<>();
-        for (FeedbackSection section : sections) {
-            if (section.getQuestions() == null) {
-                continue;
-            }
-            for (FeedbackQuestion question : section.getQuestions()) {
-                if (question == null || question.getId() == null) {
-                    continue;
-                }
-                FeedbackAssignmentQuestion snapshot = new FeedbackAssignmentQuestion();
-                snapshot.setAssignment(assignment);
-                snapshot.setSourceQuestion(question);
-                snapshot.setQuestionCode("LEGACY-Q-" + question.getId());
-                snapshot.setCompetencyCode(LEGACY_COMPETENCY);
-                snapshot.setQuestionTextSnapshot(question.getQuestionText());
-                snapshot.setResponseType(DEFAULT_RESPONSE_TYPE);
-                snapshot.setScoringBehavior(SCORING_SCORED);
-                snapshot.setRatingScaleId(question.getRatingScaleId());
-                snapshot.setRequired(Boolean.TRUE.equals(question.getIsRequired()));
-                snapshot.setWeight(resolveWeight(question.getWeight(), 1.0));
-                snapshot.setSectionCode("LEGACY-SECTION-" + (section.getId() == null ? section.getOrderNo() : section.getId()));
-                snapshot.setSectionTitle(firstNonBlank(section.getTitle(), "Evaluation"));
-                snapshot.setSectionOrder(section.getOrderNo() == null ? 1 : section.getOrderNo());
-                snapshot.setDisplayOrder(question.getQuestionOrder() == null ? snapshots.size() + 1 : question.getQuestionOrder());
-                snapshots.add(snapshot);
-            }
-        }
-        return snapshots;
-    }
-
-
 
     private String normalizeResponseType(String responseType) {
         String value = firstNonBlank(responseType, DEFAULT_RESPONSE_TYPE)

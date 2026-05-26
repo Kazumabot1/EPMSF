@@ -59,6 +59,23 @@ const DepartmentKpiScoringPage = () => {
       toast.error('Actual values must be zero or greater.');
       return;
     }
+    for (let i = 0; i < result.lines.length; i += 1) {
+      const line = result.lines[i];
+      const raw = drafts[result.departmentKpiResultId]?.[line.templateRowId]?.trim() ?? '';
+      if (raw === '') continue;
+      const actual = Number(raw);
+      if (line.target != null && Number.isFinite(actual) && actual > line.target) {
+        toast.error(`Row ${i + 1}: Actual % must be less than or equal to Target %.`);
+        return;
+      }
+      if (line.target != null && line.target > 0 && line.weight != null && Number.isFinite(actual)) {
+        const weightScore = ((actual / line.target) * 100 * line.weight) / 100;
+        if (weightScore > line.weight) {
+          toast.error(`Row ${i + 1}: Weight Score must be less than or equal to Weight %.`);
+          return;
+        }
+      }
+    }
     try {
       setSavingId(result.departmentKpiResultId);
       const updated = await departmentKpiWorkflowService.updateScores(result.departmentKpiResultId, scores);
@@ -126,18 +143,30 @@ const DepartmentKpiScoringPage = () => {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[850px] border-collapse text-sm">
-                    <thead className="kpi-tpl-thead"><tr><th className="px-4 py-3 text-left">KPI</th><th className="px-4 py-3 text-right">Target</th><th className="px-4 py-3 text-right">Actual</th><th className="px-4 py-3 text-right">Achievement %</th><th className="px-4 py-3 text-right">Weight</th><th className="px-4 py-3 text-right">Weighted</th></tr></thead>
+                    <thead className="kpi-tpl-thead"><tr><th className="px-4 py-3 text-left">KPI</th><th className="px-4 py-3 text-right">Target %</th><th className="px-4 py-3 text-right">Actual %</th><th className="px-4 py-3 text-right">Score %</th><th className="px-4 py-3 text-right">Weight %</th><th className="px-4 py-3 text-right">Weight Score</th></tr></thead>
                     <tbody>{result.lines.map((line) => {
                       const raw = drafts[result.departmentKpiResultId]?.[line.templateRowId] ?? '';
                       const preview = raw.trim() !== '' && line.target ? (Number(raw) / line.target) * 100 : line.score;
+                      const actual = raw.trim() === '' ? null : Number(raw);
+                      const actualInvalid = actual != null && line.target != null && Number.isFinite(actual) && actual > line.target;
+                      const previewWeightScore =
+                        preview != null && line.weight != null ? (preview * line.weight) / 100 : line.weightedScore;
                       return (
                         <tr key={line.templateRowId} className="border-t border-gray-100">
                           <td className="px-4 py-3 font-medium text-gray-800">{line.kpiLabel}{line.unitName ? ` (${line.unitName})` : ''}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{line.target ?? '-'}</td>
-                          <td className="px-4 py-3 text-right"><input className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-right" disabled={finalized} value={raw} onChange={(e) => updateDraft(result.departmentKpiResultId, line.templateRowId, e.target.value)} /></td>
+                          <td className="px-4 py-3 text-right">
+                            <input
+                              className={`w-28 rounded-lg border px-2 py-1 text-right ${actualInvalid ? 'border-red-500 bg-red-50 text-red-800' : 'border-gray-300'}`}
+                              disabled={finalized}
+                              value={raw}
+                              onChange={(e) => updateDraft(result.departmentKpiResultId, line.templateRowId, e.target.value)}
+                            />
+                            {actualInvalid && <div className="mt-1 text-xs text-red-700">Max {line.target}</div>}
+                          </td>
                           <td className="px-4 py-3 text-right tabular-nums">{preview == null ? '-' : preview.toFixed(2)}</td>
                           <td className="px-4 py-3 text-right tabular-nums">{line.weight ?? '-'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{line.weightedScore == null ? '-' : line.weightedScore.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{previewWeightScore == null ? '-' : previewWeightScore.toFixed(2)}</td>
                         </tr>
                       );
                     })}</tbody>

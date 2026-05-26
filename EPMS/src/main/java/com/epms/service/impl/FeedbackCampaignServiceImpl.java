@@ -19,12 +19,9 @@ import com.epms.entity.FeedbackAssignmentQuestion;
 import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackCampaignRelationshipWeight;
 import com.epms.entity.FeedbackEvaluatorAssignment;
-import com.epms.entity.FeedbackForm;
-import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackRequest;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackResponseItem;
-import com.epms.entity.FeedbackSection;
 import com.epms.entity.Position;
 import com.epms.entity.PositionLevel;
 import com.epms.entity.TeamMember;
@@ -32,7 +29,6 @@ import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignEarlyCloseStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
-import com.epms.entity.enums.FeedbackFormStatus;
 import com.epms.entity.enums.FeedbackRequestStatus;
 import com.epms.entity.enums.FeedbackRelationshipType;
 import com.epms.entity.enums.ResponseStatus;
@@ -43,7 +39,6 @@ import com.epms.repository.FeedbackAssignmentQuestionRepository;
 import com.epms.repository.FeedbackCampaignRepository;
 import com.epms.repository.FeedbackCampaignRelationshipWeightRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
-import com.epms.repository.FeedbackFormRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.TeamMemberRepository;
@@ -87,7 +82,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
     private final FeedbackRequestRepository feedbackRequestRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackAssignmentQuestionRepository assignmentQuestionRepository;
-    private final FeedbackFormRepository feedbackFormRepository;
     private final FeedbackResponseRepository feedbackResponseRepository;
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
@@ -318,7 +312,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         }
 
         List<FeedbackRequest> newRequests = selectedContexts.stream()
-                .map(context -> buildRequest(campaign, null, context, requestedByUserId))
+                .map(context -> buildRequest(campaign, context, requestedByUserId))
                 .toList();
         List<FeedbackRequest> saved = feedbackRequestRepository.saveAll(newRequests);
         feedbackOperationalService.audit(
@@ -375,8 +369,11 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         if (campaign.getStatus() == FeedbackCampaignStatus.ACTIVE) {
             return campaign;
         }
-        if (campaign.getStatus() != FeedbackCampaignStatus.READY_TO_ACTIVATE && campaign.getStatus() != FeedbackCampaignStatus.DRAFT) {
-            throw new BusinessValidationException("Only DRAFT or READY_TO_ACTIVATE campaigns can be activated.");
+        if (campaign.getStatus() != FeedbackCampaignStatus.READY_TO_ACTIVATE) {
+            if (campaign.getStatus() == FeedbackCampaignStatus.DRAFT) {
+                throw new BusinessValidationException("Validate the campaign setup first. Only READY_TO_ACTIVATE campaigns can be activated.");
+            }
+            throw new BusinessValidationException("Only READY_TO_ACTIVATE campaigns can be activated.");
         }
         FeedbackCampaignActivationReadinessResponse readiness = buildActivationReadiness(campaign);
         if (!readiness.getBlockingIssues().isEmpty()) {
@@ -833,6 +830,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         List<FeedbackEvaluatorAssignment> assignments = assignmentRepository.findByCampaignIdWithRequest(campaign.getId());
         long snapshotCount = assignmentQuestionRepository.countByAssignmentFeedbackRequestCampaignId(campaign.getId());
 
+        addLifecycleCheck(campaign, checks);
         addCampaignInfoCheck(campaign, checks, blocking, warnings);
         addTargetCheck(requests, checks, blocking, warnings);
         addAssignmentCheck(requests, assignments, checks, blocking, warnings);
@@ -848,7 +846,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
         boolean noBlocking = blocking.isEmpty();
         boolean canMarkReady = noBlocking && campaign.getStatus() == FeedbackCampaignStatus.DRAFT;
-        boolean canActivate = noBlocking && (campaign.getStatus() == FeedbackCampaignStatus.DRAFT || campaign.getStatus() == FeedbackCampaignStatus.READY_TO_ACTIVATE);
+        boolean canActivate = noBlocking && campaign.getStatus() == FeedbackCampaignStatus.READY_TO_ACTIVATE;
 
         return FeedbackCampaignActivationReadinessResponse.builder()
                 .campaignId(campaign.getId())
@@ -871,6 +869,37 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
                 .blockingIssues(blocking.stream().distinct().toList())
                 .warnings(warnings.stream().distinct().toList())
                 .build();
+    }
+
+    private void addLifecycleCheck(
+            FeedbackCampaign campaign,
+            List<FeedbackCampaignActivationReadinessResponse.FeedbackCampaignActivationCheck> checks
+    ) {
+        FeedbackCampaignStatus status = campaign.getStatus();
+        if (status == FeedbackCampaignStatus.DRAFT) {
+            checks.add(readinessCheck(
+                    "LIFECYCLE",
+                    "Lifecycle gate",
+                    "WARNING",
+                    "Setup can be validated after all launch checks pass. Activation is available only after the campaign is marked Ready to activate."
+            ));
+            return;
+        }
+        if (status == FeedbackCampaignStatus.READY_TO_ACTIVATE) {
+            checks.add(readinessCheck(
+                    "LIFECYCLE",
+                    "Lifecycle gate",
+                    "PASS",
+                    "Campaign setup is validated and locked. Activation is available after the final launch check passes."
+            ));
+            return;
+        }
+        checks.add(readinessCheck(
+                "LIFECYCLE",
+                "Lifecycle gate",
+                "PASS",
+                "Campaign is already past setup validation. Current status: " + status + "."
+        ));
     }
 
     private void addCampaignInfoCheck(
@@ -1208,18 +1237,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         return Math.round(value * 100.0) / 100.0;
     }
 
-    private Map<Long, FeedbackQuestion> loadCampaignQuestions(Long formId) {
-        List<FeedbackSection> sections = feedbackFormRepository.findSectionsWithQuestionsByFormId(formId);
-        if (sections == null || sections.isEmpty()) {
-            throw new ResourceNotFoundException("Feedback form questions not found for campaign.");
-        }
-        return sections.stream()
-                .flatMap(section -> section.getQuestions() == null
-                        ? java.util.stream.Stream.<FeedbackQuestion>empty()
-                        : section.getQuestions().stream())
-                .collect(Collectors.toMap(FeedbackQuestion::getId, question -> question, (first, duplicate) -> first));
-    }
-
     private boolean hasAllRequiredRatings(FeedbackResponse response, List<FeedbackAssignmentQuestion> assignmentQuestions) {
         Set<Long> requiredAssignmentQuestionIds = assignmentQuestions.stream()
                 .filter(question -> Boolean.TRUE.equals(question.getRequired()))
@@ -1386,11 +1403,11 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         return normalized == null || normalized.isBlank() ? "" : ": " + normalized;
     }
 
-    private FeedbackRequest buildRequest(FeedbackCampaign campaign, FeedbackForm form, TargetContext context, Long requestedByUserId) {
+    private FeedbackRequest buildRequest(FeedbackCampaign campaign, TargetContext context, Long requestedByUserId) {
         FeedbackRequest request = new FeedbackRequest();
         request.setCampaign(campaign);
         request.setTargetEmployeeId(context.employeeId);
-        request.setForm(form);
+        request.setForm(null);
         request.setRequestedByUserId(requestedByUserId);
         request.setDueAt(null);
         request.setIsAnonymousEnabled(false);
@@ -1974,17 +1991,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
     private String resolveCampaignType(String campaignType) {
         String normalized = normalizeText(campaignType, 80);
         return normalized == null || normalized.isBlank() ? DEFAULT_CAMPAIGN_TYPE : normalized;
-    }
-
-    private void validateOptionalForm(Long formId) {
-        if (formId == null) {
-            return;
-        }
-        FeedbackForm form = feedbackFormRepository.findById(formId)
-                .orElseThrow(() -> new ResourceNotFoundException("Feedback form not found."));
-        if (form.getStatus() != FeedbackFormStatus.ACTIVE) {
-            throw new BusinessValidationException("Only ACTIVE feedback forms can be used in a campaign.");
-        }
     }
 
     private CampaignWindow resolveWindow(FeedbackCampaignCreateRequest request) {

@@ -870,6 +870,12 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                             "KPI row \"" + rowLabel + "\" has no valid target for (actual/target)×100."
                     );
                 }
+                if (actual > target) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Row " + rowNumber(ekf, sc) + ": Actual % must be less than or equal to Target %."
+                    );
+                }
                 double achievementPct = (actual / target) * 100.0;
                 sc.setActualValue(actual);
                 sc.setScore(achievementPct);
@@ -883,6 +889,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 sc.setScore(v);
                 sc.calculateWeightedScore();
             }
+            validateWeightScoreWithinWeight(ekf, sc);
 
             sc.setEvaluatedByUser(managerUser);
             sc.setEvaluatedAt(LocalDateTime.now());
@@ -896,6 +903,37 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         employeeKpiFormRepository.save(ekf);
         return toManagerDto(ekf);
+    }
+
+    private void validateWeightScoreWithinWeight(EmployeeKpiForm ekf, EmployeeKpiScore score) {
+        Double weightScore = score.getWeightedScore();
+        KpiFormItem item = score.getKpiFormItem();
+        Integer weight = item == null ? null : item.getWeight();
+        if (weightScore != null && weight != null && weightScore > weight) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Row " + rowNumber(ekf, score) + ": Weight Score must be less than or equal to Weight %."
+            );
+        }
+    }
+
+    private int rowNumber(EmployeeKpiForm ekf, EmployeeKpiScore score) {
+        if (ekf == null || ekf.getScores() == null || score == null || score.getKpiFormItem() == null) {
+            return 1;
+        }
+        List<EmployeeKpiScore> ordered = ekf.getScores().stream()
+                .sorted(Comparator.comparing(s -> {
+                    KpiFormItem item = s.getKpiFormItem();
+                    return item == null || item.getSortOrder() == null ? 0 : item.getSortOrder();
+                }))
+                .toList();
+        for (int i = 0; i < ordered.size(); i++) {
+            KpiFormItem item = ordered.get(i).getKpiFormItem();
+            if (item != null && item.getId() != null && item.getId().equals(score.getKpiFormItem().getId())) {
+                return i + 1;
+            }
+        }
+        return 1;
     }
 
     @Override
@@ -1228,6 +1266,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .employeeKpiFormId(ekf.getId())
                 .employeeId(ekf.getEmployee().getId())
                 .employeeName(fullName(ekf.getEmployee()))
+                .departmentName(workingDepartmentName(ekf.getEmployee()))
                 .positionTitle(positionTitleForAssignment(ekf))
                 .kpiFormId(ekf.getKpiForm().getId())
                 .cyclePeriodId(ekf.getCyclePeriod() != null ? ekf.getCyclePeriod().getId() : null)
@@ -1285,10 +1324,12 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .map(sc -> {
                     KpiFormItem item = sc.getKpiFormItem();
                     String label = item.getKpiItem() != null ? item.getKpiItem().getName() : item.getKpiLabel();
+                    String category = item.getKpiCategory() != null ? item.getKpiCategory().getName() : item.getKpiCategoryLabel();
                     String unit = item.getKpiUnit() != null ? item.getKpiUnit().getName() : item.getKpiUnitLabel();
                     return ManagerKpiScoreLineDto.builder()
                             .kpiFormItemId(item.getId())
                             .kpiLabel(label)
+                            .kpiCategoryName(category)
                             .weight(item.getWeight())
                             .target(item.getTarget())
                             .unitName(unit)

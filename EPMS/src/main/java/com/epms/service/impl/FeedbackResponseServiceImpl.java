@@ -5,10 +5,8 @@ import com.epms.dto.FeedbackSubmissionStatusResponse;
 import com.epms.entity.FeedbackAssignmentQuestion;
 import com.epms.entity.FeedbackCampaignCompetencyWeight;
 import com.epms.entity.FeedbackEvaluatorAssignment;
-import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackResponseItem;
-import com.epms.entity.FeedbackSection;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
@@ -20,8 +18,6 @@ import com.epms.exception.ResourceNotFoundException;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.FeedbackCampaignCompetencyWeightRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
-import com.epms.repository.FeedbackFormRepository;
-import com.epms.repository.FeedbackQuestionRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
@@ -50,7 +46,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -63,13 +58,12 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private static final String RESPONSE_YES_NO = "YES_NO";
     private static final String SCORING_SCORED = "SCORED";
     private static final int MIN_REQUIRED_COMMENT_LENGTH = 10;
+    private static final int MAX_REQUIRED_COMMENT_LENGTH = 1000;
 
     private final FeedbackResponseRepository responseRepository;
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
-    private final FeedbackFormRepository feedbackFormRepository;
-    private final FeedbackQuestionRepository questionRepository;
     private final RatingScaleRepository ratingScaleRepository;
     private final UserRepository userRepository;
     private final FeedbackOperationalService feedbackOperationalService;
@@ -515,11 +509,18 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
                         "Rating for question " + assignmentQuestion.getQuestionCode() + " must be between 1 and " + formatScore(maxRating) + "."
                 );
             }
+            int commentLength = normalizedCommentLength(item.getComment());
             if (requireAnswersForRequiredQuestions && Boolean.TRUE.equals(assignmentQuestion.getRequired())
-                    && normalizedCommentLength(item.getComment()) < MIN_REQUIRED_COMMENT_LENGTH) {
+                    && commentLength < MIN_REQUIRED_COMMENT_LENGTH) {
                 throw new BusinessValidationException(
                         "A supporting comment of at least " + MIN_REQUIRED_COMMENT_LENGTH + " characters is required for question "
                                 + assignmentQuestion.getQuestionCode() + "."
+                );
+            }
+            if (commentLength > MAX_REQUIRED_COMMENT_LENGTH) {
+                throw new BusinessValidationException(
+                        "Comment for question " + assignmentQuestion.getQuestionCode() + " must be "
+                                + MAX_REQUIRED_COMMENT_LENGTH + " characters or fewer."
                 );
             }
         }
@@ -530,7 +531,10 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             return false;
         }
         if (isRatingResponseType(question.getResponseType())) {
-            return item.getRatingValue() != null && normalizedCommentLength(item.getComment()) >= MIN_REQUIRED_COMMENT_LENGTH;
+            int commentLength = normalizedCommentLength(item.getComment());
+            return item.getRatingValue() != null
+                    && commentLength >= MIN_REQUIRED_COMMENT_LENGTH
+                    && commentLength <= MAX_REQUIRED_COMMENT_LENGTH;
         }
         return !isBlank(item.getComment());
     }

@@ -4,6 +4,7 @@ import {
   fetchEmployees,
   type EmployeeResponse,
 } from '../services/employeeService';
+import { normalizeEvaluatorConfig } from '../types/feedbackCampaign';
 import {
   fetchDepartments,
   fetchTeams,
@@ -90,6 +91,16 @@ const mapQuestionReviewResponse = (response: FeedbackCampaignQuestionReview): Fe
   })),
   totalCompetencyWeight: Number(response.totalCompetencyWeight ?? 0),
   competencyWeightsReady: Boolean(response.competencyWeightsReady),
+});
+
+const mapAssignmentGenerationResponse = (response: FeedbackAssignmentGenerationResponse): FeedbackAssignmentGenerationResponse => ({
+  ...response,
+  totalTargets: Number(response.totalTargets ?? 0),
+  totalEvaluatorsGenerated: Number(response.totalEvaluatorsGenerated ?? 0),
+  evaluatorConfig: response.evaluatorConfig ? normalizeEvaluatorConfig(response.evaluatorConfig) : null,
+  requests: response.requests ?? [],
+  assignmentDetails: response.assignmentDetails ?? [],
+  warnings: response.warnings ?? [],
 });
 
 const mapEmployee = (employee: EmployeeResponse): FeedbackTargetEmployee => ({
@@ -349,9 +360,9 @@ export const feedbackCampaignApi = {
     try {
       const response = await api.post<ApiEnvelope<FeedbackAssignmentGenerationResponse>>(
           `${FEEDBACK_BASE}/campaigns/${campaignId}/assignments/generate`,
-          payload,
+          normalizeEvaluatorConfig(payload),
       );
-      return unwrapEnvelope(response);
+      return mapAssignmentGenerationResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Evaluators could not be saved.'));
     }
@@ -364,9 +375,9 @@ export const feedbackCampaignApi = {
     try {
       const response = await api.post<ApiEnvelope<FeedbackAssignmentGenerationResponse>>(
           `${FEEDBACK_BASE}/campaigns/${campaignId}/assignments/preview`,
-          payload,
+          normalizeEvaluatorConfig(payload),
       );
-      return unwrapEnvelope(response);
+      return mapAssignmentGenerationResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Evaluator preview could not be prepared.'));
     }
@@ -377,7 +388,7 @@ export const feedbackCampaignApi = {
       const response = await api.get<ApiEnvelope<FeedbackAssignmentGenerationResponse>>(
           `${FEEDBACK_BASE}/campaigns/${campaignId}/assignments/preview`,
       );
-      return unwrapEnvelope(response);
+      return mapAssignmentGenerationResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Evaluator preview could not be loaded.'));
     }
@@ -392,7 +403,7 @@ export const feedbackCampaignApi = {
           `${FEEDBACK_BASE}/campaigns/${campaignId}/assignments/manual`,
           payload,
       );
-      return unwrapEnvelope(response);
+      return mapAssignmentGenerationResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Evaluator could not be added.'));
     }
@@ -406,7 +417,7 @@ export const feedbackCampaignApi = {
       const response = await api.delete<ApiEnvelope<FeedbackAssignmentGenerationResponse>>(
           `${FEEDBACK_BASE}/campaigns/${campaignId}/assignments/${assignmentId}`,
       );
-      return unwrapEnvelope(response);
+      return mapAssignmentGenerationResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Evaluator could not be removed.'));
     }

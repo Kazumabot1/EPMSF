@@ -26,7 +26,14 @@ export interface FeedbackEvaluatorTask {
   autoSubmitNotice?: string | null;
   dueAt: string | null;
   submittedAt: string | null;
+  totalQuestionCount?: number;
+  requiredQuestionCount?: number;
+  answeredQuestionCount?: number;
+  answeredRequiredQuestionCount?: number;
+  completionPercent?: number;
+  finalSubmissionReady?: boolean;
 }
+
 
 export interface FeedbackRatingOption {
   value: number;

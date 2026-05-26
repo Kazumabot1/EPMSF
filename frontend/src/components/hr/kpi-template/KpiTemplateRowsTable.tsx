@@ -117,10 +117,10 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
               <th className="min-w-[140px] px-3 py-3.5">Category</th>
               <th className="min-w-[90px] px-3 py-3.5">Target %</th>
               <th className="min-w-[120px] px-3 py-3.5">Unit</th>
-              <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Actual</th>
+              <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Actual %</th>
               <th className="min-w-[88px] px-3 py-3.5">Weight %</th>
               <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Score %</th>
-              <th className="min-w-[96px] bg-violet-50 px-3 py-3.5 text-violet-900">Weighted</th>
+              <th className="min-w-[96px] bg-violet-50 px-3 py-3.5 text-violet-900">Weight Score</th>
               <th className="w-12 px-2 py-3.5" aria-label="Actions" />
             </tr>
           </thead>

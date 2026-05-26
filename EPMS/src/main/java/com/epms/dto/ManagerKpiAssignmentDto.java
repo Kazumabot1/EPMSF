@@ -19,6 +19,7 @@ public class ManagerKpiAssignmentDto {
     private Integer employeeKpiFormId;
     private Integer employeeId;
     private String employeeName;
+    private String departmentName;
     private String positionTitle;
     private Integer kpiFormId;
     private Integer cyclePeriodId;

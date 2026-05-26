@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
+import {
+    DEFAULT_EVALUATOR_CONFIG,
+    getPeerReviewerCount,
+    hasAnyEvaluatorSource,
+    normalizeEvaluatorConfig,
+} from '../../../types/feedbackCampaign';
 import type {
     FeedbackCampaign,
     FeedbackTargetEmployee,
@@ -20,17 +26,6 @@ interface Props {
     onTargetsSaved: (ids: number[], config: EvaluatorConfigInput, campaign: FeedbackCampaign) => void;
     onTargetsSet: (ids: number[], config: EvaluatorConfigInput) => void;
 }
-
-const DEFAULT_CONFIG: EvaluatorConfigInput = {
-    includeManager: true,
-    includeTeamPeers: true,
-    includeDepartmentPeers: true,
-    includeProjectPeers: false,
-    includeCrossTeamPeers: false,
-    includeSubordinates: true,
-    includeSelf: false,
-    peerCount: 3,
-};
 
 const editableStatuses = new Set(['DRAFT']);
 
@@ -67,7 +62,7 @@ export default function TargetEvaluatorTab({
     const [deptFilter, setDeptFilter] = useState<number | ''>('');
     const [teamFilter, setTeamFilter] = useState<number | ''>('');
     const [selected, setSelected] = useState<Set<number>>(new Set(targetIds));
-    const config = evalConfig ?? DEFAULT_CONFIG;
+    const config = useMemo(() => normalizeEvaluatorConfig(evalConfig ?? DEFAULT_EVALUATOR_CONFIG), [evalConfig]);
     const [saveError, setSaveError] = useState('');
 
     const activeCampaign = useMemo(() => {
@@ -146,7 +141,7 @@ export default function TargetEvaluatorTab({
     };
 
     const updateConfig = (patch: Partial<EvaluatorConfigInput>) => {
-        onEvalConfigChange({ ...config, ...patch });
+        onEvalConfigChange(normalizeEvaluatorConfig({ ...config, ...patch }));
         setSaveError('');
     };
 
@@ -222,14 +217,12 @@ export default function TargetEvaluatorTab({
     };
 
     const configValid =
-        (config.includeManager ||
-            config.includeSelf ||
-            config.includeSubordinates ||
-            config.includeTeamPeers ||
-            config.includeDepartmentPeers ||
-            config.includeProjectPeers ||
-            config.includeCrossTeamPeers) &&
-        config.peerCount > 0;
+        hasAnyEvaluatorSource(config) &&
+        config.peerMaxCount > 0 &&
+        config.peerMinCount <= config.peerMaxCount &&
+        config.subordinateMinCount <= config.subordinateMaxCount;
+
+    const peerReviewerCount = getPeerReviewerCount(config);
 
     const handleContinue = async () => {
         if (!activeCampaign) {
@@ -428,8 +421,16 @@ export default function TargetEvaluatorTab({
                     className="hfd-input"
                     min={1}
                     max={10}
-                    value={config.peerCount}
-                    onChange={e => updateConfig({ peerCount: Math.max(1, Number(e.target.value) || 1) })}
+                    value={peerReviewerCount}
+                    onChange={e => {
+                        const nextCount = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+                        updateConfig({
+                            includePeers: true,
+                            peerMinCount: Math.min(config.peerMinCount, nextCount),
+                            peerMaxCount: nextCount,
+                            peerCount: nextCount,
+                        });
+                    }}
                 />
             </div>
 

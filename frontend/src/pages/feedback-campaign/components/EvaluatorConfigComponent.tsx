@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { DEFAULT_EVALUATOR_CONFIG, normalizeEvaluatorConfig } from '../../../types/feedbackCampaign';
 import type { EvaluatorConfigInput } from '../../../types/feedbackCampaign';
 
 const evaluatorConfigSchema = z
@@ -62,27 +63,13 @@ type EvaluatorConfigComponentProps = {
     onGenerate: (payload: EvaluatorConfigInput) => Promise<void> | void;
 };
 
-const defaultValues: EvaluatorConfigValues = {
-    includeManager: true,
-    includePeers: true,
-    includeSubordinates: true,
-    includeSelf: true,
-    peerMinCount: 2,
-    peerMaxCount: 5,
-    subordinateMinCount: 0,
-    subordinateMaxCount: 5,
-    flexibleMode: true,
-    includeTeamPeers: true,
-    includeDepartmentPeers: true,
-    includeProjectPeers: false,
-    includeCrossTeamPeers: false,
-    peerCount: 5,
-};
+const defaultValues: EvaluatorConfigValues = normalizeEvaluatorConfig(DEFAULT_EVALUATOR_CONFIG);
 
-const toPayload = (values: EvaluatorConfigValues): EvaluatorConfigInput => ({
-    ...values,
-    peerCount: values.peerMaxCount,
-});
+const toPayload = (values: EvaluatorConfigValues): EvaluatorConfigInput =>
+    normalizeEvaluatorConfig({
+        ...values,
+        peerCount: values.peerMaxCount,
+    });
 
 const EvaluatorConfigComponent = ({
                                       initialValues,
@@ -97,7 +84,7 @@ const EvaluatorConfigComponent = ({
         formState: { errors },
     } = useForm<EvaluatorConfigValues>({
         resolver: zodResolver(evaluatorConfigSchema),
-        defaultValues: initialValues ?? defaultValues,
+        defaultValues: normalizeEvaluatorConfig(initialValues ?? defaultValues),
     });
 
     const submitPreview = handleSubmit(async (values) => {

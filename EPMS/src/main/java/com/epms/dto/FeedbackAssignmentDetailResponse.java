@@ -35,6 +35,9 @@ public class FeedbackAssignmentDetailResponse {
     Integer answeredQuestionCount;
     Integer answeredRequiredQuestionCount;
     Integer completionPercent;
+    Integer minRequiredCommentLength;
+    Integer maxCommentLength;
+    Integer maxAdditionalCommentLength;
     Boolean finalSubmissionReady;
     Boolean submittedLocked;
     List<FeedbackAssignmentSectionDetailResponse> sections;
