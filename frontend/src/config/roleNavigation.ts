@@ -236,11 +236,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     {
-      label: 'View Self-assessment Form',
-      path: '/department-head/self-assessment-forms',
-      icon: 'bi bi-eye',
-    },
-    {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',
       icon: 'bi-chat-dots',
@@ -360,7 +355,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       children: managerReportsChildren,
     },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
-    { label: 'My Self-Assessment', path: '/manager/self-assessment', icon: 'bi-pencil-square' },
   ],
 
   Executive: [

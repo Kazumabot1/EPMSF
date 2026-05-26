@@ -120,7 +120,7 @@ const getRoleNameFromPosition = (position?: PositionOption | null) => {
     return position.role.trim();
   }
 
-  if (position.role?.name && String(position.role.name).trim()) {
+  if (position.role && typeof position.role === 'object' && position.role.name && String(position.role.name).trim()) {
     return String(position.role.name).trim();
   }
 

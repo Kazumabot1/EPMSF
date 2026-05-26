@@ -16,9 +16,17 @@ public interface AssessmentFormDefinitionRepository extends JpaRepository<Assess
 
     List<AssessmentFormDefinition> findAllByOrderByCreatedAtDesc();
 
+    @Query("""
+            select form
+            from AssessmentFormDefinition form
+            where form.active = true
+              and (form.startDate is null or form.startDate <= :startDate)
+              and (form.endDate is null or form.endDate >= :endDate)
+            order by form.createdAt desc
+            """)
     List<AssessmentFormDefinition> findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(
-            LocalDateTime startDate,
-            LocalDateTime endDate
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
     );
 
     @Query("""

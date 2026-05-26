@@ -123,9 +123,6 @@ const uniqueDepartmentCount = (employees: EmployeeRecord[]) => {
 
 const getUserDisplayName = (user?: DashboardUser) => String(user?.fullName ?? user?.name ?? user?.email ?? 'HR User');
 
-const getUserSubtitle = (user?: DashboardUser) =>
-    String(user?.position ?? user?.employeeCode ?? user?.email ?? 'Human Resources');
-
 const formatNumber = (value?: number | string | null) => numberValue(value).toLocaleString();
 
 const formatPercent = (value?: number | string | null) => `${numberValue(value).toFixed(1)}%`;
@@ -150,7 +147,7 @@ const buildDepartmentBars = (employees: EmployeeRecord[]): DashboardChartDatum[]
     });
 
     return Array.from(map.entries())
-        .map(([label, value], index) => ({
+        .map(([label, value]) => ({
             label,
             value,
             color: label === 'Unassigned Department' ? '#d97706' : '#2563eb',
@@ -168,7 +165,7 @@ const buildPositionBars = (employees: EmployeeRecord[]): DashboardChartDatum[] =
     });
 
     return Array.from(map.entries())
-        .map(([label, value], index) => ({
+        .map(([label, value]) => ({
             label,
             value,
             color: label === 'Unassigned Position' ? '#d97706' : '#2563eb',
@@ -237,7 +234,7 @@ const buildFeedbackSummary = (rows: FeedbackParticipationRow[], fallbackRate: nu
 
 const buildFeedbackCompletionData = (rows: FeedbackParticipationRow[]): DashboardChartDatum[] =>
     rows
-        .map((row, index) => {
+        .map((row) => {
             const assigned = toDashboardNumber(row.assignedCount);
             const submitted = toDashboardNumber(row.submittedCount);
             const pending = toDashboardNumber(row.pendingCount);
@@ -412,7 +409,6 @@ const Home = () => {
     const unassignedPositionCount = employees.filter((employee) => getPositionName(employee) === 'Unassigned Position').length;
     const unassignedDepartmentCount = employees.filter((employee) => getDepartmentName(employee) === 'Unassigned Department').length;
     const positionSetupIncomplete = stats.employees > 0 && unassignedPositionCount >= stats.employees;
-    const departmentSetupIncomplete = stats.employees > 0 && unassignedDepartmentCount > 0;
     const setupIssueCount = unassignedPositionCount + unassignedDepartmentCount;
 
     const attentionCount = stats.pendingAssessments + stats.pips + stats.lowPerformers + setupIssueCount;
