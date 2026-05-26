@@ -1,6 +1,10 @@
 import api from './api';
 import { extractApiErrorMessage } from './apiError';
-import type { KpiTemplateCycleRequest, KpiTemplateCycleResponse } from '../types/kpiTemplateCycle';
+import type {
+  KpiTemplateCycleRequest,
+  KpiTemplateCycleResponse,
+  KpiTemplateCycleStatusRequest,
+} from '../types/kpiTemplateCycle';
 
 const BASE = '/hr/kpi-template-cycles';
 
@@ -41,12 +45,44 @@ export const kpiTemplateCycleService = {
     }
   },
 
-  async updateStatus(id: number, active: boolean): Promise<KpiTemplateCycleResponse> {
+  async updateStatus(id: number, activeOrPayload: boolean | KpiTemplateCycleStatusRequest): Promise<KpiTemplateCycleResponse> {
     try {
-      const response = await api.patch<KpiTemplateCycleResponse>(`${BASE}/${id}/status`, { active });
+      const payload = typeof activeOrPayload === 'boolean' ? { active: activeOrPayload } : activeOrPayload;
+      const response = await api.patch<KpiTemplateCycleResponse>(`${BASE}/${id}/status`, payload);
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to update cycle status.'));
+    }
+  },
+
+  async listPendingApprovals(): Promise<KpiTemplateCycleResponse[]> {
+    try {
+      const response = await api.get<KpiTemplateCycleResponse[]>('/executive/kpi-approvals');
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load KPI approval requests.'));
+    }
+  },
+
+  async approveEarlyClose(id: number, reviewReason?: string): Promise<KpiTemplateCycleResponse> {
+    try {
+      const response = await api.post<KpiTemplateCycleResponse>(`/executive/kpi-approvals/${id}/approve`, {
+        reviewReason,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to approve KPI close request.'));
+    }
+  },
+
+  async rejectEarlyClose(id: number, reviewReason?: string): Promise<KpiTemplateCycleResponse> {
+    try {
+      const response = await api.post<KpiTemplateCycleResponse>(`/executive/kpi-approvals/${id}/reject`, {
+        reviewReason,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to reject KPI close request.'));
     }
   },
 };

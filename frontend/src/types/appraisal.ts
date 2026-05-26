@@ -43,6 +43,7 @@ export interface AppraisalTemplateRequest {
   sections: AppraisalSectionRequest[];
   scoreBands?: AppraisalScoreBandRequest[];
   cycleSpecificCopy?: boolean;
+  editReason?: string;
 }
 
 export interface AppraisalCriterionResponse extends AppraisalCriterionRequest {
@@ -77,6 +78,7 @@ export interface AppraisalTemplateResponse {
   sections: AppraisalSectionResponse[];
   scoreBands?: AppraisalScoreBandResponse[];
   cycleSpecificCopy?: boolean;
+  editReason?: string;
 }
 
 export interface AppraisalCycleRequest {
@@ -92,6 +94,8 @@ export interface AppraisalCycleRequest {
   managerSubmissionDeadline?: string | null;
   deptHeadSubmissionDeadline?: string | null;
   departmentIds: number[];
+  editReason?: string;
+  templateChangeSummary?: string;
 }
 
 export interface AppraisalTemplateCycleRequest {
@@ -131,6 +135,8 @@ export interface AppraisalRatingInput {
 }
 
 export interface PmAppraisalSubmitRequest {
+  assessmentDate?: string | null;
+  effectiveDate?: string | null;
   ratings: AppraisalRatingInput[];
   recommendation: string;
   comment: string;

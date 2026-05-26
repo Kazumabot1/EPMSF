@@ -125,6 +125,14 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         validateCycleRequest(request);
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        String editReason = normalizeEditReason(request.getEditReason());
+        if (editReason == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
+        }
+        cycle.setLastEditReason(editReason);
         cycle.setCycleName(request.getCycleName().trim());
         cycle.setStartDate(request.getStartDate());
         cycle.setDurationMonths(request.getDurationMonths());
@@ -460,8 +468,42 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         }
     }
 
+    private void assertTemplatesNotUsedByOtherActiveCycles(Integer excludeCycleId, List<Integer> templateIds) {
+        if (templateIds == null || templateIds.isEmpty()) {
+            return;
+        }
+        List<DepartmentKpiCycleTemplate> conflicts = cycleTemplateRepository.findConflictingLinks(
+                KpiTemplateCycleStatus.ACTIVE,
+                excludeCycleId,
+                templateIds
+        );
+        if (conflicts == null || conflicts.isEmpty()) {
+            return;
+        }
+        DepartmentKpiCycleTemplate conflict = conflicts.get(0);
+        String templateTitle = conflict.getTemplate().getTitle();
+        String cycleName = conflict.getCycle().getCycleName();
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Department KPI template \"" + templateTitle + "\" is already used by the active cycle \"" + cycleName + "\"."
+        );
+    }
+
+    private String normalizeEditReason(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
+    }
+
     private void applyCycleTemplates(DepartmentKpiCycle cycle, List<Integer> templateIds) {
-        for (Integer id : templateIds.stream().distinct().toList()) {
+        List<Integer> distinctIds = templateIds.stream().distinct().toList();
+        assertTemplatesNotUsedByOtherActiveCycles(cycle.getId(), distinctIds);
+        for (Integer id : distinctIds) {
             DepartmentKpiTemplate template = templateRepository.findById(id)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department KPI template not found: " + id));
             if (template.getStatus() != KpiFormStatus.ACTIVE && template.getStatus() != KpiFormStatus.FINALIZED) {

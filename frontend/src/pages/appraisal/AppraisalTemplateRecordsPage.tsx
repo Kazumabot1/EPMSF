@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { appraisalAuditService, appraisalTemplateService, type AppraisalAuditLog } from '../../services/appraisalService';
+import { formatAppraisalAuditChangeCount, groupAppraisalAuditRecords, type GroupedAppraisalAuditLog } from '../../utils/appraisalAuditRecords';
 import { signatureService } from '../../services/signatureService';
 import { extractApiErrorMessage } from '../../services/apiError';
 import type {
@@ -12,6 +13,8 @@ import type {
 } from '../../types/appraisal';
 import type { Signature } from '../../types/signature';
 import AppraisalRatingDots from '../../components/appraisal/AppraisalRatingDots';
+import { formatDisplayDateTime } from '../../utils/appraisalDateFormat';
+import { getAppraisalScoreBandToneClass } from '../../utils/appraisalScoreBandTone';
 import './appraisal.css';
 
 type TemplateModalMode = 'create' | 'edit' | 'view' | null;
@@ -26,6 +29,13 @@ type PopupState = {
   message: string;
   type?: 'success' | 'error' | 'info';
   onOk?: () => void | Promise<void>;
+};
+
+type ReasonDialogState = {
+  title: string;
+  message: string;
+  confirmText?: string;
+  onConfirm: (reason: string) => void | Promise<void>;
 };
 
 
@@ -106,21 +116,325 @@ const getSignatureImageSrc = (signature?: Signature) => {
     : `data:${signature.imageType};base64,${signature.imageData}`;
 };
 
-const displayDateTime = (value?: string | null) => {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(parsed);
-  }
-  return value;
+const displayDateTime = (value?: string | null) => formatDisplayDateTime(value);
+
+const normalizeAuditKey = (value: string) => value.trim().toLowerCase();
+
+const parseAuditSummary = (value?: string | null) => {
+  const map = new Map<string, string>();
+  if (!value) return map;
+  value.split('|').forEach((part) => {
+    const separatorIndex = part.indexOf(':');
+    if (separatorIndex < 0) return;
+    const key = normalizeAuditKey(part.slice(0, separatorIndex));
+    const itemValue = part.slice(separatorIndex + 1).trim();
+    if (key) map.set(key, itemValue);
+  });
+  return map;
 };
+
+const stripAuditTemplateMarker = (value?: string | null) => (value ?? '')
+  .replace(/\s*@@templateId=\d+/ig, '')
+  .replace(/\s*@@auditBatch=[a-z0-9-]+/ig, '')
+  .trim();
+
+
+const parseAuditStoredValue = (value?: string | null) => {
+  const raw = stripAuditTemplateMarker(value);
+  const separator = raw.indexOf('::');
+  const rawState = separator >= 0 ? raw.slice(0, separator) : raw;
+  const detail = separator >= 0 ? raw.slice(separator + 2).trim() : '';
+  const state = normalizeAuditKey(rawState || 'changed');
+  return { state, detail };
+};
+
+const auditChangedFields = (record?: AppraisalAuditLog | null) => {
+  const changed = new Set<string>();
+  if (!record) return changed;
+
+  // New appraisal edit records are saved one row per changed item.
+  // Do not compare this record against any later audit record; each row must stay independent.
+  if (record.changedColumn) {
+    record.changedColumn.split('|').forEach((part) => {
+      const [rawToken] = stripAuditTemplateMarker(part).split(':');
+      const key = normalizeAuditKey(rawToken ?? '');
+      if (key) changed.add(key);
+    });
+    return changed;
+  }
+
+  const before = parseAuditSummary(record.oldValue);
+  const after = parseAuditSummary(record.newValue);
+  const keys = new Set([...before.keys(), ...after.keys()]);
+  keys.forEach((key) => {
+    if ((before.get(key) ?? '') !== (after.get(key) ?? '')) changed.add(key);
+  });
+  if (changed.size === 0 && (record.oldValue ?? '') !== (record.newValue ?? '')) changed.add('all');
+  return changed;
+};
+
+const hasAuditChange = (fields: Set<string>, ...labels: string[]) => fields.has('all') || labels.some((label) => fields.has(normalizeAuditKey(label)));
+
+const auditHighlightClass = (fields: Set<string>, ...labels: string[]) => (hasAuditChange(fields, ...labels) ? 'appraisal-audit-highlight' : '');
+
+type RemovedCriteriaDisplay = { criteriaIndex: number; text: string };
+
+type RemovedSectionDisplay = { sectionIndex: number; name: string; criteria: string[] };
+
+type TemplateAuditDetail = {
+  fields: Set<string>;
+  sectionIndexes: Set<number>;
+  criteriaKeys: Set<string>;
+  scoreBandIndexes: Set<number>;
+  removedSectionIndexes: Set<number>;
+  removedCriteriaKeys: Set<string>;
+  removedScoreBandIndexes: Set<number>;
+  removedScoreBandTextByIndex: Map<number, string>;
+  removedSections: RemovedSectionDisplay[];
+  removedCriteriaBySection: Map<number, RemovedCriteriaDisplay[]>;
+};
+
+type AuditSectionSnapshot = {
+  name: string;
+  criteria: string[];
+};
+
+const emptyTemplateAuditDetail = (): TemplateAuditDetail => ({
+  fields: new Set<string>(),
+  sectionIndexes: new Set<number>(),
+  criteriaKeys: new Set<string>(),
+  scoreBandIndexes: new Set<number>(),
+  removedSectionIndexes: new Set<number>(),
+  removedCriteriaKeys: new Set<string>(),
+  removedScoreBandIndexes: new Set<number>(),
+  removedScoreBandTextByIndex: new Map<number, string>(),
+  removedSections: [],
+  removedCriteriaBySection: new Map<number, RemovedCriteriaDisplay[]>(),
+});
+
+const parseEvaluationSnapshot = (value?: string | null): AuditSectionSnapshot[] => {
+  if (!value || value.trim() === '-') return [];
+  return value
+    .split(/\s*;\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const open = part.indexOf('[');
+      const close = part.lastIndexOf(']');
+      const name = open >= 0 ? part.slice(0, open).trim() : part;
+      const criteriaText = open >= 0 && close > open ? part.slice(open + 1, close).trim() : '';
+      const criteria = criteriaText && criteriaText !== '-'
+        ? criteriaText.split(/\s*\/\s*/).map((item) => item.trim()).filter(Boolean)
+        : [];
+      return { name, criteria };
+    });
+};
+
+const addRemovedCriteria = (detail: TemplateAuditDetail, sectionIndex: number, criteriaIndex: number, text: string) => {
+  const key = `${sectionIndex}.${criteriaIndex}`;
+  detail.removedCriteriaKeys.add(key);
+  const cleanText = (text || '').trim() || `Removed criteria ${sectionIndex}.${criteriaIndex}`;
+  const items = detail.removedCriteriaBySection.get(sectionIndex) ?? [];
+  const existingIndex = items.findIndex((item) => item.criteriaIndex === criteriaIndex);
+  if (existingIndex >= 0) {
+    items[existingIndex] = { criteriaIndex, text: cleanText };
+  } else {
+    items.push({ criteriaIndex, text: cleanText });
+  }
+  detail.removedCriteriaBySection.set(sectionIndex, items);
+};
+
+const auditSourceRecords = (record: AppraisalAuditLog | GroupedAppraisalAuditLog): AppraisalAuditLog[] => {
+  const grouped = record as GroupedAppraisalAuditLog;
+  return grouped.sourceRecords?.length ? grouped.sourceRecords : [record];
+};
+
+const addRemovedSection = (detail: TemplateAuditDetail, sectionIndex: number, text: string) => {
+  detail.removedSectionIndexes.add(sectionIndex);
+  const parsedSection = parseEvaluationSnapshot(text)[0];
+  const display: RemovedSectionDisplay = {
+    sectionIndex,
+    name: parsedSection?.name || text || `Removed section ${sectionIndex}`,
+    criteria: parsedSection?.criteria?.length ? parsedSection.criteria : [],
+  };
+  const existingIndex = detail.removedSections.findIndex((section) => section.sectionIndex === sectionIndex);
+  if (existingIndex >= 0) {
+    detail.removedSections[existingIndex] = display;
+  } else {
+    detail.removedSections.push(display);
+  }
+  display.criteria.forEach((criteriaText, criteriaIndex) => addRemovedCriteria(detail, sectionIndex, criteriaIndex + 1, criteriaText));
+};
+
+const applyRemovedTextFromAuditSources = (detail: TemplateAuditDetail, record: AppraisalAuditLog | GroupedAppraisalAuditLog) => {
+  auditSourceRecords(record).forEach((source) => {
+    const removedText = stripAuditTemplateMarker(source.oldValue);
+    if (!removedText) return;
+    const stateFromRecord = parseAuditStoredValue(source.newValue).state;
+    stripAuditTemplateMarker(source.changedColumn).split('|').forEach((part) => {
+      const [rawToken, rawState = ''] = stripAuditTemplateMarker(part).split(':');
+      const token = normalizeAuditKey(rawToken ?? '');
+      const state = normalizeAuditKey(rawState || stateFromRecord || 'changed');
+      if (!state.includes('removed')) return;
+
+      const sectionMatch = token.match(/^section\s+(\d+)$/);
+      if (sectionMatch?.[1]) {
+        addRemovedSection(detail, Number(sectionMatch[1]), removedText);
+      }
+
+      const criteriaMatch = token.match(/^criteria\s+(\d+)\.(\d+)$/);
+      if (criteriaMatch?.[1] && criteriaMatch?.[2]) {
+        addRemovedCriteria(detail, Number(criteriaMatch[1]), Number(criteriaMatch[2]), removedText);
+      }
+
+      const scoreMatch = token.match(/^score\s+range\s+(\d+)$/);
+      if (scoreMatch?.[1]) {
+        const scoreNo = Number(scoreMatch[1]);
+        detail.removedScoreBandIndexes.add(scoreNo);
+        detail.removedScoreBandTextByIndex.set(scoreNo, removedText);
+      }
+    });
+  });
+};
+
+const addEvaluationDiff = (detail: TemplateAuditDetail, beforeValue?: string | null, afterValue?: string | null) => {
+  if ((beforeValue ?? '') === (afterValue ?? '')) return;
+  const beforeSections = parseEvaluationSnapshot(beforeValue);
+  const afterSections = parseEvaluationSnapshot(afterValue);
+  const maxSections = Math.max(beforeSections.length, afterSections.length);
+  for (let sectionIndex = 0; sectionIndex < maxSections; sectionIndex += 1) {
+    const sectionNo = sectionIndex + 1;
+    const beforeSection = beforeSections[sectionIndex];
+    const afterSection = afterSections[sectionIndex];
+    if (beforeSection && !afterSection) {
+      detail.removedSectionIndexes.add(sectionNo);
+      detail.removedSections.push({ sectionIndex: sectionNo, name: beforeSection.name, criteria: beforeSection.criteria });
+      beforeSection.criteria.forEach((_, criteriaIndex) => {
+        detail.removedCriteriaKeys.add(`${sectionNo}.${criteriaIndex + 1}`);
+      });
+      continue;
+    }
+    if (!beforeSection && afterSection) {
+      detail.sectionIndexes.add(sectionNo);
+      afterSection.criteria.forEach((_, criteriaIndex) => detail.criteriaKeys.add(`${sectionNo}.${criteriaIndex + 1}`));
+      continue;
+    }
+    if ((beforeSection?.name ?? '') !== (afterSection?.name ?? '')) {
+      detail.sectionIndexes.add(sectionNo);
+    }
+    const maxCriteria = Math.max(beforeSection?.criteria.length ?? 0, afterSection?.criteria.length ?? 0);
+    for (let criteriaIndex = 0; criteriaIndex < maxCriteria; criteriaIndex += 1) {
+      const criteriaNo = criteriaIndex + 1;
+      const beforeCriteria = beforeSection?.criteria[criteriaIndex];
+      const afterCriteria = afterSection?.criteria[criteriaIndex];
+      if (beforeCriteria && !afterCriteria) {
+        addRemovedCriteria(detail, sectionNo, criteriaNo, beforeCriteria);
+      } else if (!beforeCriteria && afterCriteria) {
+        detail.criteriaKeys.add(`${sectionNo}.${criteriaNo}`);
+      } else if ((beforeCriteria ?? '') !== (afterCriteria ?? '')) {
+        detail.criteriaKeys.add(`${sectionNo}.${criteriaNo}`);
+      }
+    }
+  }
+};
+
+const addScoreRangeDiff = (detail: TemplateAuditDetail, beforeValue?: string | null, afterValue?: string | null) => {
+  if ((beforeValue ?? '') === (afterValue ?? '')) return;
+  const beforeRanges = (beforeValue || '').split(/\s*;\s*/).map((item) => item.trim()).filter(Boolean);
+  const afterRanges = (afterValue || '').split(/\s*;\s*/).map((item) => item.trim()).filter(Boolean);
+  const maxRanges = Math.max(beforeRanges.length, afterRanges.length);
+  for (let index = 0; index < maxRanges; index += 1) {
+    if (beforeRanges[index] && !afterRanges[index]) {
+      detail.removedScoreBandIndexes.add(index + 1);
+    } else if ((beforeRanges[index] ?? '') !== (afterRanges[index] ?? '')) {
+      detail.scoreBandIndexes.add(index + 1);
+    }
+  }
+};
+
+const buildTemplateAuditDetail = (record?: AppraisalAuditLog | null): TemplateAuditDetail => {
+  const detail = emptyTemplateAuditDetail();
+  if (!record) return detail;
+
+  auditChangedFields(record).forEach((field) => detail.fields.add(field));
+
+  const stateFromRecord = parseAuditStoredValue(record.newValue).state;
+  const tokenSource = [record.changedColumn].filter(Boolean).join(' | ');
+  tokenSource.split('|').forEach((part) => {
+    const [rawToken, rawState = ''] = stripAuditTemplateMarker(part).split(':');
+    const token = normalizeAuditKey(rawToken ?? part);
+    const state = normalizeAuditKey(rawState || stateFromRecord || 'changed');
+    const isRemoved = state.includes('removed');
+    const sectionMatch = token.match(/^section\s+(\d+)$/);
+    if (sectionMatch?.[1]) {
+      const sectionNo = Number(sectionMatch[1]);
+      if (isRemoved) detail.removedSectionIndexes.add(sectionNo);
+      else detail.sectionIndexes.add(sectionNo);
+    }
+    const criteriaMatch = token.match(/^criteria\s+(\d+)\.(\d+)$/);
+    if (criteriaMatch?.[1] && criteriaMatch?.[2]) {
+      const key = `${Number(criteriaMatch[1])}.${Number(criteriaMatch[2])}`;
+      if (isRemoved) detail.removedCriteriaKeys.add(key);
+      else detail.criteriaKeys.add(key);
+    }
+    const scoreMatch = token.match(/^score\s+range\s+(\d+)$/);
+    if (scoreMatch?.[1]) {
+      const scoreNo = Number(scoreMatch[1]);
+      if (isRemoved) detail.removedScoreBandIndexes.add(scoreNo);
+      else detail.scoreBandIndexes.add(scoreNo);
+    }
+  });
+
+  const before = parseAuditSummary(record.oldValue);
+  const after = parseAuditSummary(record.newValue);
+  addEvaluationDiff(detail, before.get('evaluation details'), after.get('evaluation details'));
+  addScoreRangeDiff(detail, before.get('score ranges'), after.get('score ranges'));
+  applyRemovedTextFromAuditSources(detail, record);
+
+  // Newer audit logs store a compact changed-field list to avoid DB truncation errors.
+  // When old/new snapshots are not present, still render removed items in red using placeholders.
+  detail.removedCriteriaKeys.forEach((key) => {
+    const [sectionText, criteriaText] = key.split('.');
+    const sectionNo = Number(sectionText);
+    const criteriaNo = Number(criteriaText);
+    if (!sectionNo || !criteriaNo) return;
+    const existing = detail.removedCriteriaBySection.get(sectionNo) ?? [];
+    if (!existing.some((item) => item.criteriaIndex === criteriaNo)) {
+      const oldText = stripAuditTemplateMarker(record.oldValue) && !stripAuditTemplateMarker(record.oldValue).includes(':') && !stripAuditTemplateMarker(record.oldValue).includes('|')
+        ? stripAuditTemplateMarker(record.oldValue)
+        : `Removed criteria ${sectionNo}.${criteriaNo}`;
+      existing.push({ criteriaIndex: criteriaNo, text: oldText });
+      detail.removedCriteriaBySection.set(sectionNo, existing);
+    }
+  });
+  detail.removedSectionIndexes.forEach((sectionNo) => {
+    if (!detail.removedSections.some((section) => section.sectionIndex === sectionNo)) {
+      const oldSectionText = stripAuditTemplateMarker(record.oldValue);
+      const oldSection = oldSectionText && !oldSectionText.includes('|') ? parseEvaluationSnapshot(oldSectionText)[0] : undefined;
+      detail.removedSections.push({
+        sectionIndex: sectionNo,
+        name: oldSection?.name || `Removed section ${sectionNo}`,
+        criteria: oldSection?.criteria?.length ? oldSection.criteria : ['Criteria under this section were removed.'],
+      });
+    }
+  });
+
+  return detail;
+};
+
+const auditSectionHighlightClass = (detail: TemplateAuditDetail, sectionIndex: number) => (
+  detail.sectionIndexes.has(sectionIndex + 1) ? 'appraisal-audit-highlight' : ''
+);
+
+const auditCriteriaHighlightClass = (detail: TemplateAuditDetail, sectionIndex: number, criteriaIndex: number) => (
+  detail.criteriaKeys.has(`${sectionIndex + 1}.${criteriaIndex + 1}`) ? 'appraisal-audit-highlight' : ''
+);
+
+const auditScoreBandHighlightClass = (detail: TemplateAuditDetail, index: number) => (
+  detail.scoreBandIndexes.has(index + 1) ? 'appraisal-audit-highlight' : ''
+);
+
+const auditRemovedClass = 'appraisal-audit-removed';
 
 type SignatureDisplayBlockProps = {
   label: string;
@@ -229,15 +543,22 @@ const AppraisalTemplateRecordsPage = () => {
   const [modalMode, setModalMode] = useState<TemplateModalMode>(null);
   const [loading, setLoading] = useState(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
+  const [reasonText, setReasonText] = useState('');
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [signatureLoading, setSignatureLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const [templateYearFilter, setTemplateYearFilter] = useState('');
   const [editRecordsTitle, setEditRecordsTitle] = useState('');
-  const [editRecords, setEditRecords] = useState<AppraisalAuditLog[]>([]);
+  const [editRecordsTemplateId, setEditRecordsTemplateId] = useState<number | null>(null);
+  const [editRecords, setEditRecords] = useState<GroupedAppraisalAuditLog[]>([]);
   const [editRecordsLoading, setEditRecordsLoading] = useState(false);
+  const [editRecordView, setEditRecordView] = useState<GroupedAppraisalAuditLog | null>(null);
+  const [editRecordTemplate, setEditRecordTemplate] = useState<AppraisalTemplateResponse | null>(null);
+  const [editRecordViewLoading, setEditRecordViewLoading] = useState(false);
 
   const formTotalCriteria = useMemo(() => form.sections.reduce((sum, section) => sum + section.criteria.length, 0), [form.sections]);
+  const latestEditRecords = useMemo(() => editRecords.slice(0, 3), [editRecords]);
   const signatureById = useMemo(() => {
     const map = new Map<number, Signature>();
     signatures.forEach((item) => map.set(item.id, item));
@@ -283,6 +604,28 @@ const AppraisalTemplateRecordsPage = () => {
     const handler = popup?.onOk;
     setPopup(null);
     if (handler) void handler();
+  };
+
+  const openReasonDialog = (dialog: ReasonDialogState) => {
+    setReasonText('');
+    setReasonDialog(dialog);
+  };
+
+  const closeReasonDialog = () => {
+    setReasonDialog(null);
+    setReasonText('');
+  };
+
+  const confirmReasonDialog = () => {
+    if (!reasonDialog) return;
+    const normalized = reasonText.trim();
+    if (!normalized) {
+      setAlert('Edit reason is required.', 'error');
+      return;
+    }
+    const handler = reasonDialog.onConfirm;
+    closeReasonDialog();
+    void handler(normalized);
   };
 
   const loadTemplates = async () => {
@@ -374,23 +717,53 @@ const AppraisalTemplateRecordsPage = () => {
 
   const openEditRecords = async (template: AppraisalTemplateResponse) => {
     setEditRecordsTitle(template.templateName);
+    setEditRecordsTemplateId(template.id);
     setEditRecords([]);
+    setEditRecordView(null);
+    setEditRecordTemplate(null);
     setEditRecordsLoading(true);
     try {
       const records = await appraisalAuditService.list('APPRAISAL_TEMPLATE', template.id);
-      setEditRecords(records);
+      setEditRecords(groupAppraisalAuditRecords(records));
     } catch (error) {
       setAlert(extractApiErrorMessage(error, 'Edit records could not be loaded.'), 'error');
       setEditRecordsTitle('');
+      setEditRecordsTemplateId(null);
     } finally {
       setEditRecordsLoading(false);
     }
   };
 
+  const openEditRecordView = async (record: AppraisalAuditLog) => {
+    setEditRecordView(record);
+    setEditRecordTemplate(null);
+    const templateId = record.entityId || editRecordsTemplateId;
+    if (!templateId) return;
+    setEditRecordViewLoading(true);
+    try {
+      const template = await appraisalTemplateService.get(templateId);
+      setEditRecordTemplate(template);
+    } catch (error) {
+      setAlert(extractApiErrorMessage(error, 'Template form could not be loaded.'), 'error');
+    } finally {
+      setEditRecordViewLoading(false);
+    }
+  };
+
+  const closeEditRecordView = () => {
+    setEditRecordView(null);
+    setEditRecordTemplate(null);
+    setEditRecordViewLoading(false);
+  };
+
   const closeEditRecords = () => {
     setEditRecordsTitle('');
+    setEditRecordsTemplateId(null);
     setEditRecords([]);
+    setEditRecordView(null);
+    setEditRecordTemplate(null);
     setEditRecordsLoading(false);
+    setEditRecordViewLoading(false);
   };
 
   const useThisTemplate = (templateId: number) => {
@@ -438,16 +811,11 @@ const AppraisalTemplateRecordsPage = () => {
     }
   };
 
-  const saveEdit = async () => {
+  const submitTemplateEdit = async (editReason: string) => {
     if (!editingTemplate) return;
-    const validationMessage = validateTemplateForm();
-    if (validationMessage) {
-      setAlert(validationMessage, 'error');
-      return;
-    }
     setLoading(true);
     try {
-      const updated = await appraisalTemplateService.updateDraft(editingTemplate.id, normalizeForm(form));
+      const updated = await appraisalTemplateService.updateDraft(editingTemplate.id, { ...normalizeForm(form), editReason });
       setAlert(`Template form "${updated.templateName}" updated successfully.`, 'success', async () => {
         closeModal();
         await loadTemplates();
@@ -457,6 +825,21 @@ const AppraisalTemplateRecordsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveEdit = async () => {
+    if (!editingTemplate) return;
+    const validationMessage = validateTemplateForm();
+    if (validationMessage) {
+      setAlert(validationMessage, 'error');
+      return;
+    }
+    openReasonDialog({
+      title: 'Confirm Template Edit',
+      message: 'Please enter the reason for editing this template form.',
+      confirmText: 'Save Changes',
+      onConfirm: (reason) => submitTemplateEdit(reason),
+    });
   };
 
   const updateSection = (sectionIndex: number, patch: Partial<AppraisalSectionRequest>) => {
@@ -528,7 +911,7 @@ const AppraisalTemplateRecordsPage = () => {
     }));
   };
 
-  const renderScoreBandEditor = (bands: AppraisalScoreBandRequest[], readOnly = false) => (
+  const renderScoreBandEditor = (bands: AppraisalScoreBandRequest[], readOnly = false, auditDetail?: TemplateAuditDetail) => (
     <div className="appraisal-score-band-editor">
       <div className="appraisal-score-band-head">
         <span>Score</span>
@@ -536,7 +919,7 @@ const AppraisalTemplateRecordsPage = () => {
         <span>Explanation</span>
       </div>
       {bands.map((band, index) => (
-        <div className="appraisal-score-band-row" key={`${band.label}-${index}`}>
+        <div className={`appraisal-score-band-row ${getAppraisalScoreBandToneClass(band.label)} ${auditDetail ? auditScoreBandHighlightClass(auditDetail, index) : ''}`.trim()} key={`${band.label}-${index}`}>
           <div className="appraisal-score-range-inputs">
             {readOnly ? (
               <strong>{String(band.minScore).padStart(2, '0')}-{band.maxScore}</strong>
@@ -561,9 +944,19 @@ const AppraisalTemplateRecordsPage = () => {
             )}
           </div>
           <strong>{band.label}</strong>
-          <span className="appraisal-muted">{band.description}</span>
+          <span className="appraisal-muted appraisal-score-band-description">{band.description}</span>
         </div>
       ))}
+      {auditDetail && Array.from(auditDetail.removedScoreBandIndexes).sort((a, b) => a - b).map((scoreNo) => {
+        const removedScoreText = auditDetail.removedScoreBandTextByIndex.get(scoreNo);
+        return (
+          <div className={`appraisal-score-band-row ${auditRemovedClass}`} key={`removed-score-${scoreNo}`}>
+            <div className="appraisal-score-range-inputs"><strong>-</strong></div>
+            <strong>{removedScoreText || `Removed score range ${scoreNo}`}</strong>
+            <span className="appraisal-muted appraisal-score-band-description">Removed</span>
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -897,6 +1290,134 @@ const AppraisalTemplateRecordsPage = () => {
     );
   };
 
+  const renderTemplateAuditForm = (template: AppraisalTemplateResponse, record: AppraisalAuditLog) => {
+    const auditDetail = buildTemplateAuditDetail(record);
+    const changedFields = auditDetail.fields;
+    let globalNo = 0;
+    const bands = uniqueScoreBands(template.scoreBands?.length ? template.scoreBands : defaultScoreBands());
+    const signatureDateFormat = template.signatureDateFormat ?? 'DD/MM/YYYY';
+    const signatureDateText = formatDateByPattern(new Date(), signatureDateFormat);
+
+    return (
+      <>
+        <div className="appraisal-edit-record-view-meta">
+          <span><strong>Edited By</strong>{record.changedByName || `User #${record.userId ?? '-'}`}</span>
+          <span><strong>Edited At</strong>{displayDateTime(record.timestamp)}</span>
+          {record.reason ? <span><strong>Reason</strong>{record.reason}</span> : null}
+        </div>
+        <div className="appraisal-template-banner center">
+          <h2>Performance Evaluation Form</h2>
+          <p>ACE Data Systems Ltd.</p>
+        </div>
+        <div className="appraisal-template-summary-card">
+          <div className={auditHighlightClass(changedFields, 'Name', 'Template Name')}><strong>Template Name</strong><span>{template.templateName}</span></div>
+          <div className={auditHighlightClass(changedFields, 'Description')}><strong>Description</strong><span>{template.description || '-'}</span></div>
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Evaluations</h3>
+          {template.sections.map((section, sectionIndex) => {
+            const removedCriteria = auditDetail.removedCriteriaBySection.get(sectionIndex + 1) ?? [];
+            return (
+              <div className="appraisal-section-card" key={section.id}>
+                <div className={`appraisal-section-header ${auditSectionHighlightClass(auditDetail, sectionIndex)}`.trim()}>
+                  <div className="appraisal-section-title-wrap">
+                    <strong>{section.sectionName}</strong>
+                    <small>{section.criteria.length} criteria</small>
+                  </div>
+                </div>
+                <div className="appraisal-template-table-wrap">
+                  <table className="appraisal-template-table">
+                    <thead><tr><th>#</th><th>Criteria</th><th>Rating 1-5</th></tr></thead>
+                    <tbody>
+                      {section.criteria.map((criteria, criteriaIndex) => {
+                        globalNo += 1;
+                        return (
+                          <tr key={criteria.id} className={auditCriteriaHighlightClass(auditDetail, sectionIndex, criteriaIndex)}>
+                            <td className="appraisal-center-cell">{globalNo}</td>
+                            <td>{criteria.criteriaText}</td>
+                            <td><AppraisalRatingDots value={null} max={criteria.maxRating || 5} disabled /></td>
+                          </tr>
+                        );
+                      })}
+                      {removedCriteria.map((criteria) => {
+                        globalNo += 1;
+                        return (
+                          <tr key={`removed-${section.id}-${criteria.criteriaIndex}`} className={auditRemovedClass}>
+                            <td className="appraisal-center-cell">{globalNo}</td>
+                            <td>{criteria.text}</td>
+                            <td><AppraisalRatingDots value={null} max={5} disabled /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+          {auditDetail.removedSections.map((section) => (
+            <div className={`appraisal-section-card ${auditRemovedClass}`} key={`removed-section-${section.sectionIndex}`}>
+              <div className={`appraisal-section-header ${auditRemovedClass}`}>
+                <div className="appraisal-section-title-wrap">
+                  <strong>{section.name}</strong>
+                  <small>{section.criteria.length} criteria removed</small>
+                </div>
+              </div>
+              <div className="appraisal-template-table-wrap">
+                <table className="appraisal-template-table">
+                  <thead><tr><th>#</th><th>Criteria</th><th>Rating 1-5</th></tr></thead>
+                  <tbody>
+                    {section.criteria.map((criteriaText, criteriaIndex) => {
+                      globalNo += 1;
+                      return (
+                        <tr key={`removed-section-${section.sectionIndex}-${criteriaIndex}`} className={auditRemovedClass}>
+                          <td className="appraisal-center-cell">{globalNo}</td>
+                          <td>{criteriaText}</td>
+                          <td><AppraisalRatingDots value={null} max={5} disabled /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Score Calculation</h3>
+          <div className="appraisal-score-formula-card in-block">
+            <div className="appraisal-total-points-strip"><strong>Total Points</strong><span>Actual total points are shown after PM submits ratings.</span></div>
+            <table className="appraisal-score-formula-table">
+              <thead><tr><th>Analysis</th><th>Formula</th><th>Score</th></tr></thead>
+              <tbody><tr><td><strong>Total Points</strong></td><td><div className="formula-main">Total Point</div><div className="formula-divider" /><div>Number of Questions Answered × 5</div><div className="formula-multiply">× 100</div></td><td>Auto calculated from PM ratings</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Score Guide</h3>
+          {renderScoreBandEditor(bands, true, auditDetail)}
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Other Remarks</h3>
+          <div className="appraisal-other-remarks-preview"><span>Appraiser's Comment for Discussion</span></div>
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Signature Section</h3>
+          <div className="appraisal-signature-grid appraisal-template-signature-grid">
+            <SignatureDisplayBlock label="Signature of Appraisee & Date" signature={template.appraiseeSignatureId ? signatureById.get(template.appraiseeSignatureId) : undefined} dateText={signatureDateText} />
+            <SignatureDisplayBlock label="Signature of Appraiser & Date" signature={template.appraiserSignatureId ? signatureById.get(template.appraiserSignatureId) : undefined} dateText={signatureDateText} />
+            <SignatureDisplayBlock label="HR Signature / Date / Designation" signature={template.hrSignatureId ? signatureById.get(template.hrSignatureId) : undefined} dateText={signatureDateText} />
+          </div>
+        </div>
+      </>
+    );
+  };
+
   const renderEditRecordsModal = () => {
     if (!editRecordsTitle) return null;
     return (
@@ -904,35 +1425,43 @@ const AppraisalTemplateRecordsPage = () => {
         <div className="appraisal-modal-box appraisal-modal-box-xl appraisal-edit-records-modal" onMouseDown={(event) => event.stopPropagation()}>
           <div className="appraisal-modal-header">
             <div>
-              <h2>Template Edit Records</h2>
+              <h2>{editRecordView ? 'Template Edit Record' : 'Template Edit Records'}</h2>
               <p>{editRecordsTitle}</p>
             </div>
             <button className="appraisal-modal-close" type="button" onClick={closeEditRecords}><i className="bi bi-x-lg" /></button>
           </div>
-          <div className="appraisal-modal-body">
-            {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
-            {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
-            {!editRecordsLoading && editRecords.length > 0 && (
-              <div className="appraisal-edit-record-list">
-                {editRecords.map((record) => (
-                  <div className="appraisal-edit-record-card" key={record.id}>
-                    <div className="appraisal-edit-record-card-head">
-                      <div>
-                        <strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong>
-                        <span>{displayDateTime(record.timestamp)}</span>
-                      </div>
-                      <span className="appraisal-status status-active">{record.action}</span>
-                    </div>
-                    <div className="appraisal-edit-record-values">
-                      <div><strong>Before</strong><p>{record.oldValue || '-'}</p></div>
-                      <div><strong>After</strong><p>{record.newValue || '-'}</p></div>
+          <div className="appraisal-modal-body template-form-modal-body">
+            {!editRecordView && (
+              <>
+                {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
+                {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
+                {!editRecordsLoading && editRecords.length > 0 && (
+                  <div className="appraisal-edit-record-history">
+                    <div className="appraisal-edit-record-history-note">Latest 3 edit records are shown first.</div>
+                    <div className="appraisal-edit-record-list">
+                      {latestEditRecords.map((record) => (
+                        <button className="appraisal-edit-record-row" type="button" key={record.id} onClick={() => void openEditRecordView(record)}>
+                          <span><strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong><small>Edited By</small></span>
+                          <span><strong>{formatAppraisalAuditChangeCount(record)}</strong><small>Changed Fields</small></span>
+                          <span><strong>{displayDateTime(record.timestamp)}</strong><small>Edited At</small></span>
+                          <i className="bi bi-chevron-right" />
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
+            )}
+            {editRecordView && (
+              <>
+                {editRecordViewLoading && <div className="appraisal-empty">Loading edited form...</div>}
+                {!editRecordViewLoading && !editRecordTemplate && <div className="appraisal-empty">Template form could not be loaded.</div>}
+                {!editRecordViewLoading && editRecordTemplate && renderTemplateAuditForm(editRecordTemplate, editRecordView)}
+              </>
             )}
           </div>
           <div className="appraisal-modal-footer">
+            {editRecordView && <button className="appraisal-button ghost" type="button" onClick={closeEditRecordView}>Back to List</button>}
             <button className="appraisal-button secondary" type="button" onClick={closeEditRecords}>Close</button>
           </div>
         </div>
@@ -985,9 +1514,6 @@ const AppraisalTemplateRecordsPage = () => {
             <thead>
               <tr>
                 <th>Template Name</th>
-                <th>Description</th>
-                <th>Sections</th>
-                <th>Criteria</th>
                 <th>Created By</th>
                 <th>Created At</th>
                 <th>Actions</th>
@@ -995,31 +1521,25 @@ const AppraisalTemplateRecordsPage = () => {
             </thead>
             <tbody>
               {templates.length === 0 && (
-                <tr><td colSpan={7}><div className="appraisal-empty">No template forms yet.</div></td></tr>
+                <tr><td colSpan={4}><div className="appraisal-empty">No template forms yet.</div></td></tr>
               )}
               {templates.length > 0 && filteredTemplates.length === 0 && (
-                <tr><td colSpan={7}><div className="appraisal-empty">No template forms match the selected search/filter.</div></td></tr>
+                <tr><td colSpan={4}><div className="appraisal-empty">No template forms match the selected search/filter.</div></td></tr>
               )}
-              {filteredTemplates.map((template) => {
-                const criteriaCount = template.sections.reduce((sum, section) => sum + section.criteria.length, 0);
-                return (
-                  <tr key={template.id}>
-                    <td><strong>{template.templateName}</strong></td>
-                    <td>{template.description || '-'}</td>
-                    <td>{template.sections.length}</td>
-                    <td>{criteriaCount}</td>
-                    <td>{template.createdByEmployeeId || '-'}</td>
-                    <td>{displayDateTime(template.createdAt)}</td>
-                    <td>
-                      <div className="appraisal-button-row record-actions">
-                        <button className="appraisal-button ghost" type="button" onClick={() => void openView(template.id)}>View Form</button>
-                        <button className="appraisal-button secondary" type="button" onClick={() => void openEdit(template.id)}>Edit</button>
-                        <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(template)}>Edit Records</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredTemplates.map((template) => (
+                <tr key={template.id}>
+                  <td><strong>{template.templateName}</strong></td>
+                  <td>{template.createdByEmployeeId || '-'}</td>
+                  <td>{displayDateTime(template.createdAt)}</td>
+                  <td>
+                    <div className="appraisal-button-row record-actions">
+                      <button className="appraisal-button ghost" type="button" onClick={() => void openView(template.id)}>View Form</button>
+                      <button className="appraisal-button secondary" type="button" onClick={() => void openEdit(template.id)}>Edit</button>
+                      <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(template)}>Edit Records</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -1027,6 +1547,28 @@ const AppraisalTemplateRecordsPage = () => {
 
 
       {renderEditRecordsModal()}
+
+      {reasonDialog && (
+        <div className="appraisal-popup-backdrop">
+          <div className="appraisal-popup-box confirm appraisal-reason-popup">
+            <div className="appraisal-popup-icon"><i className="bi bi-pencil-square" /></div>
+            <h3>{reasonDialog.title}</h3>
+            <p>{reasonDialog.message}</p>
+            <textarea
+              className="appraisal-reason-input"
+              rows={4}
+              value={reasonText}
+              onChange={(event) => setReasonText(event.target.value)}
+              placeholder="Enter edit reason"
+              autoFocus
+            />
+            <div className="appraisal-popup-actions">
+              <button className="appraisal-button secondary" type="button" onClick={closeReasonDialog}>Cancel</button>
+              <button className="appraisal-button primary" type="button" onClick={confirmReasonDialog}>{reasonDialog.confirmText ?? 'Confirm'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {popup && (
         <div className="appraisal-popup-backdrop">

@@ -15,6 +15,7 @@ import type {
 } from '../../../types/kpiTemplate';
 import type { KpiUnit } from '../../../types/kpiUnit';
 import type { PositionResponse } from '../../../types/position';
+import { DEFAULT_KPI_TEMPLATE_DURATION_MONTHS, type KpiTemplateDurationMonths } from './kpiTemplateUi';
 
 export const EXISTING_KPI_FOR_POSITION_MSG =
   'A KPI form already exists for this position. Your changes will be saved to that form.';
@@ -23,6 +24,7 @@ export type KpiTemplateFormFields = {
   title: string;
   status: KpiFormStatus;
   positionId: number | null;
+  positionDurationMonths: KpiTemplateDurationMonths;
   rows: KpiTemplateRowDraft[];
 };
 
@@ -44,6 +46,7 @@ export function mapTemplateToFormFields(tmpl: KpiTemplateResponse): KpiTemplateF
     title: tmpl.title,
     status: tmpl.status,
     positionId: tmpl.positions[0]?.positionId ?? null,
+    positionDurationMonths: (tmpl.positions[0]?.durationMonths ?? DEFAULT_KPI_TEMPLATE_DURATION_MONTHS) as KpiTemplateDurationMonths,
     rows:
       tmpl.items.length > 0
         ? tmpl.items.map((line) => ({

@@ -9,6 +9,9 @@ import { handleKpiTemplateSaveError } from '../../../components/hr/kpi-template/
 import {
   buildKpiPositionDropdownOptions,
   countAvailableKpiPositions,
+  DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
+  KPI_TEMPLATE_DURATION_OPTIONS,
+  type KpiTemplateDurationMonths,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import {
   findExistingTemplateForPosition,
@@ -43,6 +46,7 @@ const KpiTemplateEditorPage = () => {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [positionId, setPositionId] = useState<number | null>(null);
+  const [positionDurationMonths, setPositionDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
   const [positions, setPositions] = useState<PositionResponse[]>([]);
   const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
   const [existingTemplate, setExistingTemplate] = useState<ExistingKpiForPosition | null>(null);
@@ -107,6 +111,7 @@ const KpiTemplateEditorPage = () => {
           setTitle(fields.title);
           setStatus(fields.status);
           setPositionId(fields.positionId);
+          setPositionDurationMonths(fields.positionDurationMonths);
           setRows(fields.rows);
           setRemovedItemReasons({});
         }
@@ -140,6 +145,9 @@ const KpiTemplateEditorPage = () => {
   const buildPayload = (submitStatus: KpiFormStatus): KpiTemplateRequest => ({
     title: title.trim(),
     status: submitStatus,
+    startDate: null,
+    endDate: null,
+    positionDurationMonths,
     positionIds: positionId != null ? [positionId] : [],
     items: rows.map((row, index) => ({
       kpiLabel: row.kpiItemId !== null ? null : row.kpiLabel.trim() || null,
@@ -166,6 +174,9 @@ const KpiTemplateEditorPage = () => {
   const validate = (submitStatus: KpiFormStatus): string | null => {
     if (!title.trim()) return 'Title is required.';
     if (positionId === null) return 'Select a position.';
+    if (!KPI_TEMPLATE_DURATION_OPTIONS.some((option) => option.value === positionDurationMonths)) {
+      return 'Select a valid position duration.';
+    }
     if (!positions.some((p) => p.id === positionId)) {
       return 'Selected position is invalid. Choose a position from the list.';
     }
@@ -429,6 +440,29 @@ const KpiTemplateEditorPage = () => {
                     onView={() => navigate(`/hr/kpi-template/${existingTemplate.templateId}`)}
                   />
                 )}
+              </label>
+              <label className="flex flex-col gap-2">
+                <FieldLabel>Position duration</FieldLabel>
+                <div className="relative">
+                  <i className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
+                  <select
+                    required
+                    value={positionDurationMonths}
+                    disabled={savingAction !== null || loading}
+                    onChange={(event) => {
+                      setValidationMessage(null);
+                      setPositionDurationMonths(Number(event.target.value) as KpiTemplateDurationMonths);
+                    }}
+                    className={`${fieldClass} cursor-pointer appearance-none pr-10`}
+                    aria-label="Position duration"
+                  >
+                    {KPI_TEMPLATE_DURATION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </label>
               </div>
             </div>

@@ -25,4 +25,6 @@ public class AppraisalCycleRequest {
     private LocalDate managerSubmissionDeadline;
     private LocalDate deptHeadSubmissionDeadline;
     private List<Integer> departmentIds = new ArrayList<>();
+    private String editReason;
+    private String templateChangeSummary;
 }

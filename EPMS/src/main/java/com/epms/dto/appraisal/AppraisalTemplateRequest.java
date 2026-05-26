@@ -24,4 +24,5 @@ public class AppraisalTemplateRequest {
     private List<AppraisalSectionRequest> sections = new ArrayList<>();
     private List<AppraisalScoreBandRequest> scoreBands = new ArrayList<>();
     private Boolean cycleSpecificCopy = false;
+    private String editReason;
 }

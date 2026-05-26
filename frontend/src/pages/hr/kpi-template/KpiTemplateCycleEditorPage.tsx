@@ -2,19 +2,21 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
+import KpiRowReasonModal from '../../../components/hr/kpi-template/KpiRowReasonModal';
 import {
-  calculateKpiTemplateEndDate,
-  DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
-  inferKpiTemplateDurationMonths,
-  KPI_TEMPLATE_DURATION_OPTIONS,
+  calculateKpiCycleEndDate,
+  collectFormIdsInRunningKpiCycles,
+  DEFAULT_KPI_CYCLE_DURATION_YEARS,
+  inferKpiCycleDurationYears,
+  KPI_CYCLE_DURATION_OPTIONS,
   filterKpiFormsForCycleSelection,
   formatKpiFormCycleOptionLabel,
   kpiStatusBadgeClass,
-  type KpiTemplateDurationMonths,
+  type KpiCycleDurationYears,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
-import type { KpiTemplateCycleRequest } from '../../../types/kpiTemplateCycle';
+import type { KpiTemplateCycleRequest, KpiTemplateCycleResponse } from '../../../types/kpiTemplateCycle';
 import type { KpiTemplateResponse } from '../../../types/kpiTemplate';
 
 const fieldClass =
@@ -39,27 +41,39 @@ const KpiTemplateCycleEditorPage = () => {
   const [cycleName, setCycleName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [durationMonths, setDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
+  const [durationYears, setDurationYears] = useState<KpiCycleDurationYears>(DEFAULT_KPI_CYCLE_DURATION_YEARS);
   const [selectedFormIds, setSelectedFormIds] = useState<number[]>([]);
   const [templates, setTemplates] = useState<KpiTemplateResponse[]>([]);
+  const [cycles, setCycles] = useState<KpiTemplateCycleResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reasonModalOpen, setReasonModalOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<KpiTemplateCycleRequest | null>(null);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
         setLoading(true);
-        const allTemplates = await kpiTemplateService.getAllTemplates();
+        const [allTemplates, allCycles] = await Promise.all([
+          kpiTemplateService.getAllTemplates(),
+          kpiTemplateCycleService.list(),
+        ]);
         setTemplates(allTemplates);
+        setCycles(allCycles);
 
         if (isEdit && !Number.isNaN(cycleId)) {
           const cycle = await kpiTemplateCycleService.getById(cycleId);
+          if (cycle.status === 'ACTIVE') {
+            toast.error('Active cycles cannot be edited.');
+            navigate('/hr/kpi-template-cycle');
+            return;
+          }
           setCycleName(cycle.cycleName);
           const nextStart = cycle.startDate?.slice(0, 10) ?? '';
           const nextEnd = cycle.endDate?.slice(0, 10) ?? '';
           setStartDate(nextStart);
           setEndDate(nextEnd);
-          setDurationMonths(inferKpiTemplateDurationMonths(nextStart, nextEnd));
+          setDurationYears((cycle.durationYears ?? inferKpiCycleDurationYears(nextStart, nextEnd)) as KpiCycleDurationYears);
           setSelectedFormIds(cycle.kpiForms.map((form) => form.id));
         }
       } catch (err) {
@@ -69,7 +83,7 @@ const KpiTemplateCycleEditorPage = () => {
       }
     };
     void bootstrap();
-  }, [isEdit, cycleId]);
+  }, [isEdit, cycleId, navigate]);
 
   useEffect(() => {
     if (preselectFormId == null || loading) {
@@ -85,22 +99,27 @@ const KpiTemplateCycleEditorPage = () => {
     navigate(location.pathname, { replace: true, state: {} });
   }, [preselectFormId, templates, loading, navigate, location.pathname]);
 
-  const selectableTemplates = useMemo(
-    () =>
-      [...filterKpiFormsForCycleSelection(templates, selectedFormIds)].sort((a, b) =>
-        a.title.localeCompare(b.title),
-      ),
-    [templates, selectedFormIds],
+  const unavailableFormIds = useMemo(
+    () => collectFormIdsInRunningKpiCycles(cycles, isEdit && !Number.isNaN(cycleId) ? cycleId : undefined),
+    [cycles, isEdit, cycleId],
   );
 
-  const handleDurationChange = (value: KpiTemplateDurationMonths) => {
-    setDurationMonths(value);
-    setEndDate(calculateKpiTemplateEndDate(startDate, value));
+  const selectableTemplates = useMemo(
+    () =>
+      [...filterKpiFormsForCycleSelection(templates, selectedFormIds, unavailableFormIds)].sort((a, b) =>
+        a.title.localeCompare(b.title),
+      ),
+    [templates, selectedFormIds, unavailableFormIds],
+  );
+
+  const handleDurationChange = (value: KpiCycleDurationYears) => {
+    setDurationYears(value);
+    setEndDate(calculateKpiCycleEndDate(startDate, value));
   };
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
-    setEndDate(calculateKpiTemplateEndDate(value, durationMonths));
+    setEndDate(calculateKpiCycleEndDate(value, durationYears));
   };
 
   const toggleFormSelection = (formId: number) => {
@@ -124,22 +143,16 @@ const KpiTemplateCycleEditorPage = () => {
   const buildPayload = (): KpiTemplateCycleRequest => ({
     cycleName: cycleName.trim(),
     startDate,
-    durationMonths,
+    durationYears,
     kpiFormIds: selectedFormIds,
   });
 
-  const saveDraft = async () => {
-    const message = validate();
-    if (message) {
-      toast.error(message);
-      return;
-    }
+  const persistSave = async (payload: KpiTemplateCycleRequest, editReason?: string) => {
     try {
       setSaving(true);
-      const payload = buildPayload();
       if (isEdit && !Number.isNaN(cycleId)) {
-        await kpiTemplateCycleService.update(cycleId, payload);
-        toast.success('Cycle draft saved.');
+        await kpiTemplateCycleService.update(cycleId, { ...payload, editReason });
+        toast.success('Cycle saved.');
       } else {
         await kpiTemplateCycleService.create(payload);
         toast.success('Cycle draft saved.');
@@ -149,7 +162,29 @@ const KpiTemplateCycleEditorPage = () => {
       toast.error(err instanceof Error ? err.message : 'Save failed.');
     } finally {
       setSaving(false);
+      setReasonModalOpen(false);
+      setPendingPayload(null);
     }
+  };
+
+  const saveDraft = () => {
+    const message = validate();
+    if (message) {
+      toast.error(message);
+      return;
+    }
+    const payload = buildPayload();
+    if (isEdit && !Number.isNaN(cycleId)) {
+      setPendingPayload(payload);
+      setReasonModalOpen(true);
+      return;
+    }
+    void persistSave(payload);
+  };
+
+  const confirmEditWithReason = (reason: string) => {
+    if (!pendingPayload) return;
+    void persistSave(pendingPayload, reason);
   };
 
   if (loading) {
@@ -206,13 +241,13 @@ const KpiTemplateCycleEditorPage = () => {
               />
             </label>
             <label className="flex flex-col gap-2">
-              <FieldLabel>Period (months)</FieldLabel>
+              <FieldLabel>Cycle Period</FieldLabel>
               <select
-                value={durationMonths}
-                onChange={(event) => handleDurationChange(Number(event.target.value) as KpiTemplateDurationMonths)}
+                value={durationYears}
+                onChange={(event) => handleDurationChange(Number(event.target.value) as KpiCycleDurationYears)}
                 className={`${fieldClass} cursor-pointer`}
               >
-                {KPI_TEMPLATE_DURATION_OPTIONS.map((option) => (
+                {KPI_CYCLE_DURATION_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -228,7 +263,8 @@ const KpiTemplateCycleEditorPage = () => {
           <div>
             <FieldLabel>KPI forms</FieldLabel>
             <p className="mt-1 mb-3 text-sm text-gray-500">
-              Select one or more <strong>active</strong> KPI forms (saved via Use Form on the template screen).
+              Select one or more <strong>available active</strong> KPI forms (saved via Use Form on the template screen).
+              Forms already assigned to another running cycle are hidden.
             </p>
             {selectableTemplates.length === 0 ? (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -283,11 +319,22 @@ const KpiTemplateCycleEditorPage = () => {
               disabled={saving}
               className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? 'Saving draft…' : 'Save Draft'}
+              {saving ? 'Saving…' : isEdit ? 'Save' : 'Save Draft'}
             </button>
           </div>
         </form>
       </div>
+
+      <KpiRowReasonModal
+        open={reasonModalOpen}
+        title="Reason for cycle change"
+        confirmText="Save"
+        onCancel={() => {
+          setReasonModalOpen(false);
+          setPendingPayload(null);
+        }}
+        onConfirm={confirmEditWithReason}
+      />
     </div>
   );
 };

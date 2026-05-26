@@ -6,6 +6,7 @@ import com.epms.repository.AuditLogRepository;
 import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -28,6 +29,17 @@ public class AuditLogServiceImpl implements AuditLogService {
         auditLog.setNewValue(newValue);
         auditLog.setReason(reason);
         auditLogRepository.save(auditLog);
+    }
+
+    private String limit(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
     @Override
@@ -55,6 +67,7 @@ import com.epms.repository.AuditLogRepository;
 import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -67,7 +80,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     private final AuditLogRepository auditLogRepository;
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(
             Integer userId,
             String action,
@@ -81,7 +94,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(
             Integer userId,
             String action,
@@ -94,15 +107,27 @@ public class AuditLogServiceImpl implements AuditLogService {
     ) {
         AuditLog auditLog = new AuditLog();
         auditLog.setUserId(userId);
-        auditLog.setAction(action);
-        auditLog.setEntityType(entityType);
+        auditLog.setAction(limit(action, 50));
+        auditLog.setEntityType(limit(entityType, 80));
         auditLog.setEntityId(entityId);
-        auditLog.setChangedColumn(changedColumn);
-        auditLog.setOldValue(oldValue);
-        auditLog.setNewValue(newValue);
-        auditLog.setReason(reason);
+        auditLog.setChangedColumn(limit(changedColumn, 240));
+        // Keep enough detail for row-level appraisal edit records while still protecting older databases.
+        auditLog.setOldValue(limit(oldValue, 1000));
+        auditLog.setNewValue(limit(newValue, 1000));
+        auditLog.setReason(limit(reason, 500));
 
         auditLogRepository.save(auditLog);
+    }
+
+    private String limit(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
     @Override
@@ -144,6 +169,7 @@ import com.epms.repository.AuditLogRepository;
 import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -156,7 +182,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     private final AuditLogRepository auditLogRepository;
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(
             Integer userId,
             String action,
@@ -170,7 +196,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(
             Integer userId,
             String action,
@@ -183,15 +209,27 @@ public class AuditLogServiceImpl implements AuditLogService {
     ) {
         AuditLog auditLog = new AuditLog();
         auditLog.setUserId(userId);
-        auditLog.setAction(action);
-        auditLog.setEntityType(entityType);
+        auditLog.setAction(limit(action, 50));
+        auditLog.setEntityType(limit(entityType, 80));
         auditLog.setEntityId(entityId);
-        auditLog.setChangedColumn(changedColumn);
-        auditLog.setOldValue(oldValue);
-        auditLog.setNewValue(newValue);
-        auditLog.setReason(reason);
+        auditLog.setChangedColumn(limit(changedColumn, 240));
+        // Keep enough detail for row-level appraisal edit records while still protecting older databases.
+        auditLog.setOldValue(limit(oldValue, 1000));
+        auditLog.setNewValue(limit(newValue, 1000));
+        auditLog.setReason(limit(reason, 500));
 
         auditLogRepository.save(auditLog);
+    }
+
+    private String limit(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
     @Override

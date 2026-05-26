@@ -16,7 +16,23 @@ public interface KpiTemplateCyclePeriodRepository extends JpaRepository<KpiTempl
 
     Optional<KpiTemplateCyclePeriod> findTopByCycle_IdOrderByPeriodNumberDesc(Integer cycleId);
 
+    Optional<KpiTemplateCyclePeriod> findTopByCycle_IdAndKpiForm_IdOrderByPeriodNumberDesc(
+            Integer cycleId,
+            Integer kpiFormId
+    );
+
     Optional<KpiTemplateCyclePeriod> findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
+            Integer cycleId,
+            Collection<KpiTemplateCyclePeriodStatus> statuses
+    );
+
+    Optional<KpiTemplateCyclePeriod> findTopByCycle_IdAndKpiForm_IdAndStatusInOrderByPeriodNumberDesc(
+            Integer cycleId,
+            Integer kpiFormId,
+            Collection<KpiTemplateCyclePeriodStatus> statuses
+    );
+
+    List<KpiTemplateCyclePeriod> findByCycle_IdAndStatusIn(
             Integer cycleId,
             Collection<KpiTemplateCyclePeriodStatus> statuses
     );

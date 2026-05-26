@@ -45,7 +45,19 @@ const DepartmentKpiCycleListPage = () => {
                 <td className="px-4 py-3 text-gray-600">{cycle.startDate} - {cycle.endDate}</td>
                 <td className="px-4 py-3 text-gray-600">{cycle.templates.map((t) => t.title).join(', ') || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{cycle.status}</td>
-                <td className="px-4 py-3 text-right"><Link className="kpi-tpl-btn-secondary mr-2 inline-flex no-underline" to={`/hr/department-kpi-cycle/${cycle.id}/edit`}>Edit</Link><button className="kpi-tpl-btn-primary" onClick={() => void toggle(cycle)}>{cycle.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</button></td>
+                <td className="px-4 py-3 text-right">
+                  {cycle.status === 'ACTIVE' ? (
+                    <span
+                      className="kpi-tpl-btn-secondary mr-2 inline-flex cursor-not-allowed opacity-50"
+                      title="Active cycles cannot be edited"
+                    >
+                      Edit
+                    </span>
+                  ) : (
+                    <Link className="kpi-tpl-btn-secondary mr-2 inline-flex no-underline" to={`/hr/department-kpi-cycle/${cycle.id}/edit`}>Edit</Link>
+                  )}
+                  <button className="kpi-tpl-btn-primary" type="button" onClick={() => void toggle(cycle)}>{cycle.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</button>
+                </td>
               </tr>
             ))}</tbody>
           </table>

@@ -16,6 +16,24 @@ const TOKEN_FREE_ENDPOINTS = [
 const normalizeUrl = (url?: string) => {
   if (!url) return '';
 
+const normalizeErrorResponseData = async (data: unknown): Promise<unknown> => {
+  if (typeof Blob !== 'undefined' && data instanceof Blob) {
+    const text = await data.text();
+    if (!text) return data;
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { message: text };
+    }
+  }
+
+  return data;
+};
+
+const isAuthEndpoint = (url?: string) => {
+  if (!url) return false;
+
   let normalized = url;
 
   if (normalized.startsWith('http')) {

@@ -1,8 +1,11 @@
 package com.epms.service.impl;
 
+import com.epms.dto.DepartmentKpiCycleRequestDto;
 import com.epms.dto.DepartmentKpiResultDto;
 import com.epms.dto.UpdateDepartmentKpiScoresRequest;
 import com.epms.entity.Department;
+import com.epms.entity.DepartmentKpiCycle;
+import com.epms.entity.DepartmentKpiCycleTemplate;
 import com.epms.entity.DepartmentKpiResult;
 import com.epms.entity.DepartmentKpiScore;
 import com.epms.entity.DepartmentKpiTemplate;
@@ -10,6 +13,7 @@ import com.epms.entity.DepartmentKpiTemplateRow;
 import com.epms.entity.User;
 import com.epms.entity.enums.DepartmentKpiResultStatus;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.DepartmentKpiCyclePeriodRepository;
 import com.epms.repository.DepartmentKpiCycleRepository;
 import com.epms.repository.DepartmentKpiCycleTemplateRepository;
@@ -32,12 +36,18 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CONFLICT;
 
 @ExtendWith(MockitoExtension.class)
 class DepartmentKpiServiceImplTest {
@@ -88,6 +98,53 @@ class DepartmentKpiServiceImplTest {
             assertThat(line.getScore()).isEqualTo(100.0);
             assertThat(line.getWeightedScore()).isEqualTo(40.0);
         });
+    }
+
+    @Test
+    void updateCycleRejectsActiveCycle() {
+        User hr = user(1);
+        DepartmentKpiCycle cycle = departmentCycle(KpiTemplateCycleStatus.ACTIVE);
+        authenticate(hr);
+        when(cycleRepository.findDetailById(10)).thenReturn(Optional.of(cycle));
+
+        assertThatThrownBy(() -> service.updateCycle(10, cycleUpdateRequest("Renamed", "HR update")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(CONFLICT));
+    }
+
+    @Test
+    void updateCycleRequiresEditReason() {
+        User hr = user(1);
+        DepartmentKpiCycle cycle = departmentCycle(KpiTemplateCycleStatus.DRAFT);
+        authenticate(hr);
+        when(cycleRepository.findDetailById(10)).thenReturn(Optional.of(cycle));
+
+        assertThatThrownBy(() -> service.updateCycle(10, cycleUpdateRequest("Renamed", "  ")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(BAD_REQUEST));
+    }
+
+    @Test
+    void createCycleRejectsTemplateOnActiveCycle() {
+        User hr = user(1);
+        DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
+                .id(100)
+                .title("Finance KPI")
+                .status(KpiFormStatus.ACTIVE)
+                .build();
+        DepartmentKpiCycle other = departmentCycle(KpiTemplateCycleStatus.ACTIVE);
+        other.setCycleName("Other");
+        DepartmentKpiCycleTemplate link = DepartmentKpiCycleTemplate.builder()
+                .cycle(other)
+                .template(template)
+                .build();
+        authenticate(hr);
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(cycleTemplateRepository.findConflictingLinks(any(), any(), anyCollection())).thenReturn(List.of(link));
+
+        assertThatThrownBy(() -> service.createCycle(cycleCreateRequest(List.of(100))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("already used by the active cycle");
     }
 
     @Test
@@ -151,6 +208,33 @@ class DepartmentKpiServiceImplTest {
         user.setPassword("password");
         user.setActive(true);
         return user;
+    }
+
+    private static DepartmentKpiCycle departmentCycle(KpiTemplateCycleStatus status) {
+        return DepartmentKpiCycle.builder()
+                .id(10)
+                .cycleName("Dept cycle")
+                .startDate(LocalDate.of(2026, 1, 1))
+                .endDate(LocalDate.of(2026, 3, 31))
+                .durationMonths(3)
+                .status(status)
+                .build();
+    }
+
+    private static DepartmentKpiCycleRequestDto cycleCreateRequest(List<Integer> templateIds) {
+        DepartmentKpiCycleRequestDto request = new DepartmentKpiCycleRequestDto();
+        request.setCycleName("New cycle");
+        request.setStartDate(LocalDate.of(2026, 1, 1));
+        request.setDurationMonths(3);
+        request.setTemplateIds(templateIds);
+        return request;
+    }
+
+    private static DepartmentKpiCycleRequestDto cycleUpdateRequest(String name, String editReason) {
+        DepartmentKpiCycleRequestDto request = cycleCreateRequest(List.of(100));
+        request.setCycleName(name);
+        request.setEditReason(editReason);
+        return request;
     }
 
     private static void authenticate(User user) {
