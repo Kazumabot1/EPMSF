@@ -4,26 +4,17 @@ import toast from 'react-hot-toast';
 import KpiRowReasonModal from '../../../components/hr/kpi-template/KpiRowReasonModal';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import {
+  calculateKpiCycleEndDate,
   collectTemplateIdsInActiveDepartmentCycles,
   filterDepartmentTemplatesForCycleSelection,
+  todayDateInputValue,
+  type KpiCycleDurationYears,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { departmentKpiCycleService, departmentKpiTemplateService } from '../../../services/departmentKpiService';
 import type { DepartmentKpiCycle, DepartmentKpiCycleRequest, DepartmentKpiTemplate } from '../../../types/departmentKpi';
 
 const fieldClass = 'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm';
 const CYCLE_DURATION_YEARS = [1, 2, 3, 4, 5];
-
-const calculateEndDate = (startDate: string, durationYears: number) => {
-  if (!startDate) return '';
-  const end = new Date(`${startDate}T00:00:00`);
-  end.setFullYear(end.getFullYear() + durationYears);
-  end.setDate(end.getDate() - 1);
-  if (Number.isNaN(end.getTime())) return '';
-  const year = end.getFullYear();
-  const month = String(end.getMonth() + 1).padStart(2, '0');
-  const day = String(end.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 const DepartmentKpiCycleEditorPage = () => {
   const { id } = useParams();
@@ -39,6 +30,7 @@ const DepartmentKpiCycleEditorPage = () => {
   const [saving, setSaving] = useState(false);
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<DepartmentKpiCycleRequest | null>(null);
+  const minimumStartDate = useMemo(() => todayDateInputValue(), []);
 
   useEffect(() => {
     const load = async () => {
@@ -111,6 +103,10 @@ const DepartmentKpiCycleEditorPage = () => {
       toast.error('Cycle name, start date, and templates are required.');
       return;
     }
+    if (startDate < minimumStartDate) {
+      toast.error('Start date cannot be in the past.');
+      return;
+    }
     const payload = buildPayload();
     if (isEdit && !Number.isNaN(cycleId)) {
       setPendingPayload(payload);
@@ -125,7 +121,7 @@ const DepartmentKpiCycleEditorPage = () => {
     void persistSave(pendingPayload, reason);
   };
 
-  const endDate = calculateEndDate(startDate, durationYears);
+  const endDate = calculateKpiCycleEndDate(startDate, durationYears as KpiCycleDurationYears);
 
   return (
     <div className="kpi-tpl-page">
@@ -138,7 +134,7 @@ const DepartmentKpiCycleEditorPage = () => {
           <div className="grid gap-5 md:grid-cols-3">
             <label className="flex flex-col gap-2 md:col-span-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Cycle name</span><input className={fieldClass} value={cycleName} onChange={(e) => setCycleName(e.target.value)} /></label>
             <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</span><select className={fieldClass} value={durationYears} onChange={(e) => setDurationYears(Number(e.target.value))}>{CYCLE_DURATION_YEARS.map((years) => <option key={years} value={years}>{years === 1 ? '1 year' : `${years} years`}</option>)}</select></label>
-            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</span><input className={fieldClass} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
+            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</span><input className={fieldClass} type="date" value={startDate} min={minimumStartDate} onChange={(e) => setStartDate(e.target.value)} /></label>
             <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">End date</span><input className={fieldClass} type="date" value={endDate} disabled /></label>
           </div>
           <div>

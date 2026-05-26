@@ -17,8 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -40,6 +42,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private final KpiItemRepository kpiItemRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -437,8 +440,14 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (request.getCycleName() == null || request.getCycleName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cycle name is required.");
         }
+        if (request.getStartDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date is required.");
+        }
+        if (request.getStartDate().isBefore(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be in the past.");
+        }
         Integer durationYears = normalizedDurationYears(request);
-        if (request.getStartDate() == null || !ALLOWED_DURATION_YEARS.contains(durationYears)) {
+        if (!ALLOWED_DURATION_YEARS.contains(durationYears)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duration must be between 1 and 5 years.");
         }
         if (request.getTemplateIds() == null || request.getTemplateIds().isEmpty()) {
@@ -663,6 +672,10 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     }
 
     private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
+        if (startDate.getMonth() == Month.FEBRUARY && startDate.getDayOfMonth() == 29
+                && !startDate.plusYears(durationYears).isLeapYear()) {
+            return startDate.plusYears(durationYears);
+        }
         return startDate.plusYears(durationYears).minusDays(1);
     }
 

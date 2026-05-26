@@ -30,6 +30,7 @@ import com.epms.repository.UserRepository;
 import com.epms.security.UserPrincipal;
 import com.epms.service.NotificationService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,7 +40,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -49,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -78,9 +83,19 @@ class DepartmentKpiServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private DepartmentKpiServiceImpl service;
+
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneId.systemDefault());
+
+    @BeforeEach
+    void setUpClock() {
+        lenient().when(clock.instant()).thenReturn(FIXED_CLOCK.instant());
+        lenient().when(clock.getZone()).thenReturn(FIXED_CLOCK.getZone());
+    }
 
     @AfterEach
     void clearSecurityContext() {
@@ -231,6 +246,109 @@ class DepartmentKpiServiceImplTest {
         assertThatThrownBy(() -> service.createCycle(request))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Duration must be between 1 and 5 years");
+    }
+
+    @Test
+    void createCycleRejectsMissingStartDate() {
+        DepartmentKpiCycleRequestDto request = cycleCreateRequest(List.of(100));
+        request.setStartDate(null);
+
+        assertThatThrownBy(() -> service.createCycle(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Start date is required.");
+    }
+
+    @Test
+    void createCycleRejectsPastStartDate() {
+        DepartmentKpiCycleRequestDto request = cycleCreateRequest(List.of(100));
+        request.setStartDate(LocalDate.of(2025, 12, 31));
+
+        assertThatThrownBy(() -> service.createCycle(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Start date cannot be in the past.");
+    }
+
+    @Test
+    void createCycleAcceptsTomorrowStartDate() {
+        User hr = user(1);
+        DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
+                .id(100)
+                .title("Finance KPI")
+                .status(KpiFormStatus.ACTIVE)
+                .build();
+        authenticate(hr);
+        AtomicReference<DepartmentKpiCycle> savedCycle = new AtomicReference<>();
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(cycleTemplateRepository.findConflictingLinks(any(), any(), anyCollection())).thenReturn(List.of());
+        when(templateRepository.findById(100)).thenReturn(Optional.of(template));
+        when(cycleRepository.saveAndFlush(any(DepartmentKpiCycle.class))).thenAnswer(invocation -> {
+            DepartmentKpiCycle cycle = invocation.getArgument(0);
+            cycle.setId(10);
+            savedCycle.set(cycle);
+            return cycle;
+        });
+        when(cycleRepository.findDetailById(10)).thenAnswer(invocation -> Optional.of(savedCycle.get()));
+        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(10)).thenReturn(Optional.empty());
+        when(cycleTemplateRepository.findByCycle_Id(10)).thenReturn(List.of(
+                DepartmentKpiCycleTemplate.builder().cycle(departmentCycle(KpiTemplateCycleStatus.DRAFT)).template(template).build()
+        ));
+        DepartmentKpiCycleRequestDto request = cycleCreateRequest(List.of(100));
+        request.setStartDate(LocalDate.of(2026, 1, 2));
+
+        var created = service.createCycle(request);
+
+        assertThat(created.getStartDate()).isEqualTo(LocalDate.of(2026, 1, 2));
+    }
+
+    @Test
+    void createCycleCalculatesBoundaryEndDates() {
+        User hr = user(1);
+        DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
+                .id(100)
+                .title("Finance KPI")
+                .status(KpiFormStatus.ACTIVE)
+                .build();
+        authenticate(hr);
+        AtomicReference<DepartmentKpiCycle> savedCycle = new AtomicReference<>();
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(cycleTemplateRepository.findConflictingLinks(any(), any(), anyCollection())).thenReturn(List.of());
+        when(templateRepository.findById(100)).thenReturn(Optional.of(template));
+        when(cycleRepository.saveAndFlush(any(DepartmentKpiCycle.class))).thenAnswer(invocation -> {
+            DepartmentKpiCycle cycle = invocation.getArgument(0);
+            cycle.setId(10);
+            savedCycle.set(cycle);
+            return cycle;
+        });
+        when(cycleRepository.findDetailById(10)).thenAnswer(invocation -> Optional.of(savedCycle.get()));
+        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(10)).thenReturn(Optional.empty());
+        when(cycleTemplateRepository.findByCycle_Id(10)).thenReturn(List.of(
+                DepartmentKpiCycleTemplate.builder().cycle(departmentCycle(KpiTemplateCycleStatus.DRAFT)).template(template).build()
+        ));
+
+        DepartmentKpiCycleRequestDto mayStart = cycleCreateRequest(List.of(100));
+        mayStart.setStartDate(LocalDate.of(2026, 5, 26));
+        mayStart.setDurationYears(5);
+        assertThat(service.createCycle(mayStart).getEndDate()).isEqualTo(LocalDate.of(2031, 5, 25));
+
+        DepartmentKpiCycleRequestDto yearEndStart = cycleCreateRequest(List.of(100));
+        yearEndStart.setStartDate(LocalDate.of(2026, 12, 31));
+        yearEndStart.setDurationYears(1);
+        assertThat(service.createCycle(yearEndStart).getEndDate()).isEqualTo(LocalDate.of(2027, 12, 30));
+
+        DepartmentKpiCycleRequestDto leapDayStart = cycleCreateRequest(List.of(100));
+        leapDayStart.setStartDate(LocalDate.of(2028, 2, 29));
+        leapDayStart.setDurationYears(1);
+        assertThat(service.createCycle(leapDayStart).getEndDate()).isEqualTo(LocalDate.of(2029, 2, 28));
+    }
+
+    @Test
+    void updateCycleRejectsPastStartDateForDraftCycle() {
+        DepartmentKpiCycleRequestDto request = cycleUpdateRequest("Renamed", "HR update");
+        request.setStartDate(LocalDate.of(2025, 12, 31));
+
+        assertThatThrownBy(() -> service.updateCycle(10, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Start date cannot be in the past.");
     }
 
     @Test

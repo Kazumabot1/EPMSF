@@ -12,6 +12,7 @@ import {
   filterKpiFormsForCycleSelection,
   formatKpiFormCycleOptionLabel,
   kpiStatusBadgeClass,
+  todayDateInputValue,
   type KpiCycleDurationYears,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
@@ -131,6 +132,7 @@ const KpiTemplateCycleEditorPage = () => {
       ),
     [templates, selectedFormIds, unavailableFormIds],
   );
+  const minimumStartDate = useMemo(() => todayDateInputValue(), []);
 
   const handleDurationChange = (value: KpiCycleDurationYears) => {
     setDurationYears(value);
@@ -151,6 +153,7 @@ const KpiTemplateCycleEditorPage = () => {
   const validate = (): string | null => {
     if (!cycleName.trim()) return 'Cycle name is required.';
     if (!startDate || !endDate) return 'Start date is required.';
+    if (startDate < minimumStartDate) return 'Start date cannot be in the past.';
     if (selectedFormIds.length === 0) return 'Select at least one KPI form.';
     const selectedTemplates = templates.filter((template) => selectedFormIds.includes(template.id));
     const inactiveTemplate = selectedTemplates.find((template) => template.status !== 'ACTIVE');
@@ -256,6 +259,7 @@ const KpiTemplateCycleEditorPage = () => {
                 required
                 type="date"
                 value={startDate}
+                min={minimumStartDate}
                 onChange={(event) => handleStartDateChange(event.target.value)}
                 className={fieldClass}
               />

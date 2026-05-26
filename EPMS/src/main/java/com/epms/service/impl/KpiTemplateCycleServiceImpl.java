@@ -27,8 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,6 +55,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -294,6 +297,9 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         if (dto.getStartDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date is required.");
         }
+        if (dto.getStartDate().isBefore(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be in the past.");
+        }
         Integer durationYears = normalizedDurationYears(dto);
         if (!ALLOWED_DURATION_YEARS.contains(durationYears)) {
             throw new ResponseStatusException(
@@ -365,6 +371,10 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     }
 
     private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
+        if (startDate.getMonth() == Month.FEBRUARY && startDate.getDayOfMonth() == 29
+                && !startDate.plusYears(durationYears).isLeapYear()) {
+            return startDate.plusYears(durationYears);
+        }
         return startDate.plusYears(durationYears).minusDays(1);
     }
 
