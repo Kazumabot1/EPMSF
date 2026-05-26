@@ -45,11 +45,12 @@ const DepartmentKpiTemplateListPage = () => {
         </header>
         <div className="kpi-tpl-card overflow-hidden p-0">
           <table className="w-full border-collapse text-sm">
-            <thead className="kpi-tpl-thead"><tr><th className="px-4 py-3 text-left">Title</th><th className="px-4 py-3 text-left">Departments</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
+            <thead className="kpi-tpl-thead"><tr><th className="px-4 py-3 text-left">Title</th><th className="px-4 py-3 text-left">Duration</th><th className="px-4 py-3 text-left">Departments</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr> : templates.length === 0 ? <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">No Department KPI templates yet.</td></tr> : templates.map((template) => (
+              {loading ? <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr> : templates.length === 0 ? <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No Department KPI templates yet.</td></tr> : templates.map((template) => (
                 <tr key={template.id} className="border-t border-gray-100">
                   <td className="px-4 py-3 font-semibold text-gray-900">{template.title}</td>
+                  <td className="px-4 py-3 text-gray-600">{template.durationLabel ?? (template.durationMonths === 12 ? '1 year' : `${template.durationMonths} months`)}</td>
                   <td className="px-4 py-3 text-gray-600">{template.departments.map((d) => d.departmentName).join(', ') || '-'}</td>
                   <td className="px-4 py-3 text-gray-600">{template.status}</td>
                   <td className="px-4 py-3 text-right">

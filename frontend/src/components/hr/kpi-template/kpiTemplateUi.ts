@@ -66,6 +66,8 @@ const toDateInputValue = (value: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const todayDateInputValue = (): string => toDateInputValue(new Date());
+
 export function calculateKpiTemplateEndDate(startDate: string, durationMonths: KpiTemplateDurationMonths): string {
   if (!startDate) return '';
   const start = new Date(`${startDate}T00:00:00`);
@@ -82,6 +84,9 @@ export function calculateKpiCycleEndDate(startDate: string, durationYears: KpiCy
   if (Number.isNaN(start.getTime())) return '';
   const end = new Date(start);
   end.setFullYear(end.getFullYear() + durationYears);
+  if (start.getMonth() === 1 && start.getDate() === 29 && end.getMonth() === 1 && end.getDate() === 28) {
+    return toDateInputValue(end);
+  }
   end.setDate(end.getDate() - 1);
   return toDateInputValue(end);
 }

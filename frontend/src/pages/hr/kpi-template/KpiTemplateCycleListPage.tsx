@@ -31,6 +31,25 @@ const statusLabel = (cycle: KpiTemplateCycleResponse) => {
 const graceLabel = (value: KpiGraceExtension | null | undefined) =>
   graceOptions.find((option) => option.value === value)?.label ?? '—';
 
+const hasGracePeriodEnded = (cycle: KpiTemplateCycleResponse) => {
+  if (!cycle.graceEndsAt) return false;
+  const graceEnd = new Date(cycle.graceEndsAt);
+  if (Number.isNaN(graceEnd.getTime())) return false;
+  return graceEnd <= new Date();
+};
+
+const getCycleEditDisabledReason = (cycle: KpiTemplateCycleResponse) => {
+  if (cycle.status === 'ACTIVE') return 'Active cycles cannot be edited';
+  if (cycle.status === 'PENDING_APPROVAL') return 'Cycles pending CEO approval cannot be edited';
+  if (cycle.status === 'CLOSING' && cycle.earlyCloseReviewDecision === 'APPROVED') {
+    return 'CEO approved closure; this cycle can no longer be edited';
+  }
+  if (cycle.status === 'CLOSING' && hasGracePeriodEnded(cycle)) {
+    return 'Grace period has ended; this cycle can no longer be edited';
+  }
+  return null;
+};
+
 const isBeforeOfficialEndDate = (cycle: KpiTemplateCycleResponse) => {
   const endValue = cycle.currentPeriodEndDate ?? cycle.endDate;
   if (!endValue) return false;
@@ -191,6 +210,7 @@ const KpiTemplateCycleListPage = () => {
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {sorted.map((cycle, index) => {
                       const locked = cycle.status === 'PENDING_APPROVAL';
+                      const editDisabledReason = getCycleEditDisabledReason(cycle);
                       return (
                       <tr
                         key={cycle.id}
@@ -238,10 +258,10 @@ const KpiTemplateCycleListPage = () => {
                             >
                               View
                             </button>
-                            {cycle.status === 'ACTIVE' ? (
+                            {editDisabledReason ? (
                               <span
                                 className="inline-flex h-9 cursor-not-allowed items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-400 opacity-50"
-                                title="Active cycles cannot be edited"
+                                title={editDisabledReason}
                               >
                                 Edit
                               </span>

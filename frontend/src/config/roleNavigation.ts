@@ -364,6 +364,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     {
+      label: 'Approval',
+      path: '/executive/approval/kpi',
+      icon: 'bi-shield-check',
+      children: [
+        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
+        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check', end: true },
+      ],
+    },
+    {
       label: 'Reports',
       path: '/executive/reports',
       icon: 'bi-bar-chart-line',

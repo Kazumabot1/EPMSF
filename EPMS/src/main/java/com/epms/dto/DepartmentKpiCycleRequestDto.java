@@ -18,7 +18,7 @@ public class DepartmentKpiCycleRequestDto {
     private String cycleName;
     @NotNull
     private LocalDate startDate;
-    @NotNull
+    private Integer durationYears;
     private Integer durationMonths;
     @NotEmpty
     @Builder.Default

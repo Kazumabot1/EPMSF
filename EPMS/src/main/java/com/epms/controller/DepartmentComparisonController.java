@@ -6,12 +6,15 @@ import com.epms.dto.DepartmentComparisonSummaryDto;
 import com.epms.dto.DepartmentComparisonTeamDto;
 import com.epms.dto.GenericApiResponse;
 import com.epms.entity.Department;
+import com.epms.entity.DepartmentKpiResult;
 import com.epms.entity.Employee;
 import com.epms.entity.EmployeeDepartment;
 import com.epms.entity.Team;
 import com.epms.entity.User;
+import com.epms.entity.enums.DepartmentKpiResultStatus;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.DepartmentRepository;
+import com.epms.repository.DepartmentKpiResultRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
@@ -34,6 +37,7 @@ public class DepartmentComparisonController {
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
+    private final DepartmentKpiResultRepository departmentKpiResultRepository;
 
     @GetMapping("/comparison")
     @Transactional(readOnly = true)
@@ -45,7 +49,11 @@ public class DepartmentComparisonController {
         List<DepartmentComparisonSummaryDto> departments = departmentRepository
                 .searchForComparison(cleanSearch)
                 .stream()
-                .map(this::toSummaryDto)
+                .map(department -> {
+                    DepartmentComparisonSummaryDto dto = toSummaryDto(department);
+                    applyLatestDepartmentKpi(dto, department.getId());
+                    return dto;
+                })
                 .toList();
 
         return ResponseEntity.ok(
@@ -106,6 +114,7 @@ public class DepartmentComparisonController {
         dto.setEmployees(employees);
         dto.setTeams(teams);
         dto.setTeamCount((long) teams.size());
+        applyLatestDepartmentKpi(dto, department.getId());
 
         return ResponseEntity.ok(
                 GenericApiResponse.success("Department comparison detail fetched", dto)
@@ -121,6 +130,48 @@ public class DepartmentComparisonController {
                 department.getCreatedAt(),
                 department.getCreatedBy()
         );
+    }
+
+    private void applyLatestDepartmentKpi(DepartmentComparisonSummaryDto dto, Integer departmentId) {
+        departmentKpiResultRepository.findTopByDepartment_IdAndStatusOrderByFinalizedAtDesc(
+                departmentId,
+                DepartmentKpiResultStatus.FINALIZED
+        ).ifPresent(result -> {
+            dto.setDepartmentKpiScore(result.getTotalScore());
+            dto.setDepartmentKpiWeightedScore(result.getTotalWeightedScore());
+            dto.setDepartmentKpiTemplateTitle(result.getTemplate() == null ? null : result.getTemplate().getTitle());
+            dto.setDepartmentKpiPeriodStartDate(kpiPeriodStart(result));
+            dto.setDepartmentKpiPeriodEndDate(kpiPeriodEnd(result));
+            dto.setDepartmentKpiFinalizedAt(result.getFinalizedAt());
+        });
+    }
+
+    private void applyLatestDepartmentKpi(DepartmentComparisonDetailDto dto, Integer departmentId) {
+        departmentKpiResultRepository.findTopByDepartment_IdAndStatusOrderByFinalizedAtDesc(
+                departmentId,
+                DepartmentKpiResultStatus.FINALIZED
+        ).ifPresent(result -> {
+            dto.setDepartmentKpiScore(result.getTotalScore());
+            dto.setDepartmentKpiWeightedScore(result.getTotalWeightedScore());
+            dto.setDepartmentKpiTemplateTitle(result.getTemplate() == null ? null : result.getTemplate().getTitle());
+            dto.setDepartmentKpiPeriodStartDate(kpiPeriodStart(result));
+            dto.setDepartmentKpiPeriodEndDate(kpiPeriodEnd(result));
+            dto.setDepartmentKpiFinalizedAt(result.getFinalizedAt());
+        });
+    }
+
+    private java.time.LocalDate kpiPeriodStart(DepartmentKpiResult result) {
+        if (result.getCyclePeriod() != null) {
+            return result.getCyclePeriod().getStartDate();
+        }
+        return result.getTemplate() == null ? null : result.getTemplate().getStartDate();
+    }
+
+    private java.time.LocalDate kpiPeriodEnd(DepartmentKpiResult result) {
+        if (result.getCyclePeriod() != null) {
+            return result.getCyclePeriod().getEndDate();
+        }
+        return result.getTemplate() == null ? null : result.getTemplate().getEndDate();
     }
 
     private DepartmentComparisonTeamDto toTeamDto(Team team) {

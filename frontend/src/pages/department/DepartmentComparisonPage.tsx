@@ -16,7 +16,8 @@ type Side = 'left' | 'right';
 
 type DepartmentPerformance = {
   department: DepartmentComparisonDetail;
-  score: number;
+  structureScore: number;
+  kpiTotalScore: number | null;
   teamCoverage: number;
   activeTeamRate: number;
   totalEmployees: number;
@@ -43,6 +44,8 @@ const numberValue = (value?: number | null) => {
 const formatNumber = (value?: number | null) => numberValue(value).toLocaleString();
 
 const formatPercent = (value?: number | null) => `${numberValue(value).toFixed(0)}%`;
+
+const formatKpiScore = (value?: number | null) => (value == null ? 'No KPI score' : value.toFixed(2));
 
 const formatDate = (value?: string | null) => {
   if (!value) {
@@ -99,7 +102,8 @@ const getDepartmentPerformance = (
 
   return {
     department,
-    score: Math.round(clamp(score)),
+    structureScore: Math.round(clamp(score)),
+    kpiTotalScore: department.departmentKpiWeightedScore ?? null,
     teamCoverage: Math.round(teamCoverage),
     activeTeamRate: Math.round(activeTeamRate),
     totalEmployees,
@@ -131,7 +135,14 @@ const DepartmentComparisonPage = () => {
   const performanceRows = useMemo(() => {
     return departmentDetails
       .map((department) => getDepartmentPerformance(department, departmentDetails))
-      .sort((first, second) => second.score - first.score);
+      .sort((first, second) => {
+        if (first.kpiTotalScore == null && second.kpiTotalScore == null) {
+          return first.department.departmentName.localeCompare(second.department.departmentName);
+        }
+        if (first.kpiTotalScore == null) return 1;
+        if (second.kpiTotalScore == null) return -1;
+        return second.kpiTotalScore - first.kpiTotalScore;
+      });
   }, [departmentDetails]);
 
   const overview = useMemo(() => {
@@ -158,11 +169,12 @@ const DepartmentComparisonPage = () => {
       (sum, department) => sum + getTeamMemberCount(department),
       0,
     );
-    const averageScore = performanceRows.length
-      ? performanceRows.reduce((sum, row) => sum + row.score, 0) / performanceRows.length
-      : 0;
+    const scoredRows = performanceRows.filter((row) => row.kpiTotalScore != null);
+    const averageScore = scoredRows.length
+      ? scoredRows.reduce((sum, row) => sum + numberValue(row.kpiTotalScore), 0) / scoredRows.length
+      : null;
     const teamCoverage = totalEmployees > 0 ? clamp((totalTeamMembers / totalEmployees) * 100) : 0;
-    const bestDepartment = performanceRows[0];
+    const bestDepartment = scoredRows[0];
     const largestDepartment = [...performanceRows].sort(
       (first, second) => second.totalEmployees - first.totalEmployees,
     )[0];
@@ -317,8 +329,8 @@ const DepartmentComparisonPage = () => {
         </div>
 
         <div className="dept-compare-hero-score">
-          <span>Organization Score</span>
-          <strong>{formatPercent(overview.averageScore)}</strong>
+          <span>Department KPI Total Score</span>
+          <strong>{formatKpiScore(overview.averageScore)}</strong>
           <small>{formatNumber(overview.totalDepartments)} department(s) tracked</small>
         </div>
       </section>
@@ -326,12 +338,12 @@ const DepartmentComparisonPage = () => {
       <section className="dept-compare-overview-grid">
         <PerformanceCard
           icon="bi-speedometer2"
-          label="Department Performance Score"
-          value={detailLoading ? 'Loading...' : formatPercent(overview.averageScore)}
+          label="Department KPI Total Score"
+          value={detailLoading ? 'Loading...' : formatKpiScore(overview.averageScore)}
           detail={
             overview.bestDepartment
               ? `Top: ${overview.bestDepartment.department.departmentName}`
-              : 'Calculated from department structure'
+              : 'No finalized Department KPI scores yet'
           }
         />
 
@@ -363,8 +375,8 @@ const DepartmentComparisonPage = () => {
         <div className="dept-compare-ranking-card">
           <div className="dept-compare-section-head">
             <div>
-              <h2>Department Ranking</h2>
-              <p>Performance score uses employee scale, active teams, and team coverage.</p>
+              <h2>All Department KPI Total Score</h2>
+              <p>Ranking uses HR-finalized Department KPI total scores.</p>
             </div>
             <span>{detailLoading ? 'Refreshing...' : `${performanceRows.length} ranked`}</span>
           </div>
@@ -388,7 +400,7 @@ const DepartmentComparisonPage = () => {
           <InsightRow
             label="Best Overall"
             value={overview.bestDepartment?.department.departmentName}
-            meta={overview.bestDepartment ? formatPercent(overview.bestDepartment.score) : '—'}
+            meta={overview.bestDepartment ? formatKpiScore(overview.bestDepartment.kpiTotalScore) : '—'}
           />
           <InsightRow
             label="Largest Workforce"
@@ -409,9 +421,8 @@ const DepartmentComparisonPage = () => {
             }
           />
           <p className="dept-compare-note">
-            Score is calculated from data returned by /api/departments/comparison and
-            /api/departments/id/comparison. Add backend KPI averages later if you want real KPI
-            score weighting.
+            Department KPI Total Score is calculated by HR and populated from the latest finalized
+            Department KPI result for each department.
           </p>
         </div>
       </section>
@@ -502,7 +513,7 @@ const DepartmentComparisonPage = () => {
                   <th>No.</th>
                   <th>Department Name</th>
                   <th>Department Code</th>
-                  <th>Score</th>
+                  <th>Department KPI Total Score</th>
                   <th>Employees</th>
                   <th>Teams</th>
                   <th>Action</th>
@@ -536,7 +547,7 @@ const DepartmentComparisonPage = () => {
                       </td>
 
                       <td>{display(department.departmentCode)}</td>
-                      <td>{performance ? formatPercent(performance.score) : '—'}</td>
+                      <td>{performance ? formatKpiScore(performance.kpiTotalScore) : '—'}</td>
                       <td>{performance ? formatNumber(performance.totalEmployees) : '—'}</td>
                       <td>{performance ? formatNumber(performance.teamCount) : '—'}</td>
 
@@ -549,7 +560,7 @@ const DepartmentComparisonPage = () => {
                             type="button"
                             className="dept-compare-btn dept-compare-btn-soft"
                             onClick={() => addDepartmentToSide(department, 'left')}
-                            disabled={rightDepartment?.id === department.id}
+                            disabled={Boolean(leftDepartment) || rightDepartment?.id === department.id}
                           >
                             Add Left
                           </button>
@@ -558,7 +569,7 @@ const DepartmentComparisonPage = () => {
                             type="button"
                             className="dept-compare-btn dept-compare-btn-soft"
                             onClick={() => addDepartmentToSide(department, 'right')}
-                            disabled={leftDepartment?.id === department.id}
+                            disabled={Boolean(rightDepartment) || leftDepartment?.id === department.id}
                           >
                             Add Right
                           </button>
@@ -588,8 +599,8 @@ const DepartmentComparisonPage = () => {
           onClose={() => setModalDepartment(null)}
           onAddLeft={() => addDepartmentToSide(modalDepartment, 'left')}
           onAddRight={() => addDepartmentToSide(modalDepartment, 'right')}
-          leftDisabled={rightDepartment?.id === modalDepartment.id}
-          rightDisabled={leftDepartment?.id === modalDepartment.id}
+          leftDisabled={Boolean(leftDepartment) || rightDepartment?.id === modalDepartment.id}
+          rightDisabled={Boolean(rightDepartment) || leftDepartment?.id === modalDepartment.id}
         />
       )}
     </div>
@@ -619,11 +630,11 @@ const RankingBar = ({ row, rank }: { row: DepartmentPerformance; rank: number })
     <div className="dept-compare-rank-head">
       <span>#{rank}</span>
       <strong>{row.department.departmentName}</strong>
-      <em>{formatPercent(row.score)}</em>
+      <em>{formatKpiScore(row.kpiTotalScore)}</em>
     </div>
 
     <div className="dept-compare-rank-track">
-      <div className="dept-compare-rank-fill" style={{ width: `${clamp(row.score)}%` }} />
+      <div className="dept-compare-rank-fill" style={{ width: `${row.kpiTotalScore == null ? 0 : clamp(row.kpiTotalScore)}%` }} />
     </div>
 
     <div className="dept-compare-rank-meta">
@@ -682,7 +693,7 @@ const ComparisonSlot = ({ title, department, allDepartments, onClear }: Comparis
               activeText="Active"
               inactiveText="Inactive"
             />
-            {performance && <strong>{formatPercent(performance.score)} score</strong>}
+            {performance && <strong>{formatKpiScore(performance.kpiTotalScore)}</strong>}
           </div>
         </>
       ) : (
@@ -719,8 +730,8 @@ const DepartmentComparePanel = ({
 
       <div className="dept-compare-score-strip">
         <div>
-          <span>Performance Score</span>
-          <strong>{formatPercent(performance.score)}</strong>
+          <span>Department KPI Total Score</span>
+          <strong>{formatKpiScore(performance.kpiTotalScore)}</strong>
         </div>
         <div>
           <span>Team Coverage</span>
@@ -808,8 +819,8 @@ const DepartmentDetailModal = ({
         <div className="dept-compare-modal-body">
           <div className="dept-compare-score-strip modal-score">
             <div>
-              <span>Performance Score</span>
-              <strong>{formatPercent(performance.score)}</strong>
+              <span>Department KPI Total Score</span>
+              <strong>{formatKpiScore(performance.kpiTotalScore)}</strong>
             </div>
             <div>
               <span>Team Coverage</span>

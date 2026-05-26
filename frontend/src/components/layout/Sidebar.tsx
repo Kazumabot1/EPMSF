@@ -139,7 +139,7 @@ const roleLabel =
           { to: '/hr/department', label: 'Departments', icon: 'bi bi-building' },
           {
             to: '/hr/department-comparison',
-            label: 'Departments Comparison',
+            label: 'Department Comparison',
             icon: 'bi bi-columns-gap',
             end: true,
           },
@@ -339,6 +339,7 @@ const roleLabel =
         icon: 'bi bi-shield-check',
         children: [
           { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+          { to: '/executive/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check', end: true },
         ],
       },
       {
@@ -428,8 +429,13 @@ const departmentHeadNavItems: NavItem[] = [
   ) : null;
 
   const hasActiveChild = useCallback(
-      (item: NavItem) =>
-          item.children?.some((child) => location.pathname.startsWith(child.to)) ?? false,
+      (item: NavItem): boolean =>
+          item.children?.some((child) => {
+            const childActive = child.end
+                ? location.pathname === child.to
+                : location.pathname === child.to || location.pathname.startsWith(`${child.to}/`);
+            return childActive || hasActiveChild(child);
+          }) ?? false,
       [location.pathname],
   );
 
@@ -471,6 +477,51 @@ const departmentHeadNavItems: NavItem[] = [
 
       return next;
     });
+  };
+
+  const renderSubmenuItem = (child: NavItem, depth = 0) => {
+    const childExpanded = expanded.has(child.to);
+    const childActive = child.end
+        ? location.pathname === child.to
+        : location.pathname === child.to || location.pathname.startsWith(`${child.to}/`) || hasActiveChild(child);
+
+    if (child.children?.length) {
+      return (
+          <div key={child.to} className="hr-submenu-group">
+            <button
+                type="button"
+                className={`hr-submenu-link hr-submenu-toggle ${childActive ? 'active' : ''}`}
+                style={{ marginLeft: depth * 12 }}
+                onClick={() => toggleParent(child)}
+            >
+              <i className={child.icon} />
+              <span>{child.label}</span>
+              <i className={`bi ${childExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} hr-submenu-caret`} />
+            </button>
+            {childExpanded && (
+                <div className="hr-submenu hr-submenu-nested">
+                  {child.children.map((grandchild) => renderSubmenuItem(grandchild, depth + 1))}
+                </div>
+            )}
+          </div>
+      );
+    }
+
+    return (
+        <NavLink
+            key={child.to}
+            to={child.to}
+            end={child.end}
+            className={({ isActive }) =>
+                `hr-submenu-link ${isActive ? 'active' : ''}`
+            }
+            style={{ marginLeft: depth * 12 }}
+        >
+          <i className={child.icon} />
+          <span>{child.label}</span>
+          {child.to.includes('notifications') && notificationBadge}
+        </NavLink>
+    );
   };
 
   return (
@@ -543,20 +594,7 @@ const departmentHeadNavItems: NavItem[] = [
 
                   {!collapsed && isExpanded && (
                       <div className="hr-submenu">
-                        {item.children.map((child) => (
-                            <NavLink
-                                key={child.to}
-                                to={child.to}
-                                end={child.end}
-                                className={({ isActive }) =>
-                                    `hr-submenu-link ${isActive ? 'active' : ''}`
-                                }
-                            >
-                              <i className={child.icon} />
-                              <span>{child.label}</span>
-                              {child.to.includes('notifications') && notificationBadge}
-                            </NavLink>
-                        ))}
+                        {item.children.map((child) => renderSubmenuItem(child))}
                       </div>
                   )}
                 </div>
