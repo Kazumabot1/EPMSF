@@ -3,6 +3,12 @@ import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { authStorage } from '../../../services/authStorage';
 import { LaunchReadinessSection } from './campaign-setup/components/LaunchReadinessSection';
+import { CampaignStat } from './campaign-setup/components/CampaignStat';
+import { CampaignInfoStep } from './campaign-setup/components/CampaignInfoStep';
+import { TargetEmployeesStep } from './campaign-setup/components/TargetEmployeesStep';
+import { EvaluatorAssignmentsStep } from './campaign-setup/components/EvaluatorAssignmentsStep';
+import { QuestionReviewStep } from './campaign-setup/components/QuestionReviewStep';
+import { useQuestionReviewExpansion } from './campaign-setup/hooks/useQuestionReviewExpansion';
 import {
   DEFAULT_EVALUATOR_CONFIG,
   getPeerReviewerCount,
@@ -10,9 +16,7 @@ import {
   normalizeEvaluatorConfig,
 } from '../../../types/feedbackCampaign';
 import type {
-  CreateFeedbackCampaignInput,
   FeedbackCampaign,
-  FeedbackCampaignStatus,
   FeedbackAssignmentGenerationResponse,
   EvaluatorConfigInput,
   FeedbackCampaignTargetsResponse,
@@ -28,384 +32,71 @@ import type {
   FeedbackTargetEmployee,
   ManualAssignmentInput,
 } from '../../../types/feedbackCampaign';
+import type {
+  CampaignInfoForm,
+  DraftEvaluatorAddition,
+  FieldErrors,
+  ReadinessFilter,
+  SetupStepKey,
+} from './campaign-setup/types/campaignSetupTypes';
+import {
+  DESCRIPTION_LIMIT,
+  INSTRUCTIONS_LIMIT,
+  INSTRUCTION_TEMPLATE,
+  TIME_OPTIONS,
+  defaultForm,
+  relationshipOptions,
+  RELATIONSHIP_ORDER,
+  statusDescriptions,
+  statusLabels,
+} from './campaign-setup/utils/campaignSetupConstants';
+import {
+  assignmentKey,
+  assignmentReadinessClass,
+  assignmentSourceLabel,
+  assignmentStatusLabel,
+  completionLabel,
+  formatTimeLabel,
+  formatWindow,
+  initials,
+  personSubtitle,
+  readinessClass,
+  readinessLabel,
+  recipientDetailItems,
+  relationshipIcon,
+  relationshipLabel,
+  statusClass,
+} from './campaign-setup/utils/campaignSetupFormatters';
+import {
+  allocateEqualPercentages,
+  formatPercent,
+  normalizeList,
+  roundPercent,
+  sameIds,
+} from './campaign-setup/utils/campaignSetupCollections';
+import {
+  emptyActivationReadiness,
+  emptyAssignmentPreview,
+  emptyQuestionReview,
+  emptyScoringConfig,
+  emptyTargetsResponse,
+} from './campaign-setup/utils/campaignSetupEmptyState';
+import { cleanEvaluatorNote, getLaunchBannerCopy } from './campaign-setup/utils/campaignSetupMessages';
+import {
+  buildQuestionCompetencies,
+  getQuestionSectionCode,
+  isReviewQuestionScored,
+  readQuestionDragData,
+  sortQuestionItems,
+  writeQuestionDragData,
+} from './campaign-setup/utils/campaignSetupQuestionUtils';
+import { buildCampaignPayload, campaignToForm, validateCampaignInfoForm } from './campaign-setup/utils/campaignSetupValidation';
 
 interface Props {
   onCampaignCreated: (campaign: FeedbackCampaign) => void;
 }
 
-type FieldErrors = Record<string, string>;
-type ReadinessFilter = 'ALL' | 'AVAILABLE' | 'READY' | 'WARNINGS' | 'BLOCKED';
-type SetupStepKey = 'foundation' | 'targets' | 'evaluators' | 'questions' | 'launch';
-type QuestionDragPayload =
-    | { kind: 'competency'; groupKey: string; sectionCode: string }
-    | { kind: 'question'; groupKey: string; sectionCode: string; questionCode: string };
-
-type CampaignInfoForm = {
-  name: string;
-  reviewYear: number | '';
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  description: string;
-  instructions: string;
-  autoSubmitCompletedDraftsOnClose: boolean;
-  managerFeedbackAnonymous: boolean;
-  peerFeedbackAnonymous: boolean;
-  subordinateFeedbackAnonymous: boolean;
-  selfFeedbackAnonymous: boolean;
-  redistributeMissingRelationshipWeight: boolean;
-};
-
-const DEFAULT_CAMPAIGN_TYPE = '360 Feedback';
-const DESCRIPTION_LIMIT = 2000;
-const INSTRUCTIONS_LIMIT = 4000;
-const INSTRUCTION_TEMPLATE = 'Rate recent, observable work behavior. Use specific examples where possible, keep comments constructive, and avoid personal or unrelated remarks.';
-
-const padTime = (value: number) => String(value).padStart(2, '0');
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
-  const hours = Math.floor(index / 2);
-  const minutes = index % 2 === 0 ? 0 : 30;
-  return `${padTime(hours)}:${padTime(minutes)}`;
-});
-
-const buildLocalDateTime = (date: string, time: string) => date && time ? `${date}T${time}` : '';
-const formatTimeLabel = (time: string) => {
-  const [hourRaw, minuteRaw] = time.split(':').map(Number);
-  const date = new Date();
-  date.setHours(hourRaw, minuteRaw, 0, 0);
-  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
-};
-
-const statusLabels: Record<FeedbackCampaignStatus, string> = {
-  DRAFT: 'Draft',
-  READY_TO_ACTIVATE: 'Ready to activate',
-  ACTIVE: 'Active',
-  CLOSED: 'Closed',
-  PUBLISHED: 'Published',
-};
-
-const statusDescriptions: Record<FeedbackCampaignStatus, string> = {
-  DRAFT: 'Editable setup draft',
-  READY_TO_ACTIVATE: 'Setup passed validation',
-  ACTIVE: 'Collecting feedback',
-  CLOSED: 'Submission closed',
-  PUBLISHED: 'Reports published',
-};
-
-const normalizeDateTimeForApi = (value: string) => value.length === 16 ? `${value}:00` : value;
-
-const defaultForm = (): CampaignInfoForm => ({
-  name: '',
-  reviewYear: '',
-  startDate: '',
-  startTime: '',
-  endDate: '',
-  endTime: '',
-  description: '',
-  instructions: '',
-  autoSubmitCompletedDraftsOnClose: false,
-  managerFeedbackAnonymous: false,
-  peerFeedbackAnonymous: true,
-  subordinateFeedbackAnonymous: true,
-  selfFeedbackAnonymous: false,
-  redistributeMissingRelationshipWeight: true,
-});
-
-const emptyTargetsResponse = (campaign?: FeedbackCampaign | null): FeedbackCampaignTargetsResponse => ({
-  campaignId: campaign?.id ?? 0,
-  campaignName: campaign?.name ?? '',
-  campaignStatus: campaign?.status ?? 'DRAFT',
-  targetCount: 0,
-  readyCount: 0,
-  warningCount: 0,
-  blockedCount: 0,
-  targets: [],
-  warnings: [],
-});
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.replace('T', ' ');
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric', month: 'short', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: true,
-  }).format(date);
-};
-
-const formatWindow = (campaign: FeedbackCampaign) => `${formatDateTime(campaign.startAt ?? campaign.startDate)} - ${formatDateTime(campaign.endAt ?? campaign.endDate)}`;
-const statusClass = (status: FeedbackCampaignStatus | string) => `hfd-status-badge ${String(status).replace(/_/g, '-')}`;
-
-const completionLabel = (campaign: FeedbackCampaign) => {
-  if (!campaign.assignmentCount || campaign.assignmentCount <= 0) return 'Not generated';
-  return `${campaign.assignmentCount} assignment${campaign.assignmentCount === 1 ? '' : 's'}`;
-};
-
-const CampaignStat = ({ icon, label, value, note, tone }: { icon: string; label: string; value: number | string; note: string; tone: string }) => (
-    <div className={`hfdq-stat-card ${tone}`}>
-      <span className="hfdq-stat-icon"><i className={icon} /></span>
-      <div>
-        <small>{label}</small>
-        <strong>{value}</strong>
-        <em>{note}</em>
-      </div>
-    </div>
-);
-
-const normalizeList = (ids: Iterable<number>) => Array.from(new Set(ids)).sort((left, right) => left - right);
-const sameIds = (left: number[], right: number[]) => left.length === right.length && left.every((id, index) => id === right[index]);
-
-const readinessLabel = (item: FeedbackTargetCandidate) => {
-  if (!item.eligible) return 'Not available';
-  if (item.warnings.length > 0) return 'Needs review';
-  return 'Ready';
-};
-
-const readinessClass = (item: FeedbackTargetCandidate) => {
-  if (!item.eligible) return 'blocked';
-  if (item.warnings.length > 0) return 'warning';
-  return 'ready';
-};
-
-
-const recipientDetailItems = (item: FeedbackTargetCandidate) => [
-  { label: 'Manager', value: item.managerName ?? 'Not set' },
-  { label: 'Possible peers', value: String(item.peerCandidateCount ?? 0) },
-  { label: 'Direct reports', value: String(item.subordinateCandidateCount ?? 0) },
-  { label: 'Teams', value: item.activeTeamNames.length > 0 ? item.activeTeamNames.join(', ') : 'Not set' },
-];
-
-
-const questionDragMime = 'application/x-epms-question-review';
-const sortQuestionItems = <T extends { sectionOrder?: number | null; displayOrder?: number | null; questionCode?: string | null }>(items: T[]) =>
-    [...items].sort((left, right) =>
-        Number(left.sectionOrder ?? 9999) - Number(right.sectionOrder ?? 9999)
-        || Number(left.displayOrder ?? 9999) - Number(right.displayOrder ?? 9999)
-        || String(left.questionCode ?? '').localeCompare(String(right.questionCode ?? '')),
-    );
-
-const normalizeCompetencyTitle = (title?: string | null, code?: string | null) => {
-  const cleanTitle = String(title ?? '').trim();
-  const genericTitle = !cleanTitle || cleanTitle === 'Questions' || /^competency\s*\d+$/i.test(cleanTitle);
-  if (!genericTitle) return cleanTitle;
-  const cleanCode = String(code ?? '').trim();
-  return cleanCode || 'Unmapped competency';
-};
-
-const isReviewQuestionScored = (question: FeedbackCampaignQuestionGroup['questions'][number]) => {
-  const responseType = String(question.responseType ?? '').toUpperCase();
-  const scoringBehavior = String(question.scoringBehavior ?? '').toUpperCase();
-  return scoringBehavior === 'SCORED' && (responseType === 'RATING' || responseType === 'RATING_WITH_COMMENT');
-};
-
-const sameStringSet = (left: Set<string>, right: Set<string>) =>
-    left.size === right.size && Array.from(left).every(value => right.has(value));
-
-const roundPercent = (value: number) => Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
-
-const formatPercent = (value?: number | null) => {
-  const rounded = roundPercent(Number(value ?? 0));
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-};
-
-const allocateEqualPercentages = (count: number) => {
-  if (count <= 0) return [];
-  const baseCents = Math.floor(10000 / count);
-  let remaining = 10000 - (baseCents * count);
-  return Array.from({ length: count }, () => {
-    const cents = baseCents + (remaining > 0 ? 1 : 0);
-    if (remaining > 0) remaining -= 1;
-    return roundPercent(cents / 100);
-  });
-};
-
-type QuestionCompetencyGroup = {
-  sectionCode: string;
-  sectionTitle: string;
-  sectionOrder: number;
-  questions: FeedbackCampaignQuestionGroup['questions'];
-};
-
-const getQuestionSectionCode = (question: FeedbackCampaignQuestionGroup['questions'][number]) =>
-    String(question.competencyCode || question.sectionCode || 'UNMAPPED').trim();
-
-const buildQuestionCompetencies = (questions: FeedbackCampaignQuestionGroup['questions'] = []): QuestionCompetencyGroup[] => {
-  const bySection = new Map<string, QuestionCompetencyGroup>();
-  sortQuestionItems(questions).forEach((question) => {
-    const sectionCode = getQuestionSectionCode(question);
-    const existing = bySection.get(sectionCode) ?? {
-      sectionCode,
-      sectionTitle: normalizeCompetencyTitle(question.competencyName || question.sectionTitle, question.competencyCode),
-      sectionOrder: Number(question.sectionOrder ?? bySection.size + 1),
-      questions: [],
-    };
-    existing.sectionTitle = normalizeCompetencyTitle(question.competencyName || question.sectionTitle || existing.sectionTitle, question.competencyCode);
-    existing.sectionOrder = Math.min(existing.sectionOrder, Number(question.sectionOrder ?? existing.sectionOrder));
-    existing.questions = sortQuestionItems([...existing.questions, question]);
-    bySection.set(sectionCode, existing);
-  });
-  return Array.from(bySection.values()).sort((left, right) => left.sectionOrder - right.sectionOrder || left.sectionTitle.localeCompare(right.sectionTitle));
-};
-
-const emptyAssignmentPreview = (campaign?: FeedbackCampaign | null): FeedbackAssignmentGenerationResponse => ({
-  campaignId: campaign?.id ?? 0,
-  totalTargets: 0,
-  totalEvaluatorsGenerated: 0,
-  evaluatorConfig: null,
-  requests: [],
-  assignmentDetails: [],
-  warnings: [],
-});
-
-
-const emptyActivationReadiness = (campaign?: FeedbackCampaign | null): FeedbackCampaignActivationReadiness => ({
-  campaignId: campaign?.id ?? 0,
-  campaignName: campaign?.name ?? '',
-  campaignStatus: campaign?.status ?? 'DRAFT',
-  ready: false,
-  canMarkReady: false,
-  canActivate: false,
-  summary: {
-    targetCount: 0,
-    assignmentCount: 0,
-    questionSelectionCount: 0,
-    assignmentQuestionSnapshotCount: 0,
-    pendingAssignmentCount: 0,
-    inProgressAssignmentCount: 0,
-    submittedAssignmentCount: 0,
-    completionPercent: 0,
-  },
-  checks: [],
-  blockingIssues: [],
-  warnings: [],
-});
-
-const RELATIONSHIP_ORDER: FeedbackRelationshipType[] = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'];
-
-const emptyScoringConfig = (campaign?: FeedbackCampaign | null): FeedbackCampaignScoringConfig => ({
-  campaignId: campaign?.id ?? 0,
-  campaignName: campaign?.name ?? '',
-  campaignStatus: campaign?.status ?? 'DRAFT',
-  redistributeMissingRelationshipWeight: campaign?.redistributeMissingRelationshipWeight !== false,
-  totalRelationshipWeight: 100,
-  relationshipWeightsReady: true,
-  relationshipWeights: [
-    { relationshipType: 'MANAGER', label: 'Manager', weightPercent: 40, assignmentCount: 0, targetCountWithRole: 0, currentlyAvailable: false },
-    { relationshipType: 'PEER', label: 'Peer', weightPercent: 30, assignmentCount: 0, targetCountWithRole: 0, currentlyAvailable: false },
-    { relationshipType: 'SUBORDINATE', label: 'Subordinate', weightPercent: 20, assignmentCount: 0, targetCountWithRole: 0, currentlyAvailable: false },
-    { relationshipType: 'SELF', label: 'Self', weightPercent: 10, assignmentCount: 0, targetCountWithRole: 0, currentlyAvailable: false },
-  ],
-  warnings: [],
-});
-
-const emptyQuestionReview = (campaign?: FeedbackCampaign | null): FeedbackCampaignQuestionReview => ({
-  campaignId: campaign?.id ?? 0,
-  campaignName: campaign?.name ?? '',
-  campaignStatus: campaign?.status ?? 'DRAFT',
-  saved: false,
-  targetCount: 0,
-  assignmentCount: 0,
-  groupCount: 0,
-  questionCount: 0,
-  includedQuestionCount: 0,
-  scoredQuestionCount: 0,
-  includedScoredQuestionCount: 0,
-  totalCompetencyWeight: 0,
-  competencyWeightsReady: false,
-  lastSavedAt: null,
-  warnings: [],
-  competencyWeights: [],
-  groups: [],
-});
-
-
-const assignmentReadinessClass = (item: { warnings: string[]; totalAssignments: number }) => {
-  if (item.totalAssignments <= 0) return 'blocked';
-  if (item.warnings.length > 0) return 'warning';
-  return 'ready';
-};
-
-const personSubtitle = (item: FeedbackTargetCandidate) => [
-  item.employeeCode,
-  item.email,
-].filter(Boolean).join(' · ') || `Employee #${item.employeeId}`;
-
-const initials = (name?: string | null) =>
-    (name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase() ?? '').join('') || '?';
-
-const relationshipLabel = (type: FeedbackRelationshipType | string) => {
-  switch (type) {
-    case 'MANAGER':
-      return 'Manager';
-    case 'PEER':
-      return 'Peer';
-    case 'SUBORDINATE':
-      return 'Direct Report';
-    case 'SELF':
-      return 'Self';
-    default:
-      return String(type).replace(/_/g, ' ');
-  }
-};
-
-const relationshipIcon = (type: FeedbackRelationshipType | string) => {
-  switch (type) {
-    case 'MANAGER':
-      return 'bi-person-workspace';
-    case 'PEER':
-      return 'bi-people';
-    case 'SUBORDINATE':
-      return 'bi-person-lines-fill';
-    case 'SELF':
-      return 'bi-person-check';
-    default:
-      return 'bi-person';
-  }
-};
-
-const assignmentSourceLabel = (assignment: FeedbackAssignmentDetailItem) => {
-  if (assignment.selectionMethod === 'MANUAL') return 'Added by HR';
-  if (assignment.relationshipType === 'PEER') return 'Suggested';
-  return 'Included';
-};
-
-const assignmentStatusLabel = (status?: string | null) => {
-  switch (status) {
-    case 'SUBMITTED':
-      return 'Submitted';
-    case 'IN_PROGRESS':
-      return 'In progress';
-    case 'CANCELLED':
-      return 'Cancelled';
-    case 'DECLINED':
-      return 'Declined';
-    default:
-      return 'Pending';
-  }
-};
-
-const cleanEvaluatorNote = (message: string) => {
-  if (message.includes('No active direct manager')) return 'Manager not found.';
-  if (message.includes('No direct reports')) return 'No direct reports found.';
-  if (message.includes('No active team')) return 'Team not set.';
-  if (message.includes('No current department')) return 'Department not set.';
-  if (message.includes('eligible peer')) return 'Fewer peer reviewers are available.';
-  if (message.includes('eligible subordinate')) return 'Fewer direct report reviewers are available.';
-  if (message.includes('manual evaluator')) return 'Evaluator added by HR was kept.';
-  return message;
-};
-
-const relationshipOptions: Array<{ value: Exclude<FeedbackRelationshipType, 'SELF'>; label: string }> = [
-  { value: 'MANAGER', label: 'Manager' },
-  { value: 'PEER', label: 'Peer' },
-  { value: 'SUBORDINATE', label: 'Direct Report' },
-];
-
-type DraftEvaluatorAddition = ManualAssignmentInput & { draftId: string };
-
-const assignmentKey = (assignment: Pick<FeedbackAssignmentDetailItem, 'targetEmployeeId' | 'evaluatorEmployeeId' | 'relationshipType'>) =>
-    `${assignment.targetEmployeeId}:${assignment.evaluatorEmployeeId}:${assignment.relationshipType}`;
+const EMPTY_ASSIGNMENT_DETAILS: FeedbackAssignmentDetailItem[] = [];
 
 export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const [campaigns, setCampaigns] = useState<FeedbackCampaign[]>([]);
@@ -462,8 +153,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   });
   const [draftRemovedEvaluatorKeys, setDraftRemovedEvaluatorKeys] = useState<Set<string>>(() => new Set());
   const [draftManualAdditions, setDraftManualAdditions] = useState<DraftEvaluatorAddition[]>([]);
-  const [expandedQuestionCompetencies, setExpandedQuestionCompetencies] = useState<Set<string>>(() => new Set());
-  const [expandedQuestionPreviews, setExpandedQuestionPreviews] = useState<Set<string>>(() => new Set());
 
   const selectedCampaign = useMemo(
       () => campaigns.find(campaign => campaign.id === selectedCampaignId) ?? null,
@@ -576,7 +265,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   }, [savedTargetIds, selectedTargets, targetsResponse.targets]);
   const activeEvaluatorTargetId = selectedEvaluatorTargetId || evaluatorTargets[0]?.employeeId || 0;
   const activeEvaluatorTarget = evaluatorTargets.find(target => target.employeeId === activeEvaluatorTargetId) ?? null;
-  const activeEvaluatorAssignments = assignmentsByTarget.get(activeEvaluatorTargetId) ?? [];
+  const activeEvaluatorAssignments = assignmentsByTarget.get(activeEvaluatorTargetId) ?? EMPTY_ASSIGNMENT_DETAILS;
   const activePreviewItem = previewItemByTarget.get(activeEvaluatorTargetId) ?? null;
   const assignedEvaluatorIdsForActiveTarget = useMemo(
       () => new Set(activeEvaluatorAssignments.map(item => item.evaluatorEmployeeId)),
@@ -618,8 +307,13 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       && Math.abs(competencyWeightTotal - 100) <= 0.01
       && competencyWeights.every(item => (item.warnings ?? []).length === 0);
   const selectedQuestionGroup = questionGroups.find(group => group.groupKey === selectedQuestionGroupKey) ?? questionGroups[0] ?? null;
-  const selectedQuestionCompetencies = useMemo(() => buildQuestionCompetencies(selectedQuestionGroup?.questions ?? []), [selectedQuestionGroup]);
-  const selectedQuestionCompetencyKeys = useMemo(() => selectedQuestionCompetencies.map(competency => competency.sectionCode).join('|'), [selectedQuestionCompetencies]);
+  const {
+    selectedQuestionCompetencies,
+    isQuestionCompetencyExpanded,
+    toggleQuestionCompetency,
+    isQuestionPreviewExpanded,
+    toggleQuestionPreview,
+  } = useQuestionReviewExpansion(selectedQuestionGroup);
   const selectedQuestionIncludedCompetencyCount = selectedQuestionCompetencies.filter(competency => competency.questions.some(question => question.included)).length;
   const selectedQuestionIncludedQuestionCount = selectedQuestionCompetencies.flatMap(competency => competency.questions).filter(question => question.included).length;
   const selectedQuestionTotalCompetencyCount = selectedQuestionCompetencies.length;
@@ -636,16 +330,11 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const canActivate = Boolean(selectedCampaign && campaignReadyToActivate && activationReadiness.canActivate && setupReady);
   const campaignLaunched = Boolean(selectedCampaign && ['ACTIVE', 'CLOSED', 'PUBLISHED'].includes(selectedCampaign.status));
   const launchReady = Boolean(selectedCampaign && campaignReadyToActivate && setupReady);
-  const launchBannerTitle = launchReady
-      ? 'Ready to launch'
-      : setupReady && selectedCampaign?.status === 'DRAFT'
-          ? 'Ready for final validation'
-          : 'Needs attention';
-  const launchBannerMessage = launchReady
-      ? 'Setup is validated and locked. Launching this campaign will open feedback collection.'
-      : setupReady && selectedCampaign?.status === 'DRAFT'
-          ? 'All setup checks pass. Validate the setup first, then launch the campaign.'
-          : 'Fix the items below before launching this campaign.';
+  const { title: launchBannerTitle, message: launchBannerMessage } = getLaunchBannerCopy({
+    launchReady,
+    setupReady,
+    campaignStatus: selectedCampaign?.status,
+  });
   const launchTargetCount = activationReadiness.summary.targetCount || targetsResponse.targetCount || selectedCampaign?.targetCount || 0;
   const launchAssignmentCount = activationReadiness.summary.assignmentCount || selectedCampaign?.assignmentCount || savedAssignmentCount;
   const questionCountsByForm = questionGroups.map(group => Number(group.includedQuestionCount || group.questionCount || 0)).filter(count => count > 0);
@@ -698,43 +387,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
         .filter(competency => competency.questions.some(question => question.included)).length,
   })), [questionGroups]);
 
-  useEffect(() => {
-    if (!selectedQuestionGroup || selectedQuestionCompetencies.length === 0) return;
-    const currentKeys = selectedQuestionCompetencies.map(competency => `${selectedQuestionGroup.groupKey}:${competency.sectionCode}`);
-    setExpandedQuestionCompetencies(current => {
-      const stillValid = new Set(Array.from(current).filter(key => currentKeys.includes(key)));
-      const next = stillValid.size > 0 ? stillValid : new Set([currentKeys[0]]);
-      return sameStringSet(current, next) ? current : next;
-    });
-  }, [selectedQuestionGroup?.groupKey, selectedQuestionCompetencyKeys]);
 
-  const isQuestionCompetencyExpanded = (groupKey: string, sectionCode: string) =>
-      expandedQuestionCompetencies.has(`${groupKey}:${sectionCode}`);
-
-  const toggleQuestionCompetency = (groupKey: string, sectionCode: string) => {
-    const key = `${groupKey}:${sectionCode}`;
-    setExpandedQuestionCompetencies(current => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const questionPreviewKey = (groupKey: string, questionCode: string) => `${groupKey}:${questionCode}`;
-
-  const isQuestionPreviewExpanded = (groupKey: string, questionCode: string) =>
-      expandedQuestionPreviews.has(questionPreviewKey(groupKey, questionCode));
-
-  const toggleQuestionPreview = (groupKey: string, questionCode: string) => {
-    const key = questionPreviewKey(groupKey, questionCode);
-    setExpandedQuestionPreviews(current => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
 
   const draftCampaigns = campaigns.filter(campaign => campaign.status === 'DRAFT').length;
   const activeCampaigns = campaigns.filter(campaign => campaign.status === 'ACTIVE').length;
@@ -904,8 +557,13 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   useEffect(() => {
     const firstTargetId = evaluatorTargets[0]?.employeeId ?? 0;
     if (!firstTargetId) {
-      setSelectedEvaluatorTargetId(0);
-      setManualForm(current => ({ ...current, targetEmployeeId: 0, evaluatorEmployeeId: 0 }));
+      setSelectedEvaluatorTargetId(current => (current === 0 ? current : 0));
+      setManualForm(current => {
+        if (current.targetEmployeeId === 0 && current.evaluatorEmployeeId === 0) {
+          return current;
+        }
+        return { ...current, targetEmployeeId: 0, evaluatorEmployeeId: 0 };
+      });
       return;
     }
     if (!selectedEvaluatorTargetId || !evaluatorTargets.some(target => target.employeeId === selectedEvaluatorTargetId)) {
@@ -914,30 +572,24 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   }, [evaluatorTargets, selectedEvaluatorTargetId]);
 
   useEffect(() => {
-    setManualForm(current => ({
-      ...current,
-      targetEmployeeId: activeEvaluatorTargetId,
-      evaluatorEmployeeId: assignedEvaluatorIdsForActiveTarget.has(current.evaluatorEmployeeId) ? 0 : current.evaluatorEmployeeId,
-    }));
+    setManualForm(current => {
+      const nextEvaluatorEmployeeId = assignedEvaluatorIdsForActiveTarget.has(current.evaluatorEmployeeId)
+          ? 0
+          : current.evaluatorEmployeeId;
+      if (current.targetEmployeeId === activeEvaluatorTargetId
+          && current.evaluatorEmployeeId === nextEvaluatorEmployeeId) {
+        return current;
+      }
+      return {
+        ...current,
+        targetEmployeeId: activeEvaluatorTargetId,
+        evaluatorEmployeeId: nextEvaluatorEmployeeId,
+      };
+    });
   }, [activeEvaluatorTargetId, assignedEvaluatorIdsForActiveTarget]);
 
   const applyForm = (campaign: FeedbackCampaign) => {
-    setForm({
-      name: campaign.name,
-      reviewYear: campaign.reviewYear ?? '',
-      startDate: (campaign.startAt ?? campaign.startDate ?? '').slice(0, 10),
-      startTime: (campaign.startAt ?? '').slice(11, 16),
-      endDate: (campaign.endAt ?? campaign.endDate ?? '').slice(0, 10),
-      endTime: (campaign.endAt ?? '').slice(11, 16),
-      description: campaign.description ?? '',
-      instructions: campaign.instructions ?? '',
-      autoSubmitCompletedDraftsOnClose: Boolean(campaign.autoSubmitCompletedDraftsOnClose),
-      managerFeedbackAnonymous: Boolean(campaign.managerFeedbackAnonymous),
-      peerFeedbackAnonymous: campaign.peerFeedbackAnonymous !== false,
-      subordinateFeedbackAnonymous: campaign.subordinateFeedbackAnonymous !== false,
-      selfFeedbackAnonymous: Boolean(campaign.selfFeedbackAnonymous),
-      redistributeMissingRelationshipWeight: campaign.redistributeMissingRelationshipWeight !== false,
-    });
+    setForm(campaignToForm(campaign));
   };
 
   const handleSelectCampaign = async (value: string) => {
@@ -967,41 +619,11 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   };
 
   const validate = () => {
-    const nextErrors: FieldErrors = {};
-    if (!form.name.trim()) nextErrors.name = 'Campaign name is required.';
-    if (form.name.trim().length > 255) nextErrors.name = 'Campaign name cannot exceed 255 characters.';
-    const reviewYear = Number(form.reviewYear);
-    if (!form.reviewYear || !Number.isFinite(reviewYear) || reviewYear < 2000 || reviewYear > 2100) nextErrors.reviewYear = 'Enter a review year between 2000 and 2100.';
-    if (!form.startDate) nextErrors.startAt = 'Choose a start date.';
-    if (!form.startTime) nextErrors.startAt = nextErrors.startAt ?? 'Choose a start time.';
-    if (!form.endDate) nextErrors.endAt = 'Choose an end date.';
-    if (!form.endTime) nextErrors.endAt = nextErrors.endAt ?? 'Choose an end time.';
-    const startAt = buildLocalDateTime(form.startDate, form.startTime);
-    const endAt = buildLocalDateTime(form.endDate, form.endTime);
-    if (startAt && endAt && new Date(startAt) >= new Date(endAt)) nextErrors.endAt = 'End date/time must be after start date/time.';
-    if (form.description.length > DESCRIPTION_LIMIT) nextErrors.description = `Announcement cannot exceed ${DESCRIPTION_LIMIT.toLocaleString()} characters.`;
-    if (form.instructions.length > INSTRUCTIONS_LIMIT) nextErrors.instructions = `Instructions cannot exceed ${INSTRUCTIONS_LIMIT.toLocaleString()} characters.`;
+    const nextErrors = validateCampaignInfoForm(form);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const buildPayload = (): CreateFeedbackCampaignInput => ({
-    name: form.name.trim(),
-    campaignType: DEFAULT_CAMPAIGN_TYPE,
-    reviewYear: Number(form.reviewYear),
-    startAt: normalizeDateTimeForApi(buildLocalDateTime(form.startDate, form.startTime)),
-    endAt: normalizeDateTimeForApi(buildLocalDateTime(form.endDate, form.endTime)),
-    startDate: form.startDate,
-    endDate: form.endDate,
-    description: form.description.trim(),
-    instructions: form.instructions.trim(),
-    autoSubmitCompletedDraftsOnClose: form.autoSubmitCompletedDraftsOnClose,
-    managerFeedbackAnonymous: form.managerFeedbackAnonymous,
-    peerFeedbackAnonymous: form.peerFeedbackAnonymous,
-    subordinateFeedbackAnonymous: form.subordinateFeedbackAnonymous,
-    selfFeedbackAnonymous: form.selfFeedbackAnonymous,
-    redistributeMissingRelationshipWeight: form.redistributeMissingRelationshipWeight,
-  });
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1011,8 +633,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     setSaving(true);
     try {
       const saved = selectedCampaign
-          ? await feedbackCampaignApi.updateCampaign(selectedCampaign.id, buildPayload())
-          : await feedbackCampaignApi.createCampaign(buildPayload());
+          ? await feedbackCampaignApi.updateCampaign(selectedCampaign.id, buildCampaignPayload(form))
+          : await feedbackCampaignApi.createCampaign(buildCampaignPayload(form));
       setSelectedCampaignId(saved.id);
       setCampaignInfoOpen(false);
       setSuccess(selectedCampaign ? `Campaign "${saved.name}" draft updated.` : `Campaign "${saved.name}" saved as draft. Target selection is now available.`);
@@ -1420,19 +1042,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     });
   };
 
-  const writeQuestionDragData = (event: DragEvent<HTMLElement>, payload: QuestionDragPayload) => {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData(questionDragMime, JSON.stringify(payload));
-  };
 
-  const readQuestionDragData = (event: DragEvent<HTMLElement>): QuestionDragPayload | null => {
-    try {
-      const raw = event.dataTransfer.getData(questionDragMime);
-      return raw ? JSON.parse(raw) as QuestionDragPayload : null;
-    } catch {
-      return null;
-    }
-  };
 
   const handleCompetencyDrop = (event: DragEvent<HTMLElement>, groupKey: string, toSectionCode: string) => {
     event.preventDefault();
@@ -1784,953 +1394,164 @@ This will generate final feedback question snapshots, notify evaluators, and mov
           <CampaignStat icon="bi bi-send-check" label="Published" value={publishedCampaigns} note={`${activeCampaigns} active now`} tone="orange" />
         </div>
 
-        {activeStepKey === 'foundation' && (
-            <section className="hfdq-table-card hfdc-info-card">
-              <div className="hfdc-card-head">
-                <div>
-                  <span className="hfdq-kicker">Step 1</span>
-                  <h3>Campaign Info</h3>
-                  <p>Set the campaign identity, review year, feedback window, participant message, and privacy policy before choosing targets.</p>
-                </div>
-                <div className="hfdc-info-head-actions">
-                  {selectedCampaign ? <span className={statusClass(selectedCampaign.status)}>{statusLabels[selectedCampaign.status] ?? selectedCampaign.status}</span> : <span className="hfd-status-badge DRAFT">New Draft</span>}
-                  <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => setCampaignInfoOpen(current => !current)}>
-                    <i className={`bi ${campaignInfoOpen ? 'bi-chevron-up' : 'bi-pencil-square'}`} /> {campaignInfoOpen ? 'Close' : selectedCampaign ? 'Edit Campaign Info' : 'Create Campaign Info'}
-                  </button>
-                </div>
-              </div>
+        {activeStepKey === 'foundation' && <CampaignInfoStep
+            selectedCampaign={selectedCampaign}
+            statusClass={statusClass}
+            statusLabels={statusLabels}
+            setCampaignInfoOpen={setCampaignInfoOpen}
+            campaignInfoOpen={campaignInfoOpen}
+            formatWindow={formatWindow}
+            targetsResponse={targetsResponse}
+            savedAssignmentCount={savedAssignmentCount}
+            handleSave={handleSave}
+            currentUser={currentUser}
+            localTimeZone={localTimeZone}
+            errors={errors}
+            form={form}
+            canEditSelected={canEditSelected}
+            setForm={setForm}
+            TIME_OPTIONS={TIME_OPTIONS}
+            formatTimeLabel={formatTimeLabel}
+            DESCRIPTION_LIMIT={DESCRIPTION_LIMIT}
+            INSTRUCTIONS_LIMIT={INSTRUCTIONS_LIMIT}
+            INSTRUCTION_TEMPLATE={INSTRUCTION_TEMPLATE}
+            deleting={deleting}
+            handleDeleteDraft={handleDeleteDraft}
+            setErrors={setErrors}
+            saving={saving}
+        />}
 
-              {!campaignInfoOpen ? (
-                  <div className="hfdc-info-summary">
-                    <div className="hfdc-info-summary-main">
-                      <span className="hfdc-info-summary-icon"><i className="bi bi-megaphone" /></span>
-                      <div>
-                        <strong>{selectedCampaign?.name || 'No campaign information saved'}</strong>
-                        <p>{selectedCampaign ? formatWindow(selectedCampaign) : 'Create a draft campaign to continue target selection and evaluator setup.'}</p>
-                      </div>
-                    </div>
-                    <div className="hfdc-info-summary-grid">
-                      <span><small>Review year</small><strong>{selectedCampaign?.reviewYear ?? 'Not set'}</strong></span>
-                      <span><small>Targets</small><strong>{targetsResponse.targetCount}</strong></span>
-                      <span><small>Assignments</small><strong>{savedAssignmentCount}</strong></span>
-                      <span><small>Status</small><strong>{selectedCampaign ? (statusLabels[selectedCampaign.status] ?? selectedCampaign.status) : 'Draft not saved'}</strong></span>
-                    </div>
-                  </div>
-              ) : (
-                  <form onSubmit={handleSave} noValidate>
-                    <div className="hfdc-form-section hfdc-form-section-collapsible">
-                      <div className="hfdc-context-card">
-                        <span className="hfdc-context-icon"><i className="bi bi-person-badge" /></span>
-                        <div>
-                          <strong>Campaign owner</strong>
-                          <small>{currentUser?.fullName ?? 'Current HR user'}{currentUser?.email ? ` · ${currentUser.email}` : ''}</small>
-                        </div>
-                      </div>
+        {activeStepKey === 'targets' && <TargetEmployeesStep
+            selectedCampaign={selectedCampaign}
+            targetIdsNormalized={targetIdsNormalized}
+            selectedReadyCount={selectedReadyCount}
+            selectedReviewCount={selectedReviewCount}
+            selectedDepartmentCount={selectedDepartmentCount}
+            availableCandidateCount={availableCandidateCount}
+            reviewCandidateCount={reviewCandidateCount}
+            targetSearch={targetSearch}
+            setTargetSearch={setTargetSearch}
+            currentDepartmentId={currentDepartmentId}
+            setCurrentDepartmentId={setCurrentDepartmentId}
+            departments={departments}
+            positionFilter={positionFilter}
+            setPositionFilter={setPositionFilter}
+            positionOptions={positionOptions}
+            readiness={readiness}
+            setReadiness={setReadiness}
+            loadingCandidates={loadingCandidates}
+            candidateRows={candidateRows}
+            readinessClass={readinessClass}
+            personSubtitle={personSubtitle}
+            readinessLabel={readinessLabel}
+            setRecipientDetails={setRecipientDetails}
+            canEditTargets={canEditTargets}
+            toggleTarget={toggleTarget}
+            hasUnsavedTargetChanges={hasUnsavedTargetChanges}
+            targetsResponse={targetsResponse}
+            hasUnavailableSelection={hasUnavailableSelection}
+            selectedDepartmentSummary={selectedDepartmentSummary}
+            recipientDetails={recipientDetails}
+            recipientDetailItems={recipientDetailItems}
+            loadingTargets={loadingTargets}
+            selectedTargets={selectedTargets}
+            removeSelectedTarget={removeSelectedTarget}
+            setSelectedTargetIds={setSelectedTargetIds}
+            savedTargetIds={savedTargetIds}
+            savingTargets={savingTargets}
+            saveTargets={saveTargets}
+        />}
 
-                      <div className="hfdc-context-card">
-                        <span className="hfdc-context-icon"><i className="bi bi-globe2" /></span>
-                        <div>
-                          <strong>Timezone</strong>
-                          <small>{localTimeZone}. All schedule times use this timezone.</small>
-                        </div>
-                      </div>
-                      <label className="hfdc-field full">
-                        <span>Campaign Name <em>*</em></span>
-                        <input
-                            className={`hfd-input ${errors.name ? 'error' : ''}`}
-                            value={form.name}
-                            disabled={!canEditSelected}
-                            onChange={e => setForm(current => ({ ...current, name: e.target.value }))}
-                            placeholder="Example: Q2 Leadership 360 Review"
-                        />
-                        {errors.name ? <small className="hfd-error-msg">{errors.name}</small> : <small>Visible in setup screens, evaluator tasks, and campaign reports.</small>}
-                      </label>
+        {activeStepKey === 'evaluators' && <EvaluatorAssignmentsStep
+            savedTargetIds={savedTargetIds}
+            hasUnsavedTargetChanges={hasUnsavedTargetChanges}
+            hasUnavailableSelection={hasUnavailableSelection}
+            assignmentPreview={assignmentPreview}
+            previewWarningCount={previewWarningCount}
+            hasDraftEvaluatorChanges={hasDraftEvaluatorChanges}
+            hasSavedEvaluatorAssignments={hasSavedEvaluatorAssignments}
+            selectedCampaign={selectedCampaign}
+            peerReviewerCount={peerReviewerCount}
+            setPeerReviewerCount={setPeerReviewerCount}
+            canEditEvaluators={canEditEvaluators}
+            relationshipWeightTotal={relationshipWeightTotal}
+            RELATIONSHIP_ORDER={RELATIONSHIP_ORDER}
+            scoringConfig={scoringConfig}
+            updateRelationshipWeight={updateRelationshipWeight}
+            setScoringConfig={setScoringConfig}
+            savingScoringConfig={savingScoringConfig}
+            saveScoringConfig={saveScoringConfig}
+            previewingAssignments={previewingAssignments}
+            generatingAssignments={generatingAssignments}
+            previewEvaluatorRules={previewEvaluatorRules}
+            hasAssignmentPreview={hasAssignmentPreview}
+            generateEvaluatorAssignments={generateEvaluatorAssignments}
+            setActiveStepKey={setActiveStepKey}
+            cleanEvaluatorNote={cleanEvaluatorNote}
+            evaluatorTargets={evaluatorTargets}
+            previewItemByTarget={previewItemByTarget}
+            assignmentsByTarget={assignmentsByTarget}
+            assignmentReadinessClass={assignmentReadinessClass}
+            activeEvaluatorTargetId={activeEvaluatorTargetId}
+            setSelectedEvaluatorTargetId={setSelectedEvaluatorTargetId}
+            activeEvaluatorTarget={activeEvaluatorTarget}
+            activePreviewItem={activePreviewItem}
+            activeAssignmentsByRelationship={activeAssignmentsByRelationship}
+            relationshipIcon={relationshipIcon}
+            relationshipLabel={relationshipLabel}
+            initials={initials}
+            assignmentSourceLabel={assignmentSourceLabel}
+            assignmentStatusLabel={assignmentStatusLabel}
+            removingAssignmentId={removingAssignmentId}
+            removeEvaluator={removeEvaluator}
+            manualForm={manualForm}
+            setManualForm={setManualForm}
+            relationshipOptions={relationshipOptions}
+            evaluatorSearch={evaluatorSearch}
+            setEvaluatorSearch={setEvaluatorSearch}
+            evaluatorCandidates={evaluatorCandidates}
+            addingEvaluator={addingEvaluator}
+            addEvaluator={addEvaluator}
+        />}
 
-                      <label className="hfdc-field">
-                        <span>Review Year <em>*</em></span>
-                        <input
-                            type="number"
-                            min="2000"
-                            max="2100"
-                            className={`hfd-input ${errors.reviewYear ? 'error' : ''}`}
-                            value={form.reviewYear}
-                            disabled={!canEditSelected}
-                            onChange={e => setForm(current => ({ ...current, reviewYear: e.target.value === '' ? '' : Number(e.target.value) }))}
-                            placeholder="Example: 2026"
-                        />
-                        {errors.reviewYear ? <small className="hfd-error-msg">{errors.reviewYear}</small> : <small>Used for filtering, reporting, and historical comparison.</small>}
-                      </label>
-
-                      <div className="hfdc-date-time-field">
-                        <span>Start Date & Time <em>*</em></span>
-                        <div className="hfdc-date-time-grid">
-                          <input
-                              type="date"
-                              className={`hfd-input ${errors.startAt ? 'error' : ''}`}
-                              value={form.startDate}
-                              disabled={!canEditSelected}
-                              onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))}
-                              aria-label="Start date"
-                          />
-                          <select
-                              className={`hfd-input ${errors.startAt ? 'error' : ''}`}
-                              value={form.startTime}
-                              disabled={!canEditSelected}
-                              onChange={event => setForm(current => ({ ...current, startTime: event.target.value }))}
-                              aria-label="Start time"
-                          >
-                            <option value="">Select time</option>
-                            {TIME_OPTIONS.map(time => <option key={time} value={time}>{formatTimeLabel(time)}</option>)}
-                          </select>
-                        </div>
-                        {errors.startAt ? <small className="hfd-error-msg">{errors.startAt}</small> : <small>Feedback collection opens at this date and time.</small>}
-                      </div>
-
-                      <div className="hfdc-date-time-field">
-                        <span>End Date & Time <em>*</em></span>
-                        <div className="hfdc-date-time-grid">
-                          <input
-                              type="date"
-                              className={`hfd-input ${errors.endAt ? 'error' : ''}`}
-                              value={form.endDate}
-                              disabled={!canEditSelected}
-                              onChange={event => setForm(current => ({ ...current, endDate: event.target.value }))}
-                              aria-label="End date"
-                          />
-                          <select
-                              className={`hfd-input ${errors.endAt ? 'error' : ''}`}
-                              value={form.endTime}
-                              disabled={!canEditSelected}
-                              onChange={event => setForm(current => ({ ...current, endTime: event.target.value }))}
-                              aria-label="End time"
-                          >
-                            <option value="">Select time</option>
-                            {TIME_OPTIONS.map(time => <option key={time} value={time}>{formatTimeLabel(time)}</option>)}
-                          </select>
-                        </div>
-                        {errors.endAt ? <small className="hfd-error-msg">{errors.endAt}</small> : <small>Feedback collection closes after this date and time.</small>}
-                      </div>
-
-                      <div className="hfdc-window-validation full">
-                        <i className="bi bi-calendar2-check" />
-                        <span>Campaign window conflicts are checked when the draft is saved.</span>
-                      </div>
-
-                      <label className="hfdc-field full">
-                        <span>Participant Announcement</span>
-                        <textarea
-                            className={`hfd-input hfdc-textarea ${errors.description ? 'error' : ''}`}
-                            rows={3}
-                            value={form.description}
-                            disabled={!canEditSelected}
-                            onChange={e => setForm(current => ({ ...current, description: e.target.value }))}
-                            placeholder="Example: Share concise feedback that helps employees understand strengths and growth opportunities for this review cycle."
-                        />
-                        <small className={form.description.length > DESCRIPTION_LIMIT ? 'hfd-error-msg' : ''}>{form.description.length}/{DESCRIPTION_LIMIT.toLocaleString()} characters · Shown to selected participants before they begin feedback.</small>
-                        {errors.description ? <small className="hfd-error-msg">{errors.description}</small> : null}
-                      </label>
-
-                      <label className="hfdc-field full hfdc-template-field">
-                        <span>Evaluator Instructions</span>
-                        <textarea
-                            className={`hfd-input hfdc-textarea ${errors.instructions ? 'error' : ''}`}
-                            rows={3}
-                            value={form.instructions}
-                            disabled={!canEditSelected}
-                            onChange={e => setForm(current => ({ ...current, instructions: e.target.value }))}
-                            placeholder="Example: Rate recent, observable work behavior and include specific examples where helpful."
-                        />
-                        <div className="hfdc-field-footer">
-                          <small className={form.instructions.length > INSTRUCTIONS_LIMIT ? 'hfd-error-msg' : ''}>{form.instructions.length}/{INSTRUCTIONS_LIMIT.toLocaleString()} characters · Displayed before evaluators submit feedback.</small>
-                          <button className="hfd-btn hfd-btn-ghost" type="button" disabled={!canEditSelected} onClick={() => setForm(current => ({ ...current, instructions: current.instructions.trim() ? current.instructions : INSTRUCTION_TEMPLATE }))}>
-                            <i className="bi bi-magic" /> Use template
-                          </button>
-                        </div>
-                        {errors.instructions ? <small className="hfd-error-msg">{errors.instructions}</small> : null}
-                      </label>
-
-                      <details className="hfdc-advanced-policy full">
-                        <summary>
-                          <span><i className="bi bi-shield-lock" /> Privacy policy</span>
-                          <small>Optional relationship-level anonymity settings</small>
-                        </summary>
-                        <div className="hfdc-policy-grid full">
-                          <label className="hfdc-toggle-card compact">
-                            <input type="checkbox" checked={form.managerFeedbackAnonymous} disabled={!canEditSelected} onChange={e => setForm(current => ({ ...current, managerFeedbackAnonymous: e.target.checked }))} />
-                            <span><strong>Manager feedback anonymous</strong><small>Manager identity is hidden from the subject.</small></span>
-                          </label>
-                          <label className="hfdc-toggle-card compact">
-                            <input type="checkbox" checked={form.peerFeedbackAnonymous} disabled={!canEditSelected} onChange={e => setForm(current => ({ ...current, peerFeedbackAnonymous: e.target.checked }))} />
-                            <span><strong>Peer feedback anonymous</strong><small>Peer identity is hidden from the subject.</small></span>
-                          </label>
-                          <label className="hfdc-toggle-card compact">
-                            <input type="checkbox" checked={form.subordinateFeedbackAnonymous} disabled={!canEditSelected} onChange={e => setForm(current => ({ ...current, subordinateFeedbackAnonymous: e.target.checked }))} />
-                            <span><strong>Subordinate feedback anonymous</strong><small>Direct report identity is hidden from the subject.</small></span>
-                          </label>
-                          <label className="hfdc-toggle-card compact">
-                            <input type="checkbox" checked={form.selfFeedbackAnonymous} disabled={!canEditSelected} onChange={e => setForm(current => ({ ...current, selfFeedbackAnonymous: e.target.checked }))} />
-                            <span><strong>Self feedback anonymous</strong><small>Self feedback identity is hidden in reports.</small></span>
-                          </label>
-                        </div>
-                      </details>
-                    </div>
-
-                    <div className="hfdc-form-actions">
-                      {selectedCampaign?.status === 'DRAFT' && (
-                          <button className="hfd-btn hfd-btn-danger" disabled={deleting} type="button" onClick={handleDeleteDraft}>
-                            <i className="bi bi-trash" /> {deleting ? 'Deleting...' : 'Delete Draft'}
-                          </button>
-                      )}
-                      <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => { setCampaignInfoOpen(false); setErrors({}); }}>Cancel</button>
-                      <button id="btn-save-campaign-draft" type="submit" className="hfd-btn hfd-btn-primary" disabled={saving || !canEditSelected}>
-                        <i className="bi bi-save2" /> {saving ? 'Saving...' : selectedCampaign ? 'Save Changes' : 'Save Draft'}
-                      </button>
-                    </div>
-                  </form>
-              )}
-            </section>
-        )}
-
-        {activeStepKey === 'targets' && (
-            <section className={`hfdq-table-card hfdt-card hfdt-recipient-workspace ${!selectedCampaign ? 'disabled' : ''}`}>
-              <div className="hfdc-card-head hfdt-head">
-                <div>
-                  <span className="hfdq-kicker">Step 2</span>
-                  <h3>Select Feedback Recipients</h3>
-                  <p>Choose employees for this feedback cycle. Evaluators will be prepared in the next step.</p>
-                </div>
-                <div className="hfdt-summary-pills">
-                  <span><strong>{targetIdsNormalized.length}</strong> selected</span>
-                  <span><strong>{selectedReadyCount}</strong> ready</span>
-                  <span><strong>{selectedReviewCount}</strong> review</span>
-                  <span><strong>{selectedDepartmentCount}</strong> departments</span>
-                </div>
-              </div>
-
-              {!selectedCampaign ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-save" /><strong>Save campaign info first</strong><p>Recipient selection becomes available after campaign info is saved.</p></div>
-              ) : (
-                  <div className="hfdt-recipient-grid">
-                    <div className="hfdt-directory-panel hfdt-recipient-directory">
-                      <div className="hfdt-recipient-toolbar">
-                        <div>
-                          <span className="hfdq-kicker">Recipients</span>
-                          <h4>Employee Directory</h4>
-                          <p>Search and add employees to this campaign.</p>
-                        </div>
-                        <div className="hfdt-recipient-counts">
-                          <span><strong>{availableCandidateCount}</strong> ready</span>
-                          <span><strong>{reviewCandidateCount}</strong> need review</span>
-                        </div>
-                      </div>
-
-                      <div className="hfdt-recipient-filters">
-                        <label className="hfdc-field full search">
-                          <span>Search employees</span>
-                          <input className="hfd-input" value={targetSearch} onChange={event => setTargetSearch(event.target.value)} placeholder="Search by name, employee code, email, department, or position" />
-                        </label>
-                        <label className="hfdc-field">
-                          <span>Department</span>
-                          <select className="hfd-input" value={currentDepartmentId} onChange={event => setCurrentDepartmentId(event.target.value ? Number(event.target.value) : '')}>
-                            <option value="">All departments</option>
-                            {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
-                          </select>
-                        </label>
-                        <label className="hfdc-field">
-                          <span>Position</span>
-                          <select className="hfd-input" value={positionFilter} onChange={event => setPositionFilter(event.target.value)}>
-                            <option value="">All positions</option>
-                            {positionOptions.map(position => <option key={position} value={position}>{position}</option>)}
-                          </select>
-                        </label>
-                        <label className="hfdc-field">
-                          <span>Status</span>
-                          <select className="hfd-input" value={readiness} onChange={event => setReadiness(event.target.value as ReadinessFilter)}>
-                            <option value="AVAILABLE">Available</option>
-                            <option value="READY">Ready</option>
-                            <option value="WARNINGS">Needs review</option>
-                            <option value="BLOCKED">Not available</option>
-                          </select>
-                        </label>
-                      </div>
-
-                      <div className="hfdt-recipient-table">
-                        <div className="hfdt-recipient-table-head">
-                          <span>Employee</span>
-                          <span>Department</span>
-                          <span>Position</span>
-                          <span>Manager</span>
-                          <span>Status</span>
-                          <span />
-                        </div>
-                        {loadingCandidates ? (
-                            <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading employees...</div>
-                        ) : candidateRows.length === 0 ? (
-                            <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-search" /><strong>No employees found</strong><p>Try another search or adjust the filters.</p></div>
-                        ) : candidateRows.map(candidate => {
-                          const selected = targetIdsNormalized.includes(candidate.employeeId);
-                          const availability = readinessClass(candidate);
-                          return (
-                              <article key={candidate.employeeId} className={`hfdt-recipient-row ${selected ? 'selected' : ''} ${availability}`}>
-                                <div className="hfdt-recipient-person">
-                                  <span className={`hfdt-readiness-dot ${availability}`} />
-                                  <div>
-                                    <strong>{candidate.employeeName}</strong>
-                                    <small>{personSubtitle(candidate)}</small>
-                                  </div>
-                                </div>
-                                <div className="hfdt-recipient-cell">
-                                  <strong>{candidate.currentDepartmentName ?? 'Not set'}</strong>
-                                  <small>{candidate.parentDepartmentName && candidate.parentDepartmentName !== candidate.currentDepartmentName ? candidate.parentDepartmentName : 'Current department'}</small>
-                                </div>
-                                <div className="hfdt-recipient-cell">
-                                  <strong>{candidate.positionName ?? 'Not set'}</strong>
-                                  <small>{candidate.employmentStatus ?? 'Employee'}</small>
-                                </div>
-                                <div className="hfdt-recipient-cell">
-                                  <strong>{candidate.managerName ?? 'Not set'}</strong>
-                                  <small>{candidate.managerName ? 'Reporting manager' : 'Needs review'}</small>
-                                </div>
-                                <div className="hfdt-status-stack">
-                                  <span className={`hfdt-badge ${availability}`}>{readinessLabel(candidate)}</span>
-                                  <button className="hfdt-text-button" type="button" onClick={() => setRecipientDetails(candidate)}>
-                                    View details
-                                  </button>
-                                </div>
-                                <div className="hfdt-row-actions">
-                                  <button className={`hfd-btn ${selected ? 'hfd-btn-ghost' : 'hfd-btn-secondary'}`} type="button" disabled={!canEditTargets || !candidate.eligible} onClick={() => toggleTarget(candidate)}>
-                                    {selected ? <><i className="bi bi-check2" /> Selected</> : <><i className="bi bi-plus-lg" /> Add</>}
-                                  </button>
-                                </div>
-                              </article>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <aside className="hfdt-selected-panel hfdt-recipient-summary">
-                      <div className="hfdt-selected-head">
-                        <div>
-                          <span className="hfdq-kicker">Selected recipients</span>
-                          <h4>{targetIdsNormalized.length} employee{targetIdsNormalized.length === 1 ? '' : 's'}</h4>
-                          <p>{selectedReadyCount} ready · {selectedReviewCount} need review</p>
-                        </div>
-                        {hasUnsavedTargetChanges && <span className="hfdt-unsaved"><i className="bi bi-dot" /> Unsaved</span>}
-                      </div>
-
-                      {targetsResponse.warnings.length > 0 && (
-                          <div className="hfdt-response-warnings">
-                            {targetsResponse.warnings.map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
-                          </div>
-                      )}
-
-                      {hasUnavailableSelection && (
-                          <div className="hfdt-response-warnings blocked">
-                            <span><i className="bi bi-slash-circle" /> Remove unavailable recipients to continue.</span>
-                          </div>
-                      )}
-
-                      <div className="hfdt-summary-strip">
-                        <span><strong>{targetIdsNormalized.length}</strong><small>Total selected</small></span>
-                        <span><strong>{selectedDepartmentCount}</strong><small>Departments</small></span>
-                        <span><strong>{selectedReviewCount}</strong><small>Need review</small></span>
-                      </div>
-
-                      {selectedDepartmentSummary.length > 0 && (
-                          <div className="hfdt-department-summary">
-                            <strong>Departments selected</strong>
-                            <div>
-                              {selectedDepartmentSummary.map(([department, count]) => <span key={department}>{department} · {count}</span>)}
-                            </div>
-                          </div>
-                      )}
-
-                      {recipientDetails && (
-                          <div className={`hfdt-recipient-detail-card ${readinessClass(recipientDetails)}`}>
-                            <div className="hfdt-recipient-detail-head">
-                              <div>
-                                <span className="hfdq-kicker">Employee details</span>
-                                <strong>{recipientDetails.employeeName}</strong>
-                                <small>{recipientDetails.positionName ?? 'Position not set'} · {recipientDetails.currentDepartmentName ?? 'Department not set'}</small>
-                              </div>
-                              <button type="button" className="hfdt-icon-button" onClick={() => setRecipientDetails(null)} aria-label="Close details"><i className="bi bi-x-lg" /></button>
-                            </div>
-                            <div className="hfdt-recipient-detail-grid">
-                              {recipientDetailItems(recipientDetails).map(item => (
-                                  <span key={item.label}><small>{item.label}</small><strong>{item.value}</strong></span>
-                              ))}
-                            </div>
-                            {(recipientDetails.blockReasons.length > 0 || recipientDetails.warnings.length > 0 || recipientDetails.notes.length > 0) && (
-                                <div className="hfdt-recipient-detail-notes">
-                                  {recipientDetails.blockReasons.map(reason => <span key={reason} className="blocked"><i className="bi bi-slash-circle" />{reason}</span>)}
-                                  {recipientDetails.warnings.map(reason => <span key={reason} className="warning"><i className="bi bi-exclamation-triangle" />{reason}</span>)}
-                                  {recipientDetails.notes.map(note => <span key={note} className="note"><i className="bi bi-info-circle" />{note}</span>)}
-                                </div>
-                            )}
-                          </div>
-                      )}
-
-                      <div className="hfdt-selected-list">
-                        {loadingTargets ? (
-                            <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading saved recipients...</div>
-                        ) : selectedTargets.length === 0 ? (
-                            <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-person-plus" /><strong>No recipients selected</strong><p>Add employees from the directory to continue.</p></div>
-                        ) : selectedTargets.map(target => (
-                            <div key={target.employeeId} className={`hfdt-selected-card ${readinessClass(target)}`}>
-                              <div>
-                                <strong>{target.employeeName}</strong>
-                                <small>{target.currentDepartmentName ?? 'Department not set'} · {target.positionName ?? 'Position not set'}</small>
-                              </div>
-                              <div className="hfdt-selected-metrics compact">
-                                <span><b>{target.peerCandidateCount}</b> possible peers</span>
-                                <span><b>{target.subordinateCandidateCount}</b> direct reports</span>
-                              </div>
-                              {(target.warnings.length > 0 || target.notes.length > 0) && (
-                                  <div className="hfdt-selected-issues">
-                                    {target.warnings.slice(0, 1).map(warning => <span key={warning}><i className="bi bi-exclamation-triangle" /> {warning}</span>)}
-                                    {target.notes.slice(0, 1).map(note => <span key={note} className="note"><i className="bi bi-info-circle" /> {note}</span>)}
-                                  </div>
-                              )}
-                              <button type="button" className="hfd-btn hfd-btn-secondary" onClick={() => setRecipientDetails(target)}>
-                                <i className="bi bi-info-circle" /> Details
-                              </button>
-                              <button type="button" className="hfd-btn hfd-btn-ghost" disabled={!canEditTargets} onClick={() => removeSelectedTarget(target.employeeId)}>
-                                <i className="bi bi-x-lg" /> Remove
-                              </button>
-                            </div>
-                        ))}
-                      </div>
-
-                      <div className="hfdt-selected-actions">
-                        <button className="hfd-btn hfd-btn-secondary" type="button" disabled={!canEditTargets || !hasUnsavedTargetChanges} onClick={() => setSelectedTargetIds(savedTargetIds)}>
-                          Reset
-                        </button>
-                        <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditTargets || savingTargets || targetIdsNormalized.length === 0 || !hasUnsavedTargetChanges || hasUnavailableSelection} onClick={() => void saveTargets()}>
-                          <i className="bi bi-save2" /> {savingTargets ? 'Saving...' : 'Save Recipients'}
-                        </button>
-                      </div>
-                    </aside>
-                  </div>
-              )}
-            </section>
-        )}
-
-        {activeStepKey === 'evaluators' && (
-            <section className={`hfdq-table-card hfde-card hfde-final ${savedTargetIds.length === 0 || hasUnsavedTargetChanges || hasUnavailableSelection ? 'disabled' : ''}`}>
-              <div className="hfdc-card-head hfde-head">
-                <div>
-                  <span className="hfdq-kicker">Step 3</span>
-                  <h3>Prepare Evaluators</h3>
-                  <p>Review who will provide feedback before saving evaluator assignments.</p>
-                </div>
-                <div className="hfdt-summary-pills">
-                  <span><strong>{savedTargetIds.length}</strong> recipients</span>
-                  <span><strong>{assignmentPreview.totalEvaluatorsGenerated}</strong> evaluators</span>
-                  <span><strong>{previewWarningCount}</strong> need review</span>
-                  <span><strong>{hasDraftEvaluatorChanges ? 'Unsaved changes' : hasSavedEvaluatorAssignments ? 'Saved' : 'Draft'}</strong></span>
-                </div>
-              </div>
-
-              {!selectedCampaign ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-save" /><strong>Save campaign info first</strong><p>Evaluator preparation becomes available after campaign info and recipients are saved.</p></div>
-              ) : savedTargetIds.length === 0 ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-people" /><strong>Save recipients first</strong><p>Select and save feedback recipients before preparing evaluators.</p></div>
-              ) : hasUnsavedTargetChanges ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-cloud-arrow-up" /><strong>Save recipient changes</strong><p>Evaluator preview uses saved recipients only. Save or reset changes before continuing.</p></div>
-              ) : hasUnavailableSelection ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-slash-circle" /><strong>Remove unavailable recipients</strong><p>Only available recipients can continue to evaluator preparation.</p></div>
-              ) : (
-                  <div className="hfde-final-grid">
-                    <div className="hfde-settings-panel">
-                      <div className="hfde-section-head">
-                        <div>
-                          <span className="hfdq-kicker">Reviewer setup</span>
-                          <h4>Feedback groups</h4>
-                          <p>These groups will be prepared for each saved recipient.</p>
-                        </div>
-                      </div>
-
-                      <div className="hfde-reviewer-cards">
-                        <article className="hfde-reviewer-card self">
-                          <span className="hfde-role-icon self"><i className="bi bi-person-check" /></span>
-                          <div><strong>Self Review</strong><small>Included for each recipient</small></div>
-                        </article>
-                        <article className="hfde-reviewer-card manager">
-                          <span className="hfde-role-icon manager"><i className="bi bi-person-workspace" /></span>
-                          <div><strong>Manager Review</strong><small>Included when available</small></div>
-                        </article>
-                        <article className="hfde-reviewer-card peer featured">
-                          <span className="hfde-role-icon peer"><i className="bi bi-people" /></span>
-                          <div><strong>Peer Review</strong><small>{peerReviewerCount} reviewer{peerReviewerCount === 1 ? '' : 's'} per recipient</small></div>
-                        </article>
-                        <article className="hfde-reviewer-card subordinate">
-                          <span className="hfde-role-icon subordinate"><i className="bi bi-person-lines-fill" /></span>
-                          <div><strong>Direct Report Review</strong><small>Included when available</small></div>
-                        </article>
-                      </div>
-
-                      <div className="hfde-peer-control">
-                        <div>
-                          <span className="hfdq-kicker">Peer reviewers</span>
-                          <strong>People per recipient</strong>
-                          <small>Choose how many peer reviewers should be suggested for each recipient.</small>
-                        </div>
-                        <div className="hfde-stepper-control">
-                          <button type="button" onClick={() => setPeerReviewerCount(peerReviewerCount - 1)} disabled={!canEditEvaluators || peerReviewerCount <= 1}>−</button>
-                          <span>{peerReviewerCount}</span>
-                          <button type="button" onClick={() => setPeerReviewerCount(peerReviewerCount + 1)} disabled={!canEditEvaluators || peerReviewerCount >= 8}>+</button>
-                        </div>
-                      </div>
-
-                      <div className="hfdcw-card">
-                        <div className="hfdcw-head">
-                          <div>
-                            <span className="hfdq-kicker">Reviewer contribution</span>
-                            <h4>Feedback contribution</h4>
-                            <p>Set how much each feedback group contributes to the final score.</p>
-                          </div>
-                          <span className={`hfdcw-total ${Math.round(relationshipWeightTotal * 100) / 100 === 100 ? 'ready' : 'blocked'}`}>
-                    {relationshipWeightTotal}% total
-                  </span>
-                        </div>
-                        <div className="hfdcw-grid">
-                          {RELATIONSHIP_ORDER.map(type => {
-                            const item = scoringConfig.relationshipWeights.find(weight => weight.relationshipType === type);
-                            return (
-                                <label key={type} className="hfdcw-weight-row">
-                        <span>
-                          <strong>{item?.label ?? type}</strong>
-                          <small>{item?.assignmentCount ?? 0} assignment{(item?.assignmentCount ?? 0) === 1 ? '' : 's'} · {(item?.targetCountWithRole ?? 0)} target{(item?.targetCountWithRole ?? 0) === 1 ? '' : 's'} covered</small>
-                        </span>
-                                  <input
-                                      className="hfd-input"
-                                      type="number"
-                                      min={0}
-                                      max={100}
-                                      step={1}
-                                      disabled={selectedCampaign.status !== 'DRAFT'}
-                                      value={Number(item?.weightPercent ?? 0)}
-                                      onChange={event => updateRelationshipWeight(type, Number(event.target.value))}
-                                  />
-                                  <em>%</em>
-                                </label>
-                            );
-                          })}
-                        </div>
-                        <label className="hfdc-toggle-card full hfdcw-redistribute">
-                          <input
-                              type="checkbox"
-                              checked={scoringConfig.redistributeMissingRelationshipWeight}
-                              disabled={selectedCampaign.status !== 'DRAFT'}
-                              onChange={event => setScoringConfig(current => ({ ...current, redistributeMissingRelationshipWeight: event.target.checked }))}
-                          />
-                          <span>
-                    <strong>Rebalance when a group is missing</strong>
-                    <small>Use the available feedback groups when one group is not present.</small>
-                  </span>
-                        </label>
-                        {scoringConfig.warnings.length > 0 && (
-                            <div className="hfdt-response-warnings">
-                              {scoringConfig.warnings.map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
-                            </div>
-                        )}
-                        <div className="hfdcw-actions">
-                          <button className="hfd-btn hfd-btn-primary" type="button" disabled={selectedCampaign.status !== 'DRAFT' || savingScoringConfig || Math.round(relationshipWeightTotal * 100) / 100 !== 100} onClick={() => void saveScoringConfig()}>
-                            <i className="bi bi-save2" /> {savingScoringConfig ? 'Saving weights...' : 'Save Contribution'}
-                          </button>
-                        </div>
-                      </div>
-
-
-                      <div className="hfde-actions hfde-final-actions">
-                        <button className="hfd-btn hfd-btn-secondary" type="button" disabled={!canEditEvaluators || previewingAssignments || generatingAssignments} onClick={() => void previewEvaluatorRules()}>
-                          <i className="bi bi-eye" /> {previewingAssignments ? 'Preparing...' : hasAssignmentPreview ? 'Refresh Suggestions' : 'Preview Evaluators'}
-                        </button>
-                        <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditEvaluators || previewingAssignments || generatingAssignments || !hasAssignmentPreview} onClick={() => void generateEvaluatorAssignments()}>
-                          <i className="bi bi-check2-circle" /> {generatingAssignments ? 'Saving...' : 'Save Evaluators'}
-                        </button>
-                        <button className="hfd-btn hfd-btn-secondary" type="button" disabled={!hasSavedEvaluatorAssignments || hasDraftEvaluatorChanges} onClick={() => setActiveStepKey('questions')}>
-                          Continue
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="hfde-review-panel">
-                      <div className="hfde-section-head compact">
-                        <div>
-                          <span className="hfdq-kicker">Evaluator preview</span>
-                          <h4>{hasAssignmentPreview ? `${assignmentPreview.requests.length} recipient${assignmentPreview.requests.length === 1 ? '' : 's'}` : 'No preview yet'}</h4>
-                        </div>
-                        {hasAssignmentPreview && <span className={`hfdt-badge ${previewWarningCount > 0 ? 'warning' : 'ready'}`}>{previewWarningCount > 0 ? 'Needs review' : 'Ready'}</span>}
-                      </div>
-
-                      {assignmentPreview.warnings.length > 0 && (
-                          <div className="hfdt-response-warnings">
-                            {assignmentPreview.warnings.slice(0, 4).map(item => <span key={item}><i className="bi bi-info-circle" /> {cleanEvaluatorNote(item)}</span>)}
-                          </div>
-                      )}
-
-                      <div className="hfde-target-list">
-                        {!hasAssignmentPreview ? (
-                            <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-eye" /><strong>No evaluators prepared yet</strong><p>Preview evaluators to review the suggested list.</p></div>
-                        ) : evaluatorTargets.map(target => {
-                          const previewItem = previewItemByTarget.get(target.employeeId);
-                          const targetAssignments = assignmentsByTarget.get(target.employeeId) ?? [];
-                          const status = previewItem ? assignmentReadinessClass(previewItem) : 'blocked';
-                          return (
-                              <button key={target.employeeId} type="button" className={`hfde-target-card ${activeEvaluatorTargetId === target.employeeId ? 'selected' : ''} ${status}`} onClick={() => setSelectedEvaluatorTargetId(target.employeeId)}>
-                                <span className={`hfdt-readiness-dot ${status}`} />
-                                <span>
-                              <strong>{target.employeeName}</strong>
-                              <small>{target.positionName ?? 'Position not set'} · {target.currentDepartmentName ?? 'Department not set'}</small>
-                            </span>
-                                <em>{previewItem?.totalAssignments ?? targetAssignments.length}</em>
-                              </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <aside className="hfde-detail-panel">
-                      <div className="hfdt-selected-head">
-                        <div>
-                          <span className="hfdq-kicker">Recipient</span>
-                          <h4>{activeEvaluatorTarget?.employeeName ?? 'Select a recipient'}</h4>
-                          <p>{activeEvaluatorTarget ? `${activeEvaluatorTarget.positionName ?? 'Position not set'} · ${activeEvaluatorTarget.currentDepartmentName ?? 'Department not set'}` : 'Evaluator details will appear here.'}</p>
-                        </div>
-                        {activePreviewItem && <span className={`hfdt-badge ${assignmentReadinessClass(activePreviewItem)}`}>{assignmentReadinessClass(activePreviewItem) === 'ready' ? 'Ready' : 'Needs review'}</span>}
-                      </div>
-
-                      {activePreviewItem?.warnings?.length ? (
-                          <div className="hfdt-response-warnings">
-                            {activePreviewItem.warnings.slice(0, 3).map(item => <span key={item}><i className="bi bi-info-circle" /> {cleanEvaluatorNote(item)}</span>)}
-                          </div>
-                      ) : null}
-
-                      <div className="hfde-assignment-groups">
-                        {(['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'] as FeedbackRelationshipType[]).map(type => {
-                          const group = activeAssignmentsByRelationship.get(type) ?? [];
-                          return (
-                              <section key={type} className="hfde-assignment-group">
-                                <div className="hfde-assignment-group-head">
-                                  <span><i className={`bi ${relationshipIcon(type)}`} /> {relationshipLabel(type)}</span>
-                                  <em>{group.length}</em>
-                                </div>
-                                {group.length === 0 ? (
-                                    <p className="hfde-empty-line">No evaluator selected.</p>
-                                ) : group.map(assignment => (
-                                    <article key={`${assignment.assignmentId ?? 'planned'}-${assignment.targetEmployeeId}-${assignment.evaluatorEmployeeId}-${assignment.relationshipType}`} className={`hfde-assignment-row ${assignment.selectionMethod === 'MANUAL' ? 'manual' : ''}`}>
-                                      <span className="hfde-avatar">{initials(assignment.evaluatorEmployeeName)}</span>
-                                      <div>
-                                        <strong>{assignment.evaluatorEmployeeName ?? `Employee #${assignment.evaluatorEmployeeId}`}</strong>
-                                        <small>{assignment.evaluatorPositionName ?? assignment.evaluatorEmployeeEmail ?? 'Evaluator'}</small>
-                                        <span>{assignmentSourceLabel(assignment)} · {assignmentStatusLabel(assignment.status)}</span>
-                                      </div>
-                                      <button
-                                          type="button"
-                                          className="hfdt-icon-button"
-                                          disabled={!canEditEvaluators || assignment.relationshipType === 'SELF' || assignment.status === 'SUBMITTED' || (assignment.assignmentId != null && removingAssignmentId === assignment.assignmentId)}
-                                          onClick={() => void removeEvaluator(assignment)}
-                                          aria-label="Remove evaluator"
-                                      >
-                                        <i className="bi bi-x-lg" />
-                                      </button>
-                                    </article>
-                                ))}
-                              </section>
-                          );
-                        })}
-                      </div>
-
-                      <div className={`hfde-add-panel ${!canEditEvaluators || !hasAssignmentPreview ? 'disabled' : ''}`}>
-                        <div className="hfde-add-head">
-                          <div>
-                            <span className="hfdq-kicker">Adjust evaluators</span>
-                            <h4>Add evaluator</h4>
-                          </div>
-                          {!hasAssignmentPreview ? <span>Preview first</span> : hasDraftEvaluatorChanges ? <span>Unsaved changes</span> : null}
-                        </div>
-                        <div className="hfde-add-form">
-                          <label className="hfdc-field">
-                            <span>Relationship</span>
-                            <select className="hfd-input" value={manualForm.relationshipType} disabled={!canEditEvaluators || !hasAssignmentPreview} onChange={event => setManualForm(current => ({ ...current, relationshipType: event.target.value as FeedbackRelationshipType, evaluatorEmployeeId: 0 }))}>
-                              {relationshipOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-                            </select>
-                          </label>
-                          <label className="hfdc-field">
-                            <span>Find evaluator</span>
-                            <input className="hfd-input" value={evaluatorSearch} disabled={!canEditEvaluators || !hasAssignmentPreview} onChange={event => setEvaluatorSearch(event.target.value)} placeholder="Search by name or department" />
-                          </label>
-                        </div>
-                        {canEditEvaluators && hasAssignmentPreview && (
-                            <div className="hfde-candidate-list">
-                              {evaluatorCandidates.length === 0 ? (
-                                  <span className="hfde-empty-line">No evaluator found.</span>
-                              ) : evaluatorCandidates.map(employee => (
-                                  <button key={employee.id} type="button" className={`hfde-candidate ${manualForm.evaluatorEmployeeId === employee.id ? 'selected' : ''}`} onClick={() => setManualForm(current => ({ ...current, evaluatorEmployeeId: employee.id }))}>
-                                    <span className="hfde-avatar">{initials(employee.fullName)}</span>
-                                    <span><strong>{employee.fullName}</strong><small>{employee.currentDepartment ?? 'Department not set'}</small></span>
-                                    {manualForm.evaluatorEmployeeId === employee.id && <i className="bi bi-check-circle-fill" />}
-                                  </button>
-                              ))}
-                            </div>
-                        )}
-                        <label className="hfdc-field full">
-                          <span>Reason</span>
-                          <textarea className="hfd-input hfdc-textarea" rows={2} disabled={!canEditEvaluators || !hasAssignmentPreview} value={manualForm.reason ?? ''} onChange={event => setManualForm(current => ({ ...current, reason: event.target.value }))} placeholder="Example: Confirmed after reviewing the reporting line." />
-                        </label>
-                        <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditEvaluators || !hasAssignmentPreview || addingEvaluator || !manualForm.evaluatorEmployeeId || !manualForm.reason?.trim()} onClick={() => void addEvaluator()}>
-                          <i className="bi bi-plus-lg" /> {addingEvaluator ? 'Adding...' : 'Add Evaluator'}
-                        </button>
-                      </div>
-                    </aside>
-                  </div>
-              )}
-            </section>
-        )}
-
-        {activeStepKey === 'questions' && (
-            <section className={`hfdq-table-card hfdqr-card hfdqw-card ${savedAssignmentCount === 0 ? 'disabled' : ''}`}>
-              <div className="hfdqw-page-head">
-                <div className="hfdqw-title-block">
-                  <span className="hfdq-kicker">Step 4</span>
-                  <h3>{selectedCampaign?.name ?? 'Feedback Campaign'}</h3>
-                  <p>Question review · evaluator forms · form readiness</p>
-                </div>
-                <div className={`hfdqw-weight-indicator ${competencyWeightsReady ? 'ready' : 'warning'}`}>
-                  <span>Scoring weights</span>
-                  <strong>{formatPercent(competencyWeightTotal)}%</strong>
-                  <em>{competencyWeightsReady ? `${competencyWeights.length} competencies` : `${formatPercent(Math.abs(competencyWeightDelta))}% ${competencyWeightDelta > 0 ? 'remaining' : 'over'}`}</em>
-                  <button className="hfd-btn hfd-btn-primary" type="button" disabled={questionSaveDisabled} onClick={() => void saveQuestionReview()}>
-                    <i className="bi bi-save2" /> {savingQuestionReview ? 'Saving...' : 'Save Review'}
-                  </button>
-                </div>
-              </div>
-
-              {!selectedCampaign ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-save" /><strong>Save campaign info first</strong><p>Questions become available after the campaign setup is ready.</p></div>
-              ) : savedAssignmentCount === 0 ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-diagram-3" /><strong>Save evaluators first</strong><p>Questions become available after evaluators are saved.</p></div>
-              ) : loadingQuestionReview ? (
-                  <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading questions...</div>
-              ) : (
-                  <div className="hfdqw-step-stack">
-                    <section className="hfdqw-scoring-panel">
-                      <div className="hfdqw-scoring-head">
-                        <div>
-                          <span className="hfdq-kicker">Scoring weights</span>
-                          <h4>Competency weights</h4>
-                          <p>Set how much each competency contributes to each evaluator form score.</p>
-                        </div>
-                        <div className={`hfdqw-total-pill ${competencyWeightsReady ? 'ready' : 'warning'}`}>
-                          <span>Total</span>
-                          <strong>{formatPercent(competencyWeightTotal)}%</strong>
-                        </div>
-                      </div>
-
-                      <div className="hfdqw-weight-actions">
-                        <button className="hfd-btn hfd-btn-secondary" type="button" disabled={selectedCampaign.status !== 'DRAFT'} onClick={balanceCompetencyWeightsByQuestions}>
-                          Balance by questions
-                        </button>
-                        <button className="hfd-btn hfd-btn-secondary" type="button" disabled={selectedCampaign.status !== 'DRAFT'} onClick={equalizeCompetencyWeights}>
-                          Equal by competency
-                        </button>
-                        <span>{competencyWeightsReady ? 'Ready to save.' : `Adjust weights to total 100%. ${formatPercent(Math.abs(competencyWeightDelta))}% ${competencyWeightDelta > 0 ? 'remaining' : 'over'}.`}</span>
-                      </div>
-
-                      {competencyWeights.length === 0 ? (
-                          <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-sliders" /><strong>No scoring weights yet</strong><p>Refresh questions from active rules to prepare competency weights.</p></div>
-                      ) : (
-                          <div className="hfdqw-weight-table">
-                            <div className="hfdqw-weight-row hfdqw-weight-header">
-                              <span>Competency</span>
-                              <span>Questions</span>
-                              <span>Used in</span>
-                              <span>Weight</span>
-                            </div>
-                            {competencyWeights.map(weight => (
-                                <div key={weight.competencyCode} className={`hfdqw-weight-row ${(weight.warnings ?? []).length > 0 ? 'warning' : ''}`}>
-                                  <div>
-                                    <strong>{weight.competencyName}</strong>
-                                    <small>{weight.competencyCode}</small>
-                                    {(weight.warnings ?? []).map(warning => <em key={warning}><i className="bi bi-exclamation-triangle" /> {warning}</em>)}
-                                  </div>
-                                  <span>{weight.questionCountVariesByForm ? 'Varies by form' : `${weight.questionCountPerForm ?? 0} per form`}</span>
-                                  <span>{(weight.usedInForms ?? []).join(', ') || 'Not used'}</span>
-                                  <label className="hfdqw-weight-input">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        step="0.01"
-                                        disabled={selectedCampaign.status !== 'DRAFT'}
-                                        value={Number(weight.weightPercent ?? 0)}
-                                        onChange={event => updateCompetencyWeight(weight.competencyCode, Number(event.target.value))}
-                                    />
-                                    <span>%</span>
-                                  </label>
-                                </div>
-                            ))}
-                          </div>
-                      )}
-                    </section>
-
-                    <div className="hfdqw-builder-layout">
-                      <aside className="hfdqw-form-panel">
-                        <div className="hfdqw-panel-head">
-                          <span className="hfdq-kicker">Forms</span>
-                          <h4>Feedback forms</h4>
-                          <p>Select the form to review.</p>
-                        </div>
-
-                        <div className="hfdqr-actions hfdqw-actions-top">
-                          <button className="hfd-btn hfd-btn-secondary" type="button" disabled={resolvingQuestionReview || savingQuestionReview} onClick={() => void resolveQuestionReview()}>
-                            <i className="bi bi-arrow-repeat" /> {resolvingQuestionReview ? 'Refreshing...' : 'Refresh from Rules'}
-                          </button>
-                        </div>
-
-                        {questionReview.warnings.length > 0 && (
-                            <div className="hfdt-response-warnings compact">
-                              {questionReview.warnings.slice(0, 4).map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
-                            </div>
-                        )}
-
-                        <div className="hfdqr-group-list hfdqw-form-list">
-                          {questionGroups.length === 0 ? (
-                              <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-ui-checks-grid" /><strong>No questions yet</strong><p>Refresh from active rules to review the form.</p></div>
-                          ) : questionGroups.map(group => {
-                            const groupCompetencies = buildQuestionCompetencies(group.questions);
-                            const groupReady = group.includedQuestionCount > 0 && group.warnings.length === 0;
-                            return (
-                                <button key={group.groupKey} type="button" className={`hfdqr-group-card hfdqw-form-tab ${selectedQuestionGroup?.groupKey === group.groupKey ? 'selected' : ''} ${groupReady ? 'ready' : 'warning'}`} onClick={() => setSelectedQuestionGroupKey(group.groupKey)}>
-                                  <span className={`hfdt-readiness-dot ${groupReady ? 'ready' : 'warning'}`} />
-                                  <span>
-                              <strong>{relationshipLabel(group.relationshipType)} form</strong>
-                              <small>{group.includedQuestionCount}/{group.questionCount} questions · {groupCompetencies.length} competencies</small>
-                            </span>
-                                  <em>{group.includedQuestionCount}</em>
-                                </button>
-                            );
-                          })}
-                        </div>
-                      </aside>
-
-                      <main className="hfdqw-builder-panel">
-                        {!selectedQuestionGroup ? (
-                            <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-ui-checks" /><strong>Select a form</strong><p>The question review will appear here.</p></div>
-                        ) : (
-                            <>
-                              <div className="hfdqw-builder-head">
-                                <div>
-                                  <span className="hfdq-kicker">Question review</span>
-                                  <h4>{activeQuestionFormTitle}</h4>
-                                  <p>{selectedQuestionIncludedQuestionCount}/{selectedQuestionTotalQuestionCount} questions · {selectedQuestionIncludedCompetencyCount}/{selectedQuestionTotalCompetencyCount} competencies</p>
-                                </div>
-                                <div className="hfdqw-form-meta">
-                                  <span>Rating scale: 1–5</span>
-                                  <span>Comments included</span>
-                                </div>
-                              </div>
-
-                              {selectedQuestionGroup.warnings.length > 0 && (
-                                  <div className="hfdt-selected-issues hfdqr-group-warnings">
-                                    {selectedQuestionGroup.warnings.map(warning => <span key={warning}><i className="bi bi-exclamation-triangle" /> {warning}</span>)}
-                                  </div>
-                              )}
-
-                              <div className="hfdqw-accordion-list">
-                                {selectedQuestionCompetencies.length === 0 ? (
-                                    <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-slash-circle" /><strong>No questions found</strong><p>Refresh from active rules after updating the question setup.</p></div>
-                                ) : selectedQuestionCompetencies.map((competency) => {
-                                  const includedCount = competency.questions.filter(question => question.included).length;
-                                  const expanded = isQuestionCompetencyExpanded(selectedQuestionGroup.groupKey, competency.sectionCode);
-                                  return (
-                                      <article
-                                          key={competency.sectionCode}
-                                          className={`hfdqw-accordion-card ${expanded ? 'open' : ''}`}
-                                          onDragOver={event => event.preventDefault()}
-                                          onDrop={event => handleCompetencyDrop(event, selectedQuestionGroup.groupKey, competency.sectionCode)}
-                                      >
-                                        <div className="hfdqw-accordion-head">
-                                    <span
-                                        className="hfdqw-drag-handle"
-                                        draggable={selectedCampaign.status === 'DRAFT'}
-                                        onDragStart={event => writeQuestionDragData(event, { kind: 'competency', groupKey: selectedQuestionGroup.groupKey, sectionCode: competency.sectionCode })}
-                                        title="Drag to reorder"
-                                    >
-                                      <i className="bi bi-grip-vertical" />
-                                    </span>
-                                          <button type="button" className="hfdqw-accordion-toggle" onClick={() => toggleQuestionCompetency(selectedQuestionGroup.groupKey, competency.sectionCode)}>
-                                      <span>
-                                        <strong>{competency.sectionTitle}</strong>
-                                        <small>{includedCount} question{includedCount === 1 ? '' : 's'}</small>
-                                      </span>
-                                            <i className={`bi ${expanded ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                                          </button>
-
-                                        </div>
-
-                                        {expanded && (
-                                            <div className="hfdqw-question-stack">
-                                              {competency.questions.map((question, questionIndex) => (
-                                                  <article
-                                                      key={question.questionCode}
-                                                      className={`hfdqw-question-card ${question.included ? 'included' : 'excluded'} ${isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) ? 'preview-open' : ''}`}
-                                                      onDragOver={event => event.preventDefault()}
-                                                      onDrop={event => {
-                                                        event.stopPropagation();
-                                                        handleQuestionDrop(event, selectedQuestionGroup.groupKey, competency.sectionCode, question.questionCode);
-                                                      }}
-                                                  >
-                                              <span
-                                                  className="hfdqw-drag-handle"
-                                                  draggable={selectedCampaign.status === 'DRAFT'}
-                                                  onDragStart={event => writeQuestionDragData(event, { kind: 'question', groupKey: selectedQuestionGroup.groupKey, sectionCode: competency.sectionCode, questionCode: question.questionCode })}
-                                                  title="Drag to reorder"
-                                              >
-                                                <i className="bi bi-grip-vertical" />
-                                              </span>
-                                                    <div className="hfdqw-question-body">
-                                                      <div className="hfdqw-question-topline">
-                                                        <small>Question {questionIndex + 1}</small>
-                                                        <div className="hfdqw-question-actions">
-                                                          <button type="button" className="hfdqw-preview-toggle" onClick={() => toggleQuestionPreview(selectedQuestionGroup.groupKey, question.questionCode)}>
-                                                            {isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) ? 'Hide preview' : 'Show preview'}
-                                                            <i className={`bi ${isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                                                          </button>
-                                                          <label className="hfdqw-include-toggle">
-                                                            <input type="checkbox" checked={question.included} disabled={selectedCampaign.status !== 'DRAFT'} onChange={() => toggleQuestionIncluded(selectedQuestionGroup.groupKey, question.questionCode)} />
-                                                            <span>{question.included ? 'Included' : 'Excluded'}</span>
-                                                          </label>
-                                                        </div>
-                                                      </div>
-                                                      <strong>{question.questionText}</strong>
-                                                      {isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) && (
-                                                          <div className="hfdqw-preview-controls">
-                                                            <div className="hfdqw-rating-preview" aria-hidden="true">
-                                                              {[1, 2, 3, 4, 5].map(value => <button key={value} type="button" disabled>{value}</button>)}
-                                                            </div>
-                                                            <textarea className="hfdqw-comment-preview" disabled rows={3} placeholder="Write a clear, helpful comment for this feedback response." />
-                                                          </div>
-                                                      )}
-                                                    </div>
-                                                  </article>
-                                              ))}
-                                            </div>
-                                        )}
-                                      </article>
-                                  );
-                                })}
-                              </div>
-                            </>
-                        )}
-                      </main>
-                    </div>
-                  </div>
-              )}
-            </section>
-        )}
-
+        {activeStepKey === 'questions' && <QuestionReviewStep
+            savedAssignmentCount={savedAssignmentCount}
+            selectedCampaign={selectedCampaign}
+            competencyWeightsReady={competencyWeightsReady}
+            formatPercent={formatPercent}
+            competencyWeightTotal={competencyWeightTotal}
+            competencyWeights={competencyWeights}
+            competencyWeightDelta={competencyWeightDelta}
+            questionSaveDisabled={questionSaveDisabled}
+            saveQuestionReview={saveQuestionReview}
+            savingQuestionReview={savingQuestionReview}
+            loadingQuestionReview={loadingQuestionReview}
+            balanceCompetencyWeightsByQuestions={balanceCompetencyWeightsByQuestions}
+            equalizeCompetencyWeights={equalizeCompetencyWeights}
+            updateCompetencyWeight={updateCompetencyWeight}
+            resolvingQuestionReview={resolvingQuestionReview}
+            resolveQuestionReview={resolveQuestionReview}
+            questionReview={questionReview}
+            questionGroups={questionGroups}
+            buildQuestionCompetencies={buildQuestionCompetencies}
+            selectedQuestionGroup={selectedQuestionGroup}
+            setSelectedQuestionGroupKey={setSelectedQuestionGroupKey}
+            relationshipLabel={relationshipLabel}
+            activeQuestionFormTitle={activeQuestionFormTitle}
+            selectedQuestionIncludedQuestionCount={selectedQuestionIncludedQuestionCount}
+            selectedQuestionTotalQuestionCount={selectedQuestionTotalQuestionCount}
+            selectedQuestionIncludedCompetencyCount={selectedQuestionIncludedCompetencyCount}
+            selectedQuestionTotalCompetencyCount={selectedQuestionTotalCompetencyCount}
+            selectedQuestionCompetencies={selectedQuestionCompetencies}
+            isQuestionCompetencyExpanded={isQuestionCompetencyExpanded}
+            handleCompetencyDrop={handleCompetencyDrop}
+            writeQuestionDragData={writeQuestionDragData}
+            toggleQuestionCompetency={toggleQuestionCompetency}
+            isQuestionPreviewExpanded={isQuestionPreviewExpanded}
+            handleQuestionDrop={handleQuestionDrop}
+            toggleQuestionPreview={toggleQuestionPreview}
+            toggleQuestionIncluded={toggleQuestionIncluded}
+        />}
         {activeStepKey === 'launch' && (
             <LaunchReadinessSection
                 selectedCampaign={selectedCampaign}

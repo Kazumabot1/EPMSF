@@ -10,7 +10,13 @@ import CampaignMonitoringTab from '../hr-feedback/tabs/CampaignActivationTab';
 import AnalyticsTab from '../hr-feedback/tabs/AnalyticsTab';
 import FeedbackAuditPage from './FeedbackAuditPage';
 import { feedbackCampaignApi } from '../../api/feedbackCampaignApi';
-import { DEFAULT_EVALUATOR_CONFIG, normalizeEvaluatorConfig } from '../../types/feedbackCampaign';
+import { normalizeEvaluatorConfig } from '../../types/feedbackCampaign';
+import {
+  normalizeIds,
+  readStoredWorkspace,
+  sameIds,
+  writeStoredWorkspace,
+} from '../hr-feedback/tabs/campaign-setup/utils/campaignSetupStorage';
 import type {
   FeedbackAssignmentGenerationResponse,
   FeedbackCampaign,
@@ -31,13 +37,6 @@ type FeedbackModuleKey =
     | 'analytics'
     | 'audit';
 
-interface FeedbackWorkspaceState {
-  campaignId: number | null;
-  evalConfig: EvaluatorConfigInput;
-}
-
-const WORKSPACE_STORAGE_KEY = 'epms.hrFeedback.workspaceState.v3';
-const LEGACY_WORKSPACE_STORAGE_KEY = 'epms.hrFeedback.workspaceState.v2';
 
 const MODULE_COPY: Record<
     FeedbackModuleKey,
@@ -94,44 +93,6 @@ const MODULE_COPY: Record<
     title: 'Audit Log',
     description: 'Review configuration and campaign activity history for traceability.',
   },
-};
-
-const normalizeIds = (ids: number[]) => [...new Set(ids)].sort((left, right) => left - right);
-
-const sameIds = (left: number[], right: number[]) => {
-  const a = normalizeIds(left);
-  const b = normalizeIds(right);
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-};
-
-const emptyWorkspace = (): FeedbackWorkspaceState => ({
-  campaignId: null,
-  evalConfig: normalizeEvaluatorConfig(DEFAULT_EVALUATOR_CONFIG),
-});
-
-const readStoredWorkspace = (): FeedbackWorkspaceState => {
-  if (typeof window === 'undefined') return emptyWorkspace();
-
-  const readKey = (key: string): FeedbackWorkspaceState | null => {
-    const raw = window.sessionStorage.getItem(key);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as Partial<FeedbackWorkspaceState> & {
-      savedTargetIds?: number[];
-      draftTargetIds?: number[];
-    };
-
-    return {
-      campaignId: typeof parsed.campaignId === 'number' ? parsed.campaignId : null,
-      evalConfig: normalizeEvaluatorConfig(parsed.evalConfig ?? DEFAULT_EVALUATOR_CONFIG),
-    };
-  };
-
-  try {
-    return readKey(WORKSPACE_STORAGE_KEY) ?? readKey(LEGACY_WORKSPACE_STORAGE_KEY) ?? emptyWorkspace();
-  } catch {
-    return emptyWorkspace();
-  }
 };
 
 const getModuleKey = (pathname: string): FeedbackModuleKey => {
@@ -209,15 +170,10 @@ const FeedbackLayoutPage = () => {
   }, [loadCampaignWorkspace, storedWorkspace.campaignId]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const payload: FeedbackWorkspaceState = {
+    writeStoredWorkspace({
       campaignId: campaign?.id ?? storedWorkspace.campaignId ?? null,
       evalConfig: normalizeEvaluatorConfig(evalConfig),
-    };
-
-    window.sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(payload));
-    window.sessionStorage.removeItem(LEGACY_WORKSPACE_STORAGE_KEY);
+    });
   }, [campaign?.id, evalConfig, storedWorkspace.campaignId]);
 
   useEffect(() => {
