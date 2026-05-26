@@ -4,7 +4,14 @@ import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import KpiTemplateCycleViewModal from '../../../components/hr/kpi-template/KpiTemplateCycleViewModal';
 import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
-import type { KpiTemplateCycleResponse } from '../../../types/kpiTemplateCycle';
+import type { KpiGraceExtension, KpiTemplateCycleResponse } from '../../../types/kpiTemplateCycle';
+
+const graceOptions: Array<{ value: KpiGraceExtension; label: string }> = [
+  { value: 'ONE_WEEK', label: '1 week' },
+  { value: 'TWO_WEEKS', label: '2 weeks' },
+  { value: 'THREE_WEEKS', label: '3 weeks' },
+  { value: 'ONE_MONTH', label: '1 month' },
+];
 
 const formatDate = (value: string | null | undefined) => {
   if (!value) return '—';
@@ -14,10 +21,25 @@ const formatDate = (value: string | null | undefined) => {
 };
 
 const statusLabel = (cycle: KpiTemplateCycleResponse) => {
+  if (cycle.status === 'PENDING_APPROVAL') return 'Pending approval';
   if (cycle.status === 'CLOSING') return 'Closing';
   if (cycle.status === 'ACTIVE') return 'Active';
   if (cycle.status === 'DEACTIVATED') return 'Inactive';
   return 'Draft';
+};
+
+const graceLabel = (value: KpiGraceExtension | null | undefined) =>
+  graceOptions.find((option) => option.value === value)?.label ?? '—';
+
+const isBeforeOfficialEndDate = (cycle: KpiTemplateCycleResponse) => {
+  const endValue = cycle.currentPeriodEndDate ?? cycle.endDate;
+  if (!endValue) return false;
+  const end = new Date(endValue);
+  if (Number.isNaN(end.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return today < end;
 };
 
 const KpiTemplateCycleListPage = () => {
@@ -26,6 +48,9 @@ const KpiTemplateCycleListPage = () => {
   const [error, setError] = useState('');
   const [viewCycleId, setViewCycleId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [closeCycle, setCloseCycle] = useState<KpiTemplateCycleResponse | null>(null);
+  const [closeReason, setCloseReason] = useState('');
+  const [graceExtension, setGraceExtension] = useState<KpiGraceExtension>('ONE_WEEK');
 
   const load = async () => {
     try {
@@ -53,6 +78,12 @@ const KpiTemplateCycleListPage = () => {
 
   const handleToggleActive = async (cycle: KpiTemplateCycleResponse) => {
     const nextActive = cycle.status !== 'ACTIVE';
+    if (!nextActive && isBeforeOfficialEndDate(cycle)) {
+      setCloseCycle(cycle);
+      setCloseReason('');
+      setGraceExtension('ONE_WEEK');
+      return;
+    }
     try {
       setTogglingId(cycle.id);
       await kpiTemplateCycleService.updateStatus(cycle.id, nextActive);
@@ -60,6 +91,29 @@ const KpiTemplateCycleListPage = () => {
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Status update failed.');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const submitEarlyCloseRequest = async () => {
+    if (!closeCycle) return;
+    if (!closeReason.trim()) {
+      toast.error('Reason is required.');
+      return;
+    }
+    try {
+      setTogglingId(closeCycle.id);
+      await kpiTemplateCycleService.updateStatus(closeCycle.id, {
+        active: false,
+        reason: closeReason.trim(),
+        graceExtension,
+      });
+      toast.success('KPI close request sent to CEO.');
+      setCloseCycle(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to request early close.');
     } finally {
       setTogglingId(null);
     }
@@ -135,10 +189,27 @@ const KpiTemplateCycleListPage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {sorted.map((cycle, index) => (
-                      <tr key={cycle.id} className="transition-colors hover:bg-violet-50/50">
+                    {sorted.map((cycle, index) => {
+                      const locked = cycle.status === 'PENDING_APPROVAL';
+                      return (
+                      <tr
+                        key={cycle.id}
+                        className={`transition-colors hover:bg-violet-50/50 ${locked ? 'bg-gray-50 opacity-65' : ''}`}
+                      >
                         <td className="px-4 py-4 tabular-nums text-gray-600">{index + 1}</td>
-                        <td className="px-4 py-4 font-semibold text-gray-900">{cycle.cycleName}</td>
+                        <td className="px-4 py-4 font-semibold text-gray-900">
+                          {cycle.cycleName}
+                          {cycle.status === 'PENDING_APPROVAL' && (
+                            <p className="mt-1 text-xs font-semibold text-amber-700">
+                              CEO approval pending - {graceLabel(cycle.graceExtension)} grace requested
+                            </p>
+                          )}
+                          {cycle.status === 'ACTIVE' && cycle.earlyCloseReviewDecision === 'REJECTED' && cycle.earlyCloseReviewReason && (
+                            <p className="mt-1 text-xs font-semibold text-red-700">
+                              CEO rejected early close: {cycle.earlyCloseReviewReason}
+                            </p>
+                          )}
+                        </td>
                         <td className="px-4 py-4 text-gray-700">
                           {formatDate(cycle.currentPeriodStartDate ?? cycle.startDate)}
                         </td>
@@ -173,8 +244,8 @@ const KpiTemplateCycleListPage = () => {
                                 <input
                                   type="checkbox"
                                   className="peer sr-only"
-                                  checked={cycle.status === 'ACTIVE' || cycle.status === 'CLOSING'}
-                                  disabled={togglingId === cycle.id || cycle.status === 'CLOSING'}
+                                  checked={cycle.status === 'ACTIVE' || cycle.status === 'CLOSING' || cycle.status === 'PENDING_APPROVAL'}
+                                  disabled={togglingId === cycle.id || cycle.status === 'CLOSING' || cycle.status === 'PENDING_APPROVAL'}
                                   onChange={() => void handleToggleActive(cycle)}
                                 />
                                 <span className="absolute inset-0 rounded-full bg-gray-200 transition peer-checked:bg-emerald-500 peer-disabled:opacity-50" />
@@ -184,7 +255,8 @@ const KpiTemplateCycleListPage = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -198,6 +270,63 @@ const KpiTemplateCycleListPage = () => {
         cycleId={viewCycleId}
         onClose={() => setViewCycleId(null)}
       />
+
+      {closeCycle && (
+        <div className="kpi-tpl-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="kpi-tpl-reason-modal">
+            <div className="kpi-tpl-modal-header">
+              <div>
+                <p className="kpi-tpl-modal-kicker">CEO approval required</p>
+                <h2>Request early KPI cycle close</h2>
+              </div>
+              <button type="button" className="kpi-tpl-icon-btn" onClick={() => setCloseCycle(null)}>
+                <i className="bi bi-x-lg" aria-hidden />
+              </button>
+            </div>
+            <div className="kpi-tpl-modal-body space-y-4">
+              <p className="text-sm leading-6 text-gray-600">
+                {closeCycle.cycleName} ends on {formatDate(closeCycle.currentPeriodEndDate ?? closeCycle.endDate)}.
+                Add a reason and grace period for in-progress forms before sending this to CEO.
+              </p>
+              <label className="grid gap-2 text-sm font-semibold text-gray-700">
+                Reason
+                <textarea
+                  value={closeReason}
+                  onChange={(event) => setCloseReason(event.target.value)}
+                  rows={5}
+                  maxLength={1000}
+                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-violet-500"
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold text-gray-700">
+                Grace Period Extension
+                <select
+                  value={graceExtension}
+                  onChange={(event) => setGraceExtension(event.target.value as KpiGraceExtension)}
+                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-violet-500"
+                >
+                  {graceOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="kpi-tpl-modal-footer kpi-tpl-reason-footer">
+              <button type="button" className="kpi-tpl-btn-secondary" onClick={() => setCloseCycle(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="kpi-tpl-btn-primary"
+                disabled={togglingId === closeCycle.id}
+                onClick={() => void submitEarlyCloseRequest()}
+              >
+                Send to CEO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

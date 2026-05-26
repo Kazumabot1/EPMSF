@@ -9,6 +9,7 @@ import com.epms.dto.UpdateEmployeeKpiScoresRequest;
 import com.epms.dto.UseKpiDepartmentRequest;
 import com.epms.dto.UseKpiTemplateResultDto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface EmployeeKpiWorkflowService {
@@ -51,6 +52,8 @@ public interface EmployeeKpiWorkflowService {
     int runCycleMaintenance();
 
     void startCycleClosingGrace(Integer cycleId);
+
+    void startCycleClosingGrace(Integer cycleId, LocalDateTime graceEndsAt);
 
     void handleEmployeePositionChanged(Integer employeeId, Integer oldPositionId, Integer newPositionId);
 

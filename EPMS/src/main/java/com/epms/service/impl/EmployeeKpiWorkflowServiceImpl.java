@@ -458,11 +458,16 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public void startCycleClosingGrace(Integer cycleId) {
+        startCycleClosingGrace(cycleId, LocalDateTime.now().plusDays(KPI_GRACE_DAYS));
+    }
+
+    @Override
+    @Transactional
+    public void startCycleClosingGrace(Integer cycleId, LocalDateTime graceEnds) {
         KpiTemplateCycle cycle = kpiTemplateCycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found."));
         KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle);
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime graceEnds = now.plusDays(KPI_GRACE_DAYS);
 
         cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
         cycle.setClosingRequestedAt(now);
@@ -488,8 +493,24 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                         + graceEnds.toLocalDate() + ".",
                 TYPE_KPI_CYCLE_GRACE
         );
+        notifyExecutivesForCycleGrace(cycle, graceEnds);
         kpiTemplateCycleRepository.save(cycle);
         kpiTemplateCyclePeriodRepository.save(period);
+    }
+
+    private void notifyExecutivesForCycleGrace(KpiTemplateCycle cycle, LocalDateTime graceEnds) {
+        for (User executive : activeUsersByRoles(EXECUTIVE_ROLE_NAMES)) {
+            notificationService.sendOnce(
+                    executive.getId(),
+                    "KPI cycle wrapping up",
+                    "KPI cycle \"" + cycle.getCycleName()
+                            + "\" is being wrapped up. Pending KPI evaluations can continue until "
+                            + graceEnds.toLocalDate()
+                            + ". New evaluations can begin after HR launches the next KPI cycle.",
+                    TYPE_KPI_CYCLE_GRACE,
+                    cycle.getId()
+            );
+        }
     }
 
     @Override

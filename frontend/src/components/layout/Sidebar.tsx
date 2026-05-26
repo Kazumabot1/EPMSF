@@ -66,6 +66,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     (normalizedRoles.includes('EMPLOYEE') ||
       normalizedDashboard === 'EMPLOYEE_DASHBOARD');
 
+  const isExecutive =
+    normalizedRoles.includes('CEO') ||
+    normalizedRoles.includes('EXECUTIVE') ||
+    normalizedDashboard === 'CEO_DASHBOARD' ||
+    normalizedDashboard === 'EXECUTIVE_DASHBOARD';
+
   const isHrOnly = variant === 'hr' || isHr;
   const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
 const roleLabel =
@@ -83,7 +89,7 @@ const roleLabel =
               ? 'Manager'
               : isEmployee
                 ? 'Employee'
-                : normalizedDashboard === 'EXECUTIVE_DASHBOARD'
+                : isExecutive
                   ? 'Executive'
                   : 'User';
 
@@ -340,6 +346,32 @@ const roleLabel =
       { to: '/employee/notifications', label: 'Notifications', icon: 'bi bi-bell' },
     ];
 
+    const executiveNavItems: NavItem[] = [
+      { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
+      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
+      {
+        to: '/executive/approval/kpi',
+        label: 'Approval',
+        icon: 'bi bi-shield-check',
+        children: [
+          { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+        ],
+      },
+      {
+        to: '/executive/reports',
+        label: 'Reports',
+        icon: 'bi bi-bar-chart-line',
+        children: [
+          { to: '/executive/reports/performance', label: 'Performance Reports', icon: 'bi bi-file-earmark-bar-graph', end: true },
+          { to: '/executive/reports/department-performance', label: 'Department Performance', icon: 'bi bi-building-check', end: true },
+          { to: '/executive/reports/pip-status', label: 'PIP Status', icon: 'bi bi-clipboard2-pulse', end: true },
+          { to: '/executive/reports/feedback-completion', label: 'Feedback Completion', icon: 'bi bi-chat-dots', end: true },
+          { to: '/executive/reports/recommendations', label: 'Recommendations', icon: 'bi bi-stars', end: true },
+        ],
+      },
+      { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
+    ];
+
 const departmentHeadNavItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
   { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
@@ -364,11 +396,12 @@ const departmentHeadNavItems: NavItem[] = [
   if (isAdmin) return adminNavItems;
   if (isHr) return hrNavItems;
   if (isDepartmentHead) return departmentHeadNavItems;
+  if (isExecutive) return executiveNavItems;
   if (isEmployee) return employeeNavItems;
 
   return hrNavItems;
 
-}, [variant, isAdmin, isHr, isDepartmentHead, isEmployee, canCreatePip]);
+}, [variant, isAdmin, isHr, isDepartmentHead, isExecutive, isEmployee, canCreatePip]);
   const loadUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/notifications/unread-count');

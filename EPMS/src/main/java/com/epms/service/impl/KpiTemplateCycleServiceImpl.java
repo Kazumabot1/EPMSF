@@ -2,12 +2,16 @@ package com.epms.service.impl;
 
 import com.epms.dto.KpiTemplateCycleRequestDTO;
 import com.epms.dto.KpiTemplateCycleResponseDTO;
+import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.entity.KpiForm;
 import com.epms.entity.KpiTemplateCycle;
 import com.epms.entity.KpiTemplateCycleForm;
 import com.epms.entity.KpiTemplateCyclePeriod;
 import com.epms.entity.User;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiGraceExtension;
+import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.KpiFormRepository;
 import com.epms.repository.KpiTemplateCycleFormRepository;
@@ -24,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,16 +109,18 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
     @Override
     @Transactional
-    public KpiTemplateCycleResponseDTO updateStatus(Integer id, boolean active) {
+    public KpiTemplateCycleResponseDTO updateStatus(Integer id, KpiTemplateCycleStatusRequestDTO request) {
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
+        boolean active = Boolean.TRUE.equals(request.getActive());
 
         if (active) {
             if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
                 return getById(id);
             }
-            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Closing cycles cannot be reactivated.");
+            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
             }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
             cycle.setClosingRequestedAt(null);
@@ -129,6 +136,11 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         "Only active cycles can be deactivated."
                 );
             }
+            if (isBeforeOfficialEndDate(cycle)) {
+                requestEarlyClose(cycle, request);
+                cycleRepository.save(cycle);
+                return getById(id);
+            }
         }
 
         cycle.setUpdatedByUser(currentUser());
@@ -140,6 +152,97 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
             employeeKpiWorkflowService.startCycleClosingGrace(id);
         }
         return getById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<KpiTemplateCycleResponseDTO> listPendingEarlyCloseRequests() {
+        return cycleRepository
+                .findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus.PENDING_APPROVAL)
+                .stream()
+                .map(this::toSummaryDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason) {
+        KpiTemplateCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        LocalDateTime now = LocalDateTime.now();
+        KpiGraceExtension extension = cycle.getGraceExtension();
+        if (extension == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
+        }
+
+        cycle.setEarlyCloseReviewedAt(now);
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.save(cycle);
+        cycleRepository.flush();
+
+        employeeKpiWorkflowService.startCycleClosingGrace(id, extension.addTo(now));
+        return getById(id);
+    }
+
+    @Override
+    @Transactional
+    public KpiTemplateCycleResponseDTO rejectEarlyClose(Integer id, String reviewReason) {
+        KpiTemplateCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+        cycle.setEarlyCloseReviewedAt(LocalDateTime.now());
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
+        cycle.setClosingRequestedAt(null);
+        cycle.setGraceEndsAt(null);
+        cycle.setClosedAt(null);
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.save(cycle);
+        return getById(id);
+    }
+
+    private KpiTemplateCycle requirePendingApproval(Integer id) {
+        KpiTemplateCycle cycle = cycleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
+        if (cycle.getStatus() != KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending KPI early close request exists for this cycle.");
+        }
+        return cycle;
+    }
+
+    private void requestEarlyClose(KpiTemplateCycle cycle, KpiTemplateCycleStatusRequestDTO request) {
+        String reason = normalizeText(request.getReason(), 1000);
+        if (reason == null || reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required to request early cycle closure.");
+        }
+        if (request.getGraceExtension() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is required.");
+        }
+        cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        cycle.setEarlyCloseReason(reason);
+        cycle.setGraceExtension(request.getGraceExtension());
+        cycle.setEarlyCloseRequestedAt(LocalDateTime.now());
+        cycle.setEarlyCloseRequestedByUser(currentUser());
+        cycle.setEarlyCloseReviewedAt(null);
+        cycle.setEarlyCloseReviewedByUser(null);
+        cycle.setEarlyCloseReviewDecision(null);
+        cycle.setEarlyCloseReviewReason(null);
+        cycle.setUpdatedByUser(cycle.getEarlyCloseRequestedByUser());
+    }
+
+    private boolean isBeforeOfficialEndDate(KpiTemplateCycle cycle) {
+        LocalDate officialEnd = cyclePeriodRepository
+                .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
+                        cycle.getId(),
+                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+                )
+                .map(KpiTemplateCyclePeriod::getEndDate)
+                .orElse(cycle.getEndDate());
+        return officialEnd != null && LocalDate.now().isBefore(officialEnd);
     }
 
     private void validateRequest(KpiTemplateCycleRequestDTO dto) {
@@ -228,10 +331,41 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .closingRequestedAt(cycle.getClosingRequestedAt())
                 .graceEndsAt(cycle.getGraceEndsAt())
                 .closedAt(cycle.getClosedAt())
+                .earlyCloseReason(cycle.getEarlyCloseReason())
+                .graceExtension(cycle.getGraceExtension())
+                .earlyCloseRequestedAt(cycle.getEarlyCloseRequestedAt())
+                .earlyCloseRequestedByUserId(cycle.getEarlyCloseRequestedByUser() != null ? cycle.getEarlyCloseRequestedByUser().getId() : null)
+                .earlyCloseRequestedByName(displayUser(cycle.getEarlyCloseRequestedByUser()))
+                .earlyCloseReviewedAt(cycle.getEarlyCloseReviewedAt())
+                .earlyCloseReviewedByUserId(cycle.getEarlyCloseReviewedByUser() != null ? cycle.getEarlyCloseReviewedByUser().getId() : null)
+                .earlyCloseReviewedByName(displayUser(cycle.getEarlyCloseReviewedByUser()))
+                .earlyCloseReviewDecision(cycle.getEarlyCloseReviewDecision())
+                .earlyCloseReviewReason(cycle.getEarlyCloseReviewReason())
                 .createdAt(cycle.getCreatedAt())
                 .updatedAt(cycle.getUpdatedAt())
                 .kpiForms(forms)
                 .build();
+    }
+
+    private String normalizeText(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return normalized.length() > maxLength ? normalized.substring(0, maxLength) : normalized;
+    }
+
+    private String displayUser(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+            return user.getFullName();
+        }
+        return user.getEmail();
     }
 
     private User currentUser() {
