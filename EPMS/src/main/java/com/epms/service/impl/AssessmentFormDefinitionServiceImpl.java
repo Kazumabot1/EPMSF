@@ -39,8 +39,10 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     private final AssessmentFormDefinitionRepository repository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AssessmentFormResponse> getAll() {
+        expireEndedActiveForms();
+
         return repository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(this::toResponse)
@@ -48,8 +50,10 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AssessmentFormResponse getById(Integer id) {
+        expireEndedActiveForms();
+
         return toResponse(getEntity(id));
     }
 
@@ -76,6 +80,8 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
     @Override
     public AssessmentFormResponse updateActivation(Integer id, AssessmentFormActivationPayload payload) {
+        expireEndedActiveForms();
+
         if (payload == null || payload.getActive() == null) {
             throw new BadRequestException("Activation status is required.");
         }
@@ -96,6 +102,26 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         AssessmentFormDefinition form = getEntity(id);
         setInactive(form);
         repository.save(form);
+    }
+
+    private void expireEndedActiveForms() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<AssessmentFormDefinition> forms = repository.findAllByOrderByCreatedAtDesc();
+        boolean changed = false;
+
+        for (AssessmentFormDefinition form : forms) {
+            if (Boolean.TRUE.equals(form.getActive())
+                    && form.getEndDate() != null
+                    && !form.getEndDate().isAfter(now)) {
+                form.setActive(false);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            repository.saveAll(forms);
+        }
     }
 
     private AssessmentFormDefinition getEntity(Integer id) {

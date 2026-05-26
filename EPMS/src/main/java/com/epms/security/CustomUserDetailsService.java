@@ -103,10 +103,19 @@ public class CustomUserDetailsService implements UserDetailsService {
                 ? List.of(positionRoleName)
                 : roleNames.stream().toList();
 
-        String selectedDashboard = dashboardResolver.normalizeDashboard(user.getDashboard());
-        String dashboard = selectedDashboard != null
-                ? selectedDashboard
-                : dashboardResolver.resolveDashboard(dashboardRoles);
+        /*
+         * Position Role is the source of truth.
+         * Do not let old users.dashboard override a newly selected Position Role.
+         */
+        String dashboard = dashboardResolver.resolveDashboard(dashboardRoles);
+
+        if (positionRoleName == null || positionRoleName.isBlank()) {
+            String selectedDashboard = dashboardResolver.normalizeDashboard(user.getDashboard());
+
+            if (selectedDashboard != null) {
+                dashboard = selectedDashboard;
+            }
+        }
 
         if (roleNames.isEmpty()) {
             roleNames.add(roleFromDashboard(dashboard));

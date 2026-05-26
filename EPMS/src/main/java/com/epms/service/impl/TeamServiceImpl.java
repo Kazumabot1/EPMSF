@@ -700,16 +700,12 @@ public class TeamServiceImpl implements TeamService {
             throw new AccessDeniedException("HR users can view teams and team history only.");
         }
 
-        if (currentUserIsAdmin()) {
+        if (currentUserIsDepartmentHead()
+                && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        if (positionPermissionService.currentUserHasPermission("teamCreate")
-                || positionPermissionService.currentUserHasPermission("teamEdit")) {
-            return;
-        }
-
-        throw new AccessDeniedException("Your position does not have permission to manage teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can manage teams.");
     }
 
     private void assertCurrentUserCanCreateTeams() {
@@ -717,15 +713,12 @@ public class TeamServiceImpl implements TeamService {
             throw new AccessDeniedException("HR users can view teams and team history only. Team creation is handled by Department Heads.");
         }
 
-        if (currentUserIsAdmin()) {
+        if (currentUserIsDepartmentHead()
+                && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        if (positionPermissionService.currentUserHasPermission("teamCreate")) {
-            return;
-        }
-
-        throw new AccessDeniedException("Your position does not have permission to create teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can create teams.");
     }
 
     private void assertCurrentUserCanEditTeams() {
@@ -733,15 +726,12 @@ public class TeamServiceImpl implements TeamService {
             throw new AccessDeniedException("HR users can view teams and team history only.");
         }
 
-        if (currentUserIsAdmin()) {
+        if (currentUserIsDepartmentHead()
+                && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        if (positionPermissionService.currentUserHasPermission("teamEdit")) {
-            return;
-        }
-
-        throw new AccessDeniedException("Your position does not have permission to edit teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can edit teams.");
     }
 
     private void assertCurrentUserCanDeleteTeams() {
