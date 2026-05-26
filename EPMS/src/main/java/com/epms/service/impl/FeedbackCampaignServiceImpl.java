@@ -836,6 +836,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         addAssignmentCheck(requests, assignments, checks, blocking, warnings);
         addQuestionReviewCheck(campaign, assignments, checks, blocking, warnings);
         addScoringConfigCheck(campaign, assignments, checks, blocking, warnings);
+        addPrivacyPolicyCheck(campaign, checks, warnings);
         addSubmissionWindowCheck(campaign, checks, blocking, warnings);
 
         int totalAssignments = assignments.size();
@@ -1089,6 +1090,42 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             return;
         }
         checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "PASS", "Relationship weights total 100% and are ready for scoring."));
+    }
+
+    private void addPrivacyPolicyCheck(
+            FeedbackCampaign campaign,
+            List<FeedbackCampaignActivationReadinessResponse.FeedbackCampaignActivationCheck> checks,
+            List<String> warnings
+    ) {
+        List<String> anonymousRoles = new ArrayList<>();
+        if (Boolean.TRUE.equals(campaign.getManagerFeedbackAnonymous())) anonymousRoles.add("manager");
+        if (!Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) anonymousRoles.add("peer");
+        if (!Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) anonymousRoles.add("direct report");
+        if (Boolean.TRUE.equals(campaign.getSelfFeedbackAnonymous())) anonymousRoles.add("self");
+
+        List<String> privacyWarnings = new ArrayList<>();
+        if (Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) {
+            privacyWarnings.add("Peer feedback is not anonymous. Confirm this policy before launching.");
+        }
+        if (Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) {
+            privacyWarnings.add("Direct report feedback is not anonymous. Confirm this policy before launching.");
+        }
+
+        if (!privacyWarnings.isEmpty()) {
+            warnings.addAll(privacyWarnings);
+            checks.add(readinessCheck(
+                    "PRIVACY_POLICY",
+                    "Privacy settings",
+                    "WARNING",
+                    String.join(" ", privacyWarnings)
+            ));
+            return;
+        }
+
+        String message = anonymousRoles.isEmpty()
+                ? "No anonymous feedback roles are enabled."
+                : "Anonymous feedback enabled for " + String.join(", ", anonymousRoles) + " feedback.";
+        checks.add(readinessCheck("PRIVACY_POLICY", "Privacy settings", "PASS", message));
     }
 
     private void addSubmissionWindowCheck(

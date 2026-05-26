@@ -18,6 +18,34 @@ const PAGE_SIZE = 10;
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
+const normalizeText = (value?: string | null) => String(value ?? '').trim().toLowerCase();
+
+const normalizeGender = (value?: string | null) =>
+    String(value ?? '')
+        .trim()
+        .replace(/[_-]+/g, ' ')
+        .toLowerCase();
+
+const employeeSearchText = (emp: EmployeeResponse) =>
+    [
+      emp.fullName,
+      emp.firstName,
+      emp.lastName,
+      emp.staffNrc,
+      emp.email,
+      emp.phoneNumber,
+      emp.currentDepartment,
+      emp.parentDepartment,
+      emp.workingDepartment,
+      emp.positionTitle,
+      emp.positionLevelCode,
+      emp.gender,
+    ]
+        .filter(Boolean)
+        .map((value) => String(value))
+        .join(' ')
+        .toLowerCase();
+
 const sortByName = (a: EmployeeResponse, b: EmployeeResponse) => {
   const la = (a.lastName || '').toLowerCase();
   const lb = (b.lastName || '').toLowerCase();
@@ -72,24 +100,18 @@ const EmployeeManagement = () => {
 
   const filtered = useMemo(() => {
     let list = employees.filter((emp) => {
-      const displayName =
-        emp.fullName || [emp.firstName, emp.lastName].filter(Boolean).join(' ').trim() || '';
+      const q = normalizeText(search);
 
-      const q = search.trim().toLowerCase();
+      const matchSearch = !q || employeeSearchText(emp).includes(q);
 
-      const matchSearch =
-        !q ||
-        displayName.toLowerCase().includes(q) ||
-        (emp.staffNrc || '').toLowerCase().includes(q);
-
-      const matchGender = !genderFilter || emp.gender === genderFilter;
+      const matchGender = !genderFilter || normalizeGender(emp.gender) === genderFilter;
 
       const matchStatus =
-        statusFilter === 'all'
-          ? true
-          : statusFilter === 'active'
-            ? isEmployeeActive(emp)
-            : !isEmployeeActive(emp);
+          statusFilter === 'all'
+              ? true
+              : statusFilter === 'active'
+                  ? isEmployeeActive(emp)
+                  : !isEmployeeActive(emp);
 
       return matchSearch && matchGender && matchStatus;
     });
@@ -149,502 +171,502 @@ const EmployeeManagement = () => {
     }
 
     return parts
-      .map((p) => p!.charAt(0).toUpperCase())
-      .join('')
-      .slice(0, 2);
+        .map((p) => p!.charAt(0).toUpperCase())
+        .join('')
+        .slice(0, 2);
   };
 
   return (
-    <div className="epms-emp epms-emp-shell text-slate-800">
-      <Toaster toastOptions={{ duration: 4000 }} />
+      <div className="epms-emp epms-emp-shell text-slate-800">
+        <Toaster toastOptions={{ duration: 4000 }} />
 
-      <div className="epms-emp-main relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-5">
-        <header className="epms-emp-hero">
-          <p className="epms-emp-eyebrow">
-            <i className="bi bi-building" aria-hidden />
-            HR — records
-          </p>
+        <div className="epms-emp-main relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-5">
+          <header className="epms-emp-hero">
+            <p className="epms-emp-eyebrow">
+              <i className="bi bi-building" aria-hidden />
+              HR — records
+            </p>
 
-          <h1 className="epms-emp-title">Employee records</h1>
+            <h1 className="epms-emp-title">Employee records</h1>
 
-          <p className="epms-emp-lead">
-            View and manage employee master data. Use{' '}
-            <Link
-              to="/hr/employee/import"
-              className="text-indigo-600 underline decoration-indigo-200 underline-offset-2"
-            >
-              Import Employees
-            </Link>{' '}
-            for Excel/CSV bulk employee onboarding.
-          </p>
+            <p className="epms-emp-lead">
+              View and manage employee master data. Use{' '}
+              <Link
+                  to="/hr/employee/import"
+                  className="text-indigo-600 underline decoration-indigo-200 underline-offset-2"
+              >
+                Import Employees
+              </Link>{' '}
+              for Excel/CSV bulk employee onboarding.
+            </p>
 
-          <div className="epms-emp-hero-actions flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="epms-emp-btn epms-emp-btn--primary"
-              onClick={openCreate}
-            >
-              <i className="bi bi-person-plus" aria-hidden />
-              Add employee
-            </button>
+            <div className="epms-emp-hero-actions flex flex-wrap gap-2">
+              <button
+                  type="button"
+                  className="epms-emp-btn epms-emp-btn--primary"
+                  onClick={openCreate}
+              >
+                <i className="bi bi-person-plus" aria-hidden />
+                Add employee
+              </button>
 
-            <Link
-              to="/hr/employee/import"
-              className="epms-emp-btn epms-emp-btn--import no-underline"
-            >
-              <i className="bi bi-upload" aria-hidden />
-              Import (Excel / CSV)
-            </Link>
+              <Link
+                  to="/hr/employee/import"
+                  className="epms-emp-btn epms-emp-btn--import no-underline"
+              >
+                <i className="bi bi-upload" aria-hidden />
+                Import (Excel / CSV)
+              </Link>
 
-            <button
-              type="button"
-              className="epms-emp-btn epms-emp-btn--import"
-              disabled={filtered.length === 0}
-              title={`Export ${filtered.length} visible employee(s) to Excel`}
-              onClick={() =>
-                exportToExcel(
-                  filtered.map((e) => ({
-                    fullName:
-                      e.fullName?.trim() ||
-                      [e.firstName, e.lastName].filter(Boolean).join(' ').trim() ||
-                      '',
-                    position: e.positionTitle
-                      ? `${e.positionTitle}${e.positionLevelCode ? ` (${e.positionLevelCode})` : ''}`
-                      : '',
-                    department: e.currentDepartment || e.parentDepartment || '',
-                    phone: e.phoneNumber || '',
-                    nrc: e.staffNrc || '',
-                    gender: e.gender || '',
-                    status: isEmployeeActive(e) ? 'Active' : 'Inactive',
-                    email: e.email || '',
-                  })) as any,
-                  [
-                    { header: 'Full Name',   key: 'fullName'    },
-                    { header: 'Position',    key: 'position'    },
-                    { header: 'Department',  key: 'department'  },
-                    { header: 'Phone',       key: 'phone'       },
-                    { header: 'NRC',         key: 'nrc'         },
-                    { header: 'Gender',      key: 'gender'      },
-                    { header: 'Status',      key: 'status'      },
-                    { header: 'Email',       key: 'email'       },
-                  ],
-                  `hr_employees_${todayStr()}`
-                )
-              }
-            >
-              <i className="bi bi-file-earmark-excel" aria-hidden />
-              Export Excel
-            </button>
-          </div>
-        </header>
+              <button
+                  type="button"
+                  className="epms-emp-btn epms-emp-btn--import"
+                  disabled={filtered.length === 0}
+                  title={`Export ${filtered.length} visible employee(s) to Excel`}
+                  onClick={() =>
+                      exportToExcel(
+                          filtered.map((e) => ({
+                            fullName:
+                                e.fullName?.trim() ||
+                                [e.firstName, e.lastName].filter(Boolean).join(' ').trim() ||
+                                '',
+                            position: e.positionTitle
+                                ? `${e.positionTitle}${e.positionLevelCode ? ` (${e.positionLevelCode})` : ''}`
+                                : '',
+                            department: e.currentDepartment || e.parentDepartment || '',
+                            phone: e.phoneNumber || '',
+                            nrc: e.staffNrc || '',
+                            gender: e.gender || '',
+                            status: isEmployeeActive(e) ? 'Active' : 'Inactive',
+                            email: e.email || '',
+                          })) as any,
+                          [
+                            { header: 'Full Name',   key: 'fullName'    },
+                            { header: 'Position',    key: 'position'    },
+                            { header: 'Department',  key: 'department'  },
+                            { header: 'Phone',       key: 'phone'       },
+                            { header: 'NRC',         key: 'nrc'         },
+                            { header: 'Gender',      key: 'gender'      },
+                            { header: 'Status',      key: 'status'      },
+                            { header: 'Email',       key: 'email'       },
+                          ],
+                          `hr_employees_${todayStr()}`
+                      )
+                  }
+              >
+                <i className="bi bi-file-earmark-excel" aria-hidden />
+                Export Excel
+              </button>
+            </div>
+          </header>
 
-        <div className="epms-emp-stats">
-          <div className="epms-emp-stat">
+          <div className="epms-emp-stats">
+            <div className="epms-emp-stat">
             <span className="epms-emp-stat__icon" aria-hidden>
               <i className="bi bi-people-fill" />
             </span>
-            <div>
-              <span className="epms-emp-stat__label">Total (loaded)</span>
-              <span className="epms-emp-stat__value">{stats.total}</span>
+              <div>
+                <span className="epms-emp-stat__label">Total (loaded)</span>
+                <span className="epms-emp-stat__value">{stats.total}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="epms-emp-stat">
+            <div className="epms-emp-stat">
             <span className="epms-emp-stat__icon epms-emp-stat__icon--emerald" aria-hidden>
               <i className="bi bi-person-check-fill" />
             </span>
-            <div>
-              <span className="epms-emp-stat__label">Active</span>
-              <span className="epms-emp-stat__value">{stats.active}</span>
+              <div>
+                <span className="epms-emp-stat__label">Active</span>
+                <span className="epms-emp-stat__value">{stats.active}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="epms-emp-stat">
+            <div className="epms-emp-stat">
             <span className="epms-emp-stat__icon epms-emp-stat__icon--slate" aria-hidden>
               <i className="bi bi-person-x" />
             </span>
-            <div>
-              <span className="epms-emp-stat__label">Inactive</span>
-              <span className="epms-emp-stat__value">{stats.inactive}</span>
+              <div>
+                <span className="epms-emp-stat__label">Inactive</span>
+                <span className="epms-emp-stat__value">{stats.inactive}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="epms-emp-toolbar">
-          <div className="epms-emp-input-wrap w-full max-w-md">
-            <i
-              className="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              aria-hidden
-            />
+          <div className="epms-emp-toolbar">
+            <div className="epms-emp-input-wrap w-full max-w-md">
+              <i
+                  className="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  aria-hidden
+              />
 
-            <input
-              type="search"
-              className="epms-emp-input w-full"
-              placeholder="Search name or NRC…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search employees"
-            />
-          </div>
+              <input
+                  type="search"
+                  className="epms-emp-input w-full"
+                  placeholder="Search name, NRC, email, phone, department…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  aria-label="Search employees"
+              />
+            </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
-            <label className="flex min-w-[140px] flex-col text-sm text-slate-600">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+              <label className="flex min-w-[140px] flex-col text-sm text-slate-600">
               <span className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Gender
               </span>
 
-              <select
-                className="epms-emp-input rounded-lg border border-slate-300 py-2 pl-2 pr-8"
-                value={genderFilter}
-                onChange={(e) => setGenderFilter(e.target.value)}
-              >
-                <option value="">All</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </label>
+                <select
+                    className="epms-emp-input rounded-lg border border-slate-300 py-2 pl-2 pr-8"
+                    value={genderFilter}
+                    onChange={(e) => setGenderFilter(e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
 
-            <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Status
               </span>
 
-              <div className="epms-emp-seg" role="group" aria-label="Filter by status">
-                {(
-                  [
-                    ['active', 'Active'],
-                    ['inactive', 'Inactive'],
-                    ['all', 'All'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={statusFilter === key}
-                    onClick={() => setStatusFilter(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
+                <div className="epms-emp-seg" role="group" aria-label="Filter by status">
+                  {(
+                      [
+                        ['active', 'Active'],
+                        ['inactive', 'Inactive'],
+                        ['all', 'All'],
+                      ] as const
+                  ).map(([key, label]) => (
+                      <button
+                          key={key}
+                          type="button"
+                          aria-pressed={statusFilter === key}
+                          onClick={() => setStatusFilter(key)}
+                      >
+                        {label}
+                      </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {error && (
-          <div className="epms-emp-error" role="alert">
-            <i className="bi bi-exclamation-circle mt-0.5 shrink-0 text-lg" aria-hidden />
-            <div>{error}</div>
+          {error && (
+              <div className="epms-emp-error" role="alert">
+                <i className="bi bi-exclamation-circle mt-0.5 shrink-0 text-lg" aria-hidden />
+                <div>{error}</div>
 
-            <button
-              type="button"
-              className="epms-emp-btn epms-emp-btn--ghost ml-auto text-sm"
-              onClick={() => void loadEmployees()}
-            >
-              Retry
-            </button>
-          </div>
-        )}
+                <button
+                    type="button"
+                    className="epms-emp-btn epms-emp-btn--ghost ml-auto text-sm"
+                    onClick={() => void loadEmployees()}
+                >
+                  Retry
+                </button>
+              </div>
+          )}
 
-        {loading ? (
-          <div className="epms-emp-skeleton">
-            <i className="bi bi-arrow-repeat animate-spin text-xl" aria-hidden />
-            Loading employees…
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="epms-emp-empty">
-            <div className="epms-emp-empty__icon" aria-hidden>
-              <i className="bi bi-inbox" />
-            </div>
+          {loading ? (
+              <div className="epms-emp-skeleton">
+                <i className="bi bi-arrow-repeat animate-spin text-xl" aria-hidden />
+                Loading employees…
+              </div>
+          ) : filtered.length === 0 ? (
+              <div className="epms-emp-empty">
+                <div className="epms-emp-empty__icon" aria-hidden>
+                  <i className="bi bi-inbox" />
+                </div>
 
-            <p className="mb-1 text-base font-semibold text-slate-700">
-              {error && employees.length === 0
-                ? 'No data loaded'
-                : 'No employees match your filters'}
-            </p>
+                <p className="mb-1 text-base font-semibold text-slate-700">
+                  {error && employees.length === 0
+                      ? 'No data loaded'
+                      : 'No employees match your filters'}
+                </p>
 
-            <p className="m-0 text-sm">
-              {error && employees.length === 0
-                ? 'Use Retry above, or check that the server is running.'
-                : 'Try clearing search, or show all statuses to see inactive records.'}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="epms-emp-table-wrap hidden overflow-x-auto md:block">
-              <table className="epms-emp-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Employee</th>
-                    <th scope="col">Position</th>
-                    <th scope="col">Phone</th>
-                    <th scope="col">NRC</th>
-                    <th scope="col">Gender</th>
-                    <th scope="col">Department</th>
-                    <th scope="col">Status</th>
-                    <th scope="col" className="text-right">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+                <p className="m-0 text-sm">
+                  {error && employees.length === 0
+                      ? 'Use Retry above, or check that the server is running.'
+                      : 'Try clearing search, or show all statuses to see inactive records.'}
+                </p>
+              </div>
+          ) : (
+              <>
+                <div className="epms-emp-table-wrap hidden overflow-x-auto md:block">
+                  <table className="epms-emp-table">
+                    <thead>
+                    <tr>
+                      <th scope="col">Employee</th>
+                      <th scope="col">Position</th>
+                      <th scope="col">Phone</th>
+                      <th scope="col">NRC</th>
+                      <th scope="col">Gender</th>
+                      <th scope="col">Department</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" className="text-right">
+                        Actions
+                      </th>
+                    </tr>
+                    </thead>
 
-                <tbody>
-                  {paged.map((emp) => {
-                    const active = isEmployeeActive(emp);
+                    <tbody>
+                    {paged.map((emp) => {
+                      const active = isEmployeeActive(emp);
 
-                    return (
-                      <tr key={emp.id}>
-                        <td>
-                          <div className="epms-emp-name-cell">
-                            <ProfileNameCell
-                          person={emp}
-                          subtitle={emp.staffNrc || emp.email || 'No NRC'}
-                        />
-                          </div>
-                        </td>
+                      return (
+                          <tr key={emp.id}>
+                            <td>
+                              <div className="epms-emp-name-cell">
+                                <ProfileNameCell
+                                    person={emp}
+                                    subtitle={emp.staffNrc || emp.email || 'No NRC'}
+                                />
+                              </div>
+                            </td>
 
-                        <td className="max-w-[160px] truncate" title={emp.positionTitle || ''}>
-                          {emp.positionTitle
-                            ? `${emp.positionTitle}${
-                                emp.positionLevelCode ? ` (${emp.positionLevelCode})` : ''
-                              }`
-                            : '—'}
-                        </td>
+                            <td className="max-w-[160px] truncate" title={emp.positionTitle || ''}>
+                              {emp.positionTitle
+                                  ? `${emp.positionTitle}${
+                                      emp.positionLevelCode ? ` (${emp.positionLevelCode})` : ''
+                                  }`
+                                  : '—'}
+                            </td>
 
-                        <td>{emp.phoneNumber || '—'}</td>
+                            <td>{emp.phoneNumber || '—'}</td>
 
-                        <td className="max-w-[140px] truncate" title={emp.staffNrc || ''}>
-                          {emp.staffNrc || '—'}
-                        </td>
+                            <td className="max-w-[140px] truncate" title={emp.staffNrc || ''}>
+                              {emp.staffNrc || '—'}
+                            </td>
 
-                        <td>{emp.gender || '—'}</td>
+                            <td>{emp.gender || '—'}</td>
 
-                        <td
-                          className="max-w-[180px] truncate"
-                          title={emp.currentDepartment || emp.parentDepartment || ''}
-                        >
-                          {emp.currentDepartment || emp.parentDepartment || '—'}
-                        </td>
+                            <td
+                                className="max-w-[180px] truncate"
+                                title={emp.currentDepartment || emp.parentDepartment || ''}
+                            >
+                              {emp.currentDepartment || emp.parentDepartment || '—'}
+                            </td>
 
-                        <td>
+                            <td>
                           <span
-                            className={`epms-emp-badge ${
-                              active ? 'epms-emp-badge--on' : 'epms-emp-badge--off'
-                            }`}
+                              className={`epms-emp-badge ${
+                                  active ? 'epms-emp-badge--on' : 'epms-emp-badge--off'
+                              }`}
                           >
                             {active ? 'Active' : 'Inactive'}
                           </span>
-                        </td>
+                            </td>
 
-                        <td className="text-right">
-                          <div className="epms-emp-actions float-right">
-                            <button
-                              type="button"
-                              className="epms-emp-icon-btn"
-                              title="View"
-                              onClick={() => openView(emp)}
-                            >
-                              <i className="bi bi-eye" aria-hidden />
-                              <span className="sr-only">View</span>
-                            </button>
+                            <td className="text-right">
+                              <div className="epms-emp-actions float-right">
+                                <button
+                                    type="button"
+                                    className="epms-emp-icon-btn"
+                                    title="View"
+                                    onClick={() => openView(emp)}
+                                >
+                                  <i className="bi bi-eye" aria-hidden />
+                                  <span className="sr-only">View</span>
+                                </button>
 
-                            <button
-                              type="button"
-                              className="epms-emp-icon-btn"
-                              title="Edit"
-                              onClick={() => openEdit(emp)}
-                            >
-                              <i className="bi bi-pencil" aria-hidden />
-                              <span className="sr-only">Edit</span>
-                            </button>
+                                <button
+                                    type="button"
+                                    className="epms-emp-icon-btn"
+                                    title="Edit"
+                                    onClick={() => openEdit(emp)}
+                                >
+                                  <i className="bi bi-pencil" aria-hidden />
+                                  <span className="sr-only">Edit</span>
+                                </button>
 
-                            <button
-                              type="button"
-                              className="epms-emp-icon-btn epms-emp-icon-btn--danger"
-                              title="Deactivate"
-                              disabled={!active}
-                              onClick={() => openDeactivate(emp)}
-                            >
-                              <i className="bi bi-person-x" aria-hidden />
-                              <span className="sr-only">Deactivate</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                                <button
+                                    type="button"
+                                    className="epms-emp-icon-btn epms-emp-icon-btn--danger"
+                                    title="Deactivate"
+                                    disabled={!active}
+                                    onClick={() => openDeactivate(emp)}
+                                >
+                                  <i className="bi bi-person-x" aria-hidden />
+                                  <span className="sr-only">Deactivate</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                      );
+                    })}
+                    </tbody>
+                  </table>
+                </div>
 
-            <div className="epms-emp-pager hidden md:flex">
+                <div className="epms-emp-pager hidden md:flex">
               <span>
                 Page {currentPage} of {totalPages} · {filtered.length} row
                 {filtered.length === 1 ? '' : 's'}
               </span>
 
-              <div className="epms-emp-pager__nav">
-                <button
-                  type="button"
-                  className="epms-emp-pager__btn"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  aria-label="Previous page"
-                >
-                  <i className="bi bi-chevron-left" aria-hidden />
-                </button>
+                  <div className="epms-emp-pager__nav">
+                    <button
+                        type="button"
+                        className="epms-emp-pager__btn"
+                        disabled={currentPage <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        aria-label="Previous page"
+                    >
+                      <i className="bi bi-chevron-left" aria-hidden />
+                    </button>
 
-                <button
-                  type="button"
-                  className="epms-emp-pager__btn"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  aria-label="Next page"
-                >
-                  <i className="bi bi-chevron-right" aria-hidden />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
+                    <button
+                        type="button"
+                        className="epms-emp-pager__btn"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        aria-label="Next page"
+                    >
+                      <i className="bi bi-chevron-right" aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              </>
+          )}
 
-        {!loading && !error && filtered.length > 0 && (
-          <div className="space-y-3 md:hidden">
-            {paged.map((emp) => {
-              const active = isEmployeeActive(emp);
+          {!loading && !error && filtered.length > 0 && (
+              <div className="space-y-3 md:hidden">
+                {paged.map((emp) => {
+                  const active = isEmployeeActive(emp);
 
-              const name =
-                emp.fullName?.trim() ||
-                [emp.firstName, emp.lastName].filter(Boolean).join(' ').trim() ||
-                '—';
+                  const name =
+                      emp.fullName?.trim() ||
+                      [emp.firstName, emp.lastName].filter(Boolean).join(' ').trim() ||
+                      '—';
 
-              return (
-                <div key={`m-${emp.id}`} className="epms-emp-card">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
+                  return (
+                      <div key={`m-${emp.id}`} className="epms-emp-card">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                       <span
-                        className={`epms-emp-avatar shrink-0 ${
-                          !active ? 'epms-emp-avatar--inactive' : ''
-                        }`}
-                        aria-hidden
+                          className={`epms-emp-avatar shrink-0 ${
+                              !active ? 'epms-emp-avatar--inactive' : ''
+                          }`}
+                          aria-hidden
                       >
                         {initials(emp)}
                       </span>
 
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-900">{name}</p>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-900">{name}</p>
 
-                        <p className="truncate text-sm text-slate-500">
-                          {emp.positionTitle
-                            ? `${emp.positionTitle}${
-                                emp.positionLevelCode ? ` · ${emp.positionLevelCode}` : ''
-                              }`
-                            : 'No position'}
-                        </p>
+                              <p className="truncate text-sm text-slate-500">
+                                {emp.positionTitle
+                                    ? `${emp.positionTitle}${
+                                        emp.positionLevelCode ? ` · ${emp.positionLevelCode}` : ''
+                                    }`
+                                    : 'No position'}
+                              </p>
 
-                        <p className="truncate text-sm text-slate-400">
-                          {emp.phoneNumber || '—'}
-                        </p>
-                      </div>
-                    </div>
+                              <p className="truncate text-sm text-slate-400">
+                                {emp.phoneNumber || '—'}
+                              </p>
+                            </div>
+                          </div>
 
-                    <span
-                      className={`epms-emp-badge shrink-0 ${
-                        active ? 'epms-emp-badge--on' : 'epms-emp-badge--off'
-                      }`}
-                    >
+                          <span
+                              className={`epms-emp-badge shrink-0 ${
+                                  active ? 'epms-emp-badge--on' : 'epms-emp-badge--off'
+                              }`}
+                          >
                       {active ? 'Active' : 'Inactive'}
                     </span>
-                  </div>
+                        </div>
 
-                  <div className="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2">
-                    <button
-                      type="button"
-                      className="epms-emp-icon-btn"
-                      onClick={() => openView(emp)}
-                      title="View"
-                    >
-                      <i className="bi bi-eye" />
-                    </button>
+                        <div className="mt-3 flex justify-end gap-1 border-t border-slate-100 pt-2">
+                          <button
+                              type="button"
+                              className="epms-emp-icon-btn"
+                              onClick={() => openView(emp)}
+                              title="View"
+                          >
+                            <i className="bi bi-eye" />
+                          </button>
 
-                    <button
-                      type="button"
-                      className="epms-emp-icon-btn"
-                      onClick={() => openEdit(emp)}
-                      title="Edit"
-                    >
-                      <i className="bi bi-pencil" />
-                    </button>
+                          <button
+                              type="button"
+                              className="epms-emp-icon-btn"
+                              onClick={() => openEdit(emp)}
+                              title="Edit"
+                          >
+                            <i className="bi bi-pencil" />
+                          </button>
 
-                    <button
-                      type="button"
-                      className="epms-emp-icon-btn epms-emp-icon-btn--danger"
-                      disabled={!active}
-                      onClick={() => openDeactivate(emp)}
-                      title="Deactivate"
-                    >
-                      <i className="bi bi-person-x" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                          <button
+                              type="button"
+                              className="epms-emp-icon-btn epms-emp-icon-btn--danger"
+                              disabled={!active}
+                              onClick={() => openDeactivate(emp)}
+                              title="Deactivate"
+                          >
+                            <i className="bi bi-person-x" />
+                          </button>
+                        </div>
+                      </div>
+                  );
+                })}
 
-            <div className="epms-emp-pager flex md:hidden">
+                <div className="epms-emp-pager flex md:hidden">
               <span>
                 Page {currentPage} of {totalPages} · {filtered.length} row
                 {filtered.length === 1 ? '' : 's'}
               </span>
 
-              <div className="epms-emp-pager__nav">
-                <button
-                  type="button"
-                  className="epms-emp-pager__btn"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  aria-label="Previous page"
-                >
-                  <i className="bi bi-chevron-left" aria-hidden />
-                </button>
+                  <div className="epms-emp-pager__nav">
+                    <button
+                        type="button"
+                        className="epms-emp-pager__btn"
+                        disabled={currentPage <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        aria-label="Previous page"
+                    >
+                      <i className="bi bi-chevron-left" aria-hidden />
+                    </button>
 
-                <button
-                  type="button"
-                  className="epms-emp-pager__btn"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  aria-label="Next page"
-                >
-                  <i className="bi bi-chevron-right" aria-hidden />
-                </button>
+                    <button
+                        type="button"
+                        className="epms-emp-pager__btn"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        aria-label="Next page"
+                    >
+                      <i className="bi bi-chevron-right" aria-hidden />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        <EmployeeFormModal
+            open={formOpen}
+            mode={formMode}
+            employee={formMode === 'edit' ? selected : null}
+            onClose={() => setFormOpen(false)}
+            onSaved={() => void loadEmployees()}
+        />
+
+        <EmployeeViewModal
+            open={viewOpen}
+            employee={selected}
+            onClose={() => setViewOpen(false)}
+            onEdit={() => selected && openEdit(selected)}
+        />
+
+        <EmployeeDeactivateDialog
+            open={deactivateOpen}
+            employee={selected}
+            onClose={() => setDeactivateOpen(false)}
+            onDeactivated={() => void loadEmployees()}
+        />
       </div>
-
-      <EmployeeFormModal
-        open={formOpen}
-        mode={formMode}
-        employee={formMode === 'edit' ? selected : null}
-        onClose={() => setFormOpen(false)}
-        onSaved={() => void loadEmployees()}
-      />
-
-      <EmployeeViewModal
-        open={viewOpen}
-        employee={selected}
-        onClose={() => setViewOpen(false)}
-        onEdit={() => selected && openEdit(selected)}
-      />
-
-      <EmployeeDeactivateDialog
-        open={deactivateOpen}
-        employee={selected}
-        onClose={() => setDeactivateOpen(false)}
-        onDeactivated={() => void loadEmployees()}
-      />
-    </div>
   );
 };
 

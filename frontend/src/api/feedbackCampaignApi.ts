@@ -103,6 +103,32 @@ const mapAssignmentGenerationResponse = (response: FeedbackAssignmentGenerationR
   warnings: response.warnings ?? [],
 });
 
+const mapActivationReadinessResponse = (response: FeedbackCampaignActivationReadiness): FeedbackCampaignActivationReadiness => ({
+  ...response,
+  ready: Boolean(response.ready),
+  canMarkReady: Boolean(response.canMarkReady),
+  canActivate: Boolean(response.canActivate),
+  summary: {
+    targetCount: Number(response.summary?.targetCount ?? 0),
+    assignmentCount: Number(response.summary?.assignmentCount ?? 0),
+    questionSelectionCount: Number(response.summary?.questionSelectionCount ?? 0),
+    assignmentQuestionSnapshotCount: Number(response.summary?.assignmentQuestionSnapshotCount ?? 0),
+    pendingAssignmentCount: Number(response.summary?.pendingAssignmentCount ?? 0),
+    inProgressAssignmentCount: Number(response.summary?.inProgressAssignmentCount ?? 0),
+    submittedAssignmentCount: Number(response.summary?.submittedAssignmentCount ?? 0),
+    completionPercent: Number(response.summary?.completionPercent ?? 0),
+  },
+  checks: (response.checks ?? []).map(check => ({
+    ...check,
+    key: String(check.key ?? '').toUpperCase(),
+    label: check.label ?? check.key ?? 'Setup check',
+    message: check.message ?? '',
+    status: check.status ?? 'BLOCKED',
+  })),
+  blockingIssues: response.blockingIssues ?? [],
+  warnings: response.warnings ?? [],
+});
+
 const mapEmployee = (employee: EmployeeResponse): FeedbackTargetEmployee => ({
   id: employee.id,
   fullName:
@@ -271,13 +297,7 @@ export const feedbackCampaignApi = {
       const response = await api.get<ApiEnvelope<FeedbackCampaignActivationReadiness>>(
           `${FEEDBACK_BASE}/campaigns/${campaignId}/activation-readiness`,
       );
-      const data = unwrapEnvelope(response);
-      return {
-        ...data,
-        checks: data.checks ?? [],
-        blockingIssues: data.blockingIssues ?? [],
-        warnings: data.warnings ?? [],
-      };
+      return mapActivationReadinessResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to load activation readiness.'));
     }
