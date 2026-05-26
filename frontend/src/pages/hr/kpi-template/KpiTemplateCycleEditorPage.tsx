@@ -3,14 +3,14 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import {
-  calculateKpiTemplateEndDate,
-  DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
-  inferKpiTemplateDurationMonths,
-  KPI_TEMPLATE_DURATION_OPTIONS,
+  calculateKpiCycleEndDate,
+  DEFAULT_KPI_CYCLE_DURATION_YEARS,
+  inferKpiCycleDurationYears,
+  KPI_CYCLE_DURATION_OPTIONS,
   filterKpiFormsForCycleSelection,
   formatKpiFormCycleOptionLabel,
   kpiStatusBadgeClass,
-  type KpiTemplateDurationMonths,
+  type KpiCycleDurationYears,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
@@ -39,7 +39,7 @@ const KpiTemplateCycleEditorPage = () => {
   const [cycleName, setCycleName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [durationMonths, setDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
+  const [durationYears, setDurationYears] = useState<KpiCycleDurationYears>(DEFAULT_KPI_CYCLE_DURATION_YEARS);
   const [selectedFormIds, setSelectedFormIds] = useState<number[]>([]);
   const [templates, setTemplates] = useState<KpiTemplateResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +59,7 @@ const KpiTemplateCycleEditorPage = () => {
           const nextEnd = cycle.endDate?.slice(0, 10) ?? '';
           setStartDate(nextStart);
           setEndDate(nextEnd);
-          setDurationMonths(inferKpiTemplateDurationMonths(nextStart, nextEnd));
+          setDurationYears((cycle.durationYears ?? inferKpiCycleDurationYears(nextStart, nextEnd)) as KpiCycleDurationYears);
           setSelectedFormIds(cycle.kpiForms.map((form) => form.id));
         }
       } catch (err) {
@@ -93,14 +93,14 @@ const KpiTemplateCycleEditorPage = () => {
     [templates, selectedFormIds],
   );
 
-  const handleDurationChange = (value: KpiTemplateDurationMonths) => {
-    setDurationMonths(value);
-    setEndDate(calculateKpiTemplateEndDate(startDate, value));
+  const handleDurationChange = (value: KpiCycleDurationYears) => {
+    setDurationYears(value);
+    setEndDate(calculateKpiCycleEndDate(startDate, value));
   };
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
-    setEndDate(calculateKpiTemplateEndDate(value, durationMonths));
+    setEndDate(calculateKpiCycleEndDate(value, durationYears));
   };
 
   const toggleFormSelection = (formId: number) => {
@@ -124,7 +124,7 @@ const KpiTemplateCycleEditorPage = () => {
   const buildPayload = (): KpiTemplateCycleRequest => ({
     cycleName: cycleName.trim(),
     startDate,
-    durationMonths,
+    durationYears,
     kpiFormIds: selectedFormIds,
   });
 
@@ -206,13 +206,13 @@ const KpiTemplateCycleEditorPage = () => {
               />
             </label>
             <label className="flex flex-col gap-2">
-              <FieldLabel>Period (months)</FieldLabel>
+              <FieldLabel>Cycle Period</FieldLabel>
               <select
-                value={durationMonths}
-                onChange={(event) => handleDurationChange(Number(event.target.value) as KpiTemplateDurationMonths)}
+                value={durationYears}
+                onChange={(event) => handleDurationChange(Number(event.target.value) as KpiCycleDurationYears)}
                 className={`${fieldClass} cursor-pointer`}
               >
-                {KPI_TEMPLATE_DURATION_OPTIONS.map((option) => (
+                {KPI_CYCLE_DURATION_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

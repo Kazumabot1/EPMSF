@@ -13,6 +13,7 @@ export interface KpiTemplateCycleResponse {
   startDate: string;
   endDate: string;
   durationMonths: number;
+  durationYears: number;
   durationLabel: string;
   status: KpiTemplateCycleStatus;
   currentPeriodId: number | null;
@@ -46,6 +47,7 @@ export interface KpiTemplateCycleStatusRequest {
 export interface KpiTemplateCycleRequest {
   cycleName: string;
   startDate: string;
-  durationMonths: number;
+  durationYears: number;
+  durationMonths?: number;
   kpiFormIds: number[];
 }

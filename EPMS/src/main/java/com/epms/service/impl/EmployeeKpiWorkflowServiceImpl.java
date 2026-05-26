@@ -340,8 +340,42 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     public UseKpiTemplateResultDto useCycleForAllActiveDepartments(Integer cycleId) {
         KpiTemplateCycle cycle = kpiTemplateCycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found."));
-        KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle);
-        return useCyclePeriodForAllActiveDepartments(cycleId, period.getId());
+        List<Integer> targetDepartmentIds = activeDepartmentIds();
+        if (targetDepartmentIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active departments are available.");
+        }
+        List<KpiTemplateCycleForm> links = kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycleId);
+        if (links.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
+        }
+
+        int created = 0;
+        int skipped = 0;
+        int departmentsWithMatches = 0;
+        LinkedHashSet<Integer> managers = new LinkedHashSet<>();
+
+        for (KpiTemplateCycleForm link : links) {
+            KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found."));
+            KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle, form)
+                    .orElse(null);
+            if (period == null) {
+                continue;
+            }
+            AggregatedDeptApply aggregated = useCycleFormForDepartments(cycle, period, form, targetDepartmentIds);
+            created += aggregated.created();
+            skipped += aggregated.skipped();
+            departmentsWithMatches += aggregated.departmentsWithMatches();
+            managers.addAll(aggregated.managerIds());
+        }
+
+        employeeKpiFormRepository.flush();
+        return UseKpiTemplateResultDto.builder()
+                .assignmentsCreated(created)
+                .assignmentsSkippedExisting(skipped)
+                .managersNotified(managers.size())
+                .departmentsWithMatches(departmentsWithMatches)
+                .build();
     }
 
     @Override
@@ -357,57 +391,29 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active departments are available.");
         }
 
-        int created = 0;
-        int skipped = 0;
-        int departmentsWithMatches = 0;
-        LinkedHashSet<Integer> managers = new LinkedHashSet<>();
-
         List<KpiTemplateCycleForm> links = kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycleId);
         if (links.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
         }
 
-        for (KpiTemplateCycleForm link : links) {
-            KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found."));
-            List<KpiPosition> positionLinks = kpiPositionRepository.findWithPositionByKpiForm_Id(form.getId());
-            Set<Integer> positionIds = positionLinks.stream()
-                    .map(kp -> kp.getPosition().getId())
-                    .collect(Collectors.toSet());
-            if (positionIds.isEmpty()) {
-                log.info(
-                        "KPI assignment diagnostics: cycleId={}, templateId={} skipped because the template has no linked positions.",
-                        cycleId,
-                        form.getId()
-                );
-                continue;
-            }
+        List<KpiForm> forms = period.getKpiForm() == null
+                ? links.stream()
+                .map(link -> link.getKpiForm())
+                .toList()
+                : List.of(period.getKpiForm());
 
-            AggregatedDeptApply aggregated = aggregateApplyAcrossDepartments(
-                    form,
-                    cycle,
-                    period,
-                    form.getId(),
-                    positionIds,
-                    targetDepartmentIds
-            );
+        int created = 0;
+        int skipped = 0;
+        int departmentsWithMatches = 0;
+        LinkedHashSet<Integer> managers = new LinkedHashSet<>();
+        for (KpiForm linkForm : forms) {
+            KpiForm form = kpiFormRepository.findDetailWithItemsById(linkForm.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found."));
+            AggregatedDeptApply aggregated = useCycleFormForDepartments(cycle, period, form, targetDepartmentIds);
             created += aggregated.created();
             skipped += aggregated.skipped();
             departmentsWithMatches += aggregated.departmentsWithMatches();
             managers.addAll(aggregated.managerIds());
-
-            for (Integer mgrId : aggregated.managerIds()) {
-                notificationService.send(
-                        mgrId,
-                        "KPI scoring requested",
-                        "HR activated KPI cycle \"" + cycle.getCycleName() + "\" with template \""
-                                + form.getTitle()
-                                + "\" for period " + period.getPeriodNumber()
-                                + ". Enter scores for assigned KPI accounts.",
-                        TYPE_KPI_MANAGER_ASSIGNMENT,
-                        form.getId()
-                );
-            }
         }
 
         employeeKpiFormRepository.flush();
@@ -420,28 +426,86 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .build();
     }
 
-    private KpiTemplateCyclePeriod ensureLatestOpenPeriod(KpiTemplateCycle cycle) {
-        return kpiTemplateCyclePeriodRepository
-                .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
-                        cycle.getId(),
-                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
-                )
-                .orElseGet(() -> createNextPeriod(cycle, null));
+    private AggregatedDeptApply useCycleFormForDepartments(
+            KpiTemplateCycle cycle,
+            KpiTemplateCyclePeriod period,
+            KpiForm form,
+            List<Integer> targetDepartmentIds
+    ) {
+        List<KpiPosition> positionLinks = kpiPositionRepository.findWithPositionByKpiForm_Id(form.getId());
+        Set<Integer> positionIds = positionLinks.stream()
+                .filter(kp -> kp.getPosition() != null)
+                .map(kp -> kp.getPosition().getId())
+                .collect(Collectors.toSet());
+        if (positionIds.isEmpty()) {
+            log.info(
+                    "KPI assignment diagnostics: cycleId={}, templateId={} skipped because the template has no linked positions.",
+                    cycle.getId(),
+                    form.getId()
+            );
+            return new AggregatedDeptApply(0, 0, 0, new LinkedHashSet<>());
+        }
+
+        AggregatedDeptApply aggregated = aggregateApplyAcrossDepartments(
+                form,
+                cycle,
+                period,
+                form.getId(),
+                positionIds,
+                targetDepartmentIds
+        );
+        for (Integer mgrId : aggregated.managerIds()) {
+            notificationService.send(
+                    mgrId,
+                    "KPI scoring requested",
+                    "HR activated KPI cycle \"" + cycle.getCycleName() + "\" with template \""
+                            + form.getTitle()
+                            + "\" for period " + period.getPeriodNumber()
+                            + ". Enter scores for assigned KPI accounts.",
+                    TYPE_KPI_MANAGER_ASSIGNMENT,
+                    form.getId()
+            );
+        }
+        return aggregated;
     }
 
-    private KpiTemplateCyclePeriod createNextPeriod(KpiTemplateCycle cycle, KpiTemplateCyclePeriod previous) {
+    private Optional<KpiTemplateCyclePeriod> ensureLatestOpenPeriod(KpiTemplateCycle cycle, KpiForm form) {
+        return kpiTemplateCyclePeriodRepository
+                .findTopByCycle_IdAndKpiForm_IdAndStatusInOrderByPeriodNumberDesc(
+                        cycle.getId(),
+                        form.getId(),
+                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+                )
+                .or(() -> createNextPeriod(cycle, form, null));
+    }
+
+    private Optional<KpiTemplateCyclePeriod> createNextPeriod(KpiTemplateCycle cycle, KpiForm form, KpiTemplateCyclePeriod previous) {
         int nextNumber = previous == null || previous.getPeriodNumber() == null ? 1 : previous.getPeriodNumber() + 1;
         LocalDate start = previous == null ? cycle.getStartDate() : previous.getEndDate().plusDays(1);
-        LocalDate end = start.plusMonths(cycle.getDurationMonths()).minusDays(1);
+        if (start == null || cycle.getEndDate() == null || start.isAfter(cycle.getEndDate())) {
+            return Optional.empty();
+        }
+        LocalDate end = start.plusMonths(positionDurationMonths(form)).minusDays(1);
+        if (end.isAfter(cycle.getEndDate())) {
+            end = cycle.getEndDate();
+        }
         KpiTemplateCyclePeriod period = KpiTemplateCyclePeriod.builder()
                 .cycle(cycle)
+                .kpiForm(form)
                 .periodNumber(nextNumber)
                 .startDate(start)
                 .endDate(end)
                 .status(KpiTemplateCyclePeriodStatus.OPEN)
                 .build();
-        cycle.setEndDate(end);
-        return kpiTemplateCyclePeriodRepository.save(period);
+        return Optional.of(kpiTemplateCyclePeriodRepository.save(period));
+    }
+
+    private int positionDurationMonths(KpiForm form) {
+        return kpiPositionRepository.findWithPositionByKpiForm_Id(form.getId()).stream()
+                .findFirst()
+                .map(KpiPosition::getDurationMonths)
+                .filter(months -> months != null && months >= 3 && months <= 12)
+                .orElse(12);
     }
 
     private List<Integer> activeDepartmentIds() {
@@ -466,20 +530,23 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     public void startCycleClosingGrace(Integer cycleId, LocalDateTime graceEnds) {
         KpiTemplateCycle cycle = kpiTemplateCycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found."));
-        KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle);
         LocalDateTime now = LocalDateTime.now();
 
         cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
         cycle.setClosingRequestedAt(now);
         cycle.setGraceEndsAt(graceEnds);
-        period.setStatus(KpiTemplateCyclePeriodStatus.CLOSING);
-        period.setClosingRequestedAt(now);
-        period.setGraceEndsAt(graceEnds);
-
-        List<EmployeeKpiForm> openAssignments = employeeKpiFormRepository.findOpenByCyclePeriodIdWithDetail(
-                period.getId(),
-                List.of(EmployeeKpiStatus.FINALIZED, EmployeeKpiStatus.CLOSED)
-        );
+        List<KpiTemplateCyclePeriod> periods = ensureOpenPeriodsForCycle(cycle);
+        List<EmployeeKpiForm> openAssignments = new ArrayList<>();
+        for (KpiTemplateCyclePeriod period : periods) {
+            period.setStatus(KpiTemplateCyclePeriodStatus.CLOSING);
+            period.setClosingRequestedAt(now);
+            period.setGraceEndsAt(graceEnds);
+            openAssignments.addAll(employeeKpiFormRepository.findOpenByCyclePeriodIdWithDetail(
+                    period.getId(),
+                    List.of(EmployeeKpiStatus.FINALIZED, EmployeeKpiStatus.CLOSED)
+            ));
+            kpiTemplateCyclePeriodRepository.save(period);
+        }
         for (EmployeeKpiForm assignment : openAssignments) {
             assignment.setGraceReason(KpiGraceReason.CYCLE_TERMINATION);
             assignment.setGraceEndsAt(graceEnds);
@@ -495,7 +562,25 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         );
         notifyExecutivesForCycleGrace(cycle, graceEnds);
         kpiTemplateCycleRepository.save(cycle);
-        kpiTemplateCyclePeriodRepository.save(period);
+    }
+
+    private List<KpiTemplateCyclePeriod> ensureOpenPeriodsForCycle(KpiTemplateCycle cycle) {
+        List<KpiTemplateCyclePeriod> existing = new ArrayList<>(kpiTemplateCyclePeriodRepository.findByCycle_IdAndStatusIn(
+                cycle.getId(),
+                List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+        ));
+        Set<Integer> existingFormIds = existing.stream()
+                .filter(period -> period.getKpiForm() != null && period.getKpiForm().getId() != null)
+                .map(period -> period.getKpiForm().getId())
+                .collect(Collectors.toSet());
+        for (KpiTemplateCycleForm link : kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycle.getId())) {
+            KpiForm form = link.getKpiForm();
+            if (form == null || form.getId() == null || existingFormIds.contains(form.getId())) {
+                continue;
+            }
+            ensureLatestOpenPeriod(cycle, form).ifPresent(existing::add);
+        }
+        return existing;
     }
 
     private void notifyExecutivesForCycleGrace(KpiTemplateCycle cycle, LocalDateTime graceEnds) {
@@ -530,8 +615,17 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             }
             period.setStatus(KpiTemplateCyclePeriodStatus.CLOSED);
             period.setClosedAt(now);
-            KpiTemplateCyclePeriod nextPeriod = createNextPeriod(cycle, period);
-            useCyclePeriodForAllActiveDepartments(cycle.getId(), nextPeriod.getId());
+            kpiTemplateCyclePeriodRepository.save(period);
+            Optional<KpiTemplateCyclePeriod> nextPeriod = period.getKpiForm() == null
+                    ? Optional.empty()
+                    : createNextPeriod(cycle, period.getKpiForm(), period);
+            nextPeriod.ifPresent(kpiTemplateCyclePeriod -> useCyclePeriodForAllActiveDepartments(
+                    cycle.getId(),
+                    kpiTemplateCyclePeriod.getId()
+            ));
+            if (nextPeriod.isEmpty()) {
+                deactivateCycleIfComplete(cycle, now);
+            }
             processed++;
         }
 
@@ -565,10 +659,28 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         KpiTemplateCycle cycle = period.getCycle();
         period.setStatus(KpiTemplateCyclePeriodStatus.CLOSED);
         period.setClosedAt(now);
-        cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
-        cycle.setClosedAt(now);
         kpiTemplateCyclePeriodRepository.save(period);
-        kpiTemplateCycleRepository.save(cycle);
+        boolean hasOpenClosingPeriods = !kpiTemplateCyclePeriodRepository.findByCycle_IdAndStatusIn(
+                cycle.getId(),
+                List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+        ).isEmpty();
+        if (!hasOpenClosingPeriods) {
+            cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
+            cycle.setClosedAt(now);
+            kpiTemplateCycleRepository.save(cycle);
+        }
+    }
+
+    private void deactivateCycleIfComplete(KpiTemplateCycle cycle, LocalDateTime now) {
+        boolean hasOpenPeriods = !kpiTemplateCyclePeriodRepository.findByCycle_IdAndStatusIn(
+                cycle.getId(),
+                List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+        ).isEmpty();
+        if (!hasOpenPeriods && cycle.getEndDate() != null && !LocalDate.now().isBefore(cycle.getEndDate())) {
+            cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
+            cycle.setClosedAt(now);
+            kpiTemplateCycleRepository.save(cycle);
+        }
     }
 
     private void closePositionTransitionAfterGrace(EmployeeKpiPositionTransition transition, LocalDateTime now) {
@@ -697,11 +809,14 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         Map<Integer, Employee> employeeMap = Map.of(employee.getId(), employee);
         EvaluatorEmployeeRouting routing = evaluatorEmployeeRouting(workingDepartmentId, employeeMap);
         for (KpiTemplateCycle cycle : kpiTemplateCycleRepository.findByStatus(KpiTemplateCycleStatus.ACTIVE)) {
-            KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle);
             List<KpiTemplateCycleForm> links = kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycle.getId());
             for (KpiTemplateCycleForm link : links) {
                 KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId()).orElse(null);
                 if (form == null || !formMatchesPosition(form.getId(), employee.getPosition().getId())) {
+                    continue;
+                }
+                KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle, form).orElse(null);
+                if (period == null) {
                     continue;
                 }
                 if (hasExistingKpiAssignment(employee.getId(), form.getId(), cycle, period)) {
@@ -1497,6 +1612,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private ManagerEmployeeRouting managerEmployeeRouting(Integer departmentId, Map<Integer, Employee> activeDepartmentEmployees) {
         Map<Integer, LinkedHashSet<Integer>> managerEmployeeIds = new LinkedHashMap<>();
         Set<Integer> activeProjectManagerTeamEmployeeIds = new HashSet<>();
+        Set<Integer> activeTeamLeaderEmployeeIds = new HashSet<>();
         Set<Integer> managersWithActiveTeams = new HashSet<>();
         Set<Integer> nonEmployeeTargetIds = privilegedTargetEmployeeIds();
         Map<Integer, Employee> managerAssignableEmployees = activeDepartmentEmployees.entrySet().stream()
@@ -1504,6 +1620,15 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new));
 
         for (Team team : teamRepository.findByDepartmentIdAndStatusIgnoreCase(departmentId, "Active")) {
+            User teamLeader = team.getTeamLeader();
+            Integer teamLeaderEmployeeId = teamLeader == null ? null : teamLeader.getEmployeeId();
+            if (isActiveUser(teamLeader)
+                    && teamLeaderEmployeeId != null
+                    && managerAssignableEmployees.containsKey(teamLeaderEmployeeId)) {
+                activeTeamLeaderEmployeeIds.add(teamLeaderEmployeeId);
+                activeProjectManagerTeamEmployeeIds.add(teamLeaderEmployeeId);
+            }
+
             User manager = team.getProjectManager();
             if (!isActiveUser(manager)) {
                 continue;
@@ -1534,7 +1659,15 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .filter(employeeId -> !activeProjectManagerTeamEmployeeIds.contains(employeeId))
                 .toList();
         for (User manager : departmentManagers) {
-            if (!isActiveUser(manager) || managersWithActiveTeams.contains(manager.getId())) {
+            if (!isActiveUser(manager)) {
+                continue;
+            }
+            LinkedHashSet<Integer> scopedIds = managerEmployeeIds.computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>());
+            scopedIds.addAll(activeTeamLeaderEmployeeIds.stream()
+                    .filter(employeeId -> !Objects.equals(employeeId, manager.getEmployeeId()))
+                    .toList());
+
+            if (managersWithActiveTeams.contains(manager.getId())) {
                 continue;
             }
             managerEmployeeIds

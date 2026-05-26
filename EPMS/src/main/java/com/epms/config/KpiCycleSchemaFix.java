@@ -35,6 +35,8 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
                 return;
             }
             alignEarlyCloseColumns(conn);
+            alignCycleDurationColumns(conn);
+            alignCyclePeriodTemplateColumn(conn);
             alignCycleStatusEnum(conn);
             alignEmployeeKpiStatusEnum(conn);
         } catch (SQLException e) {
@@ -71,6 +73,34 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
         addColumnIfMissing(conn, "early_close_reviewed_by", "INT NULL");
         addColumnIfMissing(conn, "early_close_review_decision", "VARCHAR(30) NULL");
         addColumnIfMissing(conn, "early_close_review_reason", "VARCHAR(1000) NULL");
+    }
+
+    private void alignCycleDurationColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle")) {
+            return;
+        }
+        if (!columnExists(conn, "kpi_template_cycle", "duration_years")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE kpi_template_cycle ADD COLUMN duration_years INT NOT NULL DEFAULT 1");
+                stmt.executeUpdate(
+                        "UPDATE kpi_template_cycle "
+                                + "SET duration_years = GREATEST(1, LEAST(5, CEIL(COALESCE(duration_months, 12) / 12)))"
+                );
+                log.info("Added kpi_template_cycle.duration_years column.");
+            }
+        }
+    }
+
+    private void alignCyclePeriodTemplateColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle_period")) {
+            return;
+        }
+        if (!columnExists(conn, "kpi_template_cycle_period", "kpi_form_id")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE kpi_template_cycle_period ADD COLUMN kpi_form_id INT NULL");
+                log.info("Added kpi_template_cycle_period.kpi_form_id column.");
+            }
+        }
     }
 
     private void addColumnIfMissing(Connection conn, String columnName, String definition) throws SQLException {

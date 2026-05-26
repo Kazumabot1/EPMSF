@@ -35,8 +35,13 @@ public class KpiTemplateCycle {
     @Column(name = "duration_months", nullable = false)
     private Integer durationMonths;
 
+    @Column(name = "duration_years", nullable = false)
+    @Builder.Default
+    private Integer durationYears = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
+    @Builder.Default
     private KpiTemplateCycleStatus status = KpiTemplateCycleStatus.DRAFT;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -106,6 +111,12 @@ public class KpiTemplateCycle {
         }
         if (status == null) {
             status = KpiTemplateCycleStatus.DRAFT;
+        }
+        if (durationYears == null) {
+            durationYears = 1;
+        }
+        if (durationMonths == null) {
+            durationMonths = durationYears * 12;
         }
     }
 

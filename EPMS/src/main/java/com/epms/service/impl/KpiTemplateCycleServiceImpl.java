@@ -38,7 +38,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
-    private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    private static final Set<Integer> ALLOWED_DURATION_YEARS = Set.of(1, 2, 3, 4, 5);
 
     private final KpiTemplateCycleRepository cycleRepository;
     private final KpiTemplateCycleFormRepository cycleFormRepository;
@@ -52,13 +52,15 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     public KpiTemplateCycleResponseDTO create(KpiTemplateCycleRequestDTO dto) {
         validateRequest(dto);
         User author = currentUser();
-        LocalDate endDate = calculateEndDate(dto.getStartDate(), dto.getDurationMonths());
+        Integer durationYears = normalizedDurationYears(dto);
+        LocalDate endDate = calculateEndDate(dto.getStartDate(), durationYears);
 
         KpiTemplateCycle cycle = KpiTemplateCycle.builder()
                 .cycleName(dto.getCycleName().trim())
                 .startDate(dto.getStartDate())
                 .endDate(endDate)
-                .durationMonths(dto.getDurationMonths())
+                .durationMonths(durationYears * 12)
+                .durationYears(durationYears)
                 .status(KpiTemplateCycleStatus.DRAFT)
                 .createdByUser(author)
                 .build();
@@ -78,8 +80,10 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
         cycle.setCycleName(dto.getCycleName().trim());
         cycle.setStartDate(dto.getStartDate());
-        cycle.setDurationMonths(dto.getDurationMonths());
-        cycle.setEndDate(calculateEndDate(dto.getStartDate(), dto.getDurationMonths()));
+        Integer durationYears = normalizedDurationYears(dto);
+        cycle.setDurationYears(durationYears);
+        cycle.setDurationMonths(durationYears * 12);
+        cycle.setEndDate(calculateEndDate(dto.getStartDate(), durationYears));
         cycle.setUpdatedByUser(currentUser());
 
         cycle.getCycleForms().clear();
@@ -252,10 +256,11 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         if (dto.getStartDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date is required.");
         }
-        if (dto.getDurationMonths() == null || !ALLOWED_DURATION_MONTHS.contains(dto.getDurationMonths())) {
+        Integer durationYears = normalizedDurationYears(dto);
+        if (!ALLOWED_DURATION_YEARS.contains(durationYears)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Duration must be between 3 and 12 months."
+                    "Cycle period must be between 1 and 5 years."
             );
         }
         if (dto.getKpiFormIds() == null || dto.getKpiFormIds().isEmpty()) {
@@ -289,15 +294,22 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         }
     }
 
-    private LocalDate calculateEndDate(LocalDate startDate, int durationMonths) {
-        return startDate.plusMonths(durationMonths).minusDays(1);
+    private Integer normalizedDurationYears(KpiTemplateCycleRequestDTO dto) {
+        if (dto.getDurationYears() != null) {
+            return dto.getDurationYears();
+        }
+        if (dto.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(dto.getDurationMonths() / 12.0)));
+        }
+        return null;
     }
 
-    private String durationLabel(int months) {
-        if (months == 12) {
-            return "1 year";
-        }
-        return months + " months";
+    private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
+        return startDate.plusYears(durationYears).minusDays(1);
+    }
+
+    private String durationLabel(int years) {
+        return years == 1 ? "1 year" : years + " years";
     }
 
     private KpiTemplateCycleResponseDTO toSummaryDto(KpiTemplateCycle cycle) {
@@ -315,6 +327,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCyclePeriod currentPeriod = cyclePeriodRepository
                 .findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
                 .orElse(null);
+        Integer durationYears = responseDurationYears(cycle);
 
         return KpiTemplateCycleResponseDTO.builder()
                 .id(cycle.getId())
@@ -322,7 +335,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .startDate(cycle.getStartDate())
                 .endDate(cycle.getEndDate())
                 .durationMonths(cycle.getDurationMonths())
-                .durationLabel(durationLabel(cycle.getDurationMonths()))
+                .durationYears(durationYears)
+                .durationLabel(durationLabel(durationYears))
                 .status(cycle.getStatus())
                 .currentPeriodId(currentPeriod != null ? currentPeriod.getId() : null)
                 .currentPeriodNumber(currentPeriod != null ? currentPeriod.getPeriodNumber() : null)
@@ -345,6 +359,16 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .updatedAt(cycle.getUpdatedAt())
                 .kpiForms(forms)
                 .build();
+    }
+
+    private Integer responseDurationYears(KpiTemplateCycle cycle) {
+        if (cycle.getDurationYears() != null && ALLOWED_DURATION_YEARS.contains(cycle.getDurationYears())) {
+            return cycle.getDurationYears();
+        }
+        if (cycle.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(cycle.getDurationMonths() / 12.0)));
+        }
+        return 1;
     }
 
     private String normalizeText(String value, int maxLength) {

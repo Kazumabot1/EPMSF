@@ -33,6 +33,7 @@ export function kpiStatusBadgeClass(status: string): string {
 }
 
 export type KpiTemplateDurationMonths = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type KpiCycleDurationYears = 1 | 2 | 3 | 4 | 5;
 
 export const KPI_TEMPLATE_DURATION_OPTIONS: Array<{ value: KpiTemplateDurationMonths; label: string }> = [
   { value: 3, label: '3 months' },
@@ -48,6 +49,15 @@ export const KPI_TEMPLATE_DURATION_OPTIONS: Array<{ value: KpiTemplateDurationMo
 ];
 
 export const DEFAULT_KPI_TEMPLATE_DURATION_MONTHS: KpiTemplateDurationMonths = 12;
+export const DEFAULT_KPI_CYCLE_DURATION_YEARS: KpiCycleDurationYears = 1;
+
+export const KPI_CYCLE_DURATION_OPTIONS: Array<{ value: KpiCycleDurationYears; label: string }> = [
+  { value: 1, label: '1 year' },
+  { value: 2, label: '2 years' },
+  { value: 3, label: '3 years' },
+  { value: 4, label: '4 years' },
+  { value: 5, label: '5 years' },
+];
 
 const toDateInputValue = (value: Date): string => {
   const year = value.getFullYear();
@@ -64,6 +74,23 @@ export function calculateKpiTemplateEndDate(startDate: string, durationMonths: K
   end.setMonth(end.getMonth() + durationMonths);
   end.setDate(end.getDate() - 1);
   return toDateInputValue(end);
+}
+
+export function calculateKpiCycleEndDate(startDate: string, durationYears: KpiCycleDurationYears): string {
+  if (!startDate) return '';
+  const start = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return '';
+  const end = new Date(start);
+  end.setFullYear(end.getFullYear() + durationYears);
+  end.setDate(end.getDate() - 1);
+  return toDateInputValue(end);
+}
+
+export function inferKpiCycleDurationYears(startDate: string, endDate: string): KpiCycleDurationYears {
+  const matched = KPI_CYCLE_DURATION_OPTIONS.find(
+    (option) => calculateKpiCycleEndDate(startDate, option.value) === endDate,
+  );
+  return matched?.value ?? DEFAULT_KPI_CYCLE_DURATION_YEARS;
 }
 
 export function inferKpiTemplateDurationMonths(startDate: string, endDate: string): KpiTemplateDurationMonths {
@@ -150,7 +177,11 @@ export function formatKpiFormCycleOptionLabel(template: {
   positions?: Array<{ positionTitle?: string | null }>;
 }): string {
   const positions = (template.positions ?? [])
-    .map((link) => link.positionTitle?.trim())
+    .map((link) => {
+      const title = link.positionTitle?.trim();
+      const duration = 'durationLabel' in link && typeof link.durationLabel === 'string' ? link.durationLabel : null;
+      return title && duration ? `${title} - ${duration}` : title;
+    })
     .filter((name): name is string => Boolean(name))
     .join(', ');
   const positionSuffix = positions ? ` — ${positions}` : '';

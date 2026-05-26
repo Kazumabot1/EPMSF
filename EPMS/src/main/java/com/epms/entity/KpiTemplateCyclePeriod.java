@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
         name = "kpi_template_cycle_period",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_kpi_cycle_period_number",
-                columnNames = {"cycle_id", "period_number"}
+                columnNames = {"cycle_id", "kpi_form_id", "period_number"}
         )
 )
 @Data
@@ -29,6 +29,11 @@ public class KpiTemplateCyclePeriod {
     @JoinColumn(name = "cycle_id", nullable = false)
     @EqualsAndHashCode.Exclude
     private KpiTemplateCycle cycle;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kpi_form_id")
+    @EqualsAndHashCode.Exclude
+    private KpiForm kpiForm;
 
     @Column(name = "period_number", nullable = false)
     private Integer periodNumber;

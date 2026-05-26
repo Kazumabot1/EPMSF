@@ -3,7 +3,9 @@ package com.epms.service.impl;
 import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.entity.KpiTemplateCycle;
 import com.epms.entity.KpiTemplateCyclePeriod;
+import com.epms.entity.KpiForm;
 import com.epms.entity.User;
+import com.epms.entity.enums.KpiFormStatus;
 import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiGraceExtension;
 import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
@@ -144,6 +146,38 @@ class KpiTemplateCycleServiceImplTest {
         assertThat(cycle.getEarlyCloseReviewDecision()).isEqualTo(KpiEarlyCloseReviewDecision.REJECTED);
         assertThat(cycle.getEarlyCloseReviewReason()).isEqualTo("Need more evidence");
         verify(employeeKpiWorkflowService, never()).startCycleClosingGrace(anyInt(), any(LocalDateTime.class));
+    }
+
+    @Test
+    void createUsesDurationYearsToCalculateCycleEndDate() {
+        User hr = user(17, "HR User");
+        KpiForm form = new KpiForm();
+        form.setId(200);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
+        when(kpiFormRepository.findById(200)).thenReturn(Optional.of(form));
+        when(cycleRepository.save(any(KpiTemplateCycle.class))).thenAnswer(invocation -> {
+            KpiTemplateCycle saved = invocation.getArgument(0);
+            saved.setId(100);
+            return saved;
+        });
+        stubCycle(activeCycle());
+
+        com.epms.dto.KpiTemplateCycleRequestDTO request = new com.epms.dto.KpiTemplateCycleRequestDTO();
+        request.setCycleName("FY KPI");
+        request.setStartDate(LocalDate.of(2026, 1, 1));
+        request.setDurationYears(3);
+        request.setKpiFormIds(List.of(200));
+
+        service.create(request);
+
+        ArgumentCaptor<KpiTemplateCycle> saved = ArgumentCaptor.forClass(KpiTemplateCycle.class);
+        verify(cycleRepository).save(saved.capture());
+        assertThat(saved.getValue().getEndDate()).isEqualTo(LocalDate.of(2028, 12, 31));
+        assertThat(saved.getValue().getDurationYears()).isEqualTo(3);
+        assertThat(saved.getValue().getDurationMonths()).isEqualTo(36);
     }
 
     private void stubCycle(KpiTemplateCycle cycle) {

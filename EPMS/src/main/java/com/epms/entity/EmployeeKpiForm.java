@@ -178,7 +178,7 @@ public class EmployeeKpiForm {
         if (evaluators == null) {
             evaluators = new LinkedHashSet<>();
         }
-        evaluators.add(evaluator);
         evaluator.setEmployeeKpiForm(this);
+        evaluators.add(evaluator);
     }
 }
