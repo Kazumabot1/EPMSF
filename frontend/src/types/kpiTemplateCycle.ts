@@ -50,4 +50,6 @@ export interface KpiTemplateCycleRequest {
   durationYears: number;
   durationMonths?: number;
   kpiFormIds: number[];
+  /** Required when updating an existing cycle. */
+  editReason?: string;
 }

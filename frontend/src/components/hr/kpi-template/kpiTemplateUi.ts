@@ -149,13 +149,77 @@ export function countPositionsWithoutKpiTemplate(
   return positions.filter((position) => !assigned.has(position.id)).length;
 }
 
-/** KPI forms saved via "Use Form" (draft) — selectable in template cycles. */
+/** KPI template cycles that still hold form assignments (not draft/inactive). */
+export const RUNNING_KPI_CYCLE_STATUSES = ['ACTIVE', 'CLOSING', 'PENDING_APPROVAL'] as const;
+
+export type CycleWithLinkedForms = {
+  id: number;
+  status: string;
+  kpiForms: { id: number }[];
+};
+
+export type CycleWithLinkedTemplates = {
+  id: number;
+  status: string;
+  templates: { id: number }[];
+};
+
+export function collectFormIdsInRunningKpiCycles(
+  cycles: CycleWithLinkedForms[],
+  excludeCycleId?: number,
+): Set<number> {
+  const running = new Set<string>(RUNNING_KPI_CYCLE_STATUSES);
+  const ids = new Set<number>();
+  for (const cycle of cycles) {
+    if (!running.has(cycle.status)) continue;
+    if (excludeCycleId != null && cycle.id === excludeCycleId) continue;
+    for (const form of cycle.kpiForms) {
+      ids.add(form.id);
+    }
+  }
+  return ids;
+}
+
+export function collectTemplateIdsInActiveDepartmentCycles(
+  cycles: CycleWithLinkedTemplates[],
+  excludeCycleId?: number,
+): Set<number> {
+  const ids = new Set<number>();
+  for (const cycle of cycles) {
+    if (cycle.status !== 'ACTIVE') continue;
+    if (excludeCycleId != null && cycle.id === excludeCycleId) continue;
+    for (const template of cycle.templates) {
+      ids.add(template.id);
+    }
+  }
+  return ids;
+}
+
+/** KPI forms saved via "Use Form" — selectable when active, not on another running cycle, or already on this cycle. */
 export function filterKpiFormsForCycleSelection<T extends { id: number; status: string }>(
   templates: T[],
   selectedFormIds: number[] = [],
+  unavailableFormIds: Set<number> = new Set(),
 ): T[] {
   const selected = new Set(selectedFormIds);
-  return templates.filter((template) => template.status === 'ACTIVE' || selected.has(template.id));
+  return templates.filter(
+    (template) =>
+      (template.status === 'ACTIVE' && !unavailableFormIds.has(template.id)) || selected.has(template.id),
+  );
+}
+
+export function filterDepartmentTemplatesForCycleSelection<T extends { id: number; status: string }>(
+  templates: T[],
+  selectedTemplateIds: number[] = [],
+  unavailableTemplateIds: Set<number> = new Set(),
+): T[] {
+  const selected = new Set(selectedTemplateIds);
+  return templates.filter(
+    (template) =>
+      ((template.status === 'ACTIVE' || template.status === 'FINALIZED') &&
+        !unavailableTemplateIds.has(template.id)) ||
+      selected.has(template.id),
+  );
 }
 
 export function formatTemplatePositionLabels(

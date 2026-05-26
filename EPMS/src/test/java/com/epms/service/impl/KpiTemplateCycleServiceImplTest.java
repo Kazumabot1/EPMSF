@@ -1,7 +1,9 @@
 package com.epms.service.impl;
 
+import com.epms.dto.KpiTemplateCycleRequestDTO;
 import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.entity.KpiTemplateCycle;
+import com.epms.entity.KpiTemplateCycleForm;
 import com.epms.entity.KpiTemplateCyclePeriod;
 import com.epms.entity.KpiForm;
 import com.epms.entity.User;
@@ -36,10 +38,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CONFLICT;
 
 @ExtendWith(MockitoExtension.class)
 class KpiTemplateCycleServiceImplTest {
@@ -158,6 +163,7 @@ class KpiTemplateCycleServiceImplTest {
         authenticate(hr, List.of("HR"), "HR_DASHBOARD");
         when(userRepository.findById(17)).thenReturn(Optional.of(hr));
         when(kpiFormRepository.findById(200)).thenReturn(Optional.of(form));
+        when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection())).thenReturn(List.of());
         when(cycleRepository.save(any(KpiTemplateCycle.class))).thenAnswer(invocation -> {
             KpiTemplateCycle saved = invocation.getArgument(0);
             saved.setId(100);
@@ -178,6 +184,78 @@ class KpiTemplateCycleServiceImplTest {
         assertThat(saved.getValue().getEndDate()).isEqualTo(LocalDate.of(2028, 12, 31));
         assertThat(saved.getValue().getDurationYears()).isEqualTo(3);
         assertThat(saved.getValue().getDurationMonths()).isEqualTo(36);
+    }
+
+    @Test
+    void updateRejectsActiveCycle() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = activeCycle();
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+
+        KpiTemplateCycleRequestDTO request = cycleUpdateRequest("Adjusted", "Because");
+
+        assertThatThrownBy(() -> service.update(100, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(CONFLICT));
+    }
+
+    @Test
+    void updateRequiresEditReason() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = draftCycle();
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+
+        KpiTemplateCycleRequestDTO request = cycleUpdateRequest("Adjusted", "   ");
+
+        assertThatThrownBy(() -> service.update(100, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(BAD_REQUEST));
+    }
+
+    @Test
+    void createRejectsFormAlreadyOnRunningCycle() {
+        User hr = user(17, "HR User");
+        KpiForm form = new KpiForm();
+        form.setId(200);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+        KpiTemplateCycle otherCycle = activeCycle();
+        otherCycle.setCycleName("Other cycle");
+        KpiTemplateCycleForm link = KpiTemplateCycleForm.builder()
+                .cycle(otherCycle)
+                .kpiForm(form)
+                .build();
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection()))
+                .thenReturn(List.of(link));
+
+        KpiTemplateCycleRequestDTO request = new KpiTemplateCycleRequestDTO();
+        request.setCycleName("FY KPI");
+        request.setStartDate(LocalDate.of(2026, 1, 1));
+        request.setDurationYears(1);
+        request.setKpiFormIds(List.of(200));
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("already used by the running cycle");
+    }
+
+    private KpiTemplateCycle draftCycle() {
+        KpiTemplateCycle cycle = activeCycle();
+        cycle.setStatus(KpiTemplateCycleStatus.DRAFT);
+        return cycle;
+    }
+
+    private KpiTemplateCycleRequestDTO cycleUpdateRequest(String name, String editReason) {
+        KpiTemplateCycleRequestDTO request = new KpiTemplateCycleRequestDTO();
+        request.setCycleName(name);
+        request.setStartDate(LocalDate.of(2026, 1, 1));
+        request.setDurationYears(1);
+        request.setKpiFormIds(List.of(200));
+        request.setEditReason(editReason);
+        return request;
     }
 
     private void stubCycle(KpiTemplateCycle cycle) {

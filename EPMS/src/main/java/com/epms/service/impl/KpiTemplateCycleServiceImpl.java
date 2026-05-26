@@ -29,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,12 @@ import java.util.Set;
 public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
     private static final Set<Integer> ALLOWED_DURATION_YEARS = Set.of(1, 2, 3, 4, 5);
+
+    private static final Set<KpiTemplateCycleStatus> RUNNING_CYCLE_STATUSES = EnumSet.of(
+            KpiTemplateCycleStatus.ACTIVE,
+            KpiTemplateCycleStatus.CLOSING,
+            KpiTemplateCycleStatus.PENDING_APPROVAL
+    );
 
     private final KpiTemplateCycleRepository cycleRepository;
     private final KpiTemplateCycleFormRepository cycleFormRepository;
@@ -77,6 +84,15 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         validateRequest(dto);
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
+
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        String editReason = normalizeText(dto.getEditReason(), 1000);
+        if (editReason == null || editReason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
+        }
+        cycle.setLastEditReason(editReason);
 
         cycle.setCycleName(dto.getCycleName().trim());
         cycle.setStartDate(dto.getStartDate());
@@ -270,6 +286,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
     private void applyForms(KpiTemplateCycle cycle, List<Integer> kpiFormIds) {
         List<Integer> distinctIds = kpiFormIds.stream().distinct().toList();
+        assertFormsNotUsedByOtherRunningCycles(cycle.getId(), distinctIds);
         Map<Integer, KpiForm> formsById = new LinkedHashMap<>();
         for (Integer formId : distinctIds) {
             KpiForm form = kpiFormRepository.findById(formId)
@@ -292,6 +309,27 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                     .build();
             cycle.getCycleForms().add(link);
         }
+    }
+
+    private void assertFormsNotUsedByOtherRunningCycles(Integer excludeCycleId, List<Integer> kpiFormIds) {
+        if (kpiFormIds == null || kpiFormIds.isEmpty()) {
+            return;
+        }
+        List<KpiTemplateCycleForm> conflicts = cycleFormRepository.findConflictingLinks(
+                RUNNING_CYCLE_STATUSES,
+                excludeCycleId,
+                kpiFormIds
+        );
+        if (conflicts == null || conflicts.isEmpty()) {
+            return;
+        }
+        KpiTemplateCycleForm conflict = conflicts.get(0);
+        String formTitle = conflict.getKpiForm().getTitle();
+        String cycleName = conflict.getCycle().getCycleName();
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "KPI form \"" + formTitle + "\" is already used by the running cycle \"" + cycleName + "\"."
+        );
     }
 
     private Integer normalizedDurationYears(KpiTemplateCycleRequestDTO dto) {

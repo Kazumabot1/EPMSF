@@ -58,6 +58,8 @@ export interface DepartmentKpiCycleRequest {
   startDate: string;
   durationMonths: number;
   templateIds: number[];
+  /** Required when updating an existing cycle. */
+  editReason?: string;
 }
 
 export interface DepartmentKpiTemplateSummary {

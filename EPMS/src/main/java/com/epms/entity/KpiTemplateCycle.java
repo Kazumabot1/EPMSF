@@ -99,6 +99,9 @@ public class KpiTemplateCycle {
     @Column(name = "early_close_review_reason", length = 1000)
     private String earlyCloseReviewReason;
 
+    @Column(name = "last_edit_reason", length = 1000)
+    private String lastEditReason;
+
     @Builder.Default
     @OneToMany(mappedBy = "cycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude

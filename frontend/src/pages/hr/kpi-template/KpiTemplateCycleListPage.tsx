@@ -238,6 +238,21 @@ const KpiTemplateCycleListPage = () => {
                             >
                               View
                             </button>
+                            {cycle.status === 'ACTIVE' ? (
+                              <span
+                                className="inline-flex h-9 cursor-not-allowed items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-400 opacity-50"
+                                title="Active cycles cannot be edited"
+                              >
+                                Edit
+                              </span>
+                            ) : (
+                              <Link
+                                to={`/hr/kpi-template-cycle/${cycle.id}/edit`}
+                                className="inline-flex h-9 items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 no-underline hover:bg-gray-50"
+                              >
+                                Edit
+                              </Link>
+                            )}
                             <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-gray-600">
                               <span>{statusLabel(cycle)}</span>
                               <span className="relative inline-flex h-6 w-11 shrink-0">
