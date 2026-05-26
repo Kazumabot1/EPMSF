@@ -187,7 +187,7 @@ function Login() {
         email: forgotEmail.trim(),
       });
 
-      setForgotMessage(response.data.message || 'If this email exists, we sent an OTP.');
+      setForgotMessage(response.data.message || 'OTP sent successfully. Please check your email.');
       setForgotStep('otp');
     } catch (err: unknown) {
       setForgotError(getErrorMessage(err, 'Unable to send OTP.'));
@@ -358,8 +358,8 @@ function Login() {
                 <h2 id="forgot-password-title">Forgot password</h2>
 
                 <p className="forgot-modal-subtitle">
-                  {forgotStep === 'email' && 'Enter your Gmail address and we will send a 6-digit OTP.'}
-                  {forgotStep === 'otp' && 'Enter the 6-digit OTP sent to your Gmail address.'}
+                  {forgotStep === 'email' && 'Enter your account email address. We will send a 6-digit OTP only if the account is active.'}
+                  {forgotStep === 'otp' && 'Enter the 6-digit OTP sent to your email address.'}
                   {forgotStep === 'reset' && 'Set a new password for your account.'}
                   {forgotStep === 'done' && 'Your password has been reset successfully.'}
                 </p>
@@ -370,14 +370,14 @@ function Login() {
                 {forgotStep === 'email' && (
                     <form className="login-form" onSubmit={requestOtp}>
                       <label className="login-label" htmlFor="forgotEmail">
-                        Gmail
+                        Email Address
                       </label>
 
                       <input
                           id="forgotEmail"
                           className="login-input"
                           type="email"
-                          placeholder="yourname@gmail.com"
+                          placeholder="name@company.com"
                           value={forgotEmail}
                           onChange={(event) => setForgotEmail(event.target.value)}
                           autoComplete="email"

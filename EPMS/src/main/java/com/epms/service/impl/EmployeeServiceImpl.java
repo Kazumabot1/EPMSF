@@ -221,6 +221,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Transactional
     public EmployeeResponseDto createEmployee(EmployeeRequestDto request) {
         validateLoginAccountRequest(request);
+        validateEmployeeIdentityUniqueness(request, null);
 
         Department currentDepartment = requireDepartment(
                 request.effectiveCurrentDepartmentId(),
@@ -273,6 +274,8 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         Employee employee = employeeRepository.findWithDepartmentsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
+
+        validateEmployeeIdentityUniqueness(request, employee.getId());
 
         Position oldPosition = employee.getPosition();
         Integer oldPositionId = oldPosition != null ? oldPosition.getId() : null;
@@ -502,6 +505,37 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (!userAccountProvisioningService.isValidWorkEmail(request.getEmail())) {
             throw new BusinessValidationException(
                     "A valid work email is required when create login account is enabled.");
+        }
+    }
+
+
+    private void validateEmployeeIdentityUniqueness(EmployeeRequestDto request, Integer currentEmployeeId) {
+        String email = trimToNull(request.getEmail());
+
+        if (email != null) {
+            boolean emailUsedByEmployee = currentEmployeeId == null
+                    ? employeeRepository.existsByEmailIgnoreCase(email)
+                    : employeeRepository.existsByEmailIgnoreCaseAndIdNot(email, currentEmployeeId);
+
+            if (emailUsedByEmployee) {
+                throw new BusinessValidationException("Work email is already used by another employee.");
+            }
+
+            if (userRepository.countByEmailIgnoreCaseForDifferentEmployee(email, currentEmployeeId) > 0) {
+                throw new BusinessValidationException("Work email is already used by another login account.");
+            }
+        }
+
+        String staffNrc = trimToNull(request.getStaffNrc());
+
+        if (staffNrc != null) {
+            boolean nrcUsedByEmployee = currentEmployeeId == null
+                    ? employeeRepository.existsByStaffNrcIgnoreCase(staffNrc)
+                    : employeeRepository.existsByStaffNrcIgnoreCaseAndIdNot(staffNrc, currentEmployeeId);
+
+            if (nrcUsedByEmployee) {
+                throw new BusinessValidationException("Staff NRC is already used by another employee.");
+            }
         }
     }
 

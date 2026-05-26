@@ -20,6 +20,26 @@ public final class FeedbackPrivacyUtil {
     private FeedbackPrivacyUtil() {
     }
 
+    public static final int MIN_PROTECTED_RELATIONSHIP_RESPONSES = 2;
+
+    public static boolean requiresGroupThreshold(FeedbackRelationshipType relationshipType) {
+        return relationshipType == FeedbackRelationshipType.PEER
+                || relationshipType == FeedbackRelationshipType.SUBORDINATE;
+    }
+
+    public static boolean hasEnoughProtectedResponses(FeedbackRelationshipType relationshipType, long submittedCount) {
+        if (!requiresGroupThreshold(relationshipType)) {
+            return submittedCount > 0;
+        }
+        return submittedCount >= MIN_PROTECTED_RELATIONSHIP_RESPONSES;
+    }
+
+    public static String protectedRelationshipThresholdMessage(FeedbackRelationshipType relationshipType) {
+        return relationshipLabel(relationshipType) + " scores/comments require at least "
+                + MIN_PROTECTED_RELATIONSHIP_RESPONSES
+                + " submitted responses before they can be shown outside HR analytics.";
+    }
+
     public static boolean isIdentityProtected(FeedbackEvaluatorAssignment assignment) {
         if (assignment == null) {
             return true;

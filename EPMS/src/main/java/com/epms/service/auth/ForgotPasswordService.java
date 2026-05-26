@@ -32,7 +32,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ForgotPasswordService {
 
-    private static final String PUBLIC_SENT_MESSAGE = "If this email exists, we sent an OTP.";
+    private static final String OTP_SENT_MESSAGE = "OTP sent successfully. Please check your email.";
+    private static final String ACCOUNT_NOT_FOUND_MESSAGE = "No active account was found for this email address.";
     private static final String INACTIVE_MESSAGE = "This account is inactive for now. Please contact HR or Admin to verify.";
     private static final int OTP_EXPIRE_MINUTES = 10;
     private static final int MAX_FAILED_ATTEMPTS = 5;
@@ -52,7 +53,7 @@ public class ForgotPasswordService {
         Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email);
 
         if (userOpt.isEmpty()) {
-            return PUBLIC_SENT_MESSAGE;
+            throw new BadRequestException(ACCOUNT_NOT_FOUND_MESSAGE);
         }
 
         User user = userOpt.get();
@@ -81,7 +82,7 @@ public class ForgotPasswordService {
             throw new BadRequestException("OTP could not be sent. " + safe(sendResult.getSafeErrorDetail()));
         }
 
-        return PUBLIC_SENT_MESSAGE;
+        return OTP_SENT_MESSAGE;
     }
 
     @Transactional

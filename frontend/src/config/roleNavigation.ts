@@ -158,9 +158,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/hr/appraisal',
       icon: 'bi-clipboard-check',
       children: [
-        { label: 'Template Form Create', path: '/hr/appraisal/template-create', icon: 'bi-file-earmark-plus' },
         { label: 'Template Form Records', path: '/hr/appraisal/template-records', icon: 'bi-folder2-open' },
-        { label: 'Create Appraisal', path: '/hr/appraisal/create', icon: 'bi-calendar-plus' },
         { label: 'Appraisal Create Records', path: '/hr/appraisal/create-records', icon: 'bi-journal-check' },
         { label: 'Cycle Records', path: '/hr/appraisal/cycles', icon: 'bi-arrow-repeat' },
         { label: 'Manager + Dept Review Check', path: '/hr/appraisal/review-check', icon: 'bi-shield-check' },

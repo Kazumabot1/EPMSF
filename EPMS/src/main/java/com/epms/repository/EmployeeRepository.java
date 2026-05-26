@@ -66,6 +66,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
 
     Optional<Employee> findByEmail(String email);
 
+    boolean existsByEmailIgnoreCase(String email);
+
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
+
+    boolean existsByStaffNrcIgnoreCase(String staffNrc);
+
+    boolean existsByStaffNrcIgnoreCaseAndIdNot(String staffNrc, Integer id);
+
     /**
      * Used by Department Head employee pages.
      *

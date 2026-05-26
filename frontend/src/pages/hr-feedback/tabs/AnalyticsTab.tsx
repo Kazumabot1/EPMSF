@@ -41,6 +41,7 @@ const formatScore = (value?: number | null, digits = 1) => value == null ? '—'
 const sourceCount = (value?: number | null) => Number(value ?? 0);
 const visibilityLabel = (status?: string | null) => status === 'PUBLISHED' ? 'Published' : status === 'READY_TO_PUBLISH' ? 'Ready' : 'Hidden';
 const confidenceLabel = (item: FeedbackResultItem) => item.insufficientFeedback ? 'Insufficient' : item.confidenceLevel || 'Not calculated';
+const MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES = 2;
 const isReadyToPublish = (item: FeedbackResultItem) => sourceCount(item.totalResponses) > 0 && !item.insufficientFeedback;
 
 const scoreBand = (score?: number | null) => {
@@ -69,8 +70,8 @@ const confidenceMatches = (item: FeedbackResultItem, filter: ConfidenceFilter) =
 
 const relationshipBreakdown = (item: FeedbackResultItem) => [
   { label: 'Manager', count: item.managerResponses, score: item.managerAverageScore, threshold: 1 },
-  { label: 'Peer', count: item.peerResponses, score: item.peerAverageScore, threshold: 2 },
-  { label: 'Direct Report', count: item.subordinateResponses, score: item.subordinateAverageScore, threshold: 2 },
+  { label: 'Peer', count: item.peerResponses, score: item.peerAverageScore, threshold: MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES },
+  { label: 'Direct Report', count: item.subordinateResponses, score: item.subordinateAverageScore, threshold: MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES },
   { label: 'Self', count: item.selfResponses ?? 0, score: item.selfAverageScore, threshold: 1 },
 ].filter(row => sourceCount(row.count) > 0);
 
@@ -555,14 +556,14 @@ export default function AnalyticsTab() {
                     <div className="hfd-publish-step-body">
                       <div className="hfd-publish-readiness-grid">
                         <strong>{readyCount} ready employees</strong>
-                        <span>{blockedItems.length} blocked because feedback is insufficient.</span>
+                        <span>{blockedItems.length} blocked by confidence or confidentiality checks.</span>
                       </div>
 
                       <section className="hfd-publish-section">
                         <h4>Publish results for</h4>
                         <label className="hfd-radio-card">
                           <input type="radio" checked={publishOptions.scope === 'ALL_READY'} onChange={() => setPublishOptions(current => ({ ...current, scope: 'ALL_READY' }))} />
-                          <span><strong>All ready employees</strong><small>Publish every employee result that passed scoring and confidentiality checks.</small></span>
+                          <span><strong>All ready employees</strong><small>Publish every employee result that passed backend scoring, confidence, and confidentiality checks.</small></span>
                         </label>
                         <label className="hfd-radio-card">
                           <input type="radio" checked={publishOptions.scope === 'SELECTED_EMPLOYEES'} onChange={() => setPublishOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} />
@@ -613,7 +614,7 @@ export default function AnalyticsTab() {
                         </dl>
                       </section>
                       <div className="hfd-alert hfd-alert-info">
-                        <i className="bi bi-shield-lock" /> Some relationship scores or comments may stay hidden when there is not enough feedback to protect confidentiality.
+                        <i className="bi bi-shield-lock" /> Peer and direct report breakdowns require at least {MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} submitted responses before they can be shown outside HR analytics.
                       </div>
                       <label className="hfd-confirm-check">
                         <input type="checkbox" checked={publishOptions.confirmVisibility} onChange={e => setPublishOptions(current => ({ ...current, confirmVisibility: e.target.checked }))} />

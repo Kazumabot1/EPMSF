@@ -2,6 +2,7 @@ import { type DragEvent, type FormEvent, useEffect, useMemo, useState } from 're
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { authStorage } from '../../../services/authStorage';
+import { LaunchReadinessSection } from './campaign-setup/components/LaunchReadinessSection';
 import {
   DEFAULT_EVALUATOR_CONFIG,
   getPeerReviewerCount,
@@ -318,48 +319,6 @@ const emptyQuestionReview = (campaign?: FeedbackCampaign | null): FeedbackCampai
   groups: [],
 });
 
-
-const activationCheckClass = (status?: string | null) => {
-  const normalized = String(status ?? '').toUpperCase();
-  if (normalized === 'PASS') return 'ready';
-  if (normalized === 'WARNING') return 'warning';
-  return 'blocked';
-};
-
-const activationCheckIcon = (status?: string | null) => {
-  const normalized = String(status ?? '').toUpperCase();
-  if (normalized === 'PASS') return 'bi-check-circle-fill';
-  if (normalized === 'WARNING') return 'bi-exclamation-triangle-fill';
-  return 'bi-x-circle-fill';
-};
-
-const launchCheckLabels: Record<string, string> = {
-  LIFECYCLE: 'Lifecycle gate',
-  CAMPAIGN_INFO: 'Campaign details',
-  TARGETS: 'Recipients',
-  EVALUATOR_ASSIGNMENTS: 'Evaluator assignments',
-  QUESTION_SELECTION: 'Question review',
-  RELATIONSHIP_WEIGHTS: 'Relationship weights',
-  COMPETENCY_WEIGHTS: 'Competency weights',
-  SUBMISSION_WINDOW: 'Submission window',
-  PRIVACY_POLICY: 'Privacy settings',
-};
-
-const launchCheckLabel = (key?: string | null, fallback?: string | null) => launchCheckLabels[String(key ?? '').toUpperCase()] ?? fallback ?? 'Setup check';
-
-const launchCheckMessage = (key?: string | null, status?: string | null, fallback?: string | null) => {
-  const normalizedKey = String(key ?? '').toUpperCase();
-  const normalizedStatus = String(status ?? '').toUpperCase();
-  if (normalizedStatus === 'PASS') return fallback ?? 'Ready.';
-  if (normalizedKey === 'LIFECYCLE') return fallback ?? 'Validate setup before launching.';
-  if (normalizedKey === 'QUESTION_SELECTION') return 'Save the question review before launching.';
-  if (normalizedKey === 'RELATIONSHIP_WEIGHTS') return 'Evaluator role weights must total 100%.';
-  if (normalizedKey === 'COMPETENCY_WEIGHTS') return 'Competency weights must total 100%.';
-  if (normalizedKey === 'TARGETS') return 'Select and save at least one feedback recipient.';
-  if (normalizedKey === 'EVALUATOR_ASSIGNMENTS') return 'Generate evaluator assignments before launching.';
-  if (normalizedKey === 'SUBMISSION_WINDOW') return fallback ?? 'Review the submission window before launching.';
-  return fallback ?? 'Review this item before launching.';
-};
 
 const assignmentReadinessClass = (item: { warnings: string[]; totalAssignments: number }) => {
   if (item.totalAssignments <= 0) return 'blocked';
@@ -729,6 +688,15 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     }
     return checks;
   }, [activationReadiness.checks, privacySummary, selectedCampaign]);
+
+  const launchQuestionFormSummaries = useMemo(() => questionGroups.map(group => ({
+    key: group.groupKey,
+    relationshipLabel: relationshipLabel(group.relationshipType),
+    includedQuestionCount: Number(group.includedQuestionCount ?? 0),
+    questionCount: Number(group.questionCount ?? 0),
+    competencyCount: buildQuestionCompetencies(group.questions ?? [])
+        .filter(competency => competency.questions.some(question => question.included)).length,
+  })), [questionGroups]);
 
   useEffect(() => {
     if (!selectedQuestionGroup || selectedQuestionCompetencies.length === 0) return;
@@ -2764,148 +2732,38 @@ This will generate final feedback question snapshots, notify evaluators, and mov
         )}
 
         {activeStepKey === 'launch' && (
-            <section className={`hfdq-table-card hfda-card ${!questionReviewReady && selectedCampaign?.status === 'DRAFT' ? 'disabled' : ''}`}>
-              <div className="hfdc-card-head hfda-head">
-                <div>
-                  <span className="hfdq-kicker">Step 5</span>
-                  <h3>Review & Launch</h3>
-                  <p>Check the final setup before opening feedback collection.</p>
-                </div>
-                <div className="hfdt-summary-pills">
-                  <span><strong>{campaignLaunched ? statusLabels[selectedCampaign!.status] : launchReady ? 'Ready' : 'Review'}</strong> status</span>
-                  <span><strong>{launchTargetCount}</strong> recipients</span>
-                  <span><strong>{launchAssignmentCount}</strong> assignments</span>
-                  <span><strong>{questionGroups.length}</strong> forms</span>
-                </div>
-              </div>
-
-              {!selectedCampaign ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-save" /><strong>Save a draft campaign first</strong><p>Launch becomes available after the setup is saved.</p></div>
-              ) : campaignLaunched ? (
-                  <div className="hfda-launched-state">
-                    <span className="hfda-launched-icon"><i className="bi bi-rocket-takeoff" /></span>
-                    <div>
-                      <span className="hfdq-kicker">Campaign launched</span>
-                      <h4>{selectedCampaign.status === 'ACTIVE' ? 'Feedback collection is active.' : `Campaign status: ${statusLabels[selectedCampaign.status] ?? selectedCampaign.status}`}</h4>
-                      <p>Use Monitoring to track evaluator progress, follow up on incomplete assignments, and manage submission activity.</p>
-                    </div>
-                    <a className="hfd-btn hfd-btn-primary" href="/hr/feedback/monitoring"><i className="bi bi-graph-up-arrow" /> Open Monitoring</a>
-                  </div>
-              ) : !questionReviewReady && selectedCampaign.status === 'DRAFT' ? (
-                  <div className="hfd-empty-state hfdt-empty"><i className="bi bi-ui-checks-grid" /><strong>Save question review first</strong><p>Launch requires saved recipients, evaluator assignments, questions, and scoring weights.</p></div>
-              ) : loadingActivation ? (
-                  <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading final launch check...</div>
-              ) : (
-                  <div className="hfda-launch-stack">
-                    <div className={`hfda-launch-banner ${launchReady ? 'ready' : 'blocked'}`}>
-                      <i className={`bi ${launchReady ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`} />
-                      <div>
-                        <strong>{launchBannerTitle}</strong>
-                        <p>{launchBannerMessage}</p>
-                      </div>
-                    </div>
-
-                    {activationReadiness.blockingIssues.length > 0 && (
-                        <div className="hfdt-response-warnings blocked">
-                          {activationReadiness.blockingIssues.map(item => <span key={item}><i className="bi bi-x-circle" /> {item}</span>)}
-                        </div>
-                    )}
-
-                    {activationReadiness.warnings.length > 0 && (
-                        <div className="hfdt-response-warnings">
-                          {activationReadiness.warnings.map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
-                        </div>
-                    )}
-
-                    <div className="hfda-launch-grid">
-                      <div className="hfda-readiness-panel">
-                        <div className="hfdt-policy-note">
-                          <i className="bi bi-shield-lock" />
-                          <div>
-                            <strong>Setup locks after launch</strong>
-                            <p>Feedback assignments become available, the question set is locked for this campaign, and setup changes will no longer be editable.</p>
-                          </div>
-                        </div>
-
-                        <div className="hfda-check-list">
-                          {launchChecklist.length === 0 ? (
-                              <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-clipboard-check" /><strong>No validation result yet</strong><p>Refresh the final check after saving setup changes.</p></div>
-                          ) : launchChecklist.map(check => (
-                              <article key={check.key} className={`hfda-check-card ${activationCheckClass(check.status)}`}>
-                                <i className={`bi ${activationCheckIcon(check.status)}`} />
-                                <div>
-                                  <strong>{launchCheckLabel(check.key, check.label)}</strong>
-                                  <small>{launchCheckMessage(check.key, check.status, check.message)}</small>
-                                </div>
-                                <em>{String(check.status).toUpperCase() === 'PASS' ? 'Ready' : String(check.status).toUpperCase() === 'WARNING' ? 'Warning' : 'Needs attention'}</em>
-                              </article>
-                          ))}
-                        </div>
-                      </div>
-
-                      <aside className="hfda-summary-panel">
-                        <article className="hfda-summary-card">
-                          <span className="hfdq-kicker">Campaign</span>
-                          <h4>{selectedCampaign.name}</h4>
-                          <p>Review year: {selectedCampaign.reviewYear}</p>
-                          <p>Feedback period: {formatWindow(selectedCampaign)}</p>
-                          <p>{privacySummary}</p>
-                        </article>
-
-                        <article className="hfda-summary-card">
-                          <span className="hfdq-kicker">Recipients</span>
-                          <h4>{launchTargetCount} selected employee{launchTargetCount === 1 ? '' : 's'}</h4>
-                          <p>{targetsResponse.warningCount > 0 ? `${targetsResponse.warningCount} recipient warning${targetsResponse.warningCount === 1 ? '' : 's'} to review.` : 'Recipient selection is ready.'}</p>
-                        </article>
-
-                        <article className="hfda-summary-card">
-                          <span className="hfdq-kicker">Evaluator assignments</span>
-                          <h4>{launchAssignmentCount} assignment{launchAssignmentCount === 1 ? '' : 's'}</h4>
-                          <p>{roleAssignmentSummary.length > 0 ? roleAssignmentSummary.join(' · ') : 'Generate evaluator assignments before launch.'}</p>
-                        </article>
-
-                        <article className="hfda-summary-card">
-                          <span className="hfdq-kicker">Question forms</span>
-                          <h4>{questionGroups.length} form{questionGroups.length === 1 ? '' : 's'} · {questionsPerFormLabel}</h4>
-                          <p>{competencyCountLabel}</p>
-                          <div className="hfda-form-summary-list">
-                            {questionGroups.map(group => (
-                                <span key={group.groupKey}>{relationshipLabel(group.relationshipType)}: {group.includedQuestionCount}/{group.questionCount} questions · {buildQuestionCompetencies(group.questions).filter(competency => competency.questions.some(question => question.included)).length} competencies</span>
-                            ))}
-                          </div>
-                        </article>
-
-                        <article className="hfda-summary-card">
-                          <span className="hfdq-kicker">Scoring</span>
-                          <h4>{scoringConfig.relationshipWeightsReady && competencyWeightsReady ? 'Scoring ready' : 'Review scoring setup'}</h4>
-                          <p>Relationship weights: {formatPercent(scoringConfig.totalRelationshipWeight)}%</p>
-                          <p>Competency weights: {formatPercent(competencyWeightTotal)}%</p>
-                          <p>Missing role handling: {scoringConfig.redistributeMissingRelationshipWeight ? 'Redistribute available weight' : 'Require every weighted role'}</p>
-                        </article>
-                      </aside>
-                    </div>
-
-                    <div className="hfda-launch-actions">
-                      <button className="hfd-btn hfd-btn-secondary" type="button" disabled={loadingActivation} onClick={() => selectedCampaign && void loadActivationState(selectedCampaign.id)}>
-                        <i className="bi bi-arrow-clockwise" /> Refresh Check
-                      </button>
-                      <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => setActiveStepKey('questions')}>
-                        <i className="bi bi-ui-checks-grid" /> Back to Question Review
-                      </button>
-                      {selectedCampaign.status === 'DRAFT' && (
-                          <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canValidateSetup || activatingCampaign} onClick={() => void validateSelectedCampaignSetup()}>
-                            <i className="bi bi-shield-check" /> {activatingCampaign ? 'Validating...' : 'Validate Setup'}
-                          </button>
-                      )}
-                      {selectedCampaign.status === 'READY_TO_ACTIVATE' && (
-                          <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canActivate || activatingCampaign} onClick={() => void activateSelectedCampaign()}>
-                            <i className="bi bi-rocket-takeoff" /> {activatingCampaign ? 'Launching...' : 'Launch Campaign'}
-                          </button>
-                      )}
-                    </div>
-                  </div>
-              )}
-            </section>
+            <LaunchReadinessSection
+                selectedCampaign={selectedCampaign}
+                questionReviewReady={questionReviewReady}
+                campaignLaunched={campaignLaunched}
+                launchReady={launchReady}
+                launchTargetCount={launchTargetCount}
+                launchAssignmentCount={launchAssignmentCount}
+                questionFormCount={questionGroups.length}
+                loadingActivation={loadingActivation}
+                launchBannerTitle={launchBannerTitle}
+                launchBannerMessage={launchBannerMessage}
+                activationReadiness={activationReadiness}
+                launchChecklist={launchChecklist}
+                campaignWindowLabel={selectedCampaign ? formatWindow(selectedCampaign) : '-'}
+                privacySummary={privacySummary}
+                targetWarningCount={targetsResponse.warningCount}
+                roleAssignmentSummary={roleAssignmentSummary}
+                questionsPerFormLabel={questionsPerFormLabel}
+                competencyCountLabel={competencyCountLabel}
+                questionFormSummaries={launchQuestionFormSummaries}
+                scoringConfig={scoringConfig}
+                competencyWeightsReady={competencyWeightsReady}
+                competencyWeightTotal={competencyWeightTotal}
+                canValidateSetup={canValidateSetup}
+                canActivate={canActivate}
+                activatingCampaign={activatingCampaign}
+                formatPercent={formatPercent}
+                onRefreshCheck={() => selectedCampaign && void loadActivationState(selectedCampaign.id)}
+                onBackToQuestionReview={() => setActiveStepKey('questions')}
+                onValidateSetup={() => void validateSelectedCampaignSetup()}
+                onLaunchCampaign={() => void activateSelectedCampaign()}
+            />
         )}
 
 

@@ -53,6 +53,17 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    @Query("""
+            SELECT COUNT(u)
+            FROM User u
+            WHERE LOWER(u.email) = LOWER(:email)
+              AND (:employeeId IS NULL OR u.employeeId IS NULL OR u.employeeId <> :employeeId)
+            """)
+    long countByEmailIgnoreCaseForDifferentEmployee(
+            @Param("email") String email,
+            @Param("employeeId") Integer employeeId
+    );
+
     long countByManagerId(Integer managerId);
 
     long countByDepartmentId(Integer departmentId);
