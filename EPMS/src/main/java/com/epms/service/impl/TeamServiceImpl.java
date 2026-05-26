@@ -972,7 +972,8 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return hasRole(user, "MANAGER")
+        return isTeamLeadRoleOrPosition(user)
+                || hasRole(user, "MANAGER")
                 || hasRole(user, "PROJECT_MANAGER")
                 || hasRole(user, "PM");
     }
@@ -1013,7 +1014,8 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return !hasRole(user, "MANAGER")
+        return !isTeamLeadRoleOrPosition(user)
+                && !hasRole(user, "MANAGER")
                 && !hasRole(user, "PROJECT_MANAGER")
                 && !hasRole(user, "PM")
                 && !hasRole(user, "HR")
@@ -1021,6 +1023,27 @@ public class TeamServiceImpl implements TeamService {
                 && !hasRole(user, "DEPARTMENT_HEAD")
                 && !hasRole(user, "DEPARTMENTHEAD")
                 && !hasRole(user, "DEPT_HEAD");
+    }
+
+
+    private boolean isTeamLeadRoleOrPosition(User user) {
+        if (user == null) {
+            return false;
+        }
+
+        if (hasRole(user, "TEAM_LEADER")
+                || hasRole(user, "TEAM_LEAD")
+                || hasRole(user, "TEAMLEADER")
+                || hasRole(user, "TEAMLEAD")) {
+            return true;
+        }
+
+        if (user.getPosition() == null || user.getPosition().getPositionTitle() == null) {
+            return false;
+        }
+
+        String title = normalizeRole(user.getPosition().getPositionTitle());
+        return title.contains("teamleader") || title.contains("teamlead");
     }
 
     private boolean hasPositionPermission(User user, String permissionField) {
