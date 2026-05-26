@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface FeedbackEvaluationService {
     FeedbackAssignmentGenerationResponse generateAssignments(Long campaignId, EvaluatorConfigDTO config, Long actorUserId);
+    FeedbackAssignmentGenerationResponse previewAssignments(Long campaignId, EvaluatorConfigDTO config);
     FeedbackAssignmentGenerationResponse getAssignmentPreview(Long campaignId);
     FeedbackAssignmentGenerationResponse addManualAssignment(Long campaignId, FeedbackManualAssignmentRequest request, Long actorUserId);
     FeedbackAssignmentGenerationResponse removeAssignment(Long campaignId, Long assignmentId, Long actorUserId);

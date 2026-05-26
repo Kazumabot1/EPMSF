@@ -19,8 +19,10 @@ public class ManagerKpiAssignmentDto {
     private Integer employeeKpiFormId;
     private Integer employeeId;
     private String employeeName;
+    private String departmentName;
     private String positionTitle;
     private Integer kpiFormId;
+    private Integer cyclePeriodId;
     private String kpiTitle;
     private EmployeeKpiStatus status;
     private Double totalScore;
@@ -31,6 +33,8 @@ public class ManagerKpiAssignmentDto {
 
     private LocalDate periodStartDate;
     private LocalDate periodEndDate;
+    private String graceReason;
+    private LocalDateTime graceEndsAt;
 
     @Builder.Default
     private List<ManagerKpiScoreLineDto> lines = new ArrayList<>();

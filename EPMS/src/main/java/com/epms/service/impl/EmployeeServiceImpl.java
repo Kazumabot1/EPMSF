@@ -1,4 +1,3 @@
-
 package com.epms.service.impl;
 
 import com.epms.dto.AccountProvisionResult;
@@ -7,23 +6,29 @@ import com.epms.dto.EmployeeRequestDto;
 import com.epms.dto.EmployeeResponseDto;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
+import com.epms.entity.EmployeeAuditHistory;
 import com.epms.entity.EmployeeDepartment;
 import com.epms.entity.Position;
 import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
+import com.epms.entity.UserRole;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.DepartmentRepository;
+import com.epms.repository.EmployeeAuditHistoryRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.PositionRepository;
+import com.epms.repository.RoleRepository;
 import com.epms.repository.TeamMemberRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
+import com.epms.repository.UserRoleRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeService;
+import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.NotificationService;
 import com.epms.service.UserAccountProvisioningService;
 import lombok.RequiredArgsConstructor;
@@ -47,11 +52,15 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final PositionRepository positionRepository;
     private final DepartmentRepository departmentRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
+    private final EmployeeAuditHistoryRepository employeeAuditHistoryRepository;
     private final UserAccountProvisioningService userAccountProvisioningService;
     private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final RoleRepository roleRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
+    private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @Override
     @Transactional(readOnly = true)
@@ -212,6 +221,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Transactional
     public EmployeeResponseDto createEmployee(EmployeeRequestDto request) {
         validateLoginAccountRequest(request);
+        validateEmployeeIdentityUniqueness(request, null);
 
         Department currentDepartment = requireDepartment(
                 request.effectiveCurrentDepartmentId(),
@@ -234,15 +244,21 @@ public class EmployeeServiceImpl implements EmployeeService {
         syncDepartmentAssignment(currentDepartment, parentDepartment, saved);
 
         AccountProvisionResult provision = null;
+        String derivedDashboard = dashboardFromPosition(saved.getPosition());
 
         if (Boolean.TRUE.equals(request.getCreateLoginAccount())) {
             provision = userAccountProvisioningService.provisionFromEmployee(
                     saved,
-                    "EMPLOYEE",
-                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+                    roleNameFromPosition(saved.getPosition()),
+                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail()),
+                    derivedDashboard
             );
 
-            syncLinkedUserFromEmployee(saved, workingDepartment != null ? workingDepartment.getId() : null);
+            syncLinkedUserFromEmployee(
+                    saved,
+                    workingDepartment != null ? workingDepartment.getId() : null,
+                    derivedDashboard
+            );
         }
 
         EmployeeResponseDto dto = getEmployeeById(saved.getId());
@@ -259,7 +275,21 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee employee = employeeRepository.findWithDepartmentsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
 
+        validateEmployeeIdentityUniqueness(request, employee.getId());
+
+        Position oldPosition = employee.getPosition();
+        Integer oldPositionId = oldPosition != null ? oldPosition.getId() : null;
+        String oldPositionTitle = oldPosition != null ? oldPosition.getPositionTitle() : null;
+        String oldPositionLevelCode = oldPosition != null && oldPosition.getLevel() != null
+                ? oldPosition.getLevel().getLevelCode()
+                : null;
+        String oldRoleName = oldPosition != null && oldPosition.getRole() != null
+                ? oldPosition.getRole().getName()
+                : null;
+
         EmployeeDepartment oldAssignment = getActiveAssignment(employee).orElse(null);
+        Department oldCurrentDepartment = oldAssignment != null ? oldAssignment.getCurrentDepartment() : null;
+        Department oldParentDepartment = oldAssignment != null ? oldAssignment.getParentDepartment() : null;
         Department oldWorkingDepartment = getWorkingDepartment(oldAssignment);
 
         Department currentDepartment = requireDepartment(
@@ -319,19 +349,38 @@ public class EmployeeServiceImpl implements EmployeeService {
         copyRequestToEntity(request, employee);
 
         Employee saved = employeeRepository.save(employee);
+        Integer newPositionId = saved.getPosition() != null ? saved.getPosition().getId() : null;
         syncDepartmentAssignment(currentDepartment, parentDepartment, saved);
-
         AccountProvisionResult provision = null;
+        String derivedDashboard = dashboardFromPosition(saved.getPosition());
 
         if (Boolean.TRUE.equals(request.getCreateLoginAccount())) {
             provision = userAccountProvisioningService.provisionFromEmployee(
                     saved,
-                    "EMPLOYEE",
-                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+                    roleNameFromPosition(saved.getPosition()),
+                    Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail()),
+                    derivedDashboard
             );
         }
 
-        syncLinkedUserFromEmployee(saved, newWorkingDepartment != null ? newWorkingDepartment.getId() : null);
+        syncLinkedUserFromEmployee(
+                saved,
+                newWorkingDepartment != null ? newWorkingDepartment.getId() : null,
+                derivedDashboard
+        );
+
+        recordEmployeeAuditChanges(
+                saved,
+                oldPositionTitle,
+                oldPositionLevelCode,
+                oldRoleName,
+                oldCurrentDepartment,
+                oldParentDepartment,
+                oldWorkingDepartment,
+                currentDepartment,
+                parentDepartment,
+                newWorkingDepartment
+        );
 
         if (workingDepartmentChanged && linkedUserOpt.isPresent()) {
             applyTeamTransfer(linkedUserOpt.get(), oldTeam, newTeam);
@@ -344,6 +393,8 @@ public class EmployeeServiceImpl implements EmployeeService {
                     newTeam
             );
         }
+
+        employeeKpiWorkflowService.handleEmployeePositionChanged(saved.getId(), oldPositionId, newPositionId);
 
         EmployeeResponseDto dto = getEmployeeById(id);
         mergeAccountProvisioning(dto, provision);
@@ -373,8 +424,11 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         return getEmployeeById(id);
     }
-
-    private void syncLinkedUserFromEmployee(Employee employee, Integer workingDepartmentId) {
+    private void syncLinkedUserFromEmployee(
+            Employee employee,
+            Integer workingDepartmentId,
+            String derivedDashboard
+    ) {
         findLinkedUserByEmployeeOrEmail(employee).ifPresent(user -> {
             String firstName = employee.getFirstName() != null ? employee.getFirstName().trim() : "";
             String lastName = employee.getLastName() != null ? employee.getLastName().trim() : "";
@@ -393,10 +447,12 @@ public class EmployeeServiceImpl implements EmployeeService {
              */
             user.setDepartmentId(workingDepartmentId);
 
+            user.setDashboard(derivedDashboard != null ? derivedDashboard : dashboardFromPosition(employee.getPosition()));
             user.setActive(employee.getActive() == null || employee.getActive());
             user.setUpdatedAt(new Date());
 
             userRepository.save(user);
+            syncUserRoleFromPosition(user, employee.getPosition());
         });
     }
 
@@ -421,8 +477,27 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         return userRepository.findByEmail(email.toLowerCase());
     }
-
     private void validateLoginAccountRequest(EmployeeRequestDto request) {
+        if (request == null) {
+            throw new BusinessValidationException("Employee request is required.");
+        }
+
+        if (request.getPositionId() == null) {
+            throw new BusinessValidationException("Position is required.");
+        }
+
+        Position position = positionRepository.findById(request.getPositionId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Position not found with id: " + request.getPositionId()
+                ));
+
+        if (position.getRole() == null || position.getRole().getName() == null
+                || position.getRole().getName().trim().isEmpty()) {
+            throw new BusinessValidationException(
+                    "This position does not have any role connected. Please connect this position with a role first to assign this position."
+            );
+        }
+
         if (!Boolean.TRUE.equals(request.getCreateLoginAccount())) {
             return;
         }
@@ -430,6 +505,37 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (!userAccountProvisioningService.isValidWorkEmail(request.getEmail())) {
             throw new BusinessValidationException(
                     "A valid work email is required when create login account is enabled.");
+        }
+    }
+
+
+    private void validateEmployeeIdentityUniqueness(EmployeeRequestDto request, Integer currentEmployeeId) {
+        String email = trimToNull(request.getEmail());
+
+        if (email != null) {
+            boolean emailUsedByEmployee = currentEmployeeId == null
+                    ? employeeRepository.existsByEmailIgnoreCase(email)
+                    : employeeRepository.existsByEmailIgnoreCaseAndIdNot(email, currentEmployeeId);
+
+            if (emailUsedByEmployee) {
+                throw new BusinessValidationException("Work email is already used by another employee.");
+            }
+
+            if (userRepository.countByEmailIgnoreCaseForDifferentEmployee(email, currentEmployeeId) > 0) {
+                throw new BusinessValidationException("Work email is already used by another login account.");
+            }
+        }
+
+        String staffNrc = trimToNull(request.getStaffNrc());
+
+        if (staffNrc != null) {
+            boolean nrcUsedByEmployee = currentEmployeeId == null
+                    ? employeeRepository.existsByStaffNrcIgnoreCase(staffNrc)
+                    : employeeRepository.existsByStaffNrcIgnoreCaseAndIdNot(staffNrc, currentEmployeeId);
+
+            if (nrcUsedByEmployee) {
+                throw new BusinessValidationException("Staff NRC is already used by another employee.");
+            }
         }
     }
 
@@ -620,69 +726,6 @@ public class EmployeeServiceImpl implements EmployeeService {
         teamMemberRepository.save(newMember);
     }
 
-    /*
-    private void sendDepartmentTransferNotifications(
-            Employee employee,
-            User employeeUser,
-            Department oldDepartment,
-            Department newDepartment,
-            Team oldTeam,
-            Team newTeam
-    ) {
-        String employeeName = employeeName(employee);
-        String oldDepartmentName = oldDepartment != null ? oldDepartment.getDepartmentName() : "No department";
-        String newDepartmentName = newDepartment != null ? newDepartment.getDepartmentName() : "No department";
-        String oldTeamName = oldTeam != null ? oldTeam.getTeamName() : "No active team";
-        String newTeamName = newTeam != null ? newTeam.getTeamName() : "No active team assigned yet";
-
-        String title = "Employee Department Transfer";
-        String message = employeeName
-                + " has been transferred from "
-                + oldDepartmentName
-                + " / "
-                + oldTeamName
-                + " to "
-                + newDepartmentName
-                + " / "
-                + newTeamName
-                + ". Please review related team responsibilities, KPI, PIP, and 1:1 planning.";
-
-        Set<Integer> recipientIds = new HashSet<>();
-
-        if (oldDepartment != null && oldDepartment.getId() != null) {
-            userRepository.findActiveDepartmentHeadsByDepartmentId(oldDepartment.getId())
-                    .forEach(user -> recipientIds.add(user.getId()));
-        }
-
-        if (newDepartment != null && newDepartment.getId() != null) {
-            userRepository.findActiveDepartmentHeadsByDepartmentId(newDepartment.getId())
-                    .forEach(user -> recipientIds.add(user.getId()));
-        }
-
-        if (oldTeam != null && oldTeam.getTeamLeader() != null) {
-            recipientIds.add(oldTeam.getTeamLeader().getId());
-        }
-
-        if (newTeam != null && newTeam.getTeamLeader() != null) {
-            recipientIds.add(newTeam.getTeamLeader().getId());
-        }
-
-        if (employeeUser != null) {
-            recipientIds.add(employeeUser.getId());
-
-            if (employeeUser.getManagerId() != null) {
-                recipientIds.add(employeeUser.getManagerId());
-            }
-        }
-
-        recipientIds.stream()
-                .filter(Objects::nonNull)
-                .forEach(userId -> notificationService.send(userId, title, message, "EMPLOYEE_TRANSFER"));
-    }*/
-
-
-
-
     private void sendDepartmentTransferNotifications(
             Employee employee,
             User employeeUser,
@@ -724,22 +767,6 @@ public class EmployeeServiceImpl implements EmployeeService {
                     .forEach(user -> recipientIds.add(user.getId()));
         }
 
-        /*
-         * Relative team users:
-         * - old team leader
-         * - old team members
-         * - new team leader
-         * - new team members
-         *
-         * This covers normal employees, Project Managers, and Team Leaders
-         * if they are part of the related team.
-         */
-        addTeamRecipients(recipientIds, oldTeam);
-        addTeamRecipients(recipientIds, newTeam);
-
-        /*
-         * Employee and employee's direct manager.
-         */
         if (employeeUser != null) {
             recipientIds.add(employeeUser.getId());
 
@@ -809,20 +836,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     private boolean isImportantTeamRole(User user) {
-        if (user == null || user.getPosition() == null || user.getPosition().getPositionTitle() == null) {
-            return false;
-        }
-
-        String normalized = user.getPosition()
-                .getPositionTitle()
-                .trim()
-                .toLowerCase()
-                .replace(" ", "")
-                .replace("-", "")
-                .replace("_", "");
-
-        return normalized.contains("teamleader")
-                || normalized.contains("projectmanager");
+        return hasPositionPermission(user, "teamAssignAsLeader")
+                || hasPositionPermission(user, "teamAssignAsPm");
     }
 
     private boolean isActiveTeam(Team team) {
@@ -906,6 +921,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         Integer positionId = null;
         String positionTitle = null;
         String positionLevelCode = null;
+        String positionRoleName = null;
+        String derivedDashboard = null;
 
         if (emp.getPosition() != null) {
             positionId = emp.getPosition().getId();
@@ -914,6 +931,12 @@ public class EmployeeServiceImpl implements EmployeeService {
             if (emp.getPosition().getLevel() != null) {
                 positionLevelCode = emp.getPosition().getLevel().getLevelCode();
             }
+
+            if (emp.getPosition().getRole() != null) {
+                positionRoleName = emp.getPosition().getRole().getName();
+            }
+
+            derivedDashboard = dashboardFromPosition(emp.getPosition());
         }
 
         User linkedUser = userRepository.findByEmployeeId(emp.getId()).orElse(null);
@@ -947,6 +970,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         dto.setPositionId(positionId);
         dto.setPositionTitle(positionTitle);
         dto.setPositionLevelCode(positionLevelCode);
+
+        dto.setPositionRoleName(positionRoleName);
+        dto.setDashboard(linkedUser != null && linkedUser.getDashboard() != null
+                ? linkedUser.getDashboard()
+                : derivedDashboard);
 
         dto.setCurrentDepartmentId(currentDept != null ? currentDept.getId() : null);
         dto.setCurrentDepartment(currentDept != null ? currentDept.getDepartmentName() : null);
@@ -1026,6 +1054,128 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
 
         return "Employee #" + employee.getId();
+    }
+
+    private void syncUserRoleFromPosition(User user, Position position) {
+        if (user == null || user.getId() == null) {
+            return;
+        }
+
+        Integer roleId = position != null && position.getRole() != null
+                ? position.getRole().getId()
+                : roleRepository.findByNameIgnoreCase("EMPLOYEE").map(com.epms.entity.Role::getId).orElse(null);
+
+        if (roleId == null) {
+            return;
+        }
+
+        userRoleRepository.deleteAll(userRoleRepository.findByUserId(user.getId()));
+
+        UserRole userRole = new UserRole();
+        userRole.setUserId(user.getId());
+        userRole.setRoleId(roleId);
+        userRoleRepository.save(userRole);
+    }
+
+    private boolean hasPositionPermission(User user, String permissionField) {
+        if (user == null || user.getPosition() == null || user.getPosition().getPermissions() == null) {
+            return false;
+        }
+
+        return switch (permissionField) {
+            case "teamAssignAsLeader" -> Boolean.TRUE.equals(user.getPosition().getPermissions().getTeamAssignAsLeader());
+            case "teamAssignAsPm" -> Boolean.TRUE.equals(user.getPosition().getPermissions().getTeamAssignAsPm());
+            default -> false;
+        };
+    }
+
+    private void recordEmployeeAuditChanges(
+            Employee employee,
+            String oldPositionTitle,
+            String oldPositionLevelCode,
+            String oldRoleName,
+            Department oldCurrentDepartment,
+            Department oldParentDepartment,
+            Department oldWorkingDepartment,
+            Department newCurrentDepartment,
+            Department newParentDepartment,
+            Department newWorkingDepartment
+    ) {
+        String newPositionTitle = employee.getPosition() != null ? employee.getPosition().getPositionTitle() : null;
+        String newPositionLevelCode = employee.getPosition() != null && employee.getPosition().getLevel() != null
+                ? employee.getPosition().getLevel().getLevelCode()
+                : null;
+        String newRoleName = employee.getPosition() != null && employee.getPosition().getRole() != null
+                ? employee.getPosition().getRole().getName()
+                : "EMPLOYEE";
+
+        Integer editorId = safeCurrentUserId();
+
+        saveEmployeeAudit(employee, "position", oldPositionTitle, newPositionTitle, editorId);
+        saveEmployeeAudit(employee, "position_level", oldPositionLevelCode, newPositionLevelCode, editorId);
+        saveEmployeeAudit(employee, "role", oldRoleName, newRoleName, editorId);
+        saveEmployeeAudit(employee, "current_department",
+                oldCurrentDepartment != null ? oldCurrentDepartment.getDepartmentName() : null,
+                newCurrentDepartment != null ? newCurrentDepartment.getDepartmentName() : null,
+                editorId);
+        saveEmployeeAudit(employee, "parent_department",
+                oldParentDepartment != null ? oldParentDepartment.getDepartmentName() : null,
+                newParentDepartment != null ? newParentDepartment.getDepartmentName() : null,
+                editorId);
+        saveEmployeeAudit(employee, "working_department",
+                oldWorkingDepartment != null ? oldWorkingDepartment.getDepartmentName() : null,
+                newWorkingDepartment != null ? newWorkingDepartment.getDepartmentName() : null,
+                editorId);
+    }
+
+    private void saveEmployeeAudit(
+            Employee employee,
+            String fieldName,
+            String oldValue,
+            String newValue,
+            Integer editorId
+    ) {
+        if (employee == null || employee.getId() == null || Objects.equals(nullToBlank(oldValue), nullToBlank(newValue))) {
+            return;
+        }
+
+        EmployeeAuditHistory history = new EmployeeAuditHistory();
+        history.setEmployeeId(employee.getId());
+        history.setFieldName(fieldName);
+        history.setOldValue(oldValue);
+        history.setNewValue(newValue);
+        history.setEditedBy(editorId);
+        history.setEditedAt(new Date());
+        history.setReason("Employee profile updated");
+        employeeAuditHistoryRepository.save(history);
+    }
+
+    private Integer safeCurrentUserId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String roleNameFromPosition(Position position) {
+        if (position != null && position.getRole() != null && position.getRole().getName() != null) {
+            return position.getRole().getName();
+        }
+
+        return "EMPLOYEE";
+    }
+
+    private String dashboardFromPosition(Position position) {
+        return userAccountProvisioningService.resolveDashboardForEmployee(
+                position,
+                roleNameFromPosition(position),
+                null
+        );
+    }
+
+    private String nullToBlank(String value) {
+        return value == null ? "" : value;
     }
 
     private String trimToNull(String value) {

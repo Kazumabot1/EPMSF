@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
+import { DEFAULT_EVALUATOR_CONFIG, getPeerReviewerCount, normalizeEvaluatorConfig } from '../../../types/feedbackCampaign';
 import type {
   FeedbackCampaign,
   EvaluatorConfigInput,
@@ -18,18 +19,7 @@ interface Props {
   onAssignmentsGenerated: (result: FeedbackAssignmentGenerationResponse) => void;
 }
 
-const relationshipOptions: FeedbackRelationshipType[] = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF', 'PROJECT_STAKEHOLDER'];
-
-const DEFAULT_EVAL_CONFIG: EvaluatorConfigInput = {
-  includeManager: true,
-  includeTeamPeers: true,
-  includeDepartmentPeers: true,
-  includeProjectPeers: false,
-  includeCrossTeamPeers: false,
-  includeSubordinates: true,
-  includeSelf: false,
-  peerCount: 3,
-};
+const relationshipOptions: FeedbackRelationshipType[] = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'];
 
 const formatCampaignOption = (campaign: FeedbackCampaign) =>
     `${campaign.name} (${campaign.status})${campaign.targetCount ? ` - ${campaign.targetCount} target(s)` : ''}`;
@@ -53,8 +43,6 @@ const relationshipHelp = (relationship: FeedbackRelationshipType) => {
       return 'Direct report of the target employee.';
     case 'SELF':
       return 'The target employee evaluates themself.';
-    case 'PROJECT_STAKEHOLDER':
-      return 'Special manual reviewer or project stakeholder.';
     default:
       return 'Peer reviewer, usually from department/team/project scope.';
   }
@@ -80,6 +68,8 @@ export default function AssignmentPreviewTab({
     targetEmployeeId: targetIds[0] ?? 0,
     evaluatorEmployeeId: 0,
     relationshipType: 'PEER',
+    anonymous: true,
+    reason: '',
   });
 
   const activeCampaign = useMemo(() => {
@@ -89,7 +79,7 @@ export default function AssignmentPreviewTab({
   }, [campaign, campaigns, selectedCampaignId]);
 
   const openCampaigns = useMemo(
-      () => campaigns.filter(item => item.status !== 'CANCELLED'),
+      () => campaigns,
       [campaigns],
   );
 
@@ -99,7 +89,10 @@ export default function AssignmentPreviewTab({
     return map;
   }, [employees]);
 
-  const effectiveConfig = result?.evaluatorConfig ?? evalConfig ?? DEFAULT_EVAL_CONFIG;
+  const effectiveConfig = useMemo(
+      () => normalizeEvaluatorConfig(result?.evaluatorConfig ?? evalConfig ?? DEFAULT_EVALUATOR_CONFIG),
+      [evalConfig, result?.evaluatorConfig],
+  );
 
   const knownTargetIds = useMemo(() => {
     if (targetIds.length > 0) return targetIds;
@@ -226,17 +219,18 @@ export default function AssignmentPreviewTab({
     effectiveConfig.includeManager && 'Manager',
     effectiveConfig.includeSelf && 'Self',
     effectiveConfig.includeSubordinates && 'Subordinates',
-    effectiveConfig.includeDepartmentPeers && 'Department Peers',
-    effectiveConfig.includeTeamPeers && 'Team Peers',
-    effectiveConfig.includeProjectPeers && 'Project Peers',
-    effectiveConfig.includeCrossTeamPeers && 'Other-Team Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeDepartmentPeers && 'Department Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeTeamPeers && 'Team Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeProjectPeers && 'Project Peers',
+    effectiveConfig.includePeers && effectiveConfig.includeCrossTeamPeers && 'Other-Team Peers',
   ].filter(Boolean).join(', ');
 
+  const peerReviewerCount = getPeerReviewerCount(effectiveConfig);
   const estimatedPerTarget =
-      effectiveConfig.peerCount +
+      (effectiveConfig.includePeers ? peerReviewerCount : 0) +
       (effectiveConfig.includeManager ? 1 : 0) +
       (effectiveConfig.includeSelf ? 1 : 0) +
-      (effectiveConfig.includeSubordinates ? 1 : 0);
+      (effectiveConfig.includeSubordinates ? effectiveConfig.subordinateMaxCount : 0);
 
   const employeeName = (id: number, fallback?: string | null) => fallback ?? employeeMap.get(id)?.fullName ?? `Employee #${id}`;
 
@@ -320,12 +314,16 @@ export default function AssignmentPreviewTab({
       setError('This evaluator is already assigned to the selected target employee.');
       return;
     }
+    if (!manualForm.reason || manualForm.reason.trim().length < 5) {
+      setError('Manual evaluator changes require a reason of at least 5 characters.');
+      return;
+    }
 
     setError('');
     try {
       const res = await feedbackCampaignApi.addManualAssignment(activeCampaign.id, manualForm);
       updateResult(res);
-      setManualForm(current => ({ ...current, evaluatorEmployeeId: 0 }));
+      setManualForm(current => ({ ...current, evaluatorEmployeeId: 0, reason: '' }));
       setManualSearch('');
       await refreshSelectedCampaign();
     } catch (e) {
@@ -411,7 +409,7 @@ export default function AssignmentPreviewTab({
 
                 <section className="hfd-review-card">
                   <div className="hfd-review-card-title"><i className="bi bi-sliders" /> Evaluator Rules</div>
-                  <h3>{effectiveConfig.peerCount} peer{effectiveConfig.peerCount === 1 ? '' : 's'} / target</h3>
+                  <h3>{peerReviewerCount} peer{peerReviewerCount === 1 ? '' : 's'} / target</h3>
                   <p>{configLabels || 'Default evaluator rules'} · est. {estimatedPerTarget} evaluator{estimatedPerTarget === 1 ? '' : 's'} each</p>
                 </section>
               </div>
@@ -531,13 +529,25 @@ export default function AssignmentPreviewTab({
                         </div>
                     )}
 
+                    <label className="hfd-field" style={{ marginTop: 12 }}>
+                      <span className="hfd-label">Manual Reason</span>
+                      <textarea
+                          className="hfd-input"
+                          value={manualForm.reason ?? ''}
+                          onChange={event => setManualForm({ ...manualForm, reason: event.target.value })}
+                          placeholder="Example: Reporting hierarchy missing; HR confirms this evaluator."
+                          rows={3}
+                      />
+                      <span className="hfd-field-help">Required for audit. Minimum 5 characters.</span>
+                    </label>
+
                     {existingAssignmentsForManualTarget.length > 0 && (
                         <div className="hfd-muted" style={{ marginTop: 8 }}>
                           Already assigned for this target: {existingAssignmentsForManualTarget.map(item => employeeName(item.evaluatorEmployeeId, item.evaluatorEmployeeName)).join(', ')}
                         </div>
                     )}
 
-                    <button className="hfd-btn hfd-btn-primary" onClick={handleAddManual} style={{ marginTop: 12 }} disabled={!hasTargets || !manualForm.evaluatorEmployeeId || assignedEvaluatorIdsForManualTarget.has(manualForm.evaluatorEmployeeId)}>
+                    <button className="hfd-btn hfd-btn-primary" onClick={handleAddManual} style={{ marginTop: 12 }} disabled={!hasTargets || !manualForm.evaluatorEmployeeId || assignedEvaluatorIdsForManualTarget.has(manualForm.evaluatorEmployeeId) || !manualForm.reason || manualForm.reason.trim().length < 5}>
                       <i className="bi bi-plus-circle" /> Add Evaluator
                     </button>
 
@@ -566,7 +576,6 @@ export default function AssignmentPreviewTab({
                     <th>Self</th>
                     <th>Subordinate</th>
                     <th>Peer</th>
-                    <th>Project / Manual</th>
                     <th>Auto</th>
                     <th>Manual</th>
                     <th>Total</th>
@@ -580,14 +589,13 @@ export default function AssignmentPreviewTab({
                         <td>{r.selfAssignments ?? 0}</td>
                         <td>{r.subordinateAssignments ?? 0}</td>
                         <td>{r.peerAssignments}</td>
-                        <td>{r.projectStakeholderAssignments ?? 0}</td>
                         <td>{r.autoAssignments ?? 0}</td>
                         <td>{r.manualAssignments ?? 0}</td>
                         <td><strong>{r.totalAssignments}</strong></td>
                       </tr>
                   ))}
                   {(result.requests ?? []).length === 0 && (
-                      <tr><td colSpan={9}>No target requests found for this campaign.</td></tr>
+                      <tr><td colSpan={8}>No target requests found for this campaign.</td></tr>
                   )}
                   </tbody>
                 </table>
@@ -606,6 +614,7 @@ export default function AssignmentPreviewTab({
                     <th>Method</th>
                     <th>Status</th>
                     <th>Anonymous</th>
+                    <th>Reason / Confidence</th>
                     <th>Action</th>
                   </tr>
                   </thead>
@@ -619,18 +628,26 @@ export default function AssignmentPreviewTab({
                         <td>{assignment.status}</td>
                         <td>{assignment.anonymous ? 'Yes' : 'No'}</td>
                         <td>
-                          <button
-                              className="hfd-btn hfd-btn-outline"
-                              disabled={!isDraft || assignment.status === 'SUBMITTED'}
-                              onClick={() => handleRemove(assignment.assignmentId)}
-                          >
-                            Remove
-                          </button>
+                          {assignment.manualReason || assignment.selectionReason || assignment.confidence || '-'}
+                          {assignment.warnings?.length ? <div className="hfd-muted">{assignment.warnings.join(', ')}</div> : null}
+                        </td>
+                        <td>
+                          {assignment.assignmentId ? (
+                              <button
+                                  className="hfd-btn hfd-btn-outline"
+                                  disabled={!isDraft || assignment.status === 'SUBMITTED'}
+                                  onClick={() => handleRemove(assignment.assignmentId as number)}
+                              >
+                                Remove
+                              </button>
+                          ) : (
+                              <span className="hfd-muted">Preview</span>
+                          )}
                         </td>
                       </tr>
                   ))}
                   {(result.assignmentDetails ?? []).length === 0 && (
-                      <tr><td colSpan={7}>No evaluator assignments yet.</td></tr>
+                      <tr><td colSpan={8}>No evaluator assignments yet.</td></tr>
                   )}
                   </tbody>
                 </table>

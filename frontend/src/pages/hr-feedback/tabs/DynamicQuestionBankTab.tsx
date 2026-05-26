@@ -1,215 +1,189 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import '../hr-feedback-dashboard.css';
 import {
     hrFeedbackApi,
+    type FeedbackCompetencyItem,
+    type FeedbackCompetencyPayload,
+    type FeedbackQuestionBankReadiness,
+    type FeedbackQuestionQualityIssue,
+    type FeedbackQuestionQualityValidation,
     type QuestionBankItem,
-    type QuestionBankPayload,
 } from '../../../api/hrFeedbackApi';
+import CompetencyLibraryPanel from './question-bank/components/CompetencyLibraryPanel';
+import CompetencyManagerModal from './question-bank/components/CompetencyManagerModal';
+import QuestionBankStatCard from './question-bank/components/QuestionBankStatCard';
+import QuestionCatalogTable from './question-bank/components/QuestionCatalogTable';
+import QuestionEditorDrawer from './question-bank/components/QuestionEditorDrawer';
 import {
-    COMPETENCY_OPTIONS,
-    RESPONSE_TYPE_OPTIONS,
-    getCompetencyLabel,
-    getResponseTypeLabel,
-    getScoringCopy,
-    isRatingResponseType,
-    normalizeCompetencyCode,
+    emptyQuestionForm,
+    getCompetencyName,
     normalizeText,
-} from './feedbackQuestionConfig.ts';
+    toQuestionForm,
+    toQuestionPayload,
+    type QuestionEditorFormState,
+} from './question-bank/questionBankConfig';
+import { buildLocalQualityIssues } from './question-bank/utils/questionQuality';
 
-type QuestionDrawerMode = 'create' | 'edit';
+type EditorMode = 'create' | 'edit';
 
-type QuestionFormState = Omit<QuestionBankPayload, 'questionCode' | 'weight'> & {
-    id?: number | null;
-    questionCode?: string;
-    weight: number;
-    useCustomWeight: boolean;
+type QuestionLifecycleStatus = 'DRAFT' | 'ACTIVE' | 'RETIRED' | 'ARCHIVED';
+
+const PAGE_SIZE = 10;
+
+const normalizeCompetencies = (loaded: FeedbackCompetencyItem[]): FeedbackCompetencyItem[] => {
+    const byCode = new Map<string, FeedbackCompetencyItem>();
+
+    loaded.forEach((competency, index) => {
+        const code = competency.code || `COMPETENCY_${index + 1}`;
+        const existing = byCode.get(code);
+        if (!existing || (competency.id > 0 && existing.id <= 0)) {
+            byCode.set(code, {
+                ...competency,
+                code,
+                displayOrder: competency.displayOrder ?? (index + 1) * 10,
+                questionCount: competency.questionCount ?? 0,
+                activeQuestionCount: competency.activeQuestionCount ?? 0,
+            });
+        }
+    });
+
+    return [...byCode.values()].sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999) || a.name.localeCompare(b.name));
 };
-
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
-
-const emptyQuestionForm = (): QuestionFormState => ({
-    id: null,
-    questionCode: '',
-    competencyCode: '',
-    questionText: '',
-    responseType: 'RATING_WITH_COMMENT',
-    ratingScaleId: null,
-    weight: 1,
-    useCustomWeight: false,
-    required: true,
-    helpText: '',
-    status: 'ACTIVE',
-});
-
-const HelpTip = ({ text }: { text: string }) => (
-    <span className="hfd-help-tip" tabIndex={0} aria-label={text}>
-    ?
-    <span className="hfd-help-popover" role="tooltip">{text}</span>
-  </span>
-);
-
-const StatCard = ({ icon, label, value, note, tone }: { icon: string; label: string; value: number | string; note: string; tone: string }) => (
-    <div className={`hfdq-stat-card ${tone}`}>
-        <span className="hfdq-stat-icon"><i className={icon} /></span>
-        <div>
-            <small>{label}</small>
-            <strong>{value}</strong>
-            <em>{note}</em>
-        </div>
-    </div>
-);
-
-const responseTypeFilterOptions = ['ALL', ...RESPONSE_TYPE_OPTIONS.map(option => option.value)];
-const scoringFilterOptions = ['ALL', 'SCORED', 'NON_SCORED', 'HR_REVIEW'];
-const statusFilterOptions = ['ALL', 'ACTIVE', 'INACTIVE'];
 
 export default function DynamicQuestionBankTab() {
     const [questions, setQuestions] = useState<QuestionBankItem[]>([]);
+    const [competencies, setCompetencies] = useState<FeedbackCompetencyItem[]>([]);
+    const [readiness, setReadiness] = useState<FeedbackQuestionBankReadiness | null>(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [drawerOpen, setDrawerOpen] = useState(false);
-    const [drawerMode, setDrawerMode] = useState<QuestionDrawerMode>('create');
-    const [form, setForm] = useState<QuestionFormState>(emptyQuestionForm);
-
     const [search, setSearch] = useState('');
-    const [competencyFilter, setCompetencyFilter] = useState('ALL');
-    const [responseFilter, setResponseFilter] = useState('ALL');
-    const [scoringFilter, setScoringFilter] = useState('ALL');
     const [statusFilter, setStatusFilter] = useState('ALL');
+    const [selectedCompetency, setSelectedCompetency] = useState('ALL');
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [editorOpen, setEditorOpen] = useState(false);
+    const [editorMode, setEditorMode] = useState<EditorMode>('create');
+    const [competencyManagerOpen, setCompetencyManagerOpen] = useState(false);
+    const [competencyPanelCollapsed, setCompetencyPanelCollapsed] = useState(false);
+    const [form, setForm] = useState<QuestionEditorFormState>(emptyQuestionForm());
+    const [serverQuality, setServerQuality] = useState<FeedbackQuestionQualityValidation | null>(null);
 
-    const loadQuestions = async () => {
+    const loadQuestionBank = useCallback(async () => {
         setLoading(true);
         setError('');
         try {
-            const loaded = await hrFeedbackApi.getQuestionBank();
-            setQuestions(loaded);
+            const [loadedQuestions, loadedCompetencies, loadedReadiness] = await Promise.all([
+                hrFeedbackApi.getQuestionBank(),
+                hrFeedbackApi.getFeedbackCompetencies().catch(() => []),
+                hrFeedbackApi.getQuestionBankReadiness().catch(() => null),
+            ]);
+            setQuestions(loadedQuestions);
+            setCompetencies(normalizeCompetencies(loadedCompetencies));
+            setReadiness(loadedReadiness);
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to load question bank.');
+            setError(e instanceof Error ? e.message : 'Failed to load Question Bank.');
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        loadQuestions();
-    }, []);
+        loadQuestionBank();
+    }, [loadQuestionBank]);
+
+    const competencyCodes = useMemo(
+        () => competencies.map((competency) => competency.code).filter(Boolean),
+        [competencies],
+    );
+
+    const localIssues = useMemo(() => buildLocalQualityIssues(form, competencies), [form, competencies]);
+    const displayedIssues: FeedbackQuestionQualityIssue[] = serverQuality?.issues ?? localIssues;
+
+    const stats = useMemo(() => {
+        const active = questions.filter((question) => question.status === 'ACTIVE').length;
+        const draft = questions.filter((question) => question.status === 'DRAFT').length;
+        const currentQuestions = questions.filter((question) => question.status !== 'ARCHIVED');
+        const retired = currentQuestions.filter((question) => question.status === 'RETIRED').length;
+        const review = currentQuestions.filter((question) => question.status === 'DRAFT').length + (readiness?.issues?.length ?? 0);
+        return { total: currentQuestions.length, active, draft, retired, review };
+    }, [questions, readiness]);
+
+    const filteredQuestions = useMemo(() => {
+        const query = normalizeText(search);
+        return questions.filter((question) => {
+            const matchesSearch = !query || [question.questionCode, question.questionText, question.competencyCode, getCompetencyName(question.competencyCode, competencies)]
+                .some((value) => normalizeText(value).includes(query));
+            const matchesCompetency = selectedCompetency === 'ALL' || question.competencyCode === selectedCompetency;
+            const matchesStatus = statusFilter === 'ALL'
+                ? question.status !== 'ARCHIVED'
+                : question.status === statusFilter;
+            return matchesSearch && matchesCompetency && matchesStatus;
+        });
+    }, [competencies, questions, search, selectedCompetency, statusFilter]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, selectedCompetency, statusFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredQuestions.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const pagedQuestions = filteredQuestions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const selectedQuestion = questions.find((question) => question.id === form.id) ?? null;
 
     const resetMessages = () => {
         setError('');
         setSuccess('');
     };
 
-    const isRating = isRatingResponseType(form.responseType);
-    const scoring = getScoringCopy(form.responseType);
-
-    const competencyOptions = useMemo(() => {
-        const byValue = new Map<string, { value: string; label: string; codePart?: string }>();
-        COMPETENCY_OPTIONS.forEach(option => byValue.set(option.value, option));
-        questions.forEach(question => {
-            if (question.competencyCode && !byValue.has(question.competencyCode)) {
-                byValue.set(question.competencyCode, {
-                    value: question.competencyCode,
-                    label: getCompetencyLabel(question.competencyCode),
-                });
-            }
-        });
-        if (form.competencyCode && !byValue.has(form.competencyCode)) {
-            byValue.set(form.competencyCode, {
-                value: form.competencyCode,
-                label: getCompetencyLabel(form.competencyCode),
-            });
-        }
-        return [...byValue.values()].sort((a, b) => a.label.localeCompare(b.label));
-    }, [form.competencyCode, questions]);
-
-
-    const openCreateDrawer = () => {
+    const openCreateEditor = () => {
         resetMessages();
-        setDrawerMode('create');
-        setForm(emptyQuestionForm());
-        setDrawerOpen(true);
+        setEditorMode('create');
+        setForm(emptyQuestionForm(selectedCompetency !== 'ALL' ? selectedCompetency : competencyCodes[0] ?? ''));
+        setServerQuality(null);
+        setEditorOpen(true);
     };
 
-    const openEditDrawer = (question: QuestionBankItem) => {
+    const openEditEditor = (question: QuestionBankItem) => {
         resetMessages();
-        const isWeighted = isRatingResponseType(question.responseType) && Number(question.weight ?? 1) !== 1;
-        setDrawerMode('edit');
-        setForm({
-            id: question.id,
-            questionCode: question.questionCode,
-            competencyCode: getCompetencyLabel(question.competencyCode),
-            questionText: question.questionText,
-            responseType: question.responseType || 'RATING_WITH_COMMENT',
-            ratingScaleId: question.ratingScaleId ?? null,
-            weight: question.weight ?? 1,
-            useCustomWeight: isWeighted,
-            required: question.required !== false,
-            helpText: question.helpText ?? '',
-            status: question.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
-        });
-        setDrawerOpen(true);
+        setEditorMode('edit');
+        setForm(toQuestionForm(question));
+        setServerQuality(null);
+        setEditorOpen(true);
     };
 
-    const closeDrawer = () => {
+    const closeEditor = () => {
         if (busy) return;
-        setDrawerOpen(false);
-        setForm(emptyQuestionForm());
+        setEditorOpen(false);
+        setForm(emptyQuestionForm(competencyCodes[0] ?? ''));
+        setServerQuality(null);
     };
 
-    const patchForm = (patch: Partial<QuestionFormState>) => {
-        setForm(current => {
-            const next = { ...current, ...patch };
-            if (patch.responseType && !isRatingResponseType(patch.responseType)) {
-                next.useCustomWeight = false;
-                next.weight = 1;
-            }
-            return next;
-        });
+    const patchForm = (patch: Partial<QuestionEditorFormState>) => {
+        setForm((current) => ({ ...current, ...patch }));
+        setServerQuality(null);
     };
 
-    const saveQuestion = async () => {
+    const saveQuestion = async (targetStatus: 'DRAFT' | 'ACTIVE') => {
         resetMessages();
-        if (!form.questionText.trim()) {
-            setError('Question text is required.');
-            return;
-        }
-        if (!form.competencyCode.trim()) {
-            setError('Competency is required. Select an existing competency or type a new one.');
-            return;
-        }
-        if (isRatingResponseType(form.responseType) && form.useCustomWeight && (!Number.isFinite(form.weight) || form.weight <= 0)) {
-            setError('Custom weight must be greater than 0.');
-            return;
-        }
-
+        const payload = toQuestionPayload({ ...form, status: targetStatus });
         setBusy(true);
         try {
-            const payload: QuestionBankPayload = {
-                questionCode: form.questionCode || undefined,
-                competencyCode: normalizeCompetencyCode(form.competencyCode),
-                questionText: form.questionText.trim(),
-                responseType: form.responseType,
-                scoringBehavior: getScoringCopy(form.responseType).kind,
-                ratingScaleId: form.ratingScaleId ?? null,
-                weight: isRatingResponseType(form.responseType) && form.useCustomWeight ? Number(form.weight) : 1,
-                required: form.required,
-                helpText: form.helpText?.trim() || '',
-                status: form.status,
-            };
-
+            const validation = await hrFeedbackApi.validateQuestionBankItem(payload, form.id ?? undefined);
+            setServerQuality(validation);
+            if (!validation.canSave || (targetStatus === 'ACTIVE' && !validation.canActivate)) {
+                setError(validation.issues.find((issue) => issue.severity === 'ERROR')?.message ?? 'Question does not pass required checks.');
+                return;
+            }
             if (form.id) {
                 await hrFeedbackApi.updateQuestionBankItem(form.id, payload);
-                setSuccess('Question updated. Existing campaign snapshots will stay unchanged.');
+                setSuccess(targetStatus === 'ACTIVE' ? 'Question saved and published.' : 'Question saved as draft.');
             } else {
                 await hrFeedbackApi.createQuestionBankItem(payload);
-                setSuccess('Question created. Add a rule to decide who should see it.');
+                setSuccess(targetStatus === 'ACTIVE' ? 'Question created and published.' : 'Question created as draft.');
             }
-            closeDrawer();
-            await loadQuestions();
+            closeEditor();
+            await loadQuestionBank();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to save question.');
         } finally {
@@ -217,279 +191,170 @@ export default function DynamicQuestionBankTab() {
         }
     };
 
-    const stats = useMemo(() => {
-        const ratingQuestions = questions.filter(question => isRatingResponseType(question.responseType)).length;
-        const writtenAnswers = questions.filter(question => question.responseType === 'TEXT').length;
-        const inactive = questions.filter(question => question.status !== 'ACTIVE').length;
-        return { total: questions.length, ratingQuestions, writtenAnswers, inactive };
-    }, [questions]);
-
-    const filteredQuestions = useMemo(() => {
-        const query = normalizeText(search);
-        return questions.filter(question => {
-            const scoringKind = getScoringCopy(question.responseType, question.scoringBehavior).kind;
-            const matchesSearch = !query || [question.questionCode, question.questionText, question.competencyCode]
-                .some(value => normalizeText(value).includes(query));
-            const matchesCompetency = competencyFilter === 'ALL' || question.competencyCode === competencyFilter;
-            const matchesResponse = responseFilter === 'ALL' || question.responseType === responseFilter;
-            const matchesScoring = scoringFilter === 'ALL' || scoringKind === scoringFilter;
-            const normalizedStatus = question.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE';
-            const matchesStatus = statusFilter === 'ALL' || normalizedStatus === statusFilter;
-            return matchesSearch && matchesCompetency && matchesResponse && matchesScoring && matchesStatus;
-        });
-    }, [competencyFilter, questions, responseFilter, scoringFilter, search, statusFilter]);
-
-    useEffect(() => {
-        setPage(1);
-    }, [search, competencyFilter, responseFilter, scoringFilter, statusFilter, pageSize]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredQuestions.length / pageSize));
-    const currentPage = Math.min(page, totalPages);
-    const pagedQuestions = filteredQuestions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-    const clearFilters = () => {
-        setSearch('');
-        setCompetencyFilter('ALL');
-        setResponseFilter('ALL');
-        setScoringFilter('ALL');
-        setStatusFilter('ALL');
+    const createCompetency = async (payload: FeedbackCompetencyPayload) => {
+        resetMessages();
+        setBusy(true);
+        try {
+            await hrFeedbackApi.createFeedbackCompetency(payload);
+            setSuccess('Competency created.');
+            await loadQuestionBank();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to create competency.');
+        } finally {
+            setBusy(false);
+        }
     };
 
-    const adjustWeight = (amount: number) => {
-        patchForm({ weight: Math.max(0.1, Number((Number(form.weight || 1) + amount).toFixed(1))) });
+    const updateCompetency = async (competencyId: number, payload: FeedbackCompetencyPayload) => {
+        resetMessages();
+        setBusy(true);
+        try {
+            await hrFeedbackApi.updateFeedbackCompetency(competencyId, payload);
+            setSuccess('Competency updated.');
+            await loadQuestionBank();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update competency.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const changeQuestionStatus = async (question: QuestionBankItem, status: QuestionLifecycleStatus) => {
+        resetMessages();
+        setBusy(true);
+        try {
+            await hrFeedbackApi.updateQuestionBankStatus(question.id, status);
+            setSuccess(`Question moved to ${status.toLowerCase()}.`);
+            await loadQuestionBank();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update question status.');
+        } finally {
+            setBusy(false);
+        }
     };
 
     return (
-        <div className="hfdq-page">
-            <div className="hfdq-page-head">
+        <div className="hfdqb-page hfdqb-page-simple">
+            <header className="hfdqb-header">
                 <div>
-                    <p className="hfdq-breadcrumb"><i className="bi bi-house" /> 360 Feedback / Question Bank</p>
+                    <span className="hfdqb-kicker">360 Feedback · Performance Evaluation</span>
                     <h2>Question Bank</h2>
-                    <p>Manage reusable feedback questions that can be used across 360 campaigns, probation reviews, and leadership assessments.</p>
+                    <p>Create and maintain competency-mapped questions for performance 360 feedback.</p>
                 </div>
-                <div className="hfdq-actions">
-                    <button className="hfd-btn hfd-btn-secondary" onClick={loadQuestions} disabled={loading || busy}><i className="bi bi-arrow-clockwise" /> Refresh</button>
-                    <button className="hfd-btn hfd-btn-primary" onClick={openCreateDrawer}><i className="bi bi-plus-lg" /> New Question</button>
+                <div className="hfdqb-header-actions">
+                    <button type="button" className="hfdqb-secondary-btn" onClick={() => setCompetencyManagerOpen(true)} disabled={loading || busy}>
+                        <i className="bi bi-diagram-3" /> Manage Competencies
+                    </button>
+                    <button type="button" className="hfdqb-primary-btn" onClick={openCreateEditor} disabled={loading || busy || competencies.length === 0}>
+                        <i className="bi bi-plus-lg" /> New Question
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            {error && <div className="hfd-alert hfd-alert-error"><i className="bi bi-exclamation-triangle" />{error}</div>}
-            {success && <div className="hfd-alert hfd-alert-success"><i className="bi bi-check-circle" />{success}</div>}
+            {error ? <div className="hfd-alert hfd-alert-error"><i className="bi bi-exclamation-triangle" />{error}</div> : null}
+            {success ? <div className="hfd-alert hfd-alert-success"><i className="bi bi-check-circle" />{success}</div> : null}
 
-            <section className="hfdq-hero hfdq-question-hero">
-                <div>
-                    <span className="hfdq-kicker">Reusable question library</span>
-                    <h3>Thoughtful questions. Better feedback decisions.</h3>
-                    <p>Create clear, reusable questions and organize them by competency and response type. Question targeting is handled separately in Question Rules.</p>
-                </div>
-                <div className="hfdq-abstract-art" aria-hidden="true">
-                    <span className="shape orb" />
-                    <span className="shape card" />
-                    <span className="shape line one" />
-                    <span className="shape line two" />
-                    <span className="shape dot a" />
-                    <span className="shape dot b" />
-                </div>
+            <section className="hfdqb-stat-grid hfdqb-stat-grid-simple">
+                <QuestionBankStatCard icon="bi bi-collection" label="Total Questions" value={stats.total} note="All question statuses" tone="indigo" />
+                <QuestionBankStatCard icon="bi bi-check2-circle" label="Active" value={stats.active} note="Usable for rules" tone="emerald" />
+                <QuestionBankStatCard icon="bi bi-pencil-square" label="Draft" value={stats.draft} note="Needs review" tone="violet" />
+                <QuestionBankStatCard icon="bi bi-archive" label="Retired" value={stats.retired} note="Kept for history" tone="orange" />
+                <QuestionBankStatCard icon="bi bi-shield-check" label="Needs Review" value={stats.review} note="Drafts or data issues" tone="cyan" />
             </section>
 
-            <div className="hfdq-stats-grid">
-                <StatCard icon="bi bi-journal-text" label="Total Questions" value={stats.total} note="Available in the bank" tone="blue" />
-                <StatCard icon="bi bi-star" label="Rating Questions" value={stats.ratingQuestions} note="Can affect 360 score" tone="green" />
-                <StatCard icon="bi bi-chat-left-text" label="Written Answer" value={stats.writtenAnswers} note="Qualitative insight only" tone="purple" />
-                <StatCard icon="bi bi-pause-circle" label="Inactive" value={stats.inactive} note="Not used for new rules" tone="orange" />
-            </div>
-
-            <section className="hfdq-table-card">
-                <div className="hfdq-filter-grid question-bank">
-                    <label>
-                        <span>Search</span>
-                        <input className="hfd-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search questions..." />
-                    </label>
-                    <label>
-                        <span>Competency</span>
-                        <select className="hfd-input" value={competencyFilter} onChange={e => setCompetencyFilter(e.target.value)}>
-                            <option value="ALL">All competencies</option>
-                            {competencyOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>) }
-                        </select>
-                    </label>
-                    <label>
-                        <span>Response Type</span>
-                        <select className="hfd-input" value={responseFilter} onChange={e => setResponseFilter(e.target.value)}>
-                            {responseTypeFilterOptions.map(option => (
-                                <option key={option} value={option}>{option === 'ALL' ? 'All types' : getResponseTypeLabel(option)}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label>
-                        <span>Scoring</span>
-                        <select className="hfd-input" value={scoringFilter} onChange={e => setScoringFilter(e.target.value)}>
-                            {scoringFilterOptions.map(option => <option key={option} value={option}>{option === 'ALL' ? 'All scoring behavior' : getScoringCopy(option === 'SCORED' ? 'RATING' : option === 'HR_REVIEW' ? 'YES_NO' : 'TEXT').shortLabel}</option>)}
-                        </select>
-                    </label>
-                    <label>
-                        <span>Status</span>
-                        <select className="hfd-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                            {statusFilterOptions.map(option => <option key={option} value={option}>{option === 'ALL' ? 'All status' : option}</option>)}
-                        </select>
-                    </label>
-                    <button className="hfdq-clear" type="button" onClick={clearFilters}>Clear</button>
-                </div>
-
-                {loading ? (
-                    <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading question bank...</div>
-                ) : (
-                    <>
-                        <div className="hfd-table-wrap hfdq-modern-table-wrap">
-                            <table className="hfd-table hfdq-modern-table">
-                                <thead>
-                                <tr>
-                                    <th>Code</th>
-                                    <th>Question</th>
-                                    <th>Competency</th>
-                                    <th>Response Type</th>
-                                    <th>Scoring</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {pagedQuestions.length === 0 ? (
-                                    <tr><td colSpan={7}><div className="hfdq-empty-row">No questions match the selected filters.</div></td></tr>
-                                ) : pagedQuestions.map(question => {
-                                    const scoreCopy = getScoringCopy(question.responseType, question.scoringBehavior);
-                                    return (
-                                        <tr key={question.id}>
-                                            <td><strong>{question.questionCode}</strong></td>
-                                            <td className="hfdq-question-cell">{question.questionText}</td>
-                                            <td>{getCompetencyLabel(question.competencyCode)}</td>
-                                            <td><span className={`hfdq-chip response ${question.responseType}`}>{getResponseTypeLabel(question.responseType)}</span></td>
-                                            <td><span className={`hfdq-chip scoring ${scoreCopy.kind}`}>{scoreCopy.shortLabel}</span></td>
-                                            <td><span className={`hfd-status-badge ${question.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE'}`}>{question.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE'}</span></td>
-                                            <td>
-                                                <div className="hfdq-row-actions">
-                                                    <button className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={() => openEditDrawer(question)} disabled={busy}>Edit</button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="hfdq-pagination">
-                            <span>Showing {filteredQuestions.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredQuestions.length)} of {filteredQuestions.length} questions</span>
-                            <div>
-                                <button className="hfdq-page-btn" onClick={() => setPage(value => Math.max(1, value - 1))} disabled={currentPage <= 1}>‹</button>
-                                <strong>{currentPage}</strong>
-                                <span>of {totalPages}</span>
-                                <button className="hfdq-page-btn" onClick={() => setPage(value => Math.min(totalPages, value + 1))} disabled={currentPage >= totalPages}>›</button>
-                                <select className="hfd-input hfdq-page-size" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
-                                    {PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size} per page</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    </>
-                )}
+            <section className="hfdqb-toolbar hfdqb-toolbar-simple">
+                <label className="hfdqb-search">
+                    <i className="bi bi-search" />
+                    <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search questions by text, code, or competency..." />
+                </label>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    <option value="ALL">All Statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="RETIRED">Retired</option>
+                    <option value="ARCHIVED">Archived</option>
+                </select>
+                <button type="button" className="hfdqb-filter-btn" onClick={() => { setSearch(''); setSelectedCompetency('ALL'); setStatusFilter('ALL'); }}>
+                    <i className="bi bi-filter" /> Clear
+                </button>
+                <button type="button" className="hfdqb-icon-btn" onClick={loadQuestionBank} disabled={loading} title="Refresh">
+                    <i className="bi bi-arrow-clockwise" />
+                </button>
             </section>
 
-            {drawerOpen && (
-                <div className="hfdq-drawer-shell" role="dialog" aria-modal="true">
-                    <button className="hfdq-drawer-backdrop" aria-label="Close drawer" onClick={closeDrawer} />
-                    <aside className="hfdq-drawer">
-                        <div className="hfdq-drawer-head">
-                            <div>
-                                <p>{drawerMode === 'create' ? 'Create reusable item' : 'Edit question'}</p>
-                                <h3>{drawerMode === 'create' ? 'New Question' : 'Update Question'}</h3>
-                            </div>
-                            <button className="hfdq-icon-button" onClick={closeDrawer} disabled={busy} aria-label="Close"><i className="bi bi-x-lg" /></button>
+            <main className={`hfdqb-management-layout ${competencyPanelCollapsed ? 'competency-collapsed' : ''}`}>
+                <CompetencyLibraryPanel
+                    competencies={competencies}
+                    selectedCompetency={selectedCompetency}
+                    collapsed={competencyPanelCollapsed}
+                    onToggleCollapsed={() => setCompetencyPanelCollapsed((value) => !value)}
+                    onSelectCompetency={setSelectedCompetency}
+                    onManageCompetencies={() => setCompetencyManagerOpen(true)}
+                />
+
+                <section className="hfdqb-catalog-panel hfdqb-question-library-panel">
+                    <div className="hfdqb-panel-head hfdqb-question-library-head">
+                        <div>
+                            <p>Question Library</p>
+                            <h3>{filteredQuestions.length} question{filteredQuestions.length === 1 ? '' : 's'}</h3>
+                            <small>
+                                {selectedCompetency === 'ALL' ? 'Showing all competencies' : `Filtered by ${getCompetencyName(selectedCompetency, competencies)}`}
+                            </small>
                         </div>
+                        <div className="hfdqb-panel-actions">
+                            <span>Sort by: Recently updated</span>
+                            <button type="button" className="hfdqb-primary-btn compact" onClick={openCreateEditor} disabled={loading || busy || competencies.length === 0}>
+                                <i className="bi bi-plus-lg" /> New Question
+                            </button>
+                        </div>
+                    </div>
 
-                        <div className="hfdq-drawer-body">
-                            {drawerMode === 'edit' && form.questionCode && (
-                                <div className="hfdq-readonly-code">
-                                    <span>Question Code</span>
-                                    <strong>{form.questionCode}</strong>
-                                    <small>Code stays stable so historical reporting remains reliable.</small>
-                                </div>
-                            )}
-
-                            <label className="hfd-field">
-                                <span className="hfd-label">Question Text <span>*</span> <HelpTip text="Write one clear question. Avoid combining multiple behaviors in one question." /></span>
-                                <textarea className="hfd-input hfd-textarea" rows={4} maxLength={500} value={form.questionText} onChange={e => patchForm({ questionText: e.target.value })} placeholder="Example: Communicates clearly and effectively with others." />
-                                <small className="hfd-muted">{form.questionText.length} / 500 characters</small>
-                            </label>
-
-                            <label className="hfd-field">
-                                <span className="hfd-label">Competency <span>*</span> <HelpTip text="Type a new competency if the list does not contain the category HR needs. It will be saved with this question." /></span>
-                                <input
-                                    className="hfd-input"
-                                    list="feedback-competency-options"
-                                    value={form.competencyCode}
-                                    onChange={e => patchForm({ competencyCode: e.target.value })}
-                                    placeholder="Example: Communication, Coaching, Customer Focus"
-                                />
-                                <datalist id="feedback-competency-options">
-                                    {competencyOptions.map(option => <option key={option.value} value={option.label} />)}
-                                </datalist>
-                                <small className="hfd-muted">Select an existing competency or type a new one. The system stores it as a clean code.</small>
-                            </label>
-
-                            <label className="hfd-field">
-                                <span className="hfd-label">Response Type <span>*</span> <HelpTip text="Choose how evaluators answer. Rating questions can affect the score; written and Yes/No questions are used as supporting context." /></span>
-                                <select className="hfd-input" value={form.responseType} onChange={e => patchForm({ responseType: e.target.value })}>
-                                    {RESPONSE_TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-                                </select>
-                                <small className="hfd-muted">{RESPONSE_TYPE_OPTIONS.find(option => option.value === form.responseType)?.description}</small>
-                            </label>
-
-                            <div className={`hfdq-scoring-panel ${scoring.kind}`}>
+                    {loading ? (
+                        <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading question bank...</div>
+                    ) : (
+                        <>
+                            <QuestionCatalogTable
+                                questions={pagedQuestions}
+                                competencies={competencies}
+                                selectedQuestionId={selectedQuestion?.id}
+                                onSelectQuestion={openEditEditor}
+                                onChangeStatus={changeQuestionStatus}
+                            />
+                            <footer className="hfdqb-pagination">
+                                <span>Showing {filteredQuestions.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1} to {Math.min(currentPage * PAGE_SIZE, filteredQuestions.length)} of {filteredQuestions.length} questions</span>
                                 <div>
-                                    <strong>{scoring.label}</strong>
-                                    <p>{scoring.description}</p>
+                                    <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage <= 1}>‹</button>
+                                    <strong>{currentPage}</strong>
+                                    <span>of {totalPages}</span>
+                                    <button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage >= totalPages}>›</button>
                                 </div>
-                                <span>{scoring.shortLabel}</span>
-                            </div>
+                            </footer>
+                        </>
+                    )}
+                </section>
+            </main>
 
-                            {isRating && (
-                                <div className="hfdq-weight-card">
-                                    <label className="hfdq-toggle-row">
-                    <span>
-                      Use custom weight <HelpTip text="Optional. Weight is not a percentage. The system normalizes all scored question weights during calculation." />
-                      <small>Leave off for equal weighting.</small>
-                    </span>
-                                        <input type="checkbox" checked={form.useCustomWeight} onChange={e => patchForm({ useCustomWeight: e.target.checked, weight: e.target.checked ? form.weight : 1 })} />
-                                    </label>
-                                    {form.useCustomWeight && (
-                                        <div className="hfdq-stepper">
-                                            <button type="button" onClick={() => adjustWeight(-0.1)}>-</button>
-                                            <input type="number" min="0.1" step="0.1" value={form.weight} onChange={e => patchForm({ weight: Number(e.target.value) || 1 })} />
-                                            <button type="button" onClick={() => adjustWeight(0.1)}>+</button>
-                                        </div>
-                                    )}
-                                    <small className="hfd-muted">Example: weight 2.0 has twice the scoring impact of weight 1.0.</small>
-                                </div>
-                            )}
+            <QuestionEditorDrawer
+                open={editorOpen}
+                mode={editorMode}
+                form={form}
+                competencies={competencies}
+                issues={displayedIssues}
+                busy={busy}
+                onChange={patchForm}
+                onClose={closeEditor}
+                onSaveDraft={() => saveQuestion('DRAFT')}
+                onPublish={() => saveQuestion('ACTIVE')}
+            />
 
-                            <label className="hfd-checkbox-label hfdq-checkline">
-                                <input type="checkbox" checked={form.required} onChange={e => patchForm({ required: e.target.checked })} /> Required by default
-                            </label>
-
-                            <label className="hfd-field">
-                                <span className="hfd-label">Status <span>*</span></span>
-                                <select className="hfd-input" value={form.status} onChange={e => patchForm({ status: e.target.value })}>
-                                    <option value="ACTIVE">Active</option>
-                                    <option value="INACTIVE">Inactive</option>
-                                </select>
-                            </label>
-                        </div>
-
-                        <div className="hfdq-drawer-actions">
-                            <button className="hfd-btn hfd-btn-secondary" onClick={closeDrawer} disabled={busy}>Cancel</button>
-                            <button className="hfd-btn hfd-btn-primary" onClick={saveQuestion} disabled={busy}>{drawerMode === 'create' ? 'Create Question' : 'Save Changes'}</button>
-                        </div>
-                    </aside>
-                </div>
-            )}
+            <CompetencyManagerModal
+                open={competencyManagerOpen}
+                competencies={competencies}
+                busy={busy}
+                onClose={() => setCompetencyManagerOpen(false)}
+                onCreate={createCompetency}
+                onUpdate={updateCompetency}
+            />
         </div>
     );
 }

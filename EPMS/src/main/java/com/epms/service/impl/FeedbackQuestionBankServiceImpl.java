@@ -9,13 +9,17 @@ import com.epms.dto.FeedbackQuestionRuleResponse;
 import com.epms.dto.FeedbackQuestionRuleUpsertRequest;
 import com.epms.entity.FeedbackQuestionApplicabilityRule;
 import com.epms.entity.FeedbackQuestionBank;
+import com.epms.entity.FeedbackQuestionRuleSet;
 import com.epms.entity.FeedbackQuestionVersion;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.repository.FeedbackCompetencyRepository;
 import com.epms.repository.FeedbackQuestionApplicabilityRuleRepository;
 import com.epms.repository.FeedbackQuestionBankRepository;
+import com.epms.repository.FeedbackQuestionRuleSetRepository;
 import com.epms.repository.FeedbackQuestionVersionRepository;
 import com.epms.service.FeedbackQuestionBankService;
+import com.epms.service.QuestionQualityValidationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,26 +43,25 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
 
     private static final String DEFAULT_RESPONSE_TYPE = "RATING_WITH_COMMENT";
     private static final String RESPONSE_RATING_WITH_COMMENT = "RATING_WITH_COMMENT";
-    private static final String RESPONSE_RATING = "RATING";
-    private static final String RESPONSE_TEXT = "TEXT";
-    private static final String RESPONSE_YES_NO = "YES_NO";
-
     private static final String SCORING_SCORED = "SCORED";
-    private static final String SCORING_NON_SCORED = "NON_SCORED";
-    private static final String SCORING_HR_REVIEW = "HR_REVIEW";
 
-    private static final Set<String> SUPPORTED_STATUSES = Set.of("ACTIVE", "INACTIVE", "DRAFT", "ARCHIVED");
+    private static final Set<String> SUPPORTED_STATUSES = Set.of("ACTIVE", "DRAFT", "RETIRED", "ARCHIVED", "INACTIVE");
     private static final Set<String> SUPPORTED_RULE_RELATIONSHIPS = Set.of("MANAGER", "PEER", "SUBORDINATE", "SELF");
 
     private static final Map<String, String> COMPETENCY_CODE_PREFIXES = Map.ofEntries(
+            Map.entry("COMMUNICATION_SKILLS", "COMM"),
+            Map.entry("TEAMWORK_COLLABORATION", "TEAM"),
+            Map.entry("TECHNICAL_SKILLS", "TECH"),
+            Map.entry("WORK_QUALITY", "WORK"),
+            Map.entry("ACCOUNTABILITY_RESPONSIBILITY", "ACCT"),
+            Map.entry("PROBLEM_SOLVING", "PROB"),
+            Map.entry("LEARNING_IMPROVEMENT", "LEARN"),
+            Map.entry("ATTITUDE_PROFESSIONALISM", "PROF"),
             Map.entry("COMMUNICATION", "COMM"),
             Map.entry("TEAMWORK", "TEAM"),
             Map.entry("LEADERSHIP", "LEAD"),
             Map.entry("TECHNICAL_SKILL", "TECH"),
-            Map.entry("WORK_QUALITY", "WORK"),
             Map.entry("ACCOUNTABILITY", "ACCT"),
-            Map.entry("PROBLEM_SOLVING", "PROB"),
-            Map.entry("LEARNING_IMPROVEMENT", "LEARN"),
             Map.entry("PROFESSIONALISM", "PROF"),
             Map.entry("ATTENDANCE_RELIABILITY", "RELY"),
             Map.entry("RELIABILITY", "RELY"),
@@ -70,6 +74,9 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     private final FeedbackQuestionBankRepository questionBankRepository;
     private final FeedbackQuestionVersionRepository questionVersionRepository;
     private final FeedbackQuestionApplicabilityRuleRepository ruleRepository;
+    private final FeedbackQuestionRuleSetRepository ruleSetRepository;
+    private final FeedbackCompetencyRepository competencyRepository;
+    private final QuestionQualityValidationService qualityValidationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -88,6 +95,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     @Override
     @Transactional
     public FeedbackQuestionBankResponse createQuestion(FeedbackQuestionBankUpsertRequest request, Long actorUserId) {
+        ensureQuestionCanBeSaved(request, null);
         String questionCode = resolveQuestionCodeForCreate(request);
         if (questionBankRepository.existsByQuestionCodeIgnoreCase(questionCode)) {
             throw new BadRequestException("A feedback question with code " + questionCode + " already exists.");
@@ -113,6 +121,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     public FeedbackQuestionBankResponse updateQuestion(Long questionId, FeedbackQuestionBankUpsertRequest request) {
         FeedbackQuestionBank bank = questionBankRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Feedback question not found."));
+        ensureQuestionCanBeSaved(request, questionId);
 
         String newCode = request.getQuestionCode() == null || request.getQuestionCode().isBlank()
                 ? bank.getQuestionCode()
@@ -131,27 +140,42 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 .findTopByQuestionBank_IdAndActiveTrueOrderByVersionNumberDesc(savedBank.getId())
                 .orElse(null);
 
-        if (activeVersion == null) {
+        if (activeVersion == null || shouldCreateNewVersion(activeVersion, request)) {
+            if (activeVersion != null) {
+                activeVersion.setActive(false);
+                questionVersionRepository.save(activeVersion);
+            }
             FeedbackQuestionVersion newVersion = new FeedbackQuestionVersion();
             newVersion.setQuestionBank(savedBank);
             newVersion.setVersionNumber(Math.max(1, questionVersionRepository.findMaxVersionNumber(savedBank.getId()) + 1));
             applyVersionFields(newVersion, request);
             questionVersionRepository.save(newVersion);
-        } else {
-            // Keep question editing simple for HR: ordinary edits update the active version in place.
-            // Historical campaign integrity is still protected by feedback_assignment_questions snapshots.
-            applyVersionFields(activeVersion, request);
-            questionVersionRepository.save(activeVersion);
         }
 
         return toQuestionResponse(savedBank);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
+    public FeedbackQuestionBankResponse updateQuestionStatus(Long questionId, String status) {
+        FeedbackQuestionBank bank = questionBankRepository.findById(questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback question not found."));
+        String normalizedStatus = normalizeStatus(status);
+        if ("ARCHIVED".equals(normalizedStatus) && "ACTIVE".equals(bank.getStatus())) {
+            throw new BadRequestException("Retire the question before archiving it.");
+        }
+        bank.setStatus(normalizedStatus);
+        return toQuestionResponse(questionBankRepository.save(bank));
+    }
+
+    @Override
+    @Transactional
     public List<FeedbackQuestionRuleResponse> getRules() {
+        ruleRepository.repairQuestionBankReferencesFromLegacyVersions();
+        ruleRepository.deactivateRulesWithBrokenQuestionBankReferences();
         return ruleRepository.findAllDetailed().stream()
                 .map(this::toRuleResponse)
+                .filter(response -> response.getQuestionBankId() != null)
                 .toList();
     }
 
@@ -159,25 +183,42 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     @Transactional
     public List<FeedbackQuestionRuleResponse> createRule(FeedbackQuestionRuleUpsertRequest request) {
         List<String> relationshipTypes = resolveRelationshipTypes(request);
-        FeedbackQuestionVersion version = questionVersionRepository.findById(request.getQuestionVersionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Question version not found."));
+        List<Long> questionBankIds = resolveQuestionBankIds(request);
         Integer minRank = request.getTargetLevelMinRank() == null ? 1 : request.getTargetLevelMinRank();
         Integer maxRank = request.getTargetLevelMaxRank() == null ? 9 : request.getTargetLevelMaxRank();
-        String sectionCode = normalizeCode(request.getSectionCode(), "Section code is required.");
+        if (minRank > maxRank) {
+            throw new BadRequestException("Minimum level rank cannot be greater than maximum level rank.");
+        }
+
+        String desiredStatus = normalizeRuleSetStatus(request.getRuleSetStatus(), request.getActive(), true);
+        validateRuleSetGovernance(
+                questionBankIds,
+                relationshipTypes,
+                minRank,
+                maxRank,
+                request.getTargetDepartmentId(),
+                request.getTargetPositionId(),
+                null,
+                desiredStatus
+        );
+        request.setActive("ACTIVE".equals(desiredStatus));
+
+        FeedbackQuestionRuleSet ruleSet = new FeedbackQuestionRuleSet();
+        applyRuleSetFields(ruleSet, request, minRank, maxRank, relationshipTypes, desiredStatus);
+        ruleSet = ruleSetRepository.save(ruleSet);
 
         List<FeedbackQuestionRuleResponse> responses = new ArrayList<>();
-        for (String relationshipType : relationshipTypes) {
-            FeedbackQuestionApplicabilityRule rule = ruleRepository.findFirstInactiveDuplicateRule(
-                    version.getId(),
-                    minRank,
-                    maxRank,
-                    relationshipType,
-                    sectionCode,
-                    request.getTargetPositionId(),
-                    request.getTargetDepartmentId()
-            ).orElseGet(FeedbackQuestionApplicabilityRule::new);
-            applyRuleFields(rule, request, relationshipType, rule.getId());
-            responses.add(toRuleResponse(ruleRepository.save(rule)));
+        int offset = 0;
+        for (Long questionBankId : questionBankIds) {
+            FeedbackQuestionBank bank = questionBankRepository.findById(questionBankId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Question bank item not found."));
+            for (String relationshipType : relationshipTypes) {
+                FeedbackQuestionApplicabilityRule rule = new FeedbackQuestionApplicabilityRule();
+                rule.setRuleSet(ruleSet);
+                applyRuleFields(rule, request, bank, relationshipType, rule.getId(), ruleSet.getId(), offset);
+                responses.add(toRuleResponse(ruleRepository.save(rule)));
+            }
+            offset++;
         }
         return responses;
     }
@@ -191,8 +232,61 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         if (relationshipTypes.size() > 1) {
             throw new BadRequestException("Update one evaluator role at a time. Create new rules for additional roles.");
         }
-        applyRuleFields(rule, request, relationshipTypes.get(0), ruleId);
+        Long questionBankId = firstQuestionBankId(request, rule.getQuestionBank() == null ? null : rule.getQuestionBank().getId());
+        FeedbackQuestionBank bank = questionBankRepository.findById(questionBankId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question bank item not found."));
+        applyRuleFields(rule, request, bank, relationshipTypes.get(0), ruleId, rule.getRuleSet() == null ? null : rule.getRuleSet().getId(), 0);
         return toRuleResponse(ruleRepository.save(rule));
+    }
+
+    @Override
+    @Transactional
+    public List<FeedbackQuestionRuleResponse> updateRuleSet(Long ruleSetId, FeedbackQuestionRuleUpsertRequest request) {
+        FeedbackQuestionRuleSet ruleSet = ruleSetRepository.findById(ruleSetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question rule set not found."));
+
+        List<String> relationshipTypes = resolveRelationshipTypes(request);
+        List<Long> questionBankIds = resolveQuestionBankIds(request);
+        Integer minRank = request.getTargetLevelMinRank() == null ? 1 : request.getTargetLevelMinRank();
+        Integer maxRank = request.getTargetLevelMaxRank() == null ? 9 : request.getTargetLevelMaxRank();
+        if (minRank > maxRank) {
+            throw new BadRequestException("Minimum level rank cannot be greater than maximum level rank.");
+        }
+
+        String desiredStatus = normalizeRuleSetStatus(request.getRuleSetStatus(), request.getActive(), false);
+        validateRuleSetGovernance(
+                questionBankIds,
+                relationshipTypes,
+                minRank,
+                maxRank,
+                request.getTargetDepartmentId(),
+                request.getTargetPositionId(),
+                ruleSetId,
+                desiredStatus
+        );
+        request.setActive("ACTIVE".equals(desiredStatus));
+
+        applyRuleSetFields(ruleSet, request, minRank, maxRank, relationshipTypes, desiredStatus);
+        ruleSet = ruleSetRepository.save(ruleSet);
+
+        List<FeedbackQuestionApplicabilityRule> existingRows = ruleRepository.findDetailedByRuleSetId(ruleSetId);
+        ruleRepository.deleteAll(existingRows);
+        ruleRepository.flush();
+
+        List<FeedbackQuestionRuleResponse> responses = new ArrayList<>();
+        int offset = 0;
+        for (Long questionBankId : questionBankIds) {
+            FeedbackQuestionBank bank = questionBankRepository.findById(questionBankId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Question bank item not found."));
+            for (String relationshipType : relationshipTypes) {
+                FeedbackQuestionApplicabilityRule rule = new FeedbackQuestionApplicabilityRule();
+                rule.setRuleSet(ruleSet);
+                applyRuleFields(rule, request, bank, relationshipType, rule.getId(), ruleSet.getId(), offset);
+                responses.add(toRuleResponse(ruleRepository.save(rule)));
+            }
+            offset++;
+        }
+        return responses;
     }
 
     @Override
@@ -200,6 +294,18 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     public void deactivateRule(Long ruleId) {
         FeedbackQuestionApplicabilityRule rule = ruleRepository.findById(ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question applicability rule not found."));
+        if (rule.getRuleSet() != null && rule.getRuleSet().getId() != null) {
+            FeedbackQuestionRuleSet ruleSet = ruleSetRepository.findById(rule.getRuleSet().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Question rule set not found."));
+            ruleSet.setStatus("DISABLED");
+            ruleSet.setActive(false);
+            ruleSetRepository.save(ruleSet);
+            for (FeedbackQuestionApplicabilityRule item : ruleRepository.findDetailedByRuleSetId(ruleSet.getId())) {
+                item.setActive(false);
+                ruleRepository.save(item);
+            }
+            return;
+        }
         rule.setActive(false);
         ruleRepository.save(rule);
     }
@@ -209,20 +315,51 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     public FeedbackQuestionRuleResponse activateRule(Long ruleId) {
         FeedbackQuestionApplicabilityRule rule = ruleRepository.findById(ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question applicability rule not found."));
-        if (!SUPPORTED_RULE_RELATIONSHIPS.contains(rule.getEvaluatorRelationshipType())) {
-            throw new BadRequestException("Legacy all-role rules cannot be reactivated. Create role-specific rules instead.");
+        if (rule.getRuleSet() != null && rule.getRuleSet().getId() != null) {
+            Long ruleSetId = rule.getRuleSet().getId();
+            FeedbackQuestionRuleSet ruleSet = ruleSetRepository.findById(ruleSetId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Question rule set not found."));
+            List<FeedbackQuestionApplicabilityRule> rows = ruleRepository.findDetailedByRuleSetId(ruleSetId);
+            if (rows.isEmpty()) {
+                throw new BadRequestException("This Rule Set has no generated question rows. Edit it and select at least one question and evaluator role.");
+            }
+            List<Long> questionBankIds = rows.stream()
+                    .map(FeedbackQuestionApplicabilityRule::getQuestionBank)
+                    .filter(Objects::nonNull)
+                    .map(FeedbackQuestionBank::getId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            List<String> relationshipTypes = rows.stream()
+                    .map(FeedbackQuestionApplicabilityRule::getEvaluatorRelationshipType)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            validateRuleSetGovernance(
+                    questionBankIds,
+                    relationshipTypes,
+                    ruleSet.getTargetLevelMinRank(),
+                    ruleSet.getTargetLevelMaxRank(),
+                    ruleSet.getTargetDepartmentId(),
+                    ruleSet.getTargetPositionId(),
+                    ruleSetId,
+                    "ACTIVE"
+            );
+            ruleSet.setStatus("ACTIVE");
+            ruleSet.setActive(true);
+            ruleSetRepository.save(ruleSet);
+            FeedbackQuestionRuleResponse first = null;
+            for (FeedbackQuestionApplicabilityRule item : rows) {
+                item.setActive(true);
+                FeedbackQuestionRuleResponse response = toRuleResponse(ruleRepository.save(item));
+                if (first == null || item.getId().equals(ruleId)) {
+                    first = response;
+                }
+            }
+            return first == null ? toRuleResponse(rule) : first;
         }
-        validateDuplicateRule(
-                rule.getQuestionVersion() == null ? null : rule.getQuestionVersion().getId(),
-                rule.getTargetLevelMinRank(),
-                rule.getTargetLevelMaxRank(),
-                rule.getEvaluatorRelationshipType(),
-                rule.getSectionCode(),
-                rule.getTargetPositionId(),
-                rule.getTargetDepartmentId(),
-                rule.getId(),
-                true
-        );
+
+        validateRuleCanActivate(rule, rule.getId(), null);
         rule.setActive(true);
         return toRuleResponse(ruleRepository.save(rule));
     }
@@ -245,27 +382,22 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 LocalDate.now()
         );
 
-        Map<String, FeedbackAssignmentQuestionDetailResponse> questionsByCode = new LinkedHashMap<>();
-        Map<String, SectionBucket> sectionsByCode = new LinkedHashMap<>();
+        Map<Long, FeedbackAssignmentQuestionDetailResponse> questionsByBankId = new LinkedHashMap<>();
 
         for (FeedbackQuestionApplicabilityRule rule : rules) {
-            FeedbackQuestionVersion version = rule.getQuestionVersion();
-            if (version == null || version.getQuestionBank() == null) {
+            FeedbackQuestionBank bank = rule.getQuestionBank();
+            if (bank == null || bank.getId() == null) {
                 continue;
             }
-            FeedbackQuestionBank bank = version.getQuestionBank();
-            String questionCode = firstNonBlank(bank.getQuestionCode(), "BANK-Q-" + version.getId());
-            if (questionsByCode.containsKey(questionCode)) {
+            FeedbackQuestionVersion version = findActiveVersion(bank);
+            if (version == null) {
                 continue;
             }
-            String sectionCode = firstNonBlank(rule.getSectionCode(), "GENERAL");
-            SectionBucket bucket = sectionsByCode.computeIfAbsent(sectionCode, ignored -> new SectionBucket(
-                    sectionCode,
-                    firstNonBlank(rule.getSectionTitle(), "General Feedback"),
-                    rule.getSectionOrder() == null ? 1 : rule.getSectionOrder()
-            ));
-            String responseType = normalizeResponseType(firstNonBlank(version.getResponseType(), bank.getDefaultResponseType(), DEFAULT_RESPONSE_TYPE));
-            String scoringBehavior = resolveStoredScoringBehavior(version, bank, responseType);
+            if (questionsByBankId.containsKey(bank.getId())) {
+                continue;
+            }
+            String questionCode = firstNonBlank(bank.getQuestionCode(), "BANK-Q-" + bank.getId());
+            String responseType = coerceStoredResponseType(firstNonBlank(version.getResponseType(), bank.getDefaultResponseType(), DEFAULT_RESPONSE_TYPE));
             FeedbackAssignmentQuestionDetailResponse question = FeedbackAssignmentQuestionDetailResponse.builder()
                     .id(version.getId())
                     .assignmentQuestionId(null)
@@ -273,34 +405,34 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                     .questionCode(questionCode)
                     .competencyCode(bank.getCompetencyCode())
                     .responseType(responseType)
-                    .scoringBehavior(scoringBehavior)
+                    .scoringBehavior(SCORING_SCORED)
                     .questionText(firstNonBlank(version.getQuestionText(), bank.getDefaultText()))
-                    .questionOrder(rule.getDisplayOrder() == null ? bucket.questions.size() + 1 : rule.getDisplayOrder())
-                    .ratingScaleId(isRatingResponseType(responseType) ? version.getRatingScaleId() != null ? version.getRatingScaleId() : bank.getDefaultRatingScaleId() : null)
-                    .ratingScaleMin(isRatingResponseType(responseType) ? 1 : null)
-                    .ratingScaleMax(isRatingResponseType(responseType) ? 5 : null)
+                    .questionOrder(rule.getDisplayOrder() == null ? questionsByBankId.size() + 1 : rule.getDisplayOrder())
+                    .ratingScaleId(null)
+                    .ratingScaleMin(1)
+                    .ratingScaleMax(5)
                     .ratingOptions(List.of())
-                    .weight(resolveEffectiveWeight(responseType, scoringBehavior, rule.getWeightOverride(), bank.getDefaultWeight()))
-                    .required(rule.getRequiredOverride() != null ? rule.getRequiredOverride() : Boolean.TRUE.equals(bank.getDefaultRequired()))
+                    .weight(1.0)
+                    .required(true)
                     .existingRatingValue(null)
                     .existingComment(null)
                     .build();
-            questionsByCode.put(questionCode, question);
-            bucket.questions.add(question);
+            questionsByBankId.put(bank.getId(), question);
         }
 
-        List<FeedbackAssignmentSectionDetailResponse> sections = sectionsByCode.values().stream()
-                .sorted(Comparator.comparingInt(bucket -> bucket.orderNo))
-                .map(bucket -> FeedbackAssignmentSectionDetailResponse.builder()
-                        .id(null)
-                        .sectionCode(bucket.sectionCode)
-                        .title(bucket.title)
-                        .orderNo(bucket.orderNo)
-                        .questions(bucket.questions.stream()
-                                .sorted(Comparator.comparing(FeedbackAssignmentQuestionDetailResponse::getQuestionOrder, Comparator.nullsLast(Comparator.naturalOrder())))
-                                .toList())
-                        .build())
+        List<FeedbackAssignmentQuestionDetailResponse> questions = questionsByBankId.values().stream()
+                .sorted(Comparator.comparing(FeedbackAssignmentQuestionDetailResponse::getQuestionOrder, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
+
+        List<FeedbackAssignmentSectionDetailResponse> sections = questions.isEmpty()
+                ? List.of()
+                : List.of(FeedbackAssignmentSectionDetailResponse.builder()
+                          .id(null)
+                          .sectionCode("QUESTIONS")
+                          .title("Questions")
+                          .orderNo(1)
+                          .questions(questions)
+                          .build());
 
         return FeedbackDynamicFormPreviewResponse.builder()
                 .levelCode(firstNonBlank(levelCode, "L" + String.format("%02d", levelRank)))
@@ -308,7 +440,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 .relationshipType(normalizedRelationship)
                 .targetPositionId(targetPositionId)
                 .targetDepartmentId(targetDepartmentId)
-                .totalQuestions(questionsByCode.size())
+                .totalQuestions(questionsByBankId.size())
                 .sections(sections)
                 .build();
     }
@@ -320,9 +452,9 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         bank.setDefaultText(requireText(request.getQuestionText(), "Question text is required."));
         bank.setDefaultResponseType(responseType);
         bank.setDefaultScoringBehavior(scoringBehavior);
-        bank.setDefaultRatingScaleId(isRatingResponseType(responseType) ? request.getRatingScaleId() : null);
-        bank.setDefaultWeight(resolveEffectiveWeight(responseType, scoringBehavior, request.getWeight(), 1.0));
-        bank.setDefaultRequired(!Boolean.FALSE.equals(request.getRequired()));
+        bank.setDefaultRatingScaleId(null);
+        bank.setDefaultWeight(1.0);
+        bank.setDefaultRequired(true);
         bank.setStatus(normalizeStatus(request.getStatus()));
     }
 
@@ -332,46 +464,74 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         version.setQuestionText(requireText(request.getQuestionText(), "Question text is required."));
         version.setResponseType(responseType);
         version.setScoringBehavior(scoringBehavior);
-        version.setRatingScaleId(isRatingResponseType(responseType) ? request.getRatingScaleId() : null);
-        version.setHelpText(request.getHelpText());
+        version.setRatingScaleId(null);
+        version.setHelpText(blankToNull(request.getHelpText()));
         version.setActive(true);
+    }
+
+    private boolean shouldCreateNewVersion(FeedbackQuestionVersion activeVersion, FeedbackQuestionBankUpsertRequest request) {
+        return !Objects.equals(requireText(request.getQuestionText(), "Question text is required."), activeVersion.getQuestionText())
+                || !Objects.equals(blankToNull(request.getHelpText()), blankToNull(activeVersion.getHelpText()))
+                || !Objects.equals(normalizeResponseType(request.getResponseType()), coerceStoredResponseType(activeVersion.getResponseType()));
+    }
+
+    private void ensureQuestionCanBeSaved(FeedbackQuestionBankUpsertRequest request, Long excludeQuestionId) {
+        var validation = qualityValidationService.validateQuestion(request, excludeQuestionId);
+        if (Boolean.FALSE.equals(validation.getCanSave())) {
+            String message = validation.getIssues().stream()
+                    .filter(issue -> "ERROR".equals(issue.getSeverity()))
+                    .map(issue -> issue.getMessage())
+                    .findFirst()
+                    .orElse("Question does not pass quality validation.");
+            throw new BadRequestException(message);
+        }
+        String competencyCode = normalizeCode(request.getCompetencyCode(), "Competency code is required.");
+        competencyRepository.findByCodeIgnoreCase(competencyCode)
+                .orElseThrow(() -> new BadRequestException("Question must use an existing competency."));
     }
 
     private void applyRuleFields(
             FeedbackQuestionApplicabilityRule rule,
             FeedbackQuestionRuleUpsertRequest request,
+            FeedbackQuestionBank bank,
             String relationshipType,
-            Long excludeRuleId
+            Long excludeRuleId,
+            Long excludeRuleSetId,
+            int displayOrderOffset
     ) {
         if (request.getTargetLevelMinRank() != null && request.getTargetLevelMaxRank() != null
                 && request.getTargetLevelMinRank() > request.getTargetLevelMaxRank()) {
             throw new BadRequestException("Minimum level rank cannot be greater than maximum level rank.");
         }
-        FeedbackQuestionVersion version = questionVersionRepository.findById(request.getQuestionVersionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Question version not found."));
+        if (bank == null || bank.getId() == null) {
+            throw new BadRequestException("Question bank item is required.");
+        }
+        if (!"ACTIVE".equals(bank.getStatus())) {
+            throw new BadRequestException("Only active questions can be used in Question Rules.");
+        }
+        FeedbackQuestionVersion activeVersion = findActiveVersion(bank);
+        if (activeVersion == null) {
+            throw new BadRequestException("The selected question has no active version.");
+        }
 
         Integer minRank = request.getTargetLevelMinRank() == null ? 1 : request.getTargetLevelMinRank();
         Integer maxRank = request.getTargetLevelMaxRank() == null ? 9 : request.getTargetLevelMaxRank();
-        String sectionCode = normalizeCode(request.getSectionCode(), "Section code is required.");
         boolean desiredActive = !Boolean.FALSE.equals(request.getActive());
-        validateDuplicateRule(version.getId(), minRank, maxRank, relationshipType, sectionCode,
-                request.getTargetPositionId(), request.getTargetDepartmentId(), excludeRuleId, desiredActive);
+        validateDuplicateRule(bank.getId(), minRank, maxRank, relationshipType,
+                request.getTargetPositionId(), request.getTargetDepartmentId(), excludeRuleId, excludeRuleSetId, desiredActive);
 
-        String responseType = normalizeResponseType(version.getResponseType());
-        String scoringBehavior = resolveStoredScoringBehavior(version, version.getQuestionBank(), responseType);
-
-        rule.setQuestionVersion(version);
+        int baseDisplayOrder = request.getDisplayOrder() == null ? 10 : Math.max(1, request.getDisplayOrder());
+        rule.setQuestionBank(bank);
+        // Compatibility only for old schemas where question_version_id is still NOT NULL.
+        // Rule logic continues to use questionBank; campaign activation snapshots the
+        // exact active version later.
+        rule.setLegacyQuestionVersion(activeVersion);
         rule.setTargetLevelMinRank(minRank);
         rule.setTargetLevelMaxRank(maxRank);
         rule.setTargetPositionId(request.getTargetPositionId());
         rule.setTargetDepartmentId(request.getTargetDepartmentId());
         rule.setEvaluatorRelationshipType(relationshipType);
-        rule.setSectionCode(sectionCode);
-        rule.setSectionTitle(requireText(request.getSectionTitle(), "Section title is required."));
-        rule.setSectionOrder(request.getSectionOrder() == null ? 1 : request.getSectionOrder());
-        rule.setDisplayOrder(request.getDisplayOrder() == null ? 1 : request.getDisplayOrder());
-        rule.setRequiredOverride(request.getRequiredOverride());
-        rule.setWeightOverride(isScored(responseType, scoringBehavior) ? request.getWeightOverride() : null);
+        rule.setDisplayOrder(baseDisplayOrder + (displayOrderOffset * 10));
         rule.setRulePriority(request.getRulePriority() == null ? 100 : request.getRulePriority());
         rule.setActive(desiredActive);
     }
@@ -384,10 +544,8 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         if (activeVersion == null && bank.getId() != null) {
             activeVersion = questionVersionRepository.findTopByQuestionBank_IdAndActiveTrueOrderByVersionNumberDesc(bank.getId()).orElse(null);
         }
-        String responseType = normalizeResponseType(activeVersion == null ? bank.getDefaultResponseType() : activeVersion.getResponseType());
-        String scoringBehavior = activeVersion == null
-                ? normalizeScoringBehavior(bank.getDefaultScoringBehavior(), responseType)
-                : resolveStoredScoringBehavior(activeVersion, bank, responseType);
+        String responseType = coerceStoredResponseType(activeVersion == null ? bank.getDefaultResponseType() : activeVersion.getResponseType());
+        String scoringBehavior = SCORING_SCORED;
         return FeedbackQuestionBankResponse.builder()
                 .id(bank.getId())
                 .questionCode(bank.getQuestionCode())
@@ -396,8 +554,8 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 .responseType(responseType)
                 .scoringBehavior(scoringBehavior)
                 .ratingScaleId(isRatingResponseType(responseType) ? activeVersion == null ? bank.getDefaultRatingScaleId() : activeVersion.getRatingScaleId() : null)
-                .weight(resolveEffectiveWeight(responseType, scoringBehavior, bank.getDefaultWeight(), 1.0))
-                .required(Boolean.TRUE.equals(bank.getDefaultRequired()))
+                .weight(1.0)
+                .required(true)
                 .helpText(activeVersion == null ? null : activeVersion.getHelpText())
                 .status(bank.getStatus())
                 .activeVersionId(activeVersion == null ? null : activeVersion.getId())
@@ -408,34 +566,45 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     }
 
     private FeedbackQuestionRuleResponse toRuleResponse(FeedbackQuestionApplicabilityRule rule) {
-        FeedbackQuestionVersion version = rule.getQuestionVersion();
-        FeedbackQuestionBank bank = version == null ? null : version.getQuestionBank();
-        String responseType = normalizeResponseType(version == null ? null : version.getResponseType());
-        String scoringBehavior = version == null ? inferDefaultScoringBehavior(responseType) : resolveStoredScoringBehavior(version, bank, responseType);
+        FeedbackQuestionBank bank = rule.getQuestionBank();
+        if (bank == null && rule.getLegacyQuestionVersion() != null) {
+            bank = rule.getLegacyQuestionVersion().getQuestionBank();
+        }
+        FeedbackQuestionVersion version = bank == null ? null : findActiveVersion(bank);
+        if (version == null && rule.getLegacyQuestionVersion() != null
+                && bank != null
+                && rule.getLegacyQuestionVersion().getQuestionBank() != null
+                && bank.getId().equals(rule.getLegacyQuestionVersion().getQuestionBank().getId())) {
+            version = rule.getLegacyQuestionVersion();
+        }
+        String responseType = coerceStoredResponseType(version == null ? null : version.getResponseType());
+        FeedbackQuestionRuleSet ruleSet = rule.getRuleSet();
+        String ruleSetStatus = normalizeStoredRuleSetStatus(ruleSet == null ? null : ruleSet.getStatus(), ruleSet == null ? null : ruleSet.getActive());
+        boolean rowActive = Boolean.TRUE.equals(rule.getActive()) && (ruleSet == null || "ACTIVE".equals(ruleSetStatus));
         return FeedbackQuestionRuleResponse.builder()
                 .id(rule.getId())
+                .ruleSetId(ruleSet == null ? null : ruleSet.getId())
+                .ruleSetName(ruleSet == null ? null : ruleSet.getName())
+                .ruleSetDescription(ruleSet == null ? null : ruleSet.getDescription())
+                .ruleSetStatus(ruleSetStatus)
+                .ruleSetType(resolveRuleSetType(rule.getTargetDepartmentId(), rule.getTargetPositionId()))
                 .questionBankId(bank == null ? null : bank.getId())
-                .questionVersionId(version == null ? null : version.getId())
+                .activeVersionId(version == null ? null : version.getId())
                 .questionCode(bank == null ? null : bank.getQuestionCode())
                 .competencyCode(bank == null ? null : bank.getCompetencyCode())
-                .questionText(version == null ? null : version.getQuestionText())
+                .questionText(version == null ? bank == null ? null : bank.getDefaultText() : version.getQuestionText())
                 .responseType(responseType)
-                .scoringBehavior(scoringBehavior)
+                .scoringBehavior(SCORING_SCORED)
                 .questionStatus(bank == null ? null : bank.getStatus())
-                .effectiveActive(Boolean.TRUE.equals(rule.getActive()) && bank != null && "ACTIVE".equals(bank.getStatus()))
+                .effectiveActive(rowActive && bank != null && "ACTIVE".equals(bank.getStatus()) && version != null)
                 .targetLevelMinRank(rule.getTargetLevelMinRank())
                 .targetLevelMaxRank(rule.getTargetLevelMaxRank())
                 .targetPositionId(rule.getTargetPositionId())
                 .targetDepartmentId(rule.getTargetDepartmentId())
                 .evaluatorRelationshipType(rule.getEvaluatorRelationshipType())
-                .sectionCode(rule.getSectionCode())
-                .sectionTitle(rule.getSectionTitle())
-                .sectionOrder(rule.getSectionOrder())
                 .displayOrder(rule.getDisplayOrder())
-                .required(rule.getRequiredOverride() != null ? rule.getRequiredOverride() : bank != null && Boolean.TRUE.equals(bank.getDefaultRequired()))
-                .weight(resolveEffectiveWeight(responseType, scoringBehavior, rule.getWeightOverride(), bank == null ? 1.0 : bank.getDefaultWeight()))
                 .rulePriority(rule.getRulePriority())
-                .active(Boolean.TRUE.equals(rule.getActive()))
+                .active(rowActive)
                 .updatedAt(rule.getUpdatedAt())
                 .build();
     }
@@ -480,33 +649,350 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 .orElse(0) + 1;
     }
 
+
+    private void applyRuleSetFields(
+            FeedbackQuestionRuleSet ruleSet,
+            FeedbackQuestionRuleUpsertRequest request,
+            Integer minRank,
+            Integer maxRank,
+            List<String> relationshipTypes,
+            String status
+    ) {
+        ruleSet.setName(resolveRuleSetName(request, minRank, maxRank, relationshipTypes));
+        ruleSet.setDescription(resolveRuleSetDescription(request));
+        ruleSet.setStatus(status);
+        ruleSet.setActive("ACTIVE".equals(status));
+        ruleSet.setTargetLevelMinRank(minRank);
+        ruleSet.setTargetLevelMaxRank(maxRank);
+        ruleSet.setTargetDepartmentId(request.getTargetDepartmentId());
+        ruleSet.setTargetPositionId(request.getTargetPositionId());
+    }
+
+    private String normalizeRuleSetStatus(String status, Boolean active, boolean creatingNew) {
+        String value = blankToNull(status);
+        if (value == null) {
+            if (active == null || Boolean.TRUE.equals(active)) {
+                return "ACTIVE";
+            }
+            return creatingNew ? "DRAFT" : "DISABLED";
+        }
+        value = value.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if ("INACTIVE".equals(value)) {
+            return creatingNew ? "DRAFT" : "DISABLED";
+        }
+        if (!Set.of("DRAFT", "ACTIVE", "DISABLED", "ARCHIVED").contains(value)) {
+            throw new BadRequestException("Unsupported Rule Set status: " + status);
+        }
+        return value;
+    }
+
+    private String normalizeStoredRuleSetStatus(String status, Boolean active) {
+        String value = blankToNull(status);
+        if (value == null) {
+            return Boolean.TRUE.equals(active) ? "ACTIVE" : "DISABLED";
+        }
+        value = value.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if ("INACTIVE".equals(value)) {
+            return "DISABLED";
+        }
+        if (!Set.of("DRAFT", "ACTIVE", "DISABLED", "ARCHIVED").contains(value)) {
+            return Boolean.TRUE.equals(active) ? "ACTIVE" : "DISABLED";
+        }
+        return value;
+    }
+
+    private String resolveRuleSetType(Long targetDepartmentId, Long targetPositionId) {
+        if (targetDepartmentId == null && targetPositionId == null) {
+            return "BASE";
+        }
+        if (targetDepartmentId != null && targetPositionId == null) {
+            return "DEPARTMENT_ADD_ON";
+        }
+        if (targetDepartmentId == null) {
+            return "POSITION_ADD_ON";
+        }
+        return "DEPARTMENT_POSITION_ADD_ON";
+    }
+
+    private void validateRuleSetGovernance(
+            List<Long> questionBankIds,
+            List<String> relationshipTypes,
+            Integer minRank,
+            Integer maxRank,
+            Long targetDepartmentId,
+            Long targetPositionId,
+            Long excludeRuleSetId,
+            String desiredStatus
+    ) {
+        validateExactDuplicateRuleSet(questionBankIds, relationshipTypes, minRank, maxRank, targetDepartmentId, targetPositionId, excludeRuleSetId);
+        if (!"ACTIVE".equals(desiredStatus)) {
+            return;
+        }
+        validateSameScopeActiveOverlap(relationshipTypes, minRank, maxRank, targetDepartmentId, targetPositionId, excludeRuleSetId);
+        validateInheritedQuestionDuplicates(questionBankIds, relationshipTypes, minRank, maxRank, targetDepartmentId, targetPositionId, excludeRuleSetId);
+    }
+
+    private void validateSameScopeActiveOverlap(
+            List<String> relationshipTypes,
+            Integer minRank,
+            Integer maxRank,
+            Long targetDepartmentId,
+            Long targetPositionId,
+            Long excludeRuleSetId
+    ) {
+        Set<String> requestedRoles = new LinkedHashSet<>(relationshipTypes);
+        for (Map.Entry<Long, List<FeedbackQuestionApplicabilityRule>> entry : groupedRuleRowsBySet().entrySet()) {
+            FeedbackQuestionRuleSet existingSet = entry.getValue().isEmpty() ? null : entry.getValue().get(0).getRuleSet();
+            if (existingSet == null || existingSet.getId() == null) {
+                continue;
+            }
+            if (excludeRuleSetId != null && excludeRuleSetId.equals(existingSet.getId())) {
+                continue;
+            }
+            if (!"ACTIVE".equals(normalizeStoredRuleSetStatus(existingSet.getStatus(), existingSet.getActive()))) {
+                continue;
+            }
+            boolean sameExactScope = Objects.equals(existingSet.getTargetDepartmentId(), targetDepartmentId)
+                    && Objects.equals(existingSet.getTargetPositionId(), targetPositionId);
+            if (!sameExactScope || !rangesOverlap(existingSet.getTargetLevelMinRank(), existingSet.getTargetLevelMaxRank(), minRank, maxRank)) {
+                continue;
+            }
+            Set<String> existingRoles = entry.getValue().stream()
+                    .map(FeedbackQuestionApplicabilityRule::getEvaluatorRelationshipType)
+                    .filter(Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+            boolean rolesOverlap = existingRoles.stream().anyMatch(requestedRoles::contains);
+            if (rolesOverlap) {
+                throw new BadRequestException("Active Rule Set overlap blocked. \"" + existingSet.getName() + "\" already covers the same level range, same department/position scope, and one or more selected evaluator roles. Edit that Rule Set instead of creating another one for the same scope.");
+            }
+        }
+    }
+
+    private void validateInheritedQuestionDuplicates(
+            List<Long> questionBankIds,
+            List<String> relationshipTypes,
+            Integer minRank,
+            Integer maxRank,
+            Long targetDepartmentId,
+            Long targetPositionId,
+            Long excludeRuleSetId
+    ) {
+        if (targetDepartmentId == null && targetPositionId == null) {
+            return;
+        }
+        Set<Long> requestedQuestions = new LinkedHashSet<>(questionBankIds);
+        Set<String> requestedRoles = new LinkedHashSet<>(relationshipTypes);
+        for (FeedbackQuestionApplicabilityRule rule : ruleRepository.findAllDetailed()) {
+            FeedbackQuestionRuleSet existingSet = rule.getRuleSet();
+            if (existingSet == null || existingSet.getId() == null) {
+                continue;
+            }
+            if (excludeRuleSetId != null && excludeRuleSetId.equals(existingSet.getId())) {
+                continue;
+            }
+            if (!"ACTIVE".equals(normalizeStoredRuleSetStatus(existingSet.getStatus(), existingSet.getActive()))) {
+                continue;
+            }
+            if (!Boolean.TRUE.equals(rule.getActive())) {
+                continue;
+            }
+            FeedbackQuestionBank existingBank = rule.getQuestionBank();
+            if (existingBank == null || existingBank.getId() == null || !requestedQuestions.contains(existingBank.getId())) {
+                continue;
+            }
+            if (!requestedRoles.contains(rule.getEvaluatorRelationshipType())) {
+                continue;
+            }
+            if (!rangesOverlap(rule.getTargetLevelMinRank(), rule.getTargetLevelMaxRank(), minRank, maxRank)) {
+                continue;
+            }
+            if (isBroaderScope(rule.getTargetDepartmentId(), rule.getTargetPositionId(), targetDepartmentId, targetPositionId)) {
+                String questionLabel = firstNonBlank(existingBank.getQuestionCode(), "Question #" + existingBank.getId());
+                throw new BadRequestException("Redundant add-on question blocked. " + questionLabel + " is already inherited from broader active Rule Set \"" + existingSet.getName() + "\" for the selected level and evaluator role. Specific Rule Sets should only add extra questions that are not already covered by broader rules.");
+            }
+        }
+    }
+
+    private Map<Long, List<FeedbackQuestionApplicabilityRule>> groupedRuleRowsBySet() {
+        Map<Long, List<FeedbackQuestionApplicabilityRule>> groupedRows = new LinkedHashMap<>();
+        for (FeedbackQuestionApplicabilityRule rule : ruleRepository.findAllDetailed()) {
+            if (rule.getRuleSet() == null || rule.getRuleSet().getId() == null) {
+                continue;
+            }
+            groupedRows.computeIfAbsent(rule.getRuleSet().getId(), ignored -> new ArrayList<>()).add(rule);
+        }
+        return groupedRows;
+    }
+
+    private boolean isBroaderScope(Long existingDepartmentId, Long existingPositionId, Long targetDepartmentId, Long targetPositionId) {
+        boolean departmentMatches = existingDepartmentId == null || Objects.equals(existingDepartmentId, targetDepartmentId);
+        boolean positionMatches = existingPositionId == null || Objects.equals(existingPositionId, targetPositionId);
+        boolean atLeastOneBroader = (existingDepartmentId == null && targetDepartmentId != null)
+                || (existingPositionId == null && targetPositionId != null);
+        return departmentMatches && positionMatches && atLeastOneBroader;
+    }
+
+    private boolean rangesOverlap(Integer aMin, Integer aMax, Integer bMin, Integer bMax) {
+        int leftMin = aMin == null ? 1 : aMin;
+        int leftMax = aMax == null ? 9 : aMax;
+        int rightMin = bMin == null ? 1 : bMin;
+        int rightMax = bMax == null ? 9 : bMax;
+        return leftMin <= rightMax && rightMin <= leftMax;
+    }
+
+    private void validateRuleCanActivate(
+            FeedbackQuestionApplicabilityRule rule,
+            Long excludeRuleId,
+            Long excludeRuleSetId
+    ) {
+        if (!SUPPORTED_RULE_RELATIONSHIPS.contains(rule.getEvaluatorRelationshipType())) {
+            throw new BadRequestException("Legacy all-role rules cannot be reactivated. Create role-specific rules instead.");
+        }
+        validateDuplicateRule(
+                rule.getQuestionBank() == null ? null : rule.getQuestionBank().getId(),
+                rule.getTargetLevelMinRank(),
+                rule.getTargetLevelMaxRank(),
+                rule.getEvaluatorRelationshipType(),
+                rule.getTargetPositionId(),
+                rule.getTargetDepartmentId(),
+                excludeRuleId,
+                excludeRuleSetId,
+                true
+        );
+    }
+
     private void validateDuplicateRule(
-            Long questionVersionId,
+            Long questionBankId,
             Integer minRank,
             Integer maxRank,
             String relationshipType,
-            String sectionCode,
             Long targetPositionId,
             Long targetDepartmentId,
             Long excludeRuleId,
+            Long excludeRuleSetId,
             boolean desiredActive
     ) {
         if (!desiredActive) {
             return;
         }
-        long duplicates = ruleRepository.countDuplicateRules(
-                questionVersionId,
+        long duplicates = ruleRepository.countDuplicateRulesOutsideRuleSet(
+                questionBankId,
                 minRank,
                 maxRank,
                 relationshipType,
-                sectionCode,
                 targetPositionId,
                 targetDepartmentId,
-                excludeRuleId
+                excludeRuleId,
+                excludeRuleSetId
         );
         if (duplicates > 0) {
-            throw new BadRequestException("Another active rule already exists for this question, level range, evaluator role, section, and targeting scope. Deactivate the existing active rule first.");
+            throw new BadRequestException("Another active rule set already covers the same question, level range, evaluator role, and targeting scope. Disable the overlapping rule set first.");
         }
+    }
+
+    private String resolveRuleSetDescription(FeedbackQuestionRuleUpsertRequest request) {
+        String description = blankToNull(request.getRuleSetDescription());
+        if (description != null && description.length() > 500) {
+            throw new BadRequestException("Rule Set purpose/notes must be 500 characters or fewer.");
+        }
+        return description;
+    }
+
+    private String resolveRuleSetName(FeedbackQuestionRuleUpsertRequest request, Integer minRank, Integer maxRank, List<String> relationshipTypes) {
+        String providedName = blankToNull(request.getRuleSetName());
+        if (providedName != null) {
+            if (providedName.length() > 180) {
+                throw new BadRequestException("Rule Set name must be 180 characters or fewer.");
+            }
+            return providedName;
+        }
+        int min = minRank == null ? 1 : minRank;
+        int max = maxRank == null ? 9 : maxRank;
+        String roleLabel = relationshipTypes != null && relationshipTypes.size() == 4 ? "All roles" : (relationshipTypes == null || relationshipTypes.isEmpty() ? "Roles" : String.join(" + ", relationshipTypes));
+        return "L" + String.format("%02d", min) + "–L" + String.format("%02d", max) + " · " + roleLabel;
+    }
+
+    private void validateExactDuplicateRuleSet(
+            List<Long> questionBankIds,
+            List<String> relationshipTypes,
+            Integer minRank,
+            Integer maxRank,
+            Long targetDepartmentId,
+            Long targetPositionId,
+            Long excludeRuleSetId
+    ) {
+        Set<Long> requestedQuestions = Set.copyOf(questionBankIds);
+        Set<String> requestedRoles = Set.copyOf(relationshipTypes);
+        Map<Long, List<FeedbackQuestionApplicabilityRule>> groupedRows = new LinkedHashMap<>();
+        for (FeedbackQuestionApplicabilityRule rule : ruleRepository.findAllDetailed()) {
+            if (rule.getRuleSet() == null || rule.getRuleSet().getId() == null) {
+                continue;
+            }
+            Long existingRuleSetId = rule.getRuleSet().getId();
+            if (excludeRuleSetId != null && excludeRuleSetId.equals(existingRuleSetId)) {
+                continue;
+            }
+            groupedRows.computeIfAbsent(existingRuleSetId, ignored -> new ArrayList<>()).add(rule);
+        }
+
+        for (List<FeedbackQuestionApplicabilityRule> rows : groupedRows.values()) {
+            if (rows.isEmpty()) {
+                continue;
+            }
+            FeedbackQuestionApplicabilityRule first = rows.get(0);
+            FeedbackQuestionRuleSet existingSet = first.getRuleSet();
+            if (existingSet != null && "ARCHIVED".equals(normalizeStoredRuleSetStatus(existingSet.getStatus(), existingSet.getActive()))) {
+                continue;
+            }
+            boolean sameScope = Objects.equals(first.getTargetLevelMinRank(), minRank)
+                    && Objects.equals(first.getTargetLevelMaxRank(), maxRank)
+                    && Objects.equals(first.getTargetDepartmentId(), targetDepartmentId)
+                    && Objects.equals(first.getTargetPositionId(), targetPositionId);
+            if (!sameScope) {
+                continue;
+            }
+            Set<Long> existingQuestions = rows.stream()
+                    .map(FeedbackQuestionApplicabilityRule::getQuestionBank)
+                    .filter(Objects::nonNull)
+                    .map(FeedbackQuestionBank::getId)
+                    .filter(Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            Set<String> existingRoles = rows.stream()
+                    .map(FeedbackQuestionApplicabilityRule::getEvaluatorRelationshipType)
+                    .filter(Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (existingQuestions.equals(requestedQuestions) && existingRoles.equals(requestedRoles)) {
+                String existingName = first.getRuleSet() == null ? "an existing Rule Set" : first.getRuleSet().getName();
+                throw new BadRequestException("This Rule Set is identical to \"" + existingName + "\". Change the level, scope, evaluator roles, or selected questions before saving.");
+            }
+        }
+    }
+
+    private List<Long> resolveQuestionBankIds(FeedbackQuestionRuleUpsertRequest request) {
+        List<Long> ids = request.getQuestionBankIds() != null && !request.getQuestionBankIds().isEmpty()
+                ? request.getQuestionBankIds()
+                : List.of(firstQuestionBankId(request, null));
+        List<Long> normalized = ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalized.isEmpty()) {
+            throw new BadRequestException("Select at least one question.");
+        }
+        return normalized;
+    }
+
+    private Long firstQuestionBankId(FeedbackQuestionRuleUpsertRequest request, Long fallback) {
+        if (request.getQuestionBankId() != null) {
+            return request.getQuestionBankId();
+        }
+        if (request.getQuestionBankIds() != null && !request.getQuestionBankIds().isEmpty()) {
+            return request.getQuestionBankIds().stream().filter(Objects::nonNull).findFirst().orElse(fallback);
+        }
+        if (fallback != null) {
+            return fallback;
+        }
+        throw new BadRequestException("Select at least one question.");
     }
 
     private List<String> resolveRelationshipTypes(FeedbackQuestionRuleUpsertRequest request) {
@@ -515,7 +1001,13 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 : List.of(firstNonBlank(request.getEvaluatorRelationshipType(), ""));
         List<String> normalized = rawValues.stream()
                 .filter(value -> value != null && !value.isBlank())
-                .map(this::normalizeRelationship)
+                .flatMap(value -> {
+                    String normalizedValue = value.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+                    if ("ALL".equals(normalizedValue) || "ANY".equals(normalizedValue) || "ALL_ROLES".equals(normalizedValue)) {
+                        return List.of("MANAGER", "PEER", "SUBORDINATE", "SELF").stream();
+                    }
+                    return List.of(normalizeRelationship(value)).stream();
+                })
                 .distinct()
                 .toList();
         if (normalized.isEmpty()) {
@@ -524,46 +1016,62 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         return normalized;
     }
 
+
+    private FeedbackQuestionVersion findActiveVersion(FeedbackQuestionBank bank) {
+        if (bank == null || bank.getId() == null) {
+            return null;
+        }
+        if (bank.getVersions() != null) {
+            FeedbackQuestionVersion version = bank.getVersions().stream()
+                    .filter(item -> Boolean.TRUE.equals(item.getActive()))
+                    .max(Comparator.comparing(FeedbackQuestionVersion::getVersionNumber, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .orElse(null);
+            if (version != null) {
+                return version;
+            }
+        }
+        return questionVersionRepository.findTopByQuestionBank_IdAndActiveTrueOrderByVersionNumberDesc(bank.getId()).orElse(null);
+    }
+
     private String normalizeResponseType(String responseType) {
         String value = firstNonBlank(responseType, DEFAULT_RESPONSE_TYPE)
                 .trim()
                 .toUpperCase(Locale.ROOT)
                 .replace('-', '_')
                 .replace(' ', '_');
-        if (value.equals("RATING_ONLY")) {
-            value = RESPONSE_RATING;
+        if (!RESPONSE_RATING_WITH_COMMENT.equals(value)) {
+            throw new BadRequestException("Question Bank only supports Rating 1–5 + Required Comment.");
         }
-        if (value.equals("WRITTEN_ANSWER") || value.equals("WRITTEN_ANSWER_ONLY")) {
-            value = RESPONSE_TEXT;
-        }
-        if (value.equals("YESNO") || value.equals("YES_OR_NO")) {
-            value = RESPONSE_YES_NO;
-        }
-        if (List.of(RESPONSE_RATING_WITH_COMMENT, RESPONSE_RATING, RESPONSE_TEXT, RESPONSE_YES_NO).contains(value)) {
-            return value;
-        }
-        throw new BadRequestException("Unsupported response type: " + responseType);
+        return RESPONSE_RATING_WITH_COMMENT;
     }
 
     private String normalizeScoringBehavior(String scoringBehavior, String responseType) {
-        String value = firstNonBlank(scoringBehavior, inferDefaultScoringBehavior(responseType))
+        normalizeResponseType(responseType);
+        String value = firstNonBlank(scoringBehavior, SCORING_SCORED)
                 .trim()
                 .toUpperCase(Locale.ROOT)
                 .replace('-', '_')
                 .replace(' ', '_');
-        if (value.equals("NOT_SCORED")) {
-            value = SCORING_NON_SCORED;
+        if (!SCORING_SCORED.equals(value)) {
+            throw new BadRequestException("Question Bank scoring behavior is fixed to SCORED.");
         }
-        if (value.equals("HRREVIEW") || value.equals("ELIGIBILITY") || value.equals("ELIGIBILITY_CHECK")) {
-            value = SCORING_HR_REVIEW;
+        return SCORING_SCORED;
+    }
+
+    /**
+     * Existing databases may contain legacy TEXT, YES_NO, or RATING questions from the old form-based flow.
+     * Listing the Question Bank must never fail because of those historical rows. New create/update requests
+     * still go through normalizeResponseType(), which enforces Rating 1-5 + Required Comment.
+     */
+    private String coerceStoredResponseType(String responseType) {
+        if (responseType == null || responseType.isBlank()) {
+            return RESPONSE_RATING_WITH_COMMENT;
         }
-        if (!List.of(SCORING_SCORED, SCORING_NON_SCORED, SCORING_HR_REVIEW).contains(value)) {
-            throw new BadRequestException("Unsupported scoring behavior: " + scoringBehavior);
+        String value = responseType.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if (RESPONSE_RATING_WITH_COMMENT.equals(value)) {
+            return RESPONSE_RATING_WITH_COMMENT;
         }
-        if (!isRatingResponseType(responseType) && SCORING_SCORED.equals(value)) {
-            throw new BadRequestException("Only rating-based response types can be included in the 360 score.");
-        }
-        return value;
+        return RESPONSE_RATING_WITH_COMMENT;
     }
 
     private String resolveStoredScoringBehavior(FeedbackQuestionVersion version, FeedbackQuestionBank bank, String responseType) {
@@ -576,19 +1084,12 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     }
 
     private String inferDefaultScoringBehavior(String responseType) {
-        String normalizedResponseType = normalizeResponseType(responseType);
-        if (isRatingResponseType(normalizedResponseType)) {
-            return SCORING_SCORED;
-        }
-        if (RESPONSE_YES_NO.equals(normalizedResponseType)) {
-            return SCORING_HR_REVIEW;
-        }
-        return SCORING_NON_SCORED;
+        normalizeResponseType(responseType);
+        return SCORING_SCORED;
     }
 
     private boolean isRatingResponseType(String responseType) {
-        String normalizedResponseType = normalizeResponseType(responseType);
-        return RESPONSE_RATING_WITH_COMMENT.equals(normalizedResponseType) || RESPONSE_RATING.equals(normalizedResponseType);
+        return RESPONSE_RATING_WITH_COMMENT.equals(normalizeResponseType(responseType));
     }
 
     private boolean isScored(String responseType, String scoringBehavior) {
@@ -596,10 +1097,8 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     }
 
     private Double resolveEffectiveWeight(String responseType, String scoringBehavior, Double primary, Double fallback) {
-        if (!isScored(responseType, scoringBehavior)) {
-            return 1.0;
-        }
-        return resolveWeight(primary, fallback);
+        normalizeScoringBehavior(scoringBehavior, responseType);
+        return 1.0;
     }
 
     private int parseLevelRank(String levelCode) {
@@ -629,12 +1128,12 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     }
 
     private String normalizeStatus(String status) {
-        String value = firstNonBlank(status, "ACTIVE").trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        String value = firstNonBlank(status, "DRAFT").trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if ("INACTIVE".equals(value)) {
+            return "RETIRED";
+        }
         if (!SUPPORTED_STATUSES.contains(value)) {
             throw new BadRequestException("Unsupported question status: " + status);
-        }
-        if ("DRAFT".equals(value) || "ARCHIVED".equals(value)) {
-            return "INACTIVE";
         }
         return value;
     }
@@ -654,14 +1153,8 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         return value.trim();
     }
 
-    private Double resolveWeight(Double primary, Double fallback) {
-        if (primary != null && primary > 0) {
-            return primary;
-        }
-        if (fallback != null && fallback > 0) {
-            return fallback;
-        }
-        return 1.0;
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private String firstNonBlank(String... values) {
@@ -673,16 +1166,4 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         return null;
     }
 
-    private static class SectionBucket {
-        private final String sectionCode;
-        private final String title;
-        private final int orderNo;
-        private final List<FeedbackAssignmentQuestionDetailResponse> questions = new ArrayList<>();
-
-        private SectionBucket(String sectionCode, String title, int orderNo) {
-            this.sectionCode = sectionCode;
-            this.title = title;
-            this.orderNo = orderNo;
-        }
-    }
 }

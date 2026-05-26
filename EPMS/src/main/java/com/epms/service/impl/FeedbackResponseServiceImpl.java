@@ -3,11 +3,10 @@ package com.epms.service.impl;
 import com.epms.dto.FeedbackReceivedItemResponse;
 import com.epms.dto.FeedbackSubmissionStatusResponse;
 import com.epms.entity.FeedbackAssignmentQuestion;
+import com.epms.entity.FeedbackCampaignCompetencyWeight;
 import com.epms.entity.FeedbackEvaluatorAssignment;
-import com.epms.entity.FeedbackQuestion;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackResponseItem;
-import com.epms.entity.FeedbackSection;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
@@ -17,9 +16,8 @@ import com.epms.entity.enums.ResponseStatus;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.exception.UnauthorizedActionException;
+import com.epms.repository.FeedbackCampaignCompetencyWeightRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
-import com.epms.repository.FeedbackFormRepository;
-import com.epms.repository.FeedbackQuestionRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
@@ -36,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,7 +46,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -59,22 +57,23 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private static final String RESPONSE_TEXT = "TEXT";
     private static final String RESPONSE_YES_NO = "YES_NO";
     private static final String SCORING_SCORED = "SCORED";
+    private static final int MIN_REQUIRED_COMMENT_LENGTH = 10;
+    private static final int MAX_REQUIRED_COMMENT_LENGTH = 1000;
 
     private final FeedbackResponseRepository responseRepository;
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
-    private final FeedbackFormRepository feedbackFormRepository;
-    private final FeedbackQuestionRepository questionRepository;
     private final RatingScaleRepository ratingScaleRepository;
     private final UserRepository userRepository;
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackSummaryService feedbackSummaryService;
     private final FeedbackQuestionResolverService questionResolverService;
+    private final FeedbackCampaignCompetencyWeightRepository competencyWeightRepository;
 
     @Override
     @Transactional
-    public FeedbackResponse saveDraft(Long evaluatorAssignmentId, Long submittingUserId, String comments, List<FeedbackResponseItem> items) {
+    public FeedbackResponse saveDraft(Long evaluatorAssignmentId, Long submittingUserId, String comments, String assessmentDateText, String effectiveDateText, List<FeedbackResponseItem> items) {
         FeedbackEvaluatorAssignment assignment = assignmentRepository.findById(evaluatorAssignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluator Assignment not found."));
 
@@ -110,6 +109,8 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         response.setEvaluatorAssignment(assignment);
         response.setOverallScore(overallScore);
         response.setComments(comments);
+        response.setAssessmentDateText(normalizeResponseHeaderText(assessmentDateText));
+        response.setEffectiveDateText(normalizeResponseHeaderText(effectiveDateText));
         response.setFinalStatus(ResponseStatus.DRAFT);
         response.setSubmittedAt(null);
 
@@ -135,7 +136,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
     @Override
     @Transactional
-    public FeedbackResponse submitResponse(Long evaluatorAssignmentId, Long submittingUserId, String comments, List<FeedbackResponseItem> items) {
+    public FeedbackResponse submitResponse(Long evaluatorAssignmentId, Long submittingUserId, String comments, String assessmentDateText, String effectiveDateText, List<FeedbackResponseItem> items) {
         log.info("Submitting Feedback Response for Assignment ID: {}", evaluatorAssignmentId);
 
         FeedbackEvaluatorAssignment assignment = assignmentRepository.findById(evaluatorAssignmentId)
@@ -175,6 +176,8 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         response.setSubmittedAt(LocalDateTime.now());
         response.setOverallScore(overallScore);
         response.setComments(comments);
+        response.setAssessmentDateText(normalizeResponseHeaderText(assessmentDateText));
+        response.setEffectiveDateText(normalizeResponseHeaderText(effectiveDateText));
         response.setFinalStatus(ResponseStatus.SUBMITTED);
 
         syncResponseItems(response, items, assignmentQuestions);
@@ -506,6 +509,20 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
                         "Rating for question " + assignmentQuestion.getQuestionCode() + " must be between 1 and " + formatScore(maxRating) + "."
                 );
             }
+            int commentLength = normalizedCommentLength(item.getComment());
+            if (requireAnswersForRequiredQuestions && Boolean.TRUE.equals(assignmentQuestion.getRequired())
+                    && commentLength < MIN_REQUIRED_COMMENT_LENGTH) {
+                throw new BusinessValidationException(
+                        "A supporting comment of at least " + MIN_REQUIRED_COMMENT_LENGTH + " characters is required for question "
+                                + assignmentQuestion.getQuestionCode() + "."
+                );
+            }
+            if (commentLength > MAX_REQUIRED_COMMENT_LENGTH) {
+                throw new BusinessValidationException(
+                        "Comment for question " + assignmentQuestion.getQuestionCode() + " must be "
+                                + MAX_REQUIRED_COMMENT_LENGTH + " characters or fewer."
+                );
+            }
         }
     }
 
@@ -514,7 +531,10 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             return false;
         }
         if (isRatingResponseType(question.getResponseType())) {
-            return item.getRatingValue() != null;
+            int commentLength = normalizedCommentLength(item.getComment());
+            return item.getRatingValue() != null
+                    && commentLength >= MIN_REQUIRED_COMMENT_LENGTH
+                    && commentLength <= MAX_REQUIRED_COMMENT_LENGTH;
         }
         return !isBlank(item.getComment());
     }
@@ -619,8 +639,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     }
 
     private Double calculateOverallScore(List<FeedbackResponseItem> items, Map<Long, FeedbackAssignmentQuestion> assignmentQuestions) {
-        double weightedPoints = 0.0;
-        double weightedPossiblePoints = 0.0;
+        Map<String, List<Double>> scoresByCompetency = new java.util.LinkedHashMap<>();
 
         for (FeedbackResponseItem item : items) {
             if (item.getRatingValue() == null || item.getAssignmentQuestion() == null) {
@@ -633,24 +652,79 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
                 throw new ResourceNotFoundException("Feedback assignment question not found: " + assignmentQuestionId);
             }
 
+            item.setAssignmentQuestion(question);
+            item.setQuestion(question.getSourceQuestion());
             if (!isScoredQuestion(question)) {
-                item.setAssignmentQuestion(question);
-                item.setQuestion(question.getSourceQuestion());
                 continue;
             }
 
-            double weight = question.getWeight() != null && question.getWeight() > 0 ? question.getWeight() : 1.0;
             double maxRating = resolveMaxRating(question);
-            weightedPoints += item.getRatingValue() * weight;
-            weightedPossiblePoints += maxRating * weight;
-            item.setAssignmentQuestion(question);
-            item.setQuestion(question.getSourceQuestion());
+            double questionScore = (item.getRatingValue() / maxRating) * 100.0;
+            String competencyCode = normalizeCompetencyCode(question.getCompetencyCode());
+            scoresByCompetency.computeIfAbsent(competencyCode, ignored -> new ArrayList<>()).add(questionScore);
         }
 
-        if (weightedPossiblePoints == 0) {
+        if (scoresByCompetency.isEmpty()) {
             return 0.0;
         }
-        return roundToTwoDecimals((weightedPoints / weightedPossiblePoints) * 100.0);
+
+        Map<String, Double> campaignWeights = loadCampaignCompetencyWeights(assignmentQuestions);
+        if (!campaignWeights.isEmpty()) {
+            double weightedScoreSum = 0.0;
+            double availableWeightSum = 0.0;
+            for (Map.Entry<String, List<Double>> entry : scoresByCompetency.entrySet()) {
+                double weight = campaignWeights.getOrDefault(normalizeCompetencyCode(entry.getKey()), 0.0);
+                if (weight <= 0) {
+                    continue;
+                }
+                double competencyScore = entry.getValue().stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+                weightedScoreSum += competencyScore * weight;
+                availableWeightSum += weight;
+            }
+            if (availableWeightSum > 0) {
+                return roundToTwoDecimals(weightedScoreSum / availableWeightSum);
+            }
+        }
+
+        double competencyScoreSum = 0.0;
+        int applicableCompetencyCount = 0;
+        for (Map.Entry<String, List<Double>> entry : scoresByCompetency.entrySet()) {
+            double competencyScore = entry.getValue().stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            competencyScoreSum += competencyScore;
+            applicableCompetencyCount++;
+        }
+
+        if (applicableCompetencyCount == 0) {
+            return 0.0;
+        }
+        return roundToTwoDecimals(competencyScoreSum / applicableCompetencyCount);
+    }
+
+    private Map<String, Double> loadCampaignCompetencyWeights(Map<Long, FeedbackAssignmentQuestion> assignmentQuestions) {
+        Long campaignId = assignmentQuestions.values().stream()
+                .filter(Objects::nonNull)
+                .map(FeedbackAssignmentQuestion::getAssignment)
+                .filter(Objects::nonNull)
+                .map(assignment -> assignment.getFeedbackRequest() == null ? null : assignment.getFeedbackRequest().getCampaign())
+                .filter(Objects::nonNull)
+                .map(campaign -> campaign.getId())
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        if (campaignId == null) {
+            return Map.of();
+        }
+        return competencyWeightRepository.findByCampaignIdOrderByCompetencyNameSnapshotAsc(campaignId).stream()
+                .filter(weight -> weight.getCompetencyCodeSnapshot() != null)
+                .collect(Collectors.toMap(
+                        weight -> normalizeCompetencyCode(weight.getCompetencyCodeSnapshot()),
+                        weight -> toDouble(weight.getWeightPercent()),
+                        (first, duplicate) -> duplicate
+                ));
+    }
+
+    private double toDouble(BigDecimal value) {
+        return value == null ? 0.0 : value.doubleValue();
     }
 
     private boolean isScoredQuestion(FeedbackAssignmentQuestion question) {
@@ -687,6 +761,28 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             return SCORING_SCORED;
         }
         return scoringBehavior.trim().toUpperCase().replace('-', '_').replace(' ', '_');
+    }
+
+    private String normalizeCompetencyCode(String competencyCode) {
+        if (competencyCode == null || competencyCode.isBlank()) {
+            return "UNMAPPED";
+        }
+        return competencyCode.trim().toUpperCase().replace('-', '_').replace(' ', '_');
+    }
+
+    private String normalizeResponseHeaderText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() > 120 ? trimmed.substring(0, 120) : trimmed;
+    }
+
+    private int normalizedCommentLength(String value) {
+        return value == null ? 0 : value.trim().length();
     }
 
     private boolean isBlank(String value) {

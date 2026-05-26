@@ -1,3 +1,4 @@
+
 // PipCreatePage.tsx file:
 
 /*
@@ -313,7 +314,7 @@ export default function PipCreatePage() {
               value={phaseCount}
               onChange={(event) => setPhaseCount(Number(event.target.value))}
             >
-              {[1, 2, 3, 4, 5, 6].map((count) => (
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => (
                 <option key={count} value={count}>
                   {count}
                 </option>

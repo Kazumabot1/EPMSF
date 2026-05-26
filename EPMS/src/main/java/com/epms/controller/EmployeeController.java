@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Comparator;
@@ -28,6 +29,11 @@ public class EmployeeController {
     private final EmployeeRepository employeeRepository;
 
     @GetMapping
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
     public ResponseEntity<GenericApiResponse<List<EmployeeResponseDto>>> getAllEmployees(
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
@@ -36,12 +42,22 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> getEmployeeById(@PathVariable Integer id) {
         EmployeeResponseDto dto = employeeService.getEmployeeById(id);
         return ResponseEntity.ok(GenericApiResponse.success("Employee fetched", dto));
     }
 
     @GetMapping("/{id}/department-transfer-preview")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
     public ResponseEntity<GenericApiResponse<EmployeeDepartmentTransferPreviewDto>> previewDepartmentTransfer(
             @PathVariable Integer id,
             @RequestParam(required = false) Integer currentDepartmentId,
@@ -67,6 +83,7 @@ public class EmployeeController {
      * because older data is only linked through users.department_id.
      */
     @GetMapping("/active-by-department/{departmentId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<GenericApiResponse<List<EmployeeDropdownDto>>> getActiveByDepartment(
             @PathVariable Integer departmentId
     ) {
@@ -96,6 +113,11 @@ public class EmployeeController {
     }
 
     @PostMapping
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> createEmployee(
             @Valid @RequestBody EmployeeRequestDto request
     ) {
@@ -105,6 +127,11 @@ public class EmployeeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> updateEmployee(
             @PathVariable Integer id,
             @Valid @RequestBody EmployeeRequestDto request
@@ -114,6 +141,11 @@ public class EmployeeController {
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> deactivateEmployee(@PathVariable Integer id) {
         EmployeeResponseDto dto = employeeService.deactivateEmployee(id);
         return ResponseEntity.ok(GenericApiResponse.success("Employee deactivated", dto));

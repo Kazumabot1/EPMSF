@@ -1,13 +1,12 @@
 package com.epms.entity;
 
 import com.epms.entity.enums.EmployeeKpiStatus;
+import com.epms.entity.enums.KpiGraceReason;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.OptionalDouble;
 import java.util.Set;
 
@@ -38,6 +37,27 @@ public class EmployeeKpiForm {
     @JoinColumn(name = "kpi_template_cycle_id")
     @EqualsAndHashCode.Exclude
     private KpiTemplateCycle kpiTemplateCycle;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cycle_period_id")
+    @EqualsAndHashCode.Exclude
+    private KpiTemplateCyclePeriod cyclePeriod;
+
+    @Column(name = "position_id_at_assignment")
+    private Integer positionIdAtAssignment;
+
+    @Column(name = "position_title_at_assignment")
+    private String positionTitleAtAssignment;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "grace_reason", length = 40)
+    private KpiGraceReason graceReason;
+
+    @Column(name = "grace_ends_at")
+    private LocalDateTime graceEndsAt;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
 
     @Column(name = "assigned_at", nullable = false)
     private LocalDateTime assignedAt;
@@ -76,6 +96,11 @@ public class EmployeeKpiForm {
     @OneToMany(mappedBy = "employeeKpiForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude
     private Set<EmployeeKpiScore> scores = new LinkedHashSet<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "employeeKpiForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @EqualsAndHashCode.Exclude
+    private Set<EmployeeKpiFormEvaluator> evaluators = new LinkedHashSet<>();
 
     @PrePersist
     public void prePersist() {
@@ -147,5 +172,13 @@ public class EmployeeKpiForm {
         }
         scores.remove(score);
         score.setEmployeeKpiForm(null);
+    }
+
+    public void addEvaluator(EmployeeKpiFormEvaluator evaluator) {
+        if (evaluators == null) {
+            evaluators = new LinkedHashSet<>();
+        }
+        evaluators.add(evaluator);
+        evaluator.setEmployeeKpiForm(this);
     }
 }

@@ -49,6 +49,8 @@ public class FeedbackResponseController {
                 request.getEvaluatorAssignmentId(),
                 submittingEmployeeId,
                 request.getComments(),
+                request.getAssessmentDateText(),
+                request.getEffectiveDateText(),
                 items
         );
 
@@ -73,6 +75,8 @@ public class FeedbackResponseController {
                 request.getEvaluatorAssignmentId(),
                 submittingEmployeeId,
                 request.getComments(),
+                request.getAssessmentDateText(),
+                request.getEffectiveDateText(),
                 items
         );
 

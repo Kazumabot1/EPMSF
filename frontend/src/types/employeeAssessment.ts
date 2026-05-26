@@ -6,7 +6,8 @@ export type AssessmentStatus =
   | 'PENDING_HR'
   | 'APPROVED'
   | 'DECLINED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'CLOSED_REJECTED';
 
 export type AssessmentResponseType =
   | 'RATING'

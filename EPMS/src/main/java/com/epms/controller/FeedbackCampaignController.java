@@ -2,32 +2,45 @@ package com.epms.controller;
 
 import com.epms.dto.EvaluatorConfigDTO;
 import com.epms.dto.FeedbackAssignmentGenerationResponse;
+import com.epms.dto.FeedbackCampaignActivationReadinessResponse;
 import com.epms.dto.FeedbackCampaignCreateRequest;
+import com.epms.dto.FeedbackCampaignMonitoringResponse;
 import com.epms.dto.FeedbackCampaignEarlyCloseRequest;
 import com.epms.dto.FeedbackCampaignEarlyCloseReviewRequest;
 import com.epms.dto.FeedbackCampaignResponse;
 import com.epms.dto.FeedbackCampaignTargetsRequest;
+import com.epms.dto.FeedbackCampaignTargetsResponse;
+import com.epms.dto.FeedbackCampaignQuestionReviewResponse;
+import com.epms.dto.FeedbackCampaignQuestionReviewSaveRequest;
+import com.epms.dto.FeedbackTargetCandidateResponse;
 import com.epms.dto.FeedbackManualAssignmentRequest;
 import com.epms.dto.FeedbackReminderResponse;
+import com.epms.dto.FeedbackCampaignScoringConfigRequest;
+import com.epms.dto.FeedbackCampaignScoringConfigResponse;
 import com.epms.dto.GenericApiResponse;
 import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackRequest;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.security.SecurityUtils;
 import com.epms.service.FeedbackCampaignService;
+import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackEvaluationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -37,6 +50,7 @@ import java.util.Locale;
 public class FeedbackCampaignController {
 
     private final FeedbackCampaignService feedbackCampaignService;
+    private final FeedbackCampaignQuestionReviewService questionReviewService;
     private final FeedbackEvaluationService feedbackEvaluationService;
 
     @PostMapping
@@ -66,12 +80,53 @@ public class FeedbackCampaignController {
         return ResponseEntity.ok(GenericApiResponse.success("Pending early close requests retrieved successfully", response));
     }
 
+    @GetMapping("/target-candidates")
+    public ResponseEntity<GenericApiResponse<List<FeedbackTargetCandidateResponse>>> getTargetCandidates(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer currentDepartmentId,
+            @RequestParam(required = false) Integer parentDepartmentId,
+            @RequestParam(required = false) Integer teamId,
+            @RequestParam(required = false) String readiness,
+            @RequestParam(required = false) String levelCode,
+            @RequestParam(required = false) Long campaignId
+    ) {
+        ensureHrOrAdmin();
+        Long excludedOwnerUserId = campaignId == null
+                ? SecurityUtils.currentUserId().longValue()
+                : feedbackCampaignService.getCampaignById(campaignId).getCreatedByUserId();
+        List<FeedbackTargetCandidateResponse> response = feedbackCampaignService.searchTargetCandidates(
+                search, currentDepartmentId, parentDepartmentId, teamId, readiness, levelCode, excludedOwnerUserId
+        );
+        return ResponseEntity.ok(GenericApiResponse.success("Target candidates retrieved successfully", response));
+    }
+
     @GetMapping("/{campaignId}")
     public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> getCampaign(@PathVariable Long campaignId) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Feedback campaign retrieved successfully",
                 mapCampaign(feedbackCampaignService.getCampaignById(campaignId))
+        ));
+    }
+
+    @GetMapping("/{campaignId}/targets")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignTargetsResponse>> getCampaignTargets(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Feedback campaign targets retrieved successfully",
+                feedbackCampaignService.getCampaignTargets(campaignId)
+        ));
+    }
+
+    @PutMapping("/{campaignId}/targets")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignTargetsResponse>> updateCampaignTargets(
+            @PathVariable Long campaignId,
+            @Valid @RequestBody FeedbackCampaignTargetsRequest request
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Feedback campaign targets saved successfully",
+                feedbackCampaignService.updateTargets(campaignId, request.getEmployeeIds(), SecurityUtils.currentUserId().longValue())
         ));
     }
 
@@ -89,6 +144,27 @@ public class FeedbackCampaignController {
         ));
     }
 
+    @GetMapping("/{campaignId}/scoring-config")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignScoringConfigResponse>> getScoringConfig(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign scoring configuration retrieved successfully",
+                feedbackCampaignService.getScoringConfig(campaignId)
+        ));
+    }
+
+    @PutMapping("/{campaignId}/scoring-config")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignScoringConfigResponse>> updateScoringConfig(
+            @PathVariable Long campaignId,
+            @Valid @RequestBody FeedbackCampaignScoringConfigRequest request
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign scoring configuration saved successfully",
+                feedbackCampaignService.updateScoringConfig(campaignId, request, SecurityUtils.currentUserId().longValue())
+        ));
+    }
+
     @PostMapping("/{campaignId}/assignments/generate")
     public ResponseEntity<GenericApiResponse<FeedbackAssignmentGenerationResponse>> generateAssignments(
             @PathVariable Long campaignId,
@@ -100,6 +176,16 @@ public class FeedbackCampaignController {
     }
 
 
+
+    @PostMapping("/{campaignId}/assignments/preview")
+    public ResponseEntity<GenericApiResponse<FeedbackAssignmentGenerationResponse>> previewAssignments(
+            @PathVariable Long campaignId,
+            @Valid @RequestBody EvaluatorConfigDTO request
+    ) {
+        ensureHrOrAdmin();
+        FeedbackAssignmentGenerationResponse response = feedbackEvaluationService.previewAssignments(campaignId, request);
+        return ResponseEntity.ok(GenericApiResponse.success("Evaluator rule preview calculated successfully", response));
+    }
 
     @GetMapping("/{campaignId}/assignments/preview")
     public ResponseEntity<GenericApiResponse<FeedbackAssignmentGenerationResponse>> getAssignmentPreview(
@@ -130,6 +216,56 @@ public class FeedbackCampaignController {
         return ResponseEntity.ok(GenericApiResponse.success("Evaluator assignment removed successfully", response));
     }
 
+
+
+
+    @GetMapping("/{campaignId}/activation-readiness")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignActivationReadinessResponse>> getActivationReadiness(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign activation readiness retrieved successfully",
+                feedbackCampaignService.getActivationReadiness(campaignId)
+        ));
+    }
+
+    @GetMapping("/{campaignId}/monitoring")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignMonitoringResponse>> getCampaignMonitoring(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign monitoring retrieved successfully",
+                feedbackCampaignService.getCampaignMonitoring(campaignId)
+        ));
+    }
+
+    @GetMapping("/{campaignId}/question-review")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignQuestionReviewResponse>> getQuestionReview(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign question review retrieved successfully",
+                questionReviewService.getQuestionReview(campaignId)
+        ));
+    }
+
+    @PostMapping("/{campaignId}/question-review/resolve")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignQuestionReviewResponse>> resolveQuestionReview(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign questions resolved from active rules",
+                questionReviewService.resolveQuestionReview(campaignId)
+        ));
+    }
+
+    @PutMapping("/{campaignId}/question-review")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignQuestionReviewResponse>> saveQuestionReview(
+            @PathVariable Long campaignId,
+            @Valid @RequestBody FeedbackCampaignQuestionReviewSaveRequest request
+    ) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign question selection saved successfully",
+                questionReviewService.saveQuestionReview(campaignId, request, SecurityUtils.currentUserId().longValue())
+        ));
+    }
 
     @PostMapping("/{campaignId}/activate")
     public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> activateCampaign(@PathVariable Long campaignId) {
@@ -202,13 +338,50 @@ public class FeedbackCampaignController {
         ));
     }
 
-    @PostMapping("/{campaignId}/cancel")
-    public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> cancelCampaign(@PathVariable Long campaignId) {
+    @PutMapping("/{campaignId}")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> updateDraftCampaign(
+            @PathVariable Long campaignId,
+            @Valid @RequestBody FeedbackCampaignCreateRequest request
+    ) {
         ensureHrOrAdmin();
-        FeedbackCampaign campaign = feedbackCampaignService.cancelCampaign(campaignId, SecurityUtils.currentUserId().longValue());
+        FeedbackCampaign campaign = feedbackCampaignService.updateDraftCampaign(
+                campaignId,
+                request,
+                SecurityUtils.currentUserId().longValue()
+        );
         return ResponseEntity.ok(GenericApiResponse.success(
-                "Feedback campaign cancelled successfully",
+                "Feedback campaign draft updated successfully",
                 mapCampaign(campaign)
+        ));
+    }
+
+    @PostMapping("/{campaignId}/ready")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> markReadyToActivate(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        FeedbackCampaign campaign = feedbackCampaignService.markReadyToActivate(campaignId, SecurityUtils.currentUserId().longValue());
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Feedback campaign setup validated and marked ready to activate",
+                mapCampaign(campaign)
+        ));
+    }
+
+    @PostMapping("/{campaignId}/publish")
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> publishCampaign(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        FeedbackCampaign campaign = feedbackCampaignService.publishCampaign(campaignId, SecurityUtils.currentUserId().longValue());
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Feedback campaign published successfully",
+                mapCampaign(campaign)
+        ));
+    }
+
+    @DeleteMapping("/{campaignId}")
+    public ResponseEntity<GenericApiResponse<Void>> deleteDraftCampaign(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        feedbackCampaignService.deleteDraftCampaign(campaignId, SecurityUtils.currentUserId().longValue());
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Draft feedback campaign deleted successfully",
+                null
         ));
     }
 
@@ -231,8 +404,8 @@ public class FeedbackCampaignController {
         return FeedbackCampaignResponse.builder()
                 .id(campaign.getId())
                 .name(campaign.getName())
+                .campaignType(campaign.getCampaignType())
                 .reviewYear(campaign.getReviewYear())
-                .reviewRound(campaign.getReviewRound())
                 .startDate(campaign.getStartDate())
                 .endDate(campaign.getEndDate())
                 .startAt(campaign.getStartAt())
@@ -242,6 +415,11 @@ public class FeedbackCampaignController {
                 .status(campaign.getStatus().name())
                 .formId(campaign.getFormId())
                 .autoSubmitCompletedDraftsOnClose(Boolean.TRUE.equals(campaign.getAutoSubmitCompletedDraftsOnClose()))
+                .managerFeedbackAnonymous(Boolean.TRUE.equals(campaign.getManagerFeedbackAnonymous()))
+                .peerFeedbackAnonymous(Boolean.TRUE.equals(campaign.getPeerFeedbackAnonymous()))
+                .subordinateFeedbackAnonymous(Boolean.TRUE.equals(campaign.getSubordinateFeedbackAnonymous()))
+                .selfFeedbackAnonymous(Boolean.TRUE.equals(campaign.getSelfFeedbackAnonymous()))
+                .redistributeMissingRelationshipWeight(!Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight()))
                 .earlyCloseRequestStatus(campaign.getEarlyCloseRequestStatus() == null ? "NONE" : campaign.getEarlyCloseRequestStatus().name())
                 .earlyCloseRequestedAt(campaign.getEarlyCloseRequestedAt())
                 .earlyCloseRequestedByUserId(campaign.getEarlyCloseRequestedByUserId())
@@ -262,32 +440,79 @@ public class FeedbackCampaignController {
     }
 
     private void ensureHrOrAdmin() {
-        List<String> roles = SecurityUtils.currentUser().getRoles();
-        boolean authorized = roles != null && roles.stream()
-                .filter(role -> role != null && !role.isBlank())
-                .map(this::normalizeRole)
-                .anyMatch(role ->
-                        role.equals("HR")
-                                || role.equals("ADMIN")
-                                || role.equals("HR_ADMIN")
-                                || role.equals("HUMAN_RESOURCES")
-                                || role.equals("HUMAN_RESOURCE")
-                                || role.equals("HR_MANAGER")
-                );
+        boolean authorized = currentNormalizedRoleNames().stream().anyMatch(this::isHrOrAdminRole);
         if (!authorized) {
             throw new UnauthorizedActionException("Only HR/Admin can manage feedback campaigns.");
         }
     }
 
     private void ensureAdmin() {
-        List<String> roles = SecurityUtils.currentUser().getRoles();
-        boolean authorized = roles != null && roles.stream()
-                .filter(role -> role != null && !role.isBlank())
-                .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN") || role.equals("SUPER_ADMIN"));
+        boolean authorized = currentNormalizedRoleNames().stream().anyMatch(this::isAdminRole);
         if (!authorized) {
             throw new UnauthorizedActionException("Only Admin can review feedback early-close requests.");
         }
+    }
+
+    private List<String> currentNormalizedRoleNames() {
+        var principal = SecurityUtils.currentUser();
+        List<String> roles = new ArrayList<>();
+
+        if (principal.getRoles() != null) {
+            principal.getRoles().stream()
+                    .filter(role -> role != null && !role.isBlank())
+                    .map(this::normalizeRole)
+                    .forEach(roles::add);
+        }
+
+        if (principal.getPermissions() != null) {
+            principal.getPermissions().stream()
+                    .filter(permission -> permission != null && !permission.isBlank())
+                    .map(this::normalizeRole)
+                    .forEach(roles::add);
+        }
+
+        if (principal.getDashboard() != null && !principal.getDashboard().isBlank()) {
+            roles.add(normalizeRole(principal.getDashboard()));
+        }
+
+        if (principal.getPosition() != null && !principal.getPosition().isBlank()) {
+            roles.add(normalizeRole(principal.getPosition()));
+        }
+
+        if (principal.getAuthorities() != null) {
+            principal.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .filter(role -> role != null && !role.isBlank())
+                    .map(this::normalizeRole)
+                    .forEach(roles::add);
+        }
+
+        return roles.stream().distinct().toList();
+    }
+
+    private boolean isHrOrAdminRole(String role) {
+        return isAdminRole(role)
+                || role.equals("HR")
+                || role.equals("HR_ADMIN")
+                || role.equals("HUMAN_RESOURCES")
+                || role.equals("HUMAN_RESOURCE")
+                || role.equals("HUMAN_RESOURCES_MANAGER")
+                || role.equals("HUMAN_RESOURCE_MANAGER")
+                || role.equals("HR_MANAGER")
+                || role.equals("HR_DASHBOARD")
+                || role.equals("ADMIN_DASHBOARD")
+                || role.equals("PEOPLE")
+                || role.equals("PEOPLE_OPS")
+                || role.equals("TALENT")
+                || role.equals("CHRO")
+                || role.contains("_HR_")
+                || role.startsWith("HR_")
+                || role.endsWith("_HR")
+                || role.contains("HUMAN_RESOURCE");
+    }
+
+    private boolean isAdminRole(String role) {
+        return role.equals("ADMIN") || role.equals("SUPER_ADMIN") || role.equals("SYSTEM_ADMIN") || role.equals("ADMIN_DASHBOARD");
     }
 
     private String normalizeRole(String role) {

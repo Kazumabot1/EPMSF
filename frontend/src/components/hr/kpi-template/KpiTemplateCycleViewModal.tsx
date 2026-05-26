@@ -72,13 +72,23 @@ const KpiTemplateCycleViewModal = ({ open, cycleId, onClose }: Props) => {
 
             <dl className="grid gap-4 sm:grid-cols-2">
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</dt>
-                <dd className="mt-1 text-sm font-semibold text-gray-900">{formatDate(cycle.startDate)}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current period start</dt>
+                <dd className="mt-1 text-sm font-semibold text-gray-900">
+                  {formatDate(cycle.currentPeriodStartDate ?? cycle.startDate)}
+                </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">End date</dt>
-                <dd className="mt-1 text-sm font-semibold text-gray-900">{formatDate(cycle.endDate)}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current period end</dt>
+                <dd className="mt-1 text-sm font-semibold text-gray-900">
+                  {formatDate(cycle.currentPeriodEndDate ?? cycle.endDate)}
+                </dd>
               </div>
+              {cycle.graceEndsAt && (
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Grace ends</dt>
+                  <dd className="mt-1 text-sm font-semibold text-amber-700">{formatDate(cycle.graceEndsAt)}</dd>
+                </div>
+              )}
             </dl>
 
             <div>

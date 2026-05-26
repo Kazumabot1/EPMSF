@@ -285,7 +285,6 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
                             .flatMap(request -> assignmentRepository.findByFeedbackRequestId(request.getId()).stream())
                             .filter(assignment -> assignment.getStatus() != AssignmentStatus.SUBMITTED)
                             .filter(assignment -> assignment.getStatus() != AssignmentStatus.CANCELLED)
-                            .filter(assignment -> assignment.getFeedbackRequest().getCampaign().getStatus() != FeedbackCampaignStatus.CANCELLED)
                             .count();
 
                     return TeamFeedbackSummaryResponse.builder()
@@ -348,7 +347,7 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
 
     private String visibilityReason(FeedbackRequest request) {
         return isTargetResultPublished(request)
-                ? "Campaign closed and HR published the summary"
+                ? "Campaign result has been published by HR"
                 : "Results are not published yet";
     }
 
@@ -362,9 +361,6 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
         if (campaignStatus == FeedbackCampaignStatus.CLOSED) {
             return "This campaign is closed. Feedback can no longer be edited or submitted.";
         }
-        if (campaignStatus == FeedbackCampaignStatus.CANCELLED) {
-            return "This campaign was cancelled.";
-        }
         if (dueAt != null && LocalDateTime.now().isAfter(dueAt)) {
             return "Feedback deadline has passed.";
         }
@@ -372,7 +368,7 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
     }
 
     private boolean isTargetResultPublished(FeedbackRequest request) {
-        return request.getCampaign().getStatus() == FeedbackCampaignStatus.CLOSED
+        return request.getCampaign().getStatus() == FeedbackCampaignStatus.PUBLISHED
                 && feedbackSummaryRepository.existsByCampaign_IdAndTargetEmployeeIdAndVisibilityStatus(
                 request.getCampaign().getId(),
                 request.getTargetEmployeeId(),

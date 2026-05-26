@@ -1,4 +1,3 @@
-
 package com.epms.security;
 
 import com.epms.entity.Permission;
@@ -79,6 +78,18 @@ public class CustomUserDetailsService implements UserDetailsService {
                 : permissionRepository.findAllById(permissionIds);
 
         Set<String> roleNames = new LinkedHashSet<>();
+        String positionRoleName = null;
+
+        if (user.getPosition() != null
+                && user.getPosition().getRole() != null
+                && user.getPosition().getRole().getName() != null
+                && (user.getPosition().getRole().getActive() == null
+                || Boolean.TRUE.equals(user.getPosition().getRole().getActive()))) {
+            positionRoleName = normalizeRoleName(user.getPosition().getRole().getName());
+            if (!positionRoleName.isBlank()) {
+                roleNames.add(positionRoleName);
+            }
+        }
 
         roles.forEach(role -> {
             String normalized = normalizeRoleName(role.getName());
@@ -88,14 +99,23 @@ public class CustomUserDetailsService implements UserDetailsService {
             }
         });
 
-        String positionTitle = user.getPosition() != null
-                ? user.getPosition().getPositionTitle()
-                : null;
+        List<String> dashboardRoles = positionRoleName != null && !positionRoleName.isBlank()
+                ? List.of(positionRoleName)
+                : roleNames.stream().toList();
 
-        String dashboard = dashboardResolver.resolveDashboard(
-                roleNames.stream().toList(),
-                positionTitle
-        );
+        /*
+         * Position Role is the source of truth.
+         * Do not let old users.dashboard override a newly selected Position Role.
+         */
+        String dashboard = dashboardResolver.resolveDashboard(dashboardRoles);
+
+        if (positionRoleName == null || positionRoleName.isBlank()) {
+            String selectedDashboard = dashboardResolver.normalizeDashboard(user.getDashboard());
+
+            if (selectedDashboard != null) {
+                dashboard = selectedDashboard;
+            }
+        }
 
         if (roleNames.isEmpty()) {
             roleNames.add(roleFromDashboard(dashboard));
@@ -141,16 +161,28 @@ public class CustomUserDetailsService implements UserDetailsService {
         String normalized = role
                 .replaceFirst("(?i)^ROLE_", "")
                 .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
                 .replaceAll("[^A-Za-z0-9]+", "_")
                 .replaceAll("^_+|_+$", "")
                 .toUpperCase();
 
-        if (normalized.equals("DEPARTMENTHEAD")) {
+        if (normalized.equals("DEPARTMENTHEAD")
+                || normalized.equals("DEPT_HEAD")
+                || normalized.equals("HEAD_OF_DEPARTMENT")) {
             return "DEPARTMENT_HEAD";
+        }
+
+        if (normalized.equals("PROJECT_MANAGER")
+                || normalized.equals("PROJECTMANAGER")
+                || normalized.equals("TEAM_MANAGER")
+                || normalized.equals("PM")) {
+            return "MANAGER";
+        }
+
+        if (normalized.equals("CEO")) {
+            return "CEO";
         }
 
         return normalized;
     }
 }
-
-

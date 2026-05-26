@@ -21,7 +21,6 @@ public class FeedbackResultItemResponse {
     Long peerResponses;
     Long subordinateResponses;
     Long selfResponses;
-    Long projectStakeholderResponses;
     Long assignedEvaluatorCount;
     Long submittedEvaluatorCount;
     Long pendingEvaluatorCount;
@@ -32,7 +31,6 @@ public class FeedbackResultItemResponse {
     Double peerAverageScore;
     Double subordinateAverageScore;
     Double selfAverageScore;
-    Double projectStakeholderAverageScore;
     String scoreCalculationMethod;
     String scoreCalculationNote;
     String visibilityStatus;

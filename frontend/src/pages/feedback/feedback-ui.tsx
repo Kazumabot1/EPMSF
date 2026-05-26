@@ -89,7 +89,7 @@ export const getStatusTone = (status?: string) => {
     case 'PENDING':
       return 'warning';
     case 'CLOSED':
-    case 'CANCELLED':
+    case 'PUBLISHED':
       return 'neutral';
     default:
       return 'info';

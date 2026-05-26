@@ -86,8 +86,6 @@ public class HrEmployeeAccountService {
         String email = cleanEmail(request.getEmail());
         String employeeCode = clean(request.getEmployeeCode());
         String fullName = clean(request.getFullName());
-        String normalizedRole = normalizeRoleName(request.getRoleName());
-
         if (email == null) {
             throw new BadRequestException("Email is required");
         }
@@ -102,6 +100,7 @@ public class HrEmployeeAccountService {
 
         Department department = findDepartment(request);
         Position position = findPosition(request);
+        String normalizedRole = resolveRoleName(request.getRoleName(), position);
 
         Employee employee = findOrCreateEmployeeForAccount(request, email, fullName, employeeCode, position);
         employee.setActive(true);
@@ -167,7 +166,6 @@ public class HrEmployeeAccountService {
         String email = cleanEmail(emailRaw);
         String fullName = clean(fullNameRaw);
         String employeeCode = clean(employeeCodeRaw);
-        String normalizedRole = normalizeRoleName(roleNameRaw);
         boolean active = activeRaw == null || activeRaw;
 
         if (email == null) {
@@ -195,6 +193,7 @@ public class HrEmployeeAccountService {
             position = positionRepository.findById(positionId)
                     .orElseThrow(() -> new BadRequestException("Position not found"));
         }
+        String normalizedRole = resolveRoleName(roleNameRaw, position);
 
         Employee employee = findOrCreateEmployeeForUser(user, email, fullName, employeeCode, position);
         employee.setActive(active);
@@ -600,6 +599,14 @@ public class HrEmployeeAccountService {
                     role.setDescription(description == null ? "Auto-created during user provisioning" : description);
                     return roleRepository.save(role);
                 });
+    }
+
+    private String resolveRoleName(String requestedRoleName, Position position) {
+        if (position != null && position.getRole() != null && position.getRole().getName() != null) {
+            return normalizeRoleName(position.getRole().getName());
+        }
+
+        return normalizeRoleName(requestedRoleName);
     }
 
     private String normalizeRoleName(String roleName) {

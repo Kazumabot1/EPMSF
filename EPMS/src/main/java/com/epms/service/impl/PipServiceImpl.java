@@ -1,3 +1,4 @@
+
 package com.epms.service.impl;
 
 import com.epms.dto.PipCreateRequestDto;
@@ -31,6 +32,7 @@ import com.epms.repository.UserRoleRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.service.NotificationService;
 import com.epms.service.PipService;
+import com.epms.service.PositionPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +62,7 @@ import java.util.Set;
 public class PipServiceImpl implements PipService {
 
     private static final int WORD_LIMIT = 1000;
+    private static final int MAX_PHASE_COUNT = 12;
 
     private static final Set<String> PHASE_STATUSES = Set.of(
             "HASNT_STARTED_YET",
@@ -81,6 +84,7 @@ public class PipServiceImpl implements PipService {
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final DepartmentRepository departmentRepository;
     private final NotificationService notificationService;
+    private final PositionPermissionService positionPermissionService;
 
     @Override
     public List<PipEligibleEmployeeDto> getEligibleEmployees() {
@@ -130,6 +134,7 @@ public class PipServiceImpl implements PipService {
     @Transactional
     public PipDetailResponseDto createPip(PipCreateRequestDto requestDto) {
         User currentUser = getCurrentUser();
+        positionPermissionService.assertCurrentUserHasPermission("pipCreate");
         User employee = getUser(requestDto.getEmployeeUserId(), "Employee user not found.");
 
         if (isHr(currentUser)) {
@@ -237,6 +242,7 @@ public class PipServiceImpl implements PipService {
     @Transactional
     public PipDetailResponseDto updatePhase(Integer pipId, Integer phaseId, PipPhaseUpdateRequestDto requestDto) {
         User currentUser = getCurrentUser();
+        positionPermissionService.assertCurrentUserHasPermission("pipEdit");
         Pip pip = getPip(pipId);
 
         if (!Boolean.TRUE.equals(pip.getStatus())) {
@@ -259,6 +265,10 @@ public class PipServiceImpl implements PipService {
 
         if (phase.getPip() == null || !Objects.equals(phase.getPip().getId(), pipId)) {
             throw new RuntimeException("Selected phase does not belong to this PIP.");
+        }
+
+        if (phase.getStartDate() != null && LocalDate.now().isBefore(phase.getStartDate())) {
+            throw new RuntimeException("This PIP phase has not started yet. You can update it from " + phase.getStartDate() + ".");
         }
 
         String oldValue = phase.getStatus() + " | " + nullToBlank(phase.getReasonNote());
@@ -316,6 +326,7 @@ public class PipServiceImpl implements PipService {
     @Transactional
     public PipDetailResponseDto finishPip(Integer id, PipFinishRequestDto requestDto) {
         User currentUser = getCurrentUser();
+        positionPermissionService.assertCurrentUserHasPermission("pipEdit");
         Pip pip = getPip(id);
 
         if (!Boolean.TRUE.equals(pip.getStatus())) {
@@ -393,6 +404,14 @@ public class PipServiceImpl implements PipService {
         List<PipPhaseRequestDto> phases = request.getPhases().stream()
                 .sorted(Comparator.comparing(PipPhaseRequestDto::getPhaseNumber))
                 .toList();
+        if (phases.isEmpty()) {
+            throw new RuntimeException("At least one phase is required.");
+        }
+
+        if (phases.size() > MAX_PHASE_COUNT) {
+            throw new RuntimeException("PIP can have at most " + MAX_PHASE_COUNT + " phases.");
+        }
+
 
         LocalDate previousEnd = null;
         int expectedNumber = 1;
@@ -463,7 +482,7 @@ public class PipServiceImpl implements PipService {
 
     private boolean canView(User currentUser, Pip pip) {
         if (isHr(currentUser)) {
-            return true;
+            return positionPermissionService.currentUserHasPermission("pipViewAll");
         }
 
         if (Objects.equals(currentUser.getId(), pip.getEmployeeUserId())) {
@@ -483,6 +502,10 @@ public class PipServiceImpl implements PipService {
         }
 
         if (Objects.equals(currentUser.getId(), pip.getEmployeeUserId())) {
+            return false;
+        }
+
+        if (!positionPermissionService.currentUserHasPermission("pipEdit")) {
             return false;
         }
 

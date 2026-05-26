@@ -1,0 +1,362 @@
+.fluxen-dashboard {
+  min-height: 100%;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 5% 0%, rgba(99, 102, 241, 0.14), transparent 28%),
+    radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.11), transparent 30%),
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 42%, #f8fafc 100%);
+}
+
+.fluxen-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 1rem;
+  align-items: stretch;
+  border-radius: 2rem;
+  padding: 1.7rem;
+  margin-bottom: 1.25rem;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.94)),
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.34), transparent 36%);
+  box-shadow: 0 26px 80px rgba(15, 23, 42, 0.22);
+}
+
+.fluxen-hero::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.fluxen-orb {
+  position: absolute;
+  width: 230px;
+  height: 230px;
+  border-radius: 999px;
+  filter: blur(20px);
+  opacity: 0.7;
+  z-index: -1;
+}
+
+.fluxen-orb--one {
+  top: -112px;
+  right: 225px;
+  background: rgba(99, 102, 241, 0.58);
+}
+
+.fluxen-orb--two {
+  right: -95px;
+  bottom: -126px;
+  background: rgba(6, 182, 212, 0.46);
+}
+
+.fluxen-hero-copy,
+.fluxen-hero-score {
+  position: relative;
+  z-index: 1;
+}
+
+.fluxen-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  color: #dbeafe;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.75rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fluxen-hero h1 {
+  margin: 0.8rem 0 0.35rem;
+  color: #ffffff;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 1000;
+  letter-spacing: -0.055em;
+}
+
+.fluxen-hero p {
+  max-width: 760px;
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  font-weight: 650;
+}
+
+.fluxen-hero-score {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  border-radius: 1.45rem;
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.fluxen-hero-score span,
+.fluxen-hero-score small {
+  color: #cbd5e1;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fluxen-hero-score strong {
+  color: #ffffff;
+  font-size: 3rem;
+  font-weight: 1000;
+  letter-spacing: -0.06em;
+  text-shadow: 0 0 24px rgba(125, 211, 252, 0.35);
+}
+
+.fluxen-alert {
+  margin-bottom: 1rem;
+  border-radius: 1.2rem;
+  padding: 1rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-weight: 850;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+}
+
+.fluxen-alert--error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.fluxen-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.fluxen-metric-card,
+.fluxen-panel-card,
+.fluxen-action-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.45rem;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.07);
+}
+
+.fluxen-metric-card {
+  padding: 1.1rem;
+}
+
+.fluxen-metric-card::after,
+.fluxen-action-card::after {
+  content: '';
+  position: absolute;
+  top: -54px;
+  right: -54px;
+  width: 122px;
+  height: 122px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.11);
+}
+
+.fluxen-metric-card--sky::after { background: rgba(14, 165, 233, 0.13); }
+.fluxen-metric-card--amber::after { background: rgba(245, 158, 11, 0.13); }
+.fluxen-metric-card--rose::after { background: rgba(244, 63, 94, 0.13); }
+.fluxen-metric-card--violet::after { background: rgba(124, 58, 237, 0.13); }
+
+.fluxen-metric-icon,
+.fluxen-action-card > span {
+  position: relative;
+  z-index: 1;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 1rem;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 1.1rem;
+}
+
+.fluxen-metric-card p {
+  position: relative;
+  z-index: 1;
+  margin: 0.85rem 0 0.2rem;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.fluxen-metric-card strong {
+  position: relative;
+  z-index: 1;
+  color: #0f172a;
+  font-size: 2rem;
+  font-weight: 1000;
+  letter-spacing: -0.05em;
+}
+
+.fluxen-metric-card small {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 0.18rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+.fluxen-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.fluxen-action-card {
+  min-height: 178px;
+  padding: 1.15rem;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.fluxen-action-card:hover {
+  transform: translateY(-3px);
+  border-color: #c7d2fe;
+  box-shadow: 0 24px 60px rgba(79, 70, 229, 0.13);
+}
+
+.fluxen-action-card strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 0.85rem;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 1000;
+}
+
+.fluxen-action-card small {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 0.38rem;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-weight: 760;
+}
+
+.fluxen-action-card em {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  color: #4f46e5;
+  font-size: 0.82rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.fluxen-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.fluxen-panel-card {
+  padding: 1.15rem;
+}
+
+.fluxen-panel-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  color: #0f172a;
+  font-size: 1.02rem;
+  font-weight: 1000;
+}
+
+.fluxen-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+}
+
+.fluxen-list-item + .fluxen-list-item {
+  margin-top: 0.65rem;
+}
+
+.fluxen-list-item strong {
+  color: #0f172a;
+  font-weight: 950;
+}
+
+.fluxen-list-item span {
+  flex-shrink: 0;
+  color: #4f46e5;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.fluxen-list-item span.is-hot {
+  color: #dc2626;
+}
+
+.fluxen-list-item span.is-soft {
+  color: #64748b;
+}
+
+.fluxen-muted {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 760;
+}
+
+@media (max-width: 1180px) {
+  .fluxen-metric-grid,
+  .fluxen-action-grid,
+  .fluxen-panel-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .fluxen-dashboard {
+    padding: 1rem;
+  }
+
+  .fluxen-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .fluxen-metric-grid,
+  .fluxen-action-grid,
+  .fluxen-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}

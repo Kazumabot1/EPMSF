@@ -15,7 +15,6 @@ public class FeedbackAssignmentPreviewItemResponse {
     int selfAssignments;
     int subordinateAssignments;
     int peerAssignments;
-    int projectStakeholderAssignments;
     int totalAssignments;
     int autoAssignments;
     int manualAssignments;

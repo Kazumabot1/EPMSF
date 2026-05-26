@@ -13,6 +13,13 @@ const formatDate = (value: string | null | undefined) => {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
+const statusLabel = (cycle: KpiTemplateCycleResponse) => {
+  if (cycle.status === 'CLOSING') return 'Closing';
+  if (cycle.status === 'ACTIVE') return 'Active';
+  if (cycle.status === 'DEACTIVATED') return 'Inactive';
+  return 'Draft';
+};
+
 const KpiTemplateCycleListPage = () => {
   const [cycles, setCycles] = useState<KpiTemplateCycleResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +56,7 @@ const KpiTemplateCycleListPage = () => {
     try {
       setTogglingId(cycle.id);
       await kpiTemplateCycleService.updateStatus(cycle.id, nextActive);
-      toast.success(nextActive ? 'Cycle activated.' : 'Cycle deactivated.');
+      toast.success(nextActive ? 'Cycle activated.' : 'Cycle closing grace started.');
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Status update failed.');
@@ -132,8 +139,17 @@ const KpiTemplateCycleListPage = () => {
                       <tr key={cycle.id} className="transition-colors hover:bg-violet-50/50">
                         <td className="px-4 py-4 tabular-nums text-gray-600">{index + 1}</td>
                         <td className="px-4 py-4 font-semibold text-gray-900">{cycle.cycleName}</td>
-                        <td className="px-4 py-4 text-gray-700">{formatDate(cycle.startDate)}</td>
-                        <td className="px-4 py-4 text-gray-700">{formatDate(cycle.endDate)}</td>
+                        <td className="px-4 py-4 text-gray-700">
+                          {formatDate(cycle.currentPeriodStartDate ?? cycle.startDate)}
+                        </td>
+                        <td className="px-4 py-4 text-gray-700">
+                          {formatDate(cycle.currentPeriodEndDate ?? cycle.endDate)}
+                          {cycle.status === 'CLOSING' && cycle.graceEndsAt && (
+                            <p className="mt-1 text-xs font-semibold text-amber-700">
+                              Grace until {formatDate(cycle.graceEndsAt)}
+                            </p>
+                          )}
+                        </td>
                         <td className="px-4 py-4 text-gray-700">{cycle.durationLabel}</td>
                         <td className="px-4 py-4 text-gray-700">
                           <p className="max-w-xs truncate" title={cycle.kpiForms.map((f) => f.title).join(', ')}>
@@ -152,13 +168,13 @@ const KpiTemplateCycleListPage = () => {
                               View
                             </button>
                             <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-gray-600">
-                              <span>{cycle.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span>
+                              <span>{statusLabel(cycle)}</span>
                               <span className="relative inline-flex h-6 w-11 shrink-0">
                                 <input
                                   type="checkbox"
                                   className="peer sr-only"
-                                  checked={cycle.status === 'ACTIVE'}
-                                  disabled={togglingId === cycle.id}
+                                  checked={cycle.status === 'ACTIVE' || cycle.status === 'CLOSING'}
+                                  disabled={togglingId === cycle.id || cycle.status === 'CLOSING'}
                                   onChange={() => void handleToggleActive(cycle)}
                                 />
                                 <span className="absolute inset-0 rounded-full bg-gray-200 transition peer-checked:bg-emerald-500 peer-disabled:opacity-50" />

@@ -1,18 +1,25 @@
 package com.epms.entity;
 
-import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.*;
 
 @Entity
 @Table(name = "positions")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class Position {
 
     @Id
@@ -22,12 +29,32 @@ public class Position {
     @Column(name = "position_title", nullable = false, length = 150)
     private String positionTitle;
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "level_id", nullable = false)
     private PositionLevel level;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "role_id")
+    private Role role;
+
+    /*
+     * Compatibility for older merged services:
+     * Some services call user.getPosition().getPermissions().
+     *
+     * The position_permissions table stores position_id, while this entity's id is positions.id.
+     * This read-only relation lets Position expose getPermissions() without changing those services.
+     */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "id",
+            referencedColumnName = "position_id",
+            insertable = false,
+            updatable = false
+    )
+    private PositionPermission permissions;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
     @Column(nullable = false)
     private Boolean status = true;
@@ -38,15 +65,14 @@ public class Position {
     @Column(name = "created_by")
     private String createdBy;
 
-    @OneToMany(mappedBy = "position", fetch = FetchType.LAZY)
-    private List<Employee> employees = new ArrayList<>();
-
-    @OneToMany(mappedBy = "position", fetch = FetchType.LAZY)
-    private List<KpiPosition> kpiPositions = new ArrayList<>();
-
     @PrePersist
-    public void prePersist() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
-        if (status == null) status = true;
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+
+        if (status == null) {
+            status = true;
+        }
     }
 }

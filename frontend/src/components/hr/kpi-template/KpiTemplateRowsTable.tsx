@@ -19,30 +19,80 @@ type Props = {
 const cellInput =
   'kpi-tpl-input min-h-[38px] w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
 
+type KpiNumberInputProps = {
+  value: number | null;
+  disabled: boolean;
+  onChange: (value: number | null) => void;
+  min?: number;
+  max?: number;
+  className?: string;
+};
+
+const blockedNumberKeys = new Set(['-', '+', 'e', 'E']);
+
+function isNumericKpiNumberText(value: string) {
+  if (value === '') {
+    return true;
+  }
+  return /^\d+(\.\d*)?$/.test(value) && Number.isFinite(Number(value));
+}
+
+function isInvalidKpiNumberValue(value: number | null, min?: number, max?: number) {
+  if (value === null) {
+    return false;
+  }
+  return !Number.isFinite(value) || (min != null && value < min) || (max != null && value > max);
+}
+
+function KpiNumberInput({ value, disabled, onChange, min, max, className = '' }: KpiNumberInputProps) {
+  const invalid = isInvalidKpiNumberValue(value, min, max);
+
+  return (
+    <div className={`kpi-tpl-number-box ${disabled ? 'is-disabled' : ''} ${invalid ? 'is-invalid' : ''}`}>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value ?? ''}
+        disabled={disabled}
+        onKeyDown={(event) => {
+          if (blockedNumberKeys.has(event.key)) {
+            event.preventDefault();
+          }
+        }}
+        onPaste={(event) => {
+          const pasted = event.clipboardData.getData('text');
+          if (!isNumericKpiNumberText(pasted)) {
+            event.preventDefault();
+          }
+        }}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (!isNumericKpiNumberText(nextValue)) {
+            return;
+          }
+          onChange(nextValue === '' ? null : Number(nextValue));
+        }}
+        className={`kpi-tpl-number-input ${className}`}
+      />
+    </div>
+  );
+}
+
 const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemoveRow, onRowChange, readOnly = false }: Props) => {
   const totalWeight = rows.reduce((sum, row) => sum + (row.weight ?? 0), 0);
-  const masterDataMissing = categories.length === 0 || units.length === 0;
+  const catalogDataMissing = categories.length === 0 || items.length === 0;
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-900/[0.03]">
-      {masterDataMissing && !readOnly && (
+      {catalogDataMissing && !readOnly && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-medium">Master data required for KPI rows</p>
+          <p className="font-medium">Optional catalog data for KPI rows</p>
           <p className="mt-1 text-amber-800/90">
             {categories.length === 0 && (
               <>
-                Add categories in{' '}
+                Catalog categories:{' '}
                 <Link to="/hr/performance-kpi/category" className="font-semibold underline">
                   KPI Categories
-                </Link>
-                .{' '}
-              </>
-            )}
-            {units.length === 0 && (
-              <>
-                Add units in{' '}
-                <Link to="/hr/performance-kpi/unit" className="font-semibold underline">
-                  KPI Units
                 </Link>
                 .{' '}
               </>
@@ -65,22 +115,32 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
             <tr className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
               <th className="min-w-[200px] px-3 py-3.5">KPI</th>
               <th className="min-w-[140px] px-3 py-3.5">Category</th>
-              <th className="min-w-[90px] px-3 py-3.5">Target</th>
+              <th className="min-w-[90px] px-3 py-3.5">Target %</th>
               <th className="min-w-[120px] px-3 py-3.5">Unit</th>
-              <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Actual</th>
+              <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Actual %</th>
               <th className="min-w-[88px] px-3 py-3.5">Weight %</th>
               <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Score %</th>
-              <th className="min-w-[96px] bg-violet-50 px-3 py-3.5 text-violet-900">Weighted</th>
+              <th className="min-w-[96px] bg-violet-50 px-3 py-3.5 text-violet-900">Weight Score</th>
               <th className="w-12 px-2 py-3.5" aria-label="Actions" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.map((row, rowIndex) => (
-              <tr key={row.rowId} className="align-top odd:bg-gray-50/40 transition-colors hover:bg-violet-50/30">
+                <tr
+                  key={row.rowId}
+                  className={`align-top odd:bg-gray-50/40 transition-colors hover:bg-violet-50/30 ${
+                    row.id == null && row.changeReason ? 'kpi-tpl-row-added' : ''
+                  }`}
+                >
                 <td className="px-3 py-3">
-                  <span className="mb-2 inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
-                    Row {rowIndex + 1}
-                  </span>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                      Row {rowIndex + 1}
+                    </span>
+                    {row.id == null && row.changeReason && (
+                      <span className="kpi-tpl-change-pill added">Added</span>
+                    )}
+                  </div>
                   <select
                     value={row.kpiItemId ?? ''}
                     disabled={readOnly}
@@ -92,6 +152,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                         kpiItemId: id,
                         kpiLabel: id !== null ? '' : row.kpiLabel,
                         kpiCategoryId: selected?.kpiCategoryId ?? row.kpiCategoryId,
+                        kpiCategoryLabel: selected != null ? '' : row.kpiCategoryLabel,
                       });
                     }}
                     className={`${cellInput} mb-2 cursor-pointer`}
@@ -118,9 +179,13 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     disabled={readOnly}
                     onChange={(event) => {
                       const v = event.target.value;
-                      onRowChange(row.rowId, { kpiCategoryId: v === '' ? null : Number(v) });
+                      const id = v === '' ? null : Number(v);
+                      onRowChange(row.rowId, {
+                        kpiCategoryId: id,
+                        kpiCategoryLabel: id !== null ? '' : row.kpiCategoryLabel,
+                      });
                     }}
-                    className={`${cellInput} cursor-pointer`}
+                    className={`${cellInput} mb-2 cursor-pointer`}
                   >
                     <option value="">Category</option>
                     {categories.map((c) => (
@@ -129,18 +194,24 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                       </option>
                     ))}
                   </select>
+                  <input
+                    type="text"
+                    value={row.kpiCategoryLabel}
+                    maxLength={100}
+                    disabled={readOnly || row.kpiCategoryId !== null}
+                    onChange={(event) => onRowChange(row.rowId, { kpiCategoryLabel: event.target.value })}
+                    placeholder="Or custom category"
+                    className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
+                  />
                 </td>
                 <td className="px-3 py-3">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={row.target ?? ''}
+                  <KpiNumberInput
+                    min={1}
+                    max={100}
+                    value={row.target}
                     disabled={readOnly}
-                    onChange={(event) => {
-                      const v = event.target.value;
-                      onRowChange(row.rowId, { target: v === '' ? null : Number(v) });
-                    }}
-                    className={`${cellInput} tabular-nums`}
+                    onChange={(target) => onRowChange(row.rowId, { target })}
+                    className="text-right tabular-nums"
                   />
                 </td>
                 <td className="px-3 py-3">
@@ -149,9 +220,13 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     disabled={readOnly}
                     onChange={(event) => {
                       const v = event.target.value;
-                      onRowChange(row.rowId, { kpiUnitId: v === '' ? null : Number(v) });
+                      const id = v === '' ? null : Number(v);
+                      onRowChange(row.rowId, {
+                        kpiUnitId: id,
+                        kpiUnitLabel: id !== null ? '' : row.kpiUnitLabel,
+                      });
                     }}
-                    className={`${cellInput} cursor-pointer`}
+                    className={`${cellInput} mb-2 cursor-pointer`}
                   >
                     <option value="">Unit</option>
                     {units.map((u) => (
@@ -160,25 +235,30 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                       </option>
                     ))}
                   </select>
+                  <input
+                    type="text"
+                    value={row.kpiUnitLabel}
+                    maxLength={100}
+                    disabled={readOnly || row.kpiUnitId !== null}
+                    onChange={(event) => onRowChange(row.rowId, { kpiUnitLabel: event.target.value })}
+                    placeholder="Or custom unit"
+                    className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
+                  />
                 </td>
                 <td className="bg-violet-50/60 px-3 py-3">
                   <div className="flex h-[72px] flex-col items-center justify-center rounded-lg border border-dashed border-violet-200 bg-white/70 px-2 text-center shadow-inner">
                     <i className="bi bi-lock text-violet-400" aria-hidden />
-                    <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-violet-700/85">PM</span>
+                    <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-violet-700/85">Manager</span>
                   </div>
                 </td>
                 <td className="px-3 py-3">
-                  <input
-                    type="number"
-                    min={0}
+                  <KpiNumberInput
+                    min={1}
                     max={100}
-                    value={row.weight ?? ''}
+                    value={row.weight}
                     disabled={readOnly}
-                    onChange={(event) => {
-                      const v = event.target.value;
-                      onRowChange(row.rowId, { weight: v === '' ? null : Number(v) });
-                    }}
-                    className={`${cellInput} font-semibold tabular-nums`}
+                    onChange={(weight) => onRowChange(row.rowId, { weight })}
+                    className="text-right font-semibold tabular-nums"
                   />
                 </td>
                 <td className="bg-violet-50/60 px-3 py-3">
@@ -205,7 +285,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     </button>
                   )}
                 </td>
-              </tr>
+                </tr>
             ))}
           </tbody>
           <tfoot>

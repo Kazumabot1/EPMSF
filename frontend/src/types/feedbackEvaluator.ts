@@ -5,9 +5,9 @@ export type ApiEnvelope<T> = {
   timestamp: string;
 };
 
-export type FeedbackRelationshipType = 'MANAGER' | 'PEER' | 'SUBORDINATE' | 'SELF' | 'PROJECT_STAKEHOLDER';
+export type FeedbackRelationshipType = 'MANAGER' | 'PEER' | 'SUBORDINATE' | 'SELF';
 export type FeedbackAssignmentStatus = 'PENDING' | 'IN_PROGRESS' | 'SUBMITTED' | 'DECLINED' | 'CANCELLED';
-export type FeedbackCampaignLifecycleStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'CANCELLED';
+export type FeedbackCampaignLifecycleStatus = 'DRAFT' | 'READY_TO_ACTIVATE' | 'ACTIVE' | 'CLOSED' | 'PUBLISHED';
 
 export interface FeedbackEvaluatorTask {
   assignmentId: number;
@@ -26,11 +26,29 @@ export interface FeedbackEvaluatorTask {
   autoSubmitNotice?: string | null;
   dueAt: string | null;
   submittedAt: string | null;
+  totalQuestionCount?: number;
+  requiredQuestionCount?: number;
+  answeredQuestionCount?: number;
+  answeredRequiredQuestionCount?: number;
+  completionPercent?: number;
+  finalSubmissionReady?: boolean;
 }
+
 
 export interface FeedbackRatingOption {
   value: number;
   label: string;
+}
+
+export interface FeedbackAssignmentEmployeeInfo {
+  employeeId: number | null;
+  userId: number | null;
+  employeeCode: string | null;
+  employeeName: string | null;
+  email: string | null;
+  positionName: string | null;
+  departmentName: string | null;
+  levelCode: string | null;
 }
 
 export interface FeedbackAssignmentQuestionDetail {
@@ -68,6 +86,8 @@ export interface FeedbackAssignmentDetail {
   campaignStartAt: string | null;
   targetEmployeeId: number;
   targetEmployeeName: string;
+  target: FeedbackAssignmentEmployeeInfo | null;
+  evaluator: FeedbackAssignmentEmployeeInfo | null;
   relationshipType: FeedbackRelationshipType;
   anonymous: boolean;
   status: FeedbackAssignmentStatus;
@@ -78,6 +98,8 @@ export interface FeedbackAssignmentDetail {
   dueAt: string | null;
   submittedAt: string | null;
   comments: string | null;
+  assessmentDateText: string | null;
+  effectiveDateText: string | null;
   totalQuestionCount: number;
   requiredQuestionCount: number;
   answeredQuestionCount: number;
@@ -91,10 +113,12 @@ export interface FeedbackAssignmentDetail {
 export interface SubmitFeedbackResponsePayload {
   evaluatorAssignmentId: number;
   comments?: string;
+  assessmentDateText?: string;
+  effectiveDateText?: string;
   responses: Array<{
     assignmentQuestionId?: number;
     questionId?: number;
-    ratingValue: number;
+    ratingValue: number | null;
     comment?: string;
   }>;
 }
@@ -102,6 +126,8 @@ export interface SubmitFeedbackResponsePayload {
 export interface SaveFeedbackDraftPayload {
   evaluatorAssignmentId: number;
   comments?: string;
+  assessmentDateText?: string;
+  effectiveDateText?: string;
   responses: Array<{
     assignmentQuestionId?: number;
     questionId?: number;

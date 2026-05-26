@@ -276,6 +276,10 @@ public class GlobalExceptionHandler {
                 message =
                         "This position already has a KPI form. Choose another position or edit the existing form.";
                 existingTemplateId = resolveKpiTemplateIdFromIntegrityViolation(ex, request);
+            } else if (isKpiFormItemOptionalLookupConflict(causeMessage)) {
+                message = "KPI template category/unit columns are not aligned with custom labels. Restart the backend to apply the schema fix.";
+            } else if (isKpiFormItemReferenceConflict(causeMessage)) {
+                message = "This KPI row is already used in employee KPI records and cannot be removed.";
             } else if (causeMessage != null
                     && (causeMessage.toLowerCase().contains("start_date")
                     || causeMessage.toLowerCase().contains("end_date"))) {
@@ -355,6 +359,24 @@ public class GlobalExceptionHandler {
                 || msg.contains("position_id")
                 || msg.contains("uk82x6nm6ro3k7p1ttuxflwbofq")
                 || msg.contains("uk_kpi_positions_position_id");
+    }
+
+    private static boolean isKpiFormItemReferenceConflict(String causeMessage) {
+        if (causeMessage == null) {
+            return false;
+        }
+        String msg = causeMessage.toLowerCase();
+        return msg.contains("employee_kpi_scores")
+                && (msg.contains("kpi_form_item_id") || msg.contains("kpi_form_items"));
+    }
+
+    private static boolean isKpiFormItemOptionalLookupConflict(String causeMessage) {
+        if (causeMessage == null) {
+            return false;
+        }
+        String msg = causeMessage.toLowerCase();
+        return (msg.contains("kpi_category_id") || msg.contains("kpi_unit_id"))
+                && (msg.contains("cannot be null") || msg.contains("doesn't have a default value"));
     }
 
     private static String mostSpecificCauseMessage(DataIntegrityViolationException ex) {

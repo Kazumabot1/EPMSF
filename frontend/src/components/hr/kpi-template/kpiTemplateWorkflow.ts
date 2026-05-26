@@ -28,10 +28,13 @@ export type KpiTemplateFormFields = {
 
 export const newKpiTemplateRow = (): KpiTemplateRowDraft => ({
   rowId: crypto.randomUUID(),
+  id: null,
   kpiItemId: null,
   kpiLabel: '',
   kpiCategoryId: null,
+  kpiCategoryLabel: '',
   kpiUnitId: null,
+  kpiUnitLabel: '',
   target: null,
   weight: null,
 });
@@ -45,10 +48,13 @@ export function mapTemplateToFormFields(tmpl: KpiTemplateResponse): KpiTemplateF
       tmpl.items.length > 0
         ? tmpl.items.map((line) => ({
             rowId: crypto.randomUUID(),
+            id: line.id ?? null,
             kpiItemId: line.kpiItemId,
             kpiLabel: line.kpiLabel ?? '',
             kpiCategoryId: line.kpiCategoryId,
+            kpiCategoryLabel: line.kpiCategoryLabel ?? (line.kpiCategoryId == null ? line.kpiCategoryName ?? '' : ''),
             kpiUnitId: line.kpiUnitId,
+            kpiUnitLabel: line.kpiUnitLabel ?? (line.kpiUnitId == null ? line.kpiUnitName ?? '' : ''),
             target: line.target,
             weight: line.weight,
           }))
@@ -63,10 +69,19 @@ export type ExistingKpiForPosition = {
 
 function deriveAssignedPositionIds(
   positions: PositionResponse[],
-  availablePositions: PositionResponse[],
+  availablePositions: PositionResponse[] | null,
   assignedPositionIds: number[],
 ): number[] {
   const assigned = new Set(assignedPositionIds);
+
+  /*
+   * null means available-positions failed.
+   * Do not treat every position as assigned when that API fails.
+   */
+  if (availablePositions === null) {
+    return [...assigned];
+  }
+
   const available = new Set(availablePositions.map((position) => position.id));
 
   for (const position of positions) {
@@ -78,22 +93,24 @@ function deriveAssignedPositionIds(
   return [...assigned];
 }
 
-/** Resolve occupied position ids from template list when assigned-position-ids API is unavailable. */
 export async function resolveAssignedPositionIdsFromTemplates(
   excludeFormId?: number,
 ): Promise<number[]> {
   const templates = await kpiTemplateService.getAllTemplates();
   const ids = new Set<number>();
+
   for (const template of templates) {
     if (excludeFormId != null && template.id === excludeFormId) {
       continue;
     }
+
     for (const link of template.positions ?? []) {
       if (link.positionId != null) {
         ids.add(link.positionId);
       }
     }
   }
+
   return [...ids];
 }
 
@@ -118,36 +135,51 @@ function findExistingInTemplateList(
     if (excludeFormId != null && template.id === excludeFormId) {
       continue;
     }
+
     const link = (template.positions ?? []).find((p) => p.positionId === positionId);
+
     if (link) {
       return { templateId: template.id, templateTitle: template.title };
     }
   }
+
   return null;
 }
 
-/** Server check: does this position already have a KPI form? */
 export async function findExistingTemplateForPosition(
   positionId: number,
   excludeFormId?: number,
 ): Promise<ExistingKpiForPosition | null> {
   try {
-    const availability = await kpiTemplateService.checkPositionAvailability(positionId, excludeFormId);
-    if (!availability.available && availability.existingTemplateId != null && availability.existingTemplateId > 0) {
+    const availability = await kpiTemplateService.checkPositionAvailability(
+      positionId,
+      excludeFormId,
+    );
+
+    if (
+      !availability.available &&
+      availability.existingTemplateId != null &&
+      availability.existingTemplateId > 0
+    ) {
       return {
         templateId: availability.existingTemplateId,
         templateTitle: availability.templateTitle ?? undefined,
       };
     }
+
     if (availability.available) {
       return null;
     }
   } catch {
-    // fall through to list / resolve fallbacks
+    // fall through
   }
 
   try {
-    const resolved = await kpiTemplateService.resolveTemplateIdForPosition(positionId, excludeFormId);
+    const resolved = await kpiTemplateService.resolveTemplateIdForPosition(
+      positionId,
+      excludeFormId,
+    );
+
     if (resolved != null && resolved > 0) {
       return { templateId: resolved };
     }
@@ -156,7 +188,11 @@ export async function findExistingTemplateForPosition(
   }
 
   try {
-    return findExistingInTemplateList(positionId, await kpiTemplateService.getAllTemplates(), excludeFormId);
+    return findExistingInTemplateList(
+      positionId,
+      await kpiTemplateService.getAllTemplates(),
+      excludeFormId,
+    );
   } catch {
     return null;
   }
@@ -167,10 +203,13 @@ export function notifySwitchedToExistingForm(templateTitle?: string): void {
     templateTitle != null && templateTitle.trim().length > 0
       ? `${EXISTING_KPI_FOR_POSITION_MSG} (“${templateTitle.trim()}”)`
       : EXISTING_KPI_FOR_POSITION_MSG;
+
   toast(detail, { icon: 'ℹ️', duration: 7000 });
 }
 
-export async function loadTemplateFormFields(templateId: number): Promise<KpiTemplateFormFields> {
+export async function loadTemplateFormFields(
+  templateId: number,
+): Promise<KpiTemplateFormFields> {
   const tmpl = await kpiTemplateService.getTemplateById(templateId);
   return mapTemplateToFormFields(tmpl);
 }
@@ -191,16 +230,17 @@ const EMPTY_LOOKUPS: KpiTemplateEditorLookups = {
   assignedPositionIds: [],
 };
 
-/**
- * Loads dropdown data independently so one failing API does not leave all selects empty.
- */
 export async function loadKpiTemplateEditorLookups(
   excludeFormId?: number,
   options?: { toastOnPartialFailure?: boolean },
 ): Promise<KpiTemplateEditorLookups> {
   const failures: string[] = [];
 
-  const load = async <T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+  const load = async <T>(
+    label: string,
+    fn: () => Promise<T>,
+    fallback: T,
+  ): Promise<T> => {
     try {
       return await fn();
     } catch (err) {
@@ -210,17 +250,39 @@ export async function loadKpiTemplateEditorLookups(
     }
   };
 
-  const [categories, units, items, positions, availablePositions, assignedPositionIds] = await Promise.all([
-    load('KPI categories', () => kpiCategoryService.getAll(), []),
-    load('KPI units', () => kpiUnitService.getAll(), []),
-    load('KPI items', () => kpiItemService.getAll(), []),
-    load('positions', () => positionService.getPositions(), []),
-    load('available positions', () => kpiTemplateService.getAvailablePositions(excludeFormId), []),
-    load('assigned positions', () => loadAssignedPositionIds(excludeFormId), []),
-  ]);
+  let availablePositionsFailed = false;
+
+  const loadAvailablePositions = async (): Promise<PositionResponse[] | null> => {
+    try {
+      return await kpiTemplateService.getAvailablePositions(excludeFormId);
+    } catch (err) {
+      availablePositionsFailed = true;
+      failures.push('available positions');
+      console.warn(
+        '[KPI template] available positions load failed:',
+        toApiRequestError(err, 'available positions').message,
+      );
+
+      return null;
+    }
+  };
+
+  const [categories, units, items, positions, availablePositions, assignedPositionIds] =
+    await Promise.all([
+      load('KPI categories', () => kpiCategoryService.getAll(), []),
+      load('KPI units', () => kpiUnitService.getAll(), []),
+      load('KPI items', () => kpiItemService.getAll(), []),
+      load('positions', () => positionService.getPositions(), []),
+      loadAvailablePositions(),
+      load('assigned positions', () => loadAssignedPositionIds(excludeFormId), []),
+    ]);
 
   if (options?.toastOnPartialFailure !== false && failures.length > 0) {
-    toast.error(`Could not load: ${failures.join(', ')}. Other dropdowns may still be usable.`);
+    const message = availablePositionsFailed
+      ? 'Some KPI lookup data could not load, but you can still save the form.'
+      : `Could not load: ${failures.join(', ')}. Other dropdowns may still be usable.`;
+
+    toast.error(message);
   }
 
   return {
@@ -228,7 +290,11 @@ export async function loadKpiTemplateEditorLookups(
     units,
     items,
     positions,
-    assignedPositionIds: deriveAssignedPositionIds(positions, availablePositions, assignedPositionIds),
+    assignedPositionIds: deriveAssignedPositionIds(
+      positions,
+      availablePositions,
+      assignedPositionIds,
+    ),
   };
 }
 
@@ -239,10 +305,6 @@ export type SaveKpiTemplateResult = {
   created: boolean;
 };
 
-/**
- * Create only when no KPI exists for the position; otherwise update the existing form.
- * Never relies on swallowing 409 alone — checks availability before POST /create.
- */
 export async function saveKpiTemplateCreateOrUpdate(options: {
   positionId: number;
   payload: KpiTemplateRequest;
@@ -256,7 +318,11 @@ export async function saveKpiTemplateCreateOrUpdate(options: {
       : null;
 
   if (templateId == null) {
-    const existing = await findExistingTemplateForPosition(options.positionId, options.excludeFormId);
+    const existing = await findExistingTemplateForPosition(
+      options.positionId,
+      options.excludeFormId,
+    );
+
     if (existing) {
       templateId = existing.templateId;
       options.onSwitchedToEdit?.(templateId);
@@ -275,11 +341,18 @@ export async function saveKpiTemplateCreateOrUpdate(options: {
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 409) {
       let conflictId =
-        err.existingTemplateId != null && err.existingTemplateId > 0 ? err.existingTemplateId : null;
+        err.existingTemplateId != null && err.existingTemplateId > 0
+          ? err.existingTemplateId
+          : null;
+
       let conflictTitle: string | undefined;
 
       if (conflictId == null) {
-        const existing = await findExistingTemplateForPosition(options.positionId, options.excludeFormId);
+        const existing = await findExistingTemplateForPosition(
+          options.positionId,
+          options.excludeFormId,
+        );
+
         if (existing) {
           conflictId = existing.templateId;
           conflictTitle = existing.templateTitle;
@@ -293,6 +366,7 @@ export async function saveKpiTemplateCreateOrUpdate(options: {
         return { templateId: updated.id, created: false };
       }
     }
+
     throw err;
   }
 }

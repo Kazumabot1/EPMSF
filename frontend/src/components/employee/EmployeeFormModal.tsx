@@ -1,1175 +1,791 @@
-/*
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import toast from 'react-hot-toast';
-import { fetchDepartments, type Department } from '../../services/departmentService';
-import { positionService } from '../../services/positionService';
-import type { PositionResponse } from '../../types/position';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import api from '../../services/api';
 import {
-  createEmployee,
-  responseToFormDefaults,
-  updateEmployee,
-  parseApiError,
-  type EmployeeResponse,
-} from '../../services/employeeService';
-import {
-  defaultEmployeeFormValues,
-  employeeFormSchema,
-  formValuesToPayload,
-  type EmployeeFormValues,
-} from './employeeFormSchema';
+  defaultDashboardForRole,
+  dashboardDisplayName,
+  roleDisplayName,
+} from '../../utils/dashboardOptions';
 
-type Props = {
+type ModalMode = 'create' | 'edit';
+
+type EmployeeFormModalProps = {
   open: boolean;
-  mode: 'create' | 'edit';
-  employee: EmployeeResponse | null;
+  mode: ModalMode;
+  employee?: any | null;
   onClose: () => void;
   onSaved: () => void;
 };
 
-const EmployeeFormModal = ({ open, mode, employee, onClose, onSaved }: Props) => {
-  const [positions, setPositions] = useState<PositionResponse[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [orgPickersLoading, setOrgPickersLoading] = useState(false);
+type DepartmentOption = {
+  id: number;
+  departmentName?: string;
+  department_name?: string;
+  name?: string;
+};
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<EmployeeFormValues>({
-    resolver: zodResolver(employeeFormSchema),
-    defaultValues: defaultEmployeeFormValues,
-  });
+type PositionOption = {
+  id: number;
+  positionTitle?: string;
+  positionName?: string;
+  name?: string;
+  levelCode?: string;
+  roleId?: number | null;
+  roleName?: string | null;
+  role?: {
+    id?: number | null;
+    name?: string | null;
+  } | string | null;
+};
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    if (mode === 'edit' && employee) {
-      reset(responseToFormDefaults(employee));
-    } else {
-      reset(defaultEmployeeFormValues);
-    }
-  }, [open, mode, employee, reset]);
+type EmployeeFormState = {
+  firstName: string;
+  lastName: string;
+  positionId: string;
+  currentDepartmentId: string;
+  parentDepartmentId: string;
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    let cancelled = false;
-    setOrgPickersLoading(true);
-    Promise.all([positionService.getPositions(), fetchDepartments()])
-      .then(([posList, deptList]) => {
-        if (!cancelled) {
-          setPositions(posList.filter((p) => p.status !== false));
-          setDepartments(deptList);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPositions([]);
-          setDepartments([]);
-          toast.error('Could not load positions or departments.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setOrgPickersLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+  phoneNumber: string;
+  email: string;
+  staffNrc: string;
+  gender: string;
+  dateOfBirth: string;
 
-  if (!open) {
-    return null;
+  createLoginAccount: boolean;
+  sendTemporaryPasswordEmail: boolean;
+
+  race: string;
+  religion: string;
+  contactAddress: string;
+  permanentAddress: string;
+  maritalStatus: string;
+  spouseName: string;
+  spouseNrc: string;
+  fatherName: string;
+  fatherNrc: string;
+};
+
+const emptyForm: EmployeeFormState = {
+  firstName: '',
+  lastName: '',
+  positionId: '',
+  currentDepartmentId: '',
+  parentDepartmentId: '',
+
+  phoneNumber: '',
+  email: '',
+  staffNrc: '',
+  gender: '',
+  dateOfBirth: '',
+
+  createLoginAccount: true,
+  sendTemporaryPasswordEmail: true,
+
+  race: '',
+  religion: '',
+  contactAddress: '',
+  permanentAddress: '',
+  maritalStatus: '',
+  spouseName: '',
+  spouseNrc: '',
+  fatherName: '',
+  fatherNrc: '',
+};
+
+const unwrap = <T,>(payload: any, fallback: T): T => {
+  if (payload?.data?.data !== undefined) return payload.data.data as T;
+  if (payload?.data !== undefined) return payload.data as T;
+  return fallback;
+};
+
+const getDepartmentName = (department: DepartmentOption) =>
+  department.departmentName ||
+  department.department_name ||
+  department.name ||
+  `Department #${department.id}`;
+
+const getPositionName = (position: PositionOption) =>
+  position.positionTitle ||
+  position.positionName ||
+  position.name ||
+  `Position #${position.id}`;
+
+const getRoleNameFromPosition = (position?: PositionOption | null) => {
+  if (!position) return '';
+
+  if (position.roleName && String(position.roleName).trim()) {
+    return String(position.roleName).trim();
   }
 
-  const onSubmit = async (values: EmployeeFormValues) => {
-    const payload = formValuesToPayload(values);
-    try {
-      if (mode === 'create') {
-        const res = await createEmployee(payload);
-        if (res.accountProvisioningMessage) {
-          const smtp = res.accountProvisioningSmtpError?.trim();
-          const detail = `${res.accountProvisioningMessage}${
-            smtp && !res.accountProvisioningMessage.includes(smtp) ? ` ${smtp}` : ''
-          }`;
-          const accountOkButEmailFailed =
-            res.accountProvisioningSuccess === true && Boolean(smtp);
+  if (typeof position.role === 'string' && position.role.trim()) {
+    return position.role.trim();
+  }
 
-          if (accountOkButEmailFailed) {
-            toast(
-              <div className="text-left text-sm text-slate-800">
-                <p className="mb-1 font-semibold text-amber-900">Employee saved — email not delivered</p>
-                <p>
-                  Account was created, but email delivery failed. Please check SMTP credentials or resend later.
-                </p>
-                {smtp ? <p className="mt-1 text-slate-600">{smtp}</p> : null}
-                <p className="mt-2 text-xs text-slate-600">
-                  Fix <code className="rounded bg-slate-100 px-1">SMTP_USER</code> and{' '}
-                  <code className="rounded bg-slate-100 px-1">SMTP_PASS</code> (Google App Password), restart the API, then
-                  use <code className="rounded bg-slate-100 px-1">POST /api/mail/test</code> or resend from the employee
-                  view.
-                </p>
-              </div>,
-              { icon: '⚠️', duration: 14_000, id: 'provision-mail' }
-            );
-          } else if (res.accountProvisioningSuccess === false && smtp) {
-            toast(
-              <div className="text-left text-sm text-slate-800">
-                <p className="mb-1 font-semibold text-amber-900">Employee saved — email not sent</p>
-                <p>{detail}</p>
-                <p className="mt-2 text-xs text-slate-600">
-                  Set <code className="rounded bg-slate-100 px-1">SMTP_USER</code> and{' '}
-                  <code className="rounded bg-slate-100 px-1">SMTP_PASS</code> (Google App Password), restart the API, then
-                  resend or use <code className="rounded bg-slate-100 px-1">POST /api/mail/test</code>.
-                </p>
-              </div>,
-              { icon: '⚠️', duration: 12_000, id: 'provision-mail' }
-            );
-          } else if (res.accountProvisioningSuccess === false) {
-            toast.error(detail);
-          } else {
-            toast.success(`Employee created. ${detail}`);
-          }
-        } else {
-          toast.success('Employee created');
-        }
-      } else if (employee) {
-        const res = await updateEmployee(employee.id, payload);
-        if (res.accountProvisioningMessage) {
-          const smtp = res.accountProvisioningSmtpError?.trim();
-          const detail = `${res.accountProvisioningMessage}${
-            smtp && !res.accountProvisioningMessage.includes(smtp) ? ` ${smtp}` : ''
-          }`;
-          const accountOkButEmailFailed =
-            res.accountProvisioningSuccess === true && Boolean(smtp);
+  if (position.role?.name && String(position.role.name).trim()) {
+    return String(position.role.name).trim();
+  }
 
-          if (accountOkButEmailFailed) {
-            toast(
-              <div className="text-left text-sm text-slate-800">
-                <p className="mb-1 font-semibold text-amber-900">Employee updated — email not delivered</p>
-                <p>
-                  Account was updated, but email delivery failed. Please check SMTP credentials or resend later.
-                </p>
-                {smtp ? <p className="mt-1 text-slate-600">{smtp}</p> : null}
-                <p className="mt-2 text-xs text-slate-600">
-                  Fix <code className="rounded bg-slate-100 px-1">SMTP_USER</code> and{' '}
-                  <code className="rounded bg-slate-100 px-1">SMTP_PASS</code>, restart the API, then use resend on the
-                  employee or <code className="rounded bg-slate-100 px-1">POST /api/mail/test</code>.
-                </p>
-              </div>,
-              { icon: '⚠️', duration: 14_000, id: 'provision-mail-update' }
-            );
-          } else if (res.accountProvisioningSuccess === false && smtp) {
-            toast(
-              <div className="text-left text-sm text-slate-800">
-                <p className="mb-1 font-semibold text-amber-900">Employee updated — email not sent</p>
-                <p>{detail}</p>
-                <p className="mt-2 text-xs text-slate-600">
-                  Check <code className="rounded bg-slate-100 px-1">SMTP_USER</code> /{' '}
-                  <code className="rounded bg-slate-100 px-1">SMTP_PASS</code> and restart the backend.
-                </p>
-              </div>,
-              { icon: '⚠️', duration: 12_000, id: 'provision-mail-update' }
-            );
-          } else if (res.accountProvisioningSuccess === false) {
-            toast.error(detail);
-          } else {
-            toast.success(`Employee updated. ${detail}`);
-          }
-        } else {
-          toast.success('Employee updated');
-        }
-      }
-      onSaved();
-      onClose();
-    } catch (e) {
-      toast.error(parseApiError(e));
+  return '';
+};
+
+const positionHasRole = (position?: PositionOption | null) => {
+  if (!position) return false;
+  return Boolean(position.roleId || getRoleNameFromPosition(position));
+};
+
+const toDateInput = (value?: string | null) => {
+  if (!value) return '';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value).slice(0, 10);
+  }
+
+  return date.toISOString().slice(0, 10);
+};
+
+const firstValue = (...values: any[]) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value;
     }
-  };
+  }
 
-  return (
-    <div className="epms-emp-modal-overlay" role="presentation" onClick={onClose}>
-      <div
-        className="epms-emp-modal epms-emp-modal--wide"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="emp-form-title"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <div className="epms-emp-modal__accent" />
-        <div className="epms-emp-modal__head">
-          <h2 id="emp-form-title" className="epms-emp-modal__title">
-            {mode === 'create' ? 'Add employee' : 'Edit employee'}
-          </h2>
-          <button type="button" className="epms-emp-modal__close" onClick={onClose} aria-label="Close">
-            <i className="bi bi-x-lg" aria-hidden />
-          </button>
-        </div>
+  return '';
+};
 
-        <form className="epms-emp-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <div className="epms-emp-form-body">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">
-                  First name <span className="text-red-600">*</span>
-                </span>
-                <input
-                  className="epms-emp-input-field"
-                  autoComplete="given-name"
-                  {...register('firstName')}
-                />
-                {errors.firstName && (
-                  <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>
-                )}
-              </label>
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">
-                  Last name <span className="text-red-600">*</span>
-                </span>
-                <input
-                  className="epms-emp-input-field"
-                  autoComplete="family-name"
-                  {...register('lastName')}
-                />
-                {errors.lastName && (
-                  <p className="mt-1 text-xs text-red-600">{errors.lastName.message}</p>
-                )}
-              </label>
-            </div>
+const EmployeeFormModal = ({
+  open,
+  mode,
+  employee,
+  onClose,
+  onSaved,
+}: EmployeeFormModalProps) => {
+  const [form, setForm] = useState<EmployeeFormState>(emptyForm);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [positions, setPositions] = useState<PositionOption[]>([]);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">Position</span>
-                <select
-                  className="epms-emp-input-field"
-                  disabled={orgPickersLoading}
-                  {...register('positionId')}
-                >
-                  <option value="">
-                    {orgPickersLoading ? 'Loading…' : '—'}
-                  </option>
-                  {positions.map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.positionTitle}
-                      {p.levelCode ? ` (${p.levelCode})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">Department</span>
-                <select
-                  className="epms-emp-input-field"
-                  disabled={orgPickersLoading}
-                  {...register('departmentId')}
-                >
-                  <option value="">
-                    {orgPickersLoading ? 'Loading…' : '—'}
-                  </option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={String(d.id)}>
-                      {d.departmentName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="epms-emp-form-section">
-              <h3>
-                <i className="bi bi-person-vcard" aria-hidden />
-                Contact &amp; identity
-              </h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Phone</span>
-                  <input className="epms-emp-input-field" type="tel" {...register('phoneNumber')} />
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Work email</span>
-                  <input className="epms-emp-input-field" type="email" {...register('email')} />
-                  {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Staff NRC</span>
-                  <input className="epms-emp-input-field" {...register('staffNrc')} />
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Gender</span>
-                  <select className="epms-emp-input-field" {...register('gender')}>
-                    <option value="">—</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Date of birth</span>
-                  <input className="epms-emp-input-field" type="date" {...register('dateOfBirth')} />
-                </label>
-              </div>
-              <div className="mt-3 flex flex-col gap-2">
-                <label className="text-sm text-slate-700">
-                  <input type="checkbox" className="mr-2" {...register('createLoginAccount')} />
-                  Create login account automatically when email is provided
-                </label>
-                <label className="text-sm text-slate-700">
-                  <input type="checkbox" className="mr-2" {...register('sendTemporaryPasswordEmail')} />
-                  Send temporary password onboarding email
-                </label>
-              </div>
-            </div>
-
-            <div className="epms-emp-form-section">
-              <h3>
-                <i className="bi bi-globe2" aria-hidden />
-                Background
-              </h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Race</span>
-                  <input className="epms-emp-input-field" {...register('race')} />
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Religion</span>
-                  <input className="epms-emp-input-field" {...register('religion')} />
-                </label>
-                <label className="epms-emp-field col-span-1 sm:col-span-2 block">
-                  <span className="epms-emp-field__label">Contact address</span>
-                  <textarea className="epms-emp-input-field min-h-[72px]" rows={2} {...register('contactAddress')} />
-                </label>
-                <label className="epms-emp-field col-span-1 sm:col-span-2 block">
-                  <span className="epms-emp-field__label">Permanent address</span>
-                  <textarea className="epms-emp-input-field min-h-[72px]" rows={2} {...register('permanentAddress')} />
-                </label>
-              </div>
-            </div>
-
-            <div className="epms-emp-form-section">
-              <h3>
-                <i className="bi bi-people" aria-hidden />
-                Family
-              </h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Marital status</span>
-                  <input className="epms-emp-input-field" {...register('maritalStatus')} />
-                </label>
-                <div className="hidden sm:block" aria-hidden />
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Spouse name</span>
-                  <input className="epms-emp-input-field" {...register('spouseName')} />
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Spouse NRC</span>
-                  <input className="epms-emp-input-field" {...register('spouseNrc')} />
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Father name</span>
-                  <input className="epms-emp-input-field" {...register('fatherName')} />
-                </label>
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Father NRC</span>
-                  <input className="epms-emp-input-field" {...register('fatherNrc')} />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="epms-emp-form-footer">
-            <button type="button" className="epms-emp-btn epms-emp-btn--ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="epms-emp-btn epms-emp-btn--primary"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <i className="bi bi-hourglass-split" aria-hidden />
-                  Saving…
-                </>
-              ) : mode === 'create' ? (
-                <>
-                  <i className="bi bi-check-lg" aria-hidden />
-                  Create
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-save" aria-hidden />
-                  Save changes
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+  const selectedPosition = useMemo(
+    () =>
+      positions.find((position) => String(position.id) === String(form.positionId)) ??
+      null,
+    [positions, form.positionId],
   );
-};
 
-export default EmployeeFormModal;
- */
-
-
-
-
-
-
-
-
-
-
-import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import toast from 'react-hot-toast';
-import { fetchDepartments, type Department } from '../../services/departmentService';
-import { positionService } from '../../services/positionService';
-import type { PositionResponse } from '../../types/position';
-import {
-  createEmployee,
-  responseToFormDefaults,
-  updateEmployee,
-  previewEmployeeDepartmentTransfer,
-  parseApiError,
-  type EmployeeDepartmentTransferPreview,
-  type EmployeeResponse,
-} from '../../services/employeeService';
-import {
-  defaultEmployeeFormValues,
-  employeeFormSchema,
-  formValuesToPayload,
-  type EmployeeFormValues,
-} from './employeeFormSchema';
-
-type Props = {
-  open: boolean;
-  mode: 'create' | 'edit';
-  employee: EmployeeResponse | null;
-  onClose: () => void;
-  onSaved: () => void;
-};
-
-const toNullableNumber = (value?: string | null): number | null => {
-  if (!value || value === '') {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const EmployeeFormModal = ({ open, mode, employee, onClose, onSaved }: Props) => {
-  const [positions, setPositions] = useState<PositionResponse[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [orgPickersLoading, setOrgPickersLoading] = useState(false);
-
-  const [transferPreview, setTransferPreview] =
-    useState<EmployeeDepartmentTransferPreview | null>(null);
-  const [pendingValues, setPendingValues] = useState<EmployeeFormValues | null>(null);
-  const [selectedTransferTeamId, setSelectedTransferTeamId] = useState('');
-  const [confirmSaving, setConfirmSaving] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<EmployeeFormValues>({
-    resolver: zodResolver(employeeFormSchema),
-    defaultValues: defaultEmployeeFormValues,
-  });
-
-  const selectedCurrentDepartmentId = watch('currentDepartmentId');
-  const selectedParentDepartmentId = watch('parentDepartmentId');
+  const selectedRoleName = getRoleNameFromPosition(selectedPosition);
+  const derivedDashboard = selectedRoleName
+    ? defaultDashboardForRole(selectedRoleName)
+    : null;
 
   const parentDepartmentOptions = useMemo(() => {
+    if (!form.currentDepartmentId) return [];
+
     return departments.filter(
-      (dept) => String(dept.id) !== String(selectedCurrentDepartmentId || '')
+      (department) => String(department.id) !== String(form.currentDepartmentId),
     );
-  }, [departments, selectedCurrentDepartmentId]);
+  }, [departments, form.currentDepartmentId]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
-    setTransferPreview(null);
-    setPendingValues(null);
-    setSelectedTransferTeamId('');
+    const loadLookups = async () => {
+      try {
+        setLoadingLookups(true);
+        setError('');
 
-    if (mode === 'edit' && employee) {
-      reset(responseToFormDefaults(employee));
-    } else {
-      reset(defaultEmployeeFormValues);
-    }
-  }, [open, mode, employee, reset]);
+        const [departmentsResponse, positionsResponse] = await Promise.all([
+          api.get('/departments'),
+          api.get('/positions'),
+        ]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+        const departmentData = unwrap<DepartmentOption[]>(departmentsResponse, []);
+        const positionData = unwrap<PositionOption[]>(positionsResponse, []);
 
-    let cancelled = false;
-    setOrgPickersLoading(true);
-
-    Promise.all([positionService.getPositions(), fetchDepartments()])
-      .then(([posList, deptList]) => {
-        if (!cancelled) {
-          setPositions(posList.filter((p) => p.status !== false));
-          setDepartments(deptList);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPositions([]);
-          setDepartments([]);
-          toast.error('Could not load positions or departments.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setOrgPickersLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
+        setDepartments(Array.isArray(departmentData) ? departmentData : []);
+        setPositions(Array.isArray(positionData) ? positionData : []);
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            'Failed to load employee form options.',
+        );
+      } finally {
+        setLoadingLookups(false);
+      }
     };
+
+    void loadLookups();
   }, [open]);
 
   useEffect(() => {
-    setValue('departmentId', selectedCurrentDepartmentId || '');
+    if (!open) return;
 
-    if (
-      selectedCurrentDepartmentId &&
-      selectedParentDepartmentId &&
-      selectedCurrentDepartmentId === selectedParentDepartmentId
-    ) {
-      setValue('parentDepartmentId', '');
+    if (mode === 'edit' && employee) {
+      setForm({
+        firstName: firstValue(employee.firstName),
+        lastName: firstValue(employee.lastName),
+        positionId: firstValue(employee.positionId, employee.position?.id),
+        currentDepartmentId: firstValue(
+          employee.currentDepartmentId,
+          employee.departmentId,
+          employee.department?.id,
+        ),
+        parentDepartmentId: firstValue(
+          employee.parentDepartmentId,
+          employee.workingDepartmentId,
+          employee.parentDepartment?.id,
+        ),
+
+        phoneNumber: firstValue(employee.phoneNumber, employee.phone),
+        email: firstValue(employee.email, employee.workEmail),
+        staffNrc: firstValue(employee.staffNrc, employee.nrc),
+        gender: firstValue(employee.gender),
+        dateOfBirth: toDateInput(employee.dateOfBirth),
+
+        createLoginAccount: Boolean(employee.email || employee.workEmail || employee.userId),
+        sendTemporaryPasswordEmail: false,
+
+        race: firstValue(employee.race),
+        religion: firstValue(employee.religion),
+        contactAddress: firstValue(employee.contactAddress),
+        permanentAddress: firstValue(employee.permanentAddress),
+        maritalStatus: firstValue(employee.maritalStatus),
+        spouseName: firstValue(employee.spouseName),
+        spouseNrc: firstValue(employee.spouseNrc),
+        fatherName: firstValue(employee.fatherName),
+        fatherNrc: firstValue(employee.fatherNrc),
+      });
+
+      return;
     }
-  }, [selectedCurrentDepartmentId, selectedParentDepartmentId, setValue]);
+
+    setForm(emptyForm);
+  }, [open, mode, employee]);
 
   if (!open) {
     return null;
   }
 
-  const closeModal = () => {
-    setTransferPreview(null);
-    setPendingValues(null);
-    setSelectedTransferTeamId('');
-    onClose();
+  const validate = () => {
+    if (!form.firstName.trim()) return 'First name is required.';
+    if (!form.lastName.trim()) return 'Last name is required.';
+    if (!form.positionId) return 'Position is required.';
+    if (!selectedPosition) return 'Selected position was not found. Please refresh and try again.';
+    if (!positionHasRole(selectedPosition)) {
+      return 'This position does not have a role connected yet. Please connect this position with a role before assigning it to an employee.';
+    }
+    if (!form.currentDepartmentId) return 'Current Department is required.';
+
+    if (form.createLoginAccount && !form.email.trim()) {
+      return 'Work email is required when creating a login account.';
+    }
+
+    return '';
   };
 
-  const showProvisionToast = (
-    action: 'created' | 'updated',
-    res: EmployeeResponse
-  ) => {
-    if (!res.accountProvisioningMessage) {
-      toast.success(`Employee ${action}`);
+  const buildPayload = () => ({
+    firstName: form.firstName.trim(),
+    lastName: form.lastName.trim(),
+
+    positionId: form.positionId ? Number(form.positionId) : null,
+    currentDepartmentId: form.currentDepartmentId
+      ? Number(form.currentDepartmentId)
+      : null,
+    departmentId: form.currentDepartmentId ? Number(form.currentDepartmentId) : null,
+    parentDepartmentId: form.parentDepartmentId
+      ? Number(form.parentDepartmentId)
+      : null,
+
+    phoneNumber: form.phoneNumber.trim() || null,
+    phone: form.phoneNumber.trim() || null,
+    email: form.email.trim() || null,
+    workEmail: form.email.trim() || null,
+    staffNrc: form.staffNrc.trim() || null,
+    nrc: form.staffNrc.trim() || null,
+    gender: form.gender || null,
+    dateOfBirth: form.dateOfBirth || null,
+
+    createLoginAccount: form.createLoginAccount,
+    sendTemporaryPasswordEmail: form.sendTemporaryPasswordEmail,
+
+    race: form.race.trim() || null,
+    religion: form.religion.trim() || null,
+    contactAddress: form.contactAddress.trim() || null,
+    permanentAddress: form.permanentAddress.trim() || null,
+    maritalStatus: form.maritalStatus || null,
+    spouseName: form.spouseName.trim() || null,
+    spouseNrc: form.spouseNrc.trim() || null,
+    fatherName: form.fatherName.trim() || null,
+    fatherNrc: form.fatherNrc.trim() || null,
+  });
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    const validation = validate();
+
+    if (validation) {
+      setError(validation);
       return;
     }
 
-    const smtp = res.accountProvisioningSmtpError?.trim();
-    const detail = `${res.accountProvisioningMessage}${
-      smtp && !res.accountProvisioningMessage.includes(smtp) ? ` ${smtp}` : ''
-    }`;
-
-    const accountOkButEmailFailed = res.accountProvisioningSuccess === true && Boolean(smtp);
-
-    if (accountOkButEmailFailed) {
-      toast(
-        <div className="text-left text-sm text-slate-800">
-          <p className="mb-1 font-semibold text-amber-900">
-            Employee {action} — email not delivered
-          </p>
-          <p>
-            Account was saved, but email delivery failed. Please check SMTP credentials or resend
-            later.
-          </p>
-          {smtp ? <p className="mt-1 text-slate-600">{smtp}</p> : null}
-          <p className="mt-2 text-xs text-slate-600">
-            Fix <code className="rounded bg-slate-100 px-1">SMTP_USER</code> and{' '}
-            <code className="rounded bg-slate-100 px-1">SMTP_PASS</code>, restart the API, then
-            resend from the employee view.
-          </p>
-        </div>,
-        { icon: '⚠️', duration: 14_000, id: `provision-mail-${action}` }
-      );
-      return;
-    }
-
-    if (res.accountProvisioningSuccess === false && smtp) {
-      toast(
-        <div className="text-left text-sm text-slate-800">
-          <p className="mb-1 font-semibold text-amber-900">
-            Employee {action} — email not sent
-          </p>
-          <p>{detail}</p>
-          <p className="mt-2 text-xs text-slate-600">
-            Check <code className="rounded bg-slate-100 px-1">SMTP_USER</code> /{' '}
-            <code className="rounded bg-slate-100 px-1">SMTP_PASS</code> and restart the backend.
-          </p>
-        </div>,
-        { icon: '⚠️', duration: 12_000, id: `provision-mail-${action}` }
-      );
-      return;
-    }
-
-    if (res.accountProvisioningSuccess === false) {
-      toast.error(detail);
-      return;
-    }
-
-    toast.success(`Employee ${action}. ${detail}`);
-  };
-
-  const saveEmployee = async (
-    values: EmployeeFormValues,
-    options?: {
-      confirmDepartmentTransfer?: boolean;
-      transferTeamId?: number | null;
-    }
-  ) => {
-    const payload = {
-      ...formValuesToPayload(values),
-      confirmDepartmentTransfer: options?.confirmDepartmentTransfer ?? false,
-      transferTeamId: options?.transferTeamId ?? null,
-    };
-
-    if (mode === 'create') {
-      const res = await createEmployee(payload);
-      showProvisionToast('created', res);
-    } else if (employee) {
-      const res = await updateEmployee(employee.id, payload);
-      showProvisionToast('updated', res);
-    }
-
-    onSaved();
-    closeModal();
-  };
-
-  const onSubmit = async (values: EmployeeFormValues) => {
     try {
-      if (mode === 'edit' && employee) {
-        const currentDepartmentId = toNullableNumber(values.currentDepartmentId);
-        const parentDepartmentId = toNullableNumber(values.parentDepartmentId);
+      setSaving(true);
+      setError('');
 
-        const preview = await previewEmployeeDepartmentTransfer(
-          employee.id,
-          currentDepartmentId,
-          parentDepartmentId
-        );
+      const payload = buildPayload();
 
-        if (preview.blocked) {
-          toast.error(preview.blockingReason || preview.message || 'Department transfer is blocked.');
-          return;
-        }
-
-        if (preview.requiresConfirmation) {
-          setTransferPreview(preview);
-          setPendingValues(values);
-          setSelectedTransferTeamId('');
-          return;
-        }
+      if (mode === 'edit' && employee?.id) {
+        await api.put(`/employees/${employee.id}`, payload);
+      } else {
+        await api.post('/employees', payload);
       }
 
-      await saveEmployee(values);
-    } catch (e) {
-      toast.error(parseApiError(e));
-    }
-  };
-
-  const confirmDepartmentTransfer = async () => {
-    if (!transferPreview || !pendingValues) {
-      return;
-    }
-
-    if (transferPreview.requiresTeamSelection && !selectedTransferTeamId) {
-      toast.error('Please select a team in the new working department.');
-      return;
-    }
-
-    const selectedTeamId = transferPreview.requiresTeamSelection
-      ? Number.parseInt(selectedTransferTeamId, 10)
-      : null;
-
-    setConfirmSaving(true);
-
-    try {
-      await saveEmployee(pendingValues, {
-        confirmDepartmentTransfer: true,
-        transferTeamId: selectedTeamId,
-      });
-    } catch (e) {
-      toast.error(parseApiError(e));
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          'Employee could not be saved.',
+      );
     } finally {
-      setConfirmSaving(false);
+      setSaving(false);
     }
   };
-
-  const activeTransferTeams =
-    transferPreview?.teams?.filter((team) => team.active) ?? [];
 
   return (
-    <div className="epms-emp-modal-overlay" role="presentation" onClick={closeModal}>
-      <div
-        className="epms-emp-modal epms-emp-modal--wide"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="emp-form-title"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <div className="epms-emp-modal__accent" />
+    <div className="epms-emp-modal-overlay">
+      <div className="epms-emp-modal epms-emp-modal--wide">
+        <div className="employee-modal-header">
+          <div>
+            <h2>{mode === 'edit' ? 'Edit employee' : 'Add employee'}</h2>
+            <p>
+              {mode === 'edit'
+                ? 'Update employee master data. Dashboard is assigned automatically from the selected position.'
+                : 'Create employee master data. Dashboard is assigned automatically from the selected position.'}
+            </p>
+          </div>
 
-        <div className="epms-emp-modal__head">
-          <h2 id="emp-form-title" className="epms-emp-modal__title">
-            {mode === 'create' ? 'Add employee' : 'Edit employee'}
-          </h2>
-
-          <button
-            type="button"
-            className="epms-emp-modal__close"
-            onClick={closeModal}
-            aria-label="Close"
-          >
-            <i className="bi bi-x-lg" aria-hidden />
+          <button type="button" className="employee-modal-close" onClick={onClose}>
+            ×
           </button>
         </div>
 
-        <form className="epms-emp-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <div className="epms-emp-form-body">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">
-                  First name <span className="text-red-600">*</span>
-                </span>
-                <input
-                  className="epms-emp-input-field"
-                  autoComplete="given-name"
-                  {...register('firstName')}
-                />
-                {errors.firstName && (
-                  <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>
-                )}
+        <form onSubmit={handleSubmit} className="employee-form">
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>
+                First name <span className="employee-required">*</span>
               </label>
-
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">
-                  Last name <span className="text-red-600">*</span>
-                </span>
-                <input
-                  className="epms-emp-input-field"
-                  autoComplete="family-name"
-                  {...register('lastName')}
-                />
-                {errors.lastName && (
-                  <p className="mt-1 text-xs text-red-600">{errors.lastName.message}</p>
-                )}
-              </label>
+              <input
+                className="employee-input"
+                value={form.firstName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, firstName: event.target.value }))
+                }
+              />
             </div>
 
-            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">Position</span>
-                <select
-                  className="epms-emp-input-field"
-                  disabled={orgPickersLoading}
-                  {...register('positionId')}
-                >
-                  <option value="">{orgPickersLoading ? 'Loading…' : '—'}</option>
-
-                  {positions.map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.positionTitle}
-                      {p.levelCode ? ` (${p.levelCode})` : ''}
-                    </option>
-                  ))}
-                </select>
+            <div className="employee-field">
+              <label>
+                Last name <span className="employee-required">*</span>
               </label>
-
-              <input type="hidden" {...register('departmentId')} />
-
-              <label className="epms-emp-field block">
-                <span className="epms-emp-field__label">
-                  Current Department <span className="text-red-600">*</span>
-                </span>
-                <select
-                  className="epms-emp-input-field"
-                  disabled={orgPickersLoading}
-                  {...register('currentDepartmentId')}
-                >
-                  <option value="">{orgPickersLoading ? 'Loading…' : '— Select Current Department —'}</option>
-
-                  {departments.map((d) => (
-                    <option key={d.id} value={String(d.id)}>
-                      {d.departmentName}
-                    </option>
-                  ))}
-                </select>
-                {errors.currentDepartmentId && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.currentDepartmentId.message}
-                  </p>
-                )}
-              </label>
-
-              <label className="epms-emp-field block sm:col-span-2">
-                <span className="epms-emp-field__label">Parent Department / Working Department</span>
-                <select
-                  className="epms-emp-input-field"
-                  disabled={orgPickersLoading || !selectedCurrentDepartmentId}
-                  {...register('parentDepartmentId')}
-                >
-                  <option value="">
-                    {!selectedCurrentDepartmentId
-                      ? '— Select Current Department first —'
-                      : '— Same as Current Department —'}
-                  </option>
-
-                  {parentDepartmentOptions.map((d) => (
-                    <option key={d.id} value={String(d.id)}>
-                      {d.departmentName}
-                    </option>
-                  ))}
-                </select>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Blank means the employee works in their Current Department. Select Parent
-                  Department only when the employee is working under another department.
-                </p>
-
-                {errors.parentDepartmentId && (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.parentDepartmentId.message}
-                  </p>
-                )}
-              </label>
-            </div>
-
-            <div className="epms-emp-form-section">
-              <h3>
-                <i className="bi bi-person-vcard" aria-hidden />
-                Contact &amp; identity
-              </h3>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Phone</span>
-                  <input className="epms-emp-input-field" type="tel" {...register('phoneNumber')} />
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Work email</span>
-                  <input className="epms-emp-input-field" type="email" {...register('email')} />
-                  {errors.email && (
-                    <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
-                  )}
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Staff NRC</span>
-                  <input className="epms-emp-input-field" {...register('staffNrc')} />
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Gender</span>
-                  <select className="epms-emp-input-field" {...register('gender')}>
-                    <option value="">—</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Date of birth</span>
-                  <input className="epms-emp-input-field" type="date" {...register('dateOfBirth')} />
-                </label>
-              </div>
-
-              <div className="mt-3 flex flex-col gap-2">
-                <label className="text-sm text-slate-700">
-                  <input type="checkbox" className="mr-2" {...register('createLoginAccount')} />
-                  Create login account automatically when email is provided
-                </label>
-
-                <label className="text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    {...register('sendTemporaryPasswordEmail')}
-                  />
-                  Send temporary password onboarding email
-                </label>
-              </div>
-            </div>
-
-            <div className="epms-emp-form-section">
-              <h3>
-                <i className="bi bi-globe2" aria-hidden />
-                Background
-              </h3>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Race</span>
-                  <input className="epms-emp-input-field" {...register('race')} />
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Religion</span>
-                  <input className="epms-emp-input-field" {...register('religion')} />
-                </label>
-
-                <label className="epms-emp-field col-span-1 sm:col-span-2 block">
-                  <span className="epms-emp-field__label">Contact address</span>
-                  <textarea
-                    className="epms-emp-input-field min-h-[72px]"
-                    rows={2}
-                    {...register('contactAddress')}
-                  />
-                </label>
-
-                <label className="epms-emp-field col-span-1 sm:col-span-2 block">
-                  <span className="epms-emp-field__label">Permanent address</span>
-                  <textarea
-                    className="epms-emp-input-field min-h-[72px]"
-                    rows={2}
-                    {...register('permanentAddress')}
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="epms-emp-form-section">
-              <h3>
-                <i className="bi bi-people" aria-hidden />
-                Family
-              </h3>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Marital status</span>
-                  <input className="epms-emp-input-field" {...register('maritalStatus')} />
-                </label>
-
-                <div className="hidden sm:block" aria-hidden />
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Spouse name</span>
-                  <input className="epms-emp-input-field" {...register('spouseName')} />
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Spouse NRC</span>
-                  <input className="epms-emp-input-field" {...register('spouseNrc')} />
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Father name</span>
-                  <input className="epms-emp-input-field" {...register('fatherName')} />
-                </label>
-
-                <label className="epms-emp-field block">
-                  <span className="epms-emp-field__label">Father NRC</span>
-                  <input className="epms-emp-input-field" {...register('fatherNrc')} />
-                </label>
-              </div>
+              <input
+                className="employee-input"
+                value={form.lastName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, lastName: event.target.value }))
+                }
+              />
             </div>
           </div>
 
-          <div className="epms-emp-form-footer">
-            <button
-              type="button"
-              className="epms-emp-btn epms-emp-btn--ghost"
-              onClick={closeModal}
-            >
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>
+                Position <span className="employee-required">*</span>
+              </label>
+              <select
+                className="employee-input"
+                value={form.positionId}
+                disabled={loadingLookups}
+                onChange={(event) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    positionId: event.target.value,
+                  }));
+                }}
+              >
+                <option value="">— Select Position —</option>
+                {positions.map((position) => {
+                  const roleName = getRoleNameFromPosition(position);
+                  return (
+                    <option key={position.id} value={position.id}>
+                      {getPositionName(position)}
+                      {position.levelCode ? ` (${position.levelCode})` : ''}
+                      {roleName ? ` — ${roleDisplayName(roleName)}` : ' — No role connected'}
+                    </option>
+                  );
+                })}
+              </select>
+              <small>
+                Position role decides the employee dashboard and access.
+              </small>
+            </div>
+
+            <div className="employee-field">
+              <label>
+                Assigned Dashboard <span className="employee-required">*</span>
+              </label>
+              <div
+                className="employee-input"
+                style={{
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: selectedPosition && !positionHasRole(selectedPosition)
+                    ? '#fef2f2'
+                    : '#f8fafc',
+                  color: selectedPosition && !positionHasRole(selectedPosition)
+                    ? '#b91c1c'
+                    : '#334155',
+                  fontWeight: 800,
+                }}
+              >
+                {!selectedPosition
+                  ? 'Select a position first'
+                  : !positionHasRole(selectedPosition)
+                    ? 'No dashboard available. Connect this position with a role first.'
+                    : dashboardDisplayName(derivedDashboard, selectedRoleName)}
+              </div>
+              <small>
+                This field is read-only. It is calculated from the selected position role.
+              </small>
+            </div>
+
+            <div className="employee-field">
+              <label>
+                Current Department <span className="employee-required">*</span>
+              </label>
+              <select
+                className="employee-input"
+                value={form.currentDepartmentId}
+                disabled={loadingLookups}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    currentDepartmentId: event.target.value,
+                    parentDepartmentId:
+                      prev.parentDepartmentId === event.target.value
+                        ? ''
+                        : prev.parentDepartmentId,
+                  }))
+                }
+              >
+                <option value="">— Select Current Department —</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {getDepartmentName(department)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="employee-field">
+              <label>Parent Department / Working Department</label>
+              <select
+                className="employee-input"
+                value={form.parentDepartmentId}
+                disabled={!form.currentDepartmentId || loadingLookups}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    parentDepartmentId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">
+                  {form.currentDepartmentId
+                    ? '— Same as Current Department —'
+                    : '— Select Current Department first —'}
+                </option>
+                {parentDepartmentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {getDepartmentName(department)}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Blank means the employee works in their Current Department. Select Parent
+                Department only when the employee is working under another department.
+              </small>
+            </div>
+          </div>
+
+          <h3 className="employee-form-section-title">Contact & identity</h3>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>Phone</label>
+              <input
+                className="employee-input"
+                value={form.phoneNumber}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, phoneNumber: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Work email</label>
+              <input
+                className="employee-input"
+                type="email"
+                value={form.email}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                    createLoginAccount: event.target.value.trim()
+                      ? prev.createLoginAccount
+                      : false,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Staff NRC</label>
+              <input
+                className="employee-input"
+                value={form.staffNrc}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, staffNrc: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Gender</label>
+              <select
+                className="employee-input"
+                value={form.gender}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, gender: event.target.value }))
+                }
+              >
+                <option value="">—</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="employee-field">
+              <label>Date of birth</label>
+              <input
+                className="employee-input"
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="employee-login-box">
+            <label className="employee-checkbox">
+              <input
+                type="checkbox"
+                checked={form.createLoginAccount}
+                disabled={!form.email.trim()}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    createLoginAccount: event.target.checked,
+                  }))
+                }
+              />
+              Create login account automatically when email is provided
+            </label>
+
+            <label className="employee-checkbox">
+              <input
+                type="checkbox"
+                checked={form.sendTemporaryPasswordEmail}
+                disabled={!form.createLoginAccount}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    sendTemporaryPasswordEmail: event.target.checked,
+                  }))
+                }
+              />
+              Send temporary password onboarding email
+            </label>
+
+            <div className="employee-field" style={{ marginTop: 12 }}>
+              <label>Login dashboard</label>
+              <div
+                className="employee-input"
+                style={{
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                  fontWeight: 800,
+                }}
+              >
+                {selectedPosition && positionHasRole(selectedPosition)
+                  ? dashboardDisplayName(derivedDashboard, selectedRoleName)
+                  : 'Dashboard will appear after selecting a position with a connected role.'}
+              </div>
+              <small>
+                HR cannot manually choose a dashboard here. The selected position decides it.
+              </small>
+            </div>
+          </div>
+
+          <h3 className="employee-form-section-title">Background</h3>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>Race</label>
+              <input
+                className="employee-input"
+                value={form.race}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, race: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Religion</label>
+              <input
+                className="employee-input"
+                value={form.religion}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, religion: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="employee-field">
+            <label>Contact address</label>
+            <textarea
+              className="employee-input employee-textarea"
+              value={form.contactAddress}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  contactAddress: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="employee-field">
+            <label>Permanent address</label>
+            <textarea
+              className="employee-input employee-textarea"
+              value={form.permanentAddress}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  permanentAddress: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <h3 className="employee-form-section-title">Family</h3>
+
+          <div className="employee-form-grid">
+            <div className="employee-field">
+              <label>Marital status</label>
+              <select
+                className="employee-input"
+                value={form.maritalStatus}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    maritalStatus: event.target.value,
+                  }))
+                }
+              >
+                <option value="">—</option>
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+              </select>
+            </div>
+
+            <div className="employee-field">
+              <label>Spouse name</label>
+              <input
+                className="employee-input"
+                value={form.spouseName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, spouseName: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Spouse NRC</label>
+              <input
+                className="employee-input"
+                value={form.spouseNrc}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, spouseNrc: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Father name</label>
+              <input
+                className="employee-input"
+                value={form.fatherName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, fatherName: event.target.value }))
+                }
+              />
+            </div>
+
+            <div className="employee-field">
+              <label>Father NRC</label>
+              <input
+                className="employee-input"
+                value={form.fatherNrc}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, fatherNrc: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          {error && <div className="employee-alert error">{error}</div>}
+
+          <div className="employee-form-actions">
+            <button type="button" className="employee-btn secondary" onClick={onClose}>
               Cancel
             </button>
 
-            <button
-              type="submit"
-              className="epms-emp-btn epms-emp-btn--primary"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <i className="bi bi-hourglass-split" aria-hidden />
-                  Saving…
-                </>
-              ) : mode === 'create' ? (
-                <>
-                  <i className="bi bi-check-lg" aria-hidden />
-                  Create
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-save" aria-hidden />
-                  Save changes
-                </>
-              )}
+            <button type="submit" className="employee-btn primary" disabled={saving}>
+              {saving ? 'Saving...' : mode === 'edit' ? 'Save Changes' : 'Create'}
             </button>
           </div>
         </form>
-
-        {transferPreview && pendingValues && (
-          <div
-            className="epms-emp-modal-overlay"
-            role="presentation"
-            onClick={() => {
-              setTransferPreview(null);
-              setPendingValues(null);
-              setSelectedTransferTeamId('');
-            }}
-          >
-            <div
-              className="epms-emp-modal max-w-lg"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="department-transfer-title"
-              onClick={(ev) => ev.stopPropagation()}
-            >
-              <div className="epms-emp-modal__accent" />
-
-              <div className="epms-emp-modal__head">
-                <h2 id="department-transfer-title" className="epms-emp-modal__title">
-                  Confirm department transfer
-                </h2>
-
-                <button
-                  type="button"
-                  className="epms-emp-modal__close"
-                  onClick={() => {
-                    setTransferPreview(null);
-                    setPendingValues(null);
-                    setSelectedTransferTeamId('');
-                  }}
-                  aria-label="Close"
-                >
-                  <i className="bi bi-x-lg" aria-hidden />
-                </button>
-              </div>
-
-              <div className="epms-emp-form-body">
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                  <p className="font-semibold">This employee is already in a team.</p>
-                  <p className="mt-1">
-                    {transferPreview.message ||
-                      'Changing the working department will affect team, KPI, PIP, and 1:1 planning.'}
-                  </p>
-                </div>
-
-                <dl className="epms-emp-dl epms-emp-dl-2 mt-4">
-                  <div>
-                    <dt>Employee</dt>
-                    <dd>{transferPreview.employeeName || '—'}</dd>
-                  </div>
-
-                  <div>
-                    <dt>Current team</dt>
-                    <dd>{transferPreview.oldTeamName || 'No active team'}</dd>
-                  </div>
-
-                  <div>
-                    <dt>Old working department</dt>
-                    <dd>{transferPreview.oldWorkingDepartmentName || '—'}</dd>
-                  </div>
-
-                  <div>
-                    <dt>New working department</dt>
-                    <dd>{transferPreview.newWorkingDepartmentName || '—'}</dd>
-                  </div>
-                </dl>
-
-                {transferPreview.requiresTeamSelection ? (
-                  <label className="epms-emp-field mt-4 block">
-                    <span className="epms-emp-field__label">
-                      Select new team <span className="text-red-600">*</span>
-                    </span>
-
-                    <select
-                      className="epms-emp-input-field"
-                      value={selectedTransferTeamId}
-                      onChange={(e) => setSelectedTransferTeamId(e.target.value)}
-                    >
-                      <option value="">— Select team —</option>
-
-                      {transferPreview.teams.map((team) => (
-                        <option
-                          key={team.id}
-                          value={String(team.id)}
-                          disabled={!team.active}
-                          style={{
-                            color: team.active ? '#15803d' : '#b91c1c',
-                          }}
-                        >
-                          {team.teamName} ({team.active ? 'Active' : 'Inactive'})
-                        </option>
-                      ))}
-                    </select>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      Inactive teams are shown but cannot be selected.
-                    </p>
-                  </label>
-                ) : activeTransferTeams.length === 0 ? (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                    The new department has no active team yet. HR can still transfer this employee
-                    and create or assign a team later.
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="epms-emp-form-footer">
-                <button
-                  type="button"
-                  className="epms-emp-btn epms-emp-btn--ghost"
-                  disabled={confirmSaving}
-                  onClick={() => {
-                    setTransferPreview(null);
-                    setPendingValues(null);
-                    setSelectedTransferTeamId('');
-                  }}
-                >
-                  No
-                </button>
-
-                <button
-                  type="button"
-                  className="epms-emp-btn epms-emp-btn--primary"
-                  disabled={
-                    confirmSaving ||
-                    (transferPreview.requiresTeamSelection && !selectedTransferTeamId)
-                  }
-                  onClick={confirmDepartmentTransfer}
-                >
-                  {confirmSaving ? (
-                    <>
-                      <i className="bi bi-hourglass-split" aria-hidden />
-                      Saving…
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-check-lg" aria-hidden />
-                      Yes, transfer employee
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

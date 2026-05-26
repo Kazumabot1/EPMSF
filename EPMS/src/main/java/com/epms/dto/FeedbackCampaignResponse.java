@@ -1,6 +1,5 @@
 package com.epms.dto;
 
-import com.epms.entity.enums.FeedbackCampaignRound;
 import lombok.Builder;
 import lombok.Value;
 
@@ -13,8 +12,8 @@ import java.util.List;
 public class FeedbackCampaignResponse {
     Long id;
     String name;
+    String campaignType;
     Integer reviewYear;
-    FeedbackCampaignRound reviewRound;
     LocalDate startDate;
     LocalDate endDate;
     LocalDateTime startAt;
@@ -24,6 +23,11 @@ public class FeedbackCampaignResponse {
     String status;
     Long formId;
     Boolean autoSubmitCompletedDraftsOnClose;
+    Boolean managerFeedbackAnonymous;
+    Boolean peerFeedbackAnonymous;
+    Boolean subordinateFeedbackAnonymous;
+    Boolean selfFeedbackAnonymous;
+    Boolean redistributeMissingRelationshipWeight;
     String earlyCloseRequestStatus;
     LocalDateTime earlyCloseRequestedAt;
     Long earlyCloseRequestedByUserId;

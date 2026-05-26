@@ -17,15 +17,25 @@ public interface EmployeeKpiWorkflowService {
 
     UseKpiTemplateResultDto useCycleForAllActiveDepartments(Integer cycleId);
 
+    UseKpiTemplateResultDto useCyclePeriodForAllActiveDepartments(Integer cycleId, Integer cyclePeriodId);
+
     List<ManagerKpiTemplateSummaryDto> listKpiTemplatesForManagerDepartment();
 
-    List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId);
+    default List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId) {
+        return listDepartmentAssignmentsForManager(kpiFormId, null);
+    }
+
+    List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId, Integer cyclePeriodId);
 
     List<ManagerKpiAssignmentDto> listFinalizedHistoryForManagerDepartment();
 
     ManagerKpiAssignmentDto updateScores(Integer employeeKpiFormId, UpdateEmployeeKpiScoresRequest request);
 
-    UseKpiTemplateResultDto finalizeDepartmentKpi(Integer kpiFormId);
+    default UseKpiTemplateResultDto finalizeDepartmentKpi(Integer kpiFormId) {
+        return finalizeDepartmentKpi(kpiFormId, null);
+    }
+
+    UseKpiTemplateResultDto finalizeDepartmentKpi(Integer kpiFormId, Integer cyclePeriodId);
 
     ManagerKpiAssignmentDto finalizeEmployeeKpi(Integer employeeKpiFormId, FinalizeEmployeeKpiRequest request);
 
@@ -37,6 +47,12 @@ public interface EmployeeKpiWorkflowService {
      * @return number of assignments newly finalized in this run
      */
     int runAutoFinalizePastDueAssignments();
+
+    int runCycleMaintenance();
+
+    void startCycleClosingGrace(Integer cycleId);
+
+    void handleEmployeePositionChanged(Integer employeeId, Integer oldPositionId, Integer newPositionId);
 
     List<HrEmployeeKpiRowDto> listFinalizedForHr();
 

@@ -1,5 +1,6 @@
 package com.epms.service.impl;
 
+import com.epms.dto.AssessmentFormDtos.AssessmentFormActivationPayload;
 import com.epms.dto.AssessmentFormDtos.AssessmentFormPayload;
 import com.epms.dto.AssessmentFormDtos.AssessmentFormResponse;
 import com.epms.dto.AssessmentFormDtos.AssessmentQuestionPayload;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,12 +33,16 @@ import java.util.Objects;
 public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefinitionService {
 
     private static final String RESPONSE_TYPE_YES_NO_RATING = "YES_NO_RATING";
+    private static final String HIDDEN_SECTION_TITLE = "Assessment Subjects";
+    private static final String TARGET_ROLE_EMPLOYEE = "Employee";
 
     private final AssessmentFormDefinitionRepository repository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AssessmentFormResponse> getAll() {
+        expireEndedActiveForms();
+
         return repository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(this::toResponse)
@@ -44,14 +50,16 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AssessmentFormResponse getById(Integer id) {
+        expireEndedActiveForms();
+
         return toResponse(getEntity(id));
     }
 
     @Override
     public AssessmentFormResponse create(AssessmentFormPayload payload) {
-        validate(payload);
+        validateCreatePayload(payload);
 
         String formName = payload.getFormName().trim();
 
@@ -60,7 +68,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         }
 
         AssessmentFormDefinition form = new AssessmentFormDefinition();
-        applyPayload(form, payload);
+        applyCreatePayload(form, payload);
 
         return toResponse(repository.save(form));
     }
@@ -71,10 +79,49 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     }
 
     @Override
+    public AssessmentFormResponse updateActivation(Integer id, AssessmentFormActivationPayload payload) {
+        expireEndedActiveForms();
+
+        if (payload == null || payload.getActive() == null) {
+            throw new BadRequestException("Activation status is required.");
+        }
+
+        AssessmentFormDefinition form = getEntity(id);
+
+        if (Boolean.TRUE.equals(payload.getActive())) {
+            activateForm(form, payload);
+        } else {
+            setInactive(form);
+        }
+
+        return toResponse(repository.save(form));
+    }
+
+    @Override
     public void deactivate(Integer id) {
         AssessmentFormDefinition form = getEntity(id);
-        form.setActive(false);
+        setInactive(form);
         repository.save(form);
+    }
+
+    private void expireEndedActiveForms() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<AssessmentFormDefinition> forms = repository.findAllByOrderByCreatedAtDesc();
+        boolean changed = false;
+
+        for (AssessmentFormDefinition form : forms) {
+            if (Boolean.TRUE.equals(form.getActive())
+                    && form.getEndDate() != null
+                    && !form.getEndDate().isAfter(now)) {
+                form.setActive(false);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            repository.saveAll(forms);
+        }
     }
 
     private AssessmentFormDefinition getEntity(Integer id) {
@@ -82,7 +129,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment form not found with id: " + id));
     }
 
-    private void validate(AssessmentFormPayload payload) {
+    private void validateCreatePayload(AssessmentFormPayload payload) {
         if (payload == null) {
             throw new BadRequestException("Assessment form payload is required.");
         }
@@ -91,47 +138,15 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
             throw new BadRequestException("Form name is required.");
         }
 
-        if (payload.getStartDate() == null) {
-            throw new BadRequestException("Start date is required.");
+        List<AssessmentQuestionPayload> subjects = flattenSubjects(payload);
+
+        if (subjects.isEmpty()) {
+            throw new BadRequestException("Add at least one assessment subject.");
         }
 
-        if (payload.getEndDate() == null) {
-            throw new BadRequestException("End date is required.");
-        }
-
-        if (payload.getStartDate().isAfter(payload.getEndDate())) {
-            throw new BadRequestException("Start date cannot be later than end date.");
-        }
-
-        if (payload.getTargetRoles() == null || payload.getTargetRoles().isEmpty()) {
-            throw new BadRequestException("Select at least one target role.");
-        }
-
-        if (payload.getSections() == null || payload.getSections().isEmpty()) {
-            throw new BadRequestException("Add at least one section.");
-        }
-
-        for (AssessmentSectionPayload section : payload.getSections()) {
-            if (section == null) {
-                throw new BadRequestException("Section payload is invalid.");
-            }
-
-            if (section.getTitle() == null || section.getTitle().isBlank()) {
-                throw new BadRequestException("Every section needs a title.");
-            }
-
-            if (section.getQuestions() == null || section.getQuestions().isEmpty()) {
-                throw new BadRequestException("Every section needs at least one assessment subject.");
-            }
-
-            for (AssessmentQuestionPayload question : section.getQuestions()) {
-                if (question == null) {
-                    throw new BadRequestException("Assessment subject payload is invalid.");
-                }
-
-                if (question.getQuestionText() == null || question.getQuestionText().isBlank()) {
-                    throw new BadRequestException("Every assessment subject needs text.");
-                }
+        for (AssessmentQuestionPayload subject : subjects) {
+            if (subject == null || subject.getQuestionText() == null || subject.getQuestionText().isBlank()) {
+                throw new BadRequestException("Every assessment subject needs text.");
             }
         }
 
@@ -140,6 +155,74 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         for (AssessmentScoreBandPayload band : bands) {
             validateScoreBand(band);
         }
+    }
+
+    private void activateForm(AssessmentFormDefinition form, AssessmentFormActivationPayload payload) {
+        validateActivationPayload(form.getId(), payload);
+
+        form.setStartDate(payload.getStartDate());
+        form.setEndDate(payload.getEndDate());
+        form.setActive(true);
+
+        if (form.getTargetRoles() == null) {
+            form.setTargetRoles(new ArrayList<>());
+        } else {
+            form.getTargetRoles().clear();
+        }
+
+        form.getTargetRoles().add(TARGET_ROLE_EMPLOYEE);
+    }
+    private void validateActivationPayload(Integer currentFormId, AssessmentFormActivationPayload payload) {
+        if (payload.getStartDate() == null) {
+            throw new BadRequestException("Start date and time are required.");
+        }
+
+        if (payload.getEndDate() == null) {
+            throw new BadRequestException("End date and time are required.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime oneYearFromNow = now.plusYears(1);
+
+        if (payload.getStartDate().isBefore(now)) {
+            throw new BadRequestException("Start date and time cannot be in the past.");
+        }
+
+        if (!payload.getEndDate().isAfter(payload.getStartDate())) {
+            throw new BadRequestException("End date and time must be after the start date and time.");
+        }
+
+        if (payload.getStartDate().isAfter(oneYearFromNow) || payload.getEndDate().isAfter(oneYearFromNow)) {
+            throw new BadRequestException("The assessment period must be within one year from now.");
+        }
+
+        List<AssessmentFormDefinition> overlappingForms = repository.findActiveFormsOverlapping(
+                currentFormId,
+                payload.getStartDate(),
+                payload.getEndDate()
+        );
+
+        if (!overlappingForms.isEmpty()) {
+            AssessmentFormDefinition existing = overlappingForms.get(0);
+            throw new BadRequestException(
+                    "Another self-assessment form is already active during the selected period: "
+                            + existing.getFormName()
+                            + ". Please choose a period that does not overlap."
+            );
+        }
+    }
+    private void setInactive(AssessmentFormDefinition form) {
+        if (form == null) {
+            throw new BadRequestException("Assessment form is required.");
+        }
+
+        if (Boolean.TRUE.equals(form.getActive())
+                && form.getStartDate() != null
+                && !form.getStartDate().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("This form has already started and cannot be set inactive.");
+        }
+
+        form.setActive(false);
     }
 
     private void validateScoreBand(AssessmentScoreBandPayload band) {
@@ -160,13 +243,13 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         }
     }
 
-    private void applyPayload(AssessmentFormDefinition form, AssessmentFormPayload payload) {
+    private void applyCreatePayload(AssessmentFormDefinition form, AssessmentFormPayload payload) {
         form.setFormName(payload.getFormName().trim());
         form.setCompanyName(clean(payload.getCompanyName()) == null ? "ACE Data Systems Ltd." : clean(payload.getCompanyName()));
         form.setDescription(clean(payload.getDescription()));
-        form.setStartDate(payload.getStartDate());
-        form.setEndDate(payload.getEndDate());
-        form.setActive(true);
+        form.setStartDate(null);
+        form.setEndDate(null);
+        form.setActive(false);
 
         if (form.getTargetRoles() == null) {
             form.setTargetRoles(new ArrayList<>());
@@ -174,14 +257,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
             form.getTargetRoles().clear();
         }
 
-        form.getTargetRoles().addAll(
-                payload.getTargetRoles()
-                        .stream()
-                        .filter(role -> role != null && !role.isBlank())
-                        .map(String::trim)
-                        .distinct()
-                        .toList()
-        );
+        form.getTargetRoles().add(TARGET_ROLE_EMPLOYEE);
 
         if (form.getTargetDepartmentIds() == null) {
             form.setTargetDepartmentIds(new ArrayList<>());
@@ -205,36 +281,30 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
             form.getSections().clear();
         }
 
-        int sectionIndex = 1;
+        AssessmentFormSectionDefinition section = new AssessmentFormSectionDefinition();
+        section.setForm(form);
+        section.setTitle(HIDDEN_SECTION_TITLE);
+        section.setOrderNo(1);
 
-        for (AssessmentSectionPayload sectionPayload : payload.getSections()) {
-            AssessmentFormSectionDefinition section = new AssessmentFormSectionDefinition();
-
-            section.setForm(form);
-            section.setTitle(sectionPayload.getTitle().trim());
-            section.setOrderNo(sectionPayload.getOrderNo() != null ? sectionPayload.getOrderNo() : sectionIndex);
-
-            if (section.getQuestions() == null) {
-                section.setQuestions(new ArrayList<>());
-            } else {
-                section.getQuestions().clear();
-            }
-
-            for (AssessmentQuestionPayload questionPayload : sectionPayload.getQuestions()) {
-                AssessmentFormQuestionDefinition question = new AssessmentFormQuestionDefinition();
-
-                question.setSection(section);
-                question.setQuestionText(questionPayload.getQuestionText().trim());
-                question.setResponseType(RESPONSE_TYPE_YES_NO_RATING);
-                question.setRequired(questionPayload.getIsRequired() == null || questionPayload.getIsRequired());
-                question.setWeight(1.0);
-
-                section.getQuestions().add(question);
-            }
-
-            form.getSections().add(section);
-            sectionIndex++;
+        if (section.getQuestions() == null) {
+            section.setQuestions(new ArrayList<>());
+        } else {
+            section.getQuestions().clear();
         }
+
+        for (AssessmentQuestionPayload subjectPayload : flattenSubjects(payload)) {
+            AssessmentFormQuestionDefinition question = new AssessmentFormQuestionDefinition();
+
+            question.setSection(section);
+            question.setQuestionText(subjectPayload.getQuestionText().trim());
+            question.setResponseType(RESPONSE_TYPE_YES_NO_RATING);
+            question.setRequired(true);
+            question.setWeight(1.0);
+
+            section.getQuestions().add(question);
+        }
+
+        form.getSections().add(section);
 
         if (form.getScoreBands() == null) {
             form.setScoreBands(new ArrayList<>());
@@ -259,8 +329,18 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         }
     }
 
-    private String resolveResponseType(String responseType) {
-        return RESPONSE_TYPE_YES_NO_RATING;
+    private List<AssessmentQuestionPayload> flattenSubjects(AssessmentFormPayload payload) {
+        if (payload == null || payload.getSections() == null) {
+            return List.of();
+        }
+
+        return payload.getSections()
+                .stream()
+                .filter(Objects::nonNull)
+                .flatMap(section -> section.getQuestions() == null ? List.<AssessmentQuestionPayload>of().stream() : section.getQuestions().stream())
+                .filter(Objects::nonNull)
+                .filter(question -> question.getQuestionText() != null && !question.getQuestionText().isBlank())
+                .toList();
     }
 
     private List<AssessmentScoreBandPayload> scoreBandPayloadsOrDefaults(List<AssessmentScoreBandPayload> payloads) {
@@ -340,8 +420,8 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         response.setDescription(form.getDescription());
         response.setStartDate(form.getStartDate());
         response.setEndDate(form.getEndDate());
-        response.setIsActive(form.getActive());
-        response.setTargetRoles(form.getTargetRoles() == null ? List.of() : form.getTargetRoles());
+        response.setIsActive(Boolean.TRUE.equals(form.getActive()));
+        response.setTargetRoles(form.getTargetRoles() == null || form.getTargetRoles().isEmpty() ? List.of(TARGET_ROLE_EMPLOYEE) : form.getTargetRoles());
         response.setTargetDepartmentIds(form.getTargetDepartmentIds() == null ? List.of() : form.getTargetDepartmentIds());
         response.setCreatedAt(form.getCreatedAt());
         response.setUpdatedAt(form.getUpdatedAt());
@@ -400,7 +480,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         response.setId(question.getId());
         response.setQuestionText(question.getQuestionText());
         response.setResponseType(RESPONSE_TYPE_YES_NO_RATING);
-        response.setIsRequired(question.getRequired());
+        response.setIsRequired(true);
         response.setWeight(1.0);
 
         return response;

@@ -8,7 +8,7 @@ import type {
   UseKpiTemplateResult,
 } from '../types/kpiWorkflow';
 
-const M_BASE = '/manager/kpi-workflow';
+const M_BASE = '/kpi-workflow';
 
 export const kpiWorkflowService = {
   async listManagerTemplates(): Promise<ManagerKpiTemplateSummary[]> {
@@ -20,10 +20,10 @@ export const kpiWorkflowService = {
     }
   },
 
-  async listAssignments(kpiFormId: number): Promise<ManagerKpiAssignment[]> {
+  async listAssignments(kpiFormId: number, cyclePeriodId?: number | null): Promise<ManagerKpiAssignment[]> {
     try {
       const response = await api.get<ManagerKpiAssignment[]>(`${M_BASE}/assignments`, {
-        params: { kpiFormId },
+        params: { kpiFormId, ...(cyclePeriodId != null ? { cyclePeriodId } : {}) },
       });
       return response.data;
     } catch (error) {
@@ -55,9 +55,12 @@ export const kpiWorkflowService = {
     }
   },
 
-  async finalizeDepartment(kpiFormId: number): Promise<UseKpiTemplateResult> {
+  async finalizeDepartment(kpiFormId: number, cyclePeriodId?: number | null): Promise<UseKpiTemplateResult> {
     try {
-      const response = await api.post<UseKpiTemplateResult>(`${M_BASE}/finalize`, { kpiFormId });
+      const response = await api.post<UseKpiTemplateResult>(`${M_BASE}/finalize`, {
+        kpiFormId,
+        ...(cyclePeriodId != null ? { cyclePeriodId } : {}),
+      });
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to finalize KPI.'));

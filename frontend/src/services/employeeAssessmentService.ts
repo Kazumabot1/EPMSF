@@ -303,15 +303,16 @@ export const employeeAssessmentService = {
       return null;
     }
 
-    const lockedStatuses = [
-      'SUBMITTED',
-      'PENDING_MANAGER',
-      'PENDING_DEPARTMENT_HEAD',
-      'PENDING_HR',
-      'APPROVED',
-      'DECLINED',
-      'REJECTED',
-    ];
+const lockedStatuses = [
+  'SUBMITTED',
+  'PENDING_MANAGER',
+  'PENDING_DEPARTMENT_HEAD',
+  'PENDING_HR',
+  'APPROVED',
+  'DECLINED',
+  'REJECTED',
+  'CLOSED_REJECTED',
+];
 
     if (lockedStatuses.includes(template.status)) {
       return template;
@@ -403,6 +404,20 @@ export const employeeAssessmentService = {
     return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
   },
 
+
+async managerDecline(
+  id: number,
+  reason: string,
+  comment?: string,
+): Promise<EmployeeAssessment> {
+  const response = await api.post(`/employee-assessments/${id}/manager-decline`, {
+    reason,
+    comment: comment ?? null,
+  });
+
+  return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
+},
+
   async managerSign(id: number, comment?: string): Promise<EmployeeAssessment> {
     return this.managerRemark(id, comment);
   },
@@ -421,13 +436,14 @@ export const employeeAssessmentService = {
     return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
   },
 
-  async hrDecline(id: number, reason: string, comment?: string): Promise<EmployeeAssessment> {
-    const response = await api.post(`/employee-assessments/${id}/hr-decline`, {
-      reason,
-      comment: comment ?? null,
-    });
-    return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
-  },
+async hrDecline(id: number, reason: string, comment?: string): Promise<EmployeeAssessment> {
+  const response = await api.post(`/employee-assessments/${id}/hr-decline`, {
+    reason,
+    comment: comment ?? null,
+  });
+
+  return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
+},
 
   async getMine(): Promise<AssessmentScoreRow[]> {
     const response = await api.get('/employee-assessments/my-scores');

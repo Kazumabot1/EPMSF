@@ -376,6 +376,19 @@ public class OnboardingEmailService {
         );
     }
 
+    public EmailSendResult sendNotificationTemplateEmail(
+            String toEmail,
+            String subject,
+            String body
+    ) {
+        return sendMimeEmail(
+                toEmail,
+                StringUtils.hasText(subject) ? subject.trim() : "EPMS Notification",
+                StringUtils.hasText(body) ? body.trim() : "",
+                false
+        );
+    }
+
     private EmailSendResult sendMimeEmail(
             String toEmail,
             String subject,

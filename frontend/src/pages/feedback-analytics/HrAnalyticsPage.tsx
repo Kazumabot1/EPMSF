@@ -25,6 +25,17 @@ const ANALYTICS_COLUMNS: Array<{ key: AnalyticsColumn; label: string }> = [
 
 const DEFAULT_ANALYTICS_COLUMNS: AnalyticsColumn[] = ['employee', 'score', 'confidence', 'completion', 'responses', 'breakdown', 'publish', 'summarized'];
 
+const DEFAULT_PUBLISH_PAYLOAD = {
+    scope: 'ALL_READY' as const,
+    includeOverallScore: true,
+    includeCompetencyBreakdown: true,
+    includeSelfVsOthers: true,
+    includeComments: false,
+    includeScoreExplanation: true,
+    notifyEmployees: true,
+};
+
+
 const formatScore = (value?: number | null) => (value == null ? '—' : `${value.toFixed(1)}%`);
 
 const formatDate = (value: string) =>
@@ -85,13 +96,12 @@ const relationshipBreakdown = (item: FeedbackResultItem) => [
     { label: 'Peer', count: item.peerResponses, score: item.peerAverageScore },
     { label: 'Subordinate', count: item.subordinateResponses, score: item.subordinateAverageScore },
     { label: 'Self', count: item.selfResponses ?? 0, score: item.selfAverageScore },
-    { label: 'Project', count: item.projectStakeholderResponses ?? 0, score: item.projectStakeholderAverageScore },
 ].filter(row => Number(row.count ?? 0) > 0);
 
 const HrAnalyticsPage = () => {
     const campaignsQuery = useFeedbackAnalyticsCampaigns();
     const closedCampaigns = useMemo(
-        () => (campaignsQuery.data ?? []).filter((campaign) => campaign.status === 'CLOSED'),
+        () => (campaignsQuery.data ?? []).filter((campaign) => campaign.status === 'CLOSED' || campaign.status === 'PUBLISHED'),
         [campaignsQuery.data],
     );
     const [campaignId, setCampaignId] = useState<number | null>(null);
@@ -189,7 +199,7 @@ const HrAnalyticsPage = () => {
         setActionError('');
         try {
             if (action === 'publish') {
-                await feedbackAnalyticsApi.publishCampaignSummary(campaignId);
+                await feedbackAnalyticsApi.publishCampaignSummary(campaignId, DEFAULT_PUBLISH_PAYLOAD);
                 setActionMessage('Summary published. Target employees can now view their feedback results.');
             } else {
                 await feedbackAnalyticsApi.unpublishCampaignSummary(campaignId);
@@ -205,7 +215,7 @@ const HrAnalyticsPage = () => {
 
     const exportFilteredCsv = () => {
         if (!filteredItems.length) return;
-        const header = ['Employee', 'Employee ID', 'Average Score', 'Category', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager', 'Peer', 'Subordinate', 'Self', 'Project', 'Publish Status', 'Calculation Note'];
+        const header = ['Employee', 'Employee ID', 'Average Score', 'Category', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager', 'Peer', 'Subordinate', 'Self', 'Publish Status', 'Calculation Note'];
         const body = filteredItems.map(item => [
             item.targetEmployeeName,
             item.targetEmployeeId,
@@ -220,7 +230,6 @@ const HrAnalyticsPage = () => {
             item.peerResponses,
             item.subordinateResponses,
             item.selfResponses ?? 0,
-            item.projectStakeholderResponses ?? 0,
             visibilityLabel(item.visibilityStatus),
             item.scoreCalculationNote ?? '',
         ]);

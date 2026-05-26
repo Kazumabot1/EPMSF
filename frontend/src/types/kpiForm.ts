@@ -7,10 +7,12 @@ export interface KpiForm {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
-  kpiUnitId: number;
+  kpiUnitId: number | null;
   kpiUnitName: string;
-  kpiCategoryId: number;
+  kpiUnitLabel?: string | null;
+  kpiCategoryId: number | null;
   kpiCategoryName: string;
+  kpiCategoryLabel?: string | null;
   kpiItemId: number;
   kpiItemName: string;
 }
@@ -19,8 +21,10 @@ export interface KpiFormRequest {
   title: string;
   target: number | null;
   weight: number;
-  kpiUnitId: number;
-  kpiCategoryId: number;
+  kpiUnitId: number | null;
+  kpiUnitLabel?: string | null;
+  kpiCategoryId: number | null;
+  kpiCategoryLabel?: string | null;
   kpiItemId: number;
   createdBy: string;
   createdByUserId?: number | null;
@@ -31,7 +35,9 @@ export interface KpiFormRowDraft {
   rowId: string;
   kpiItemId: number | null;
   kpiCategoryId: number | null;
+  kpiCategoryLabel?: string | null;
   kpiUnitId: number | null;
+  kpiUnitLabel?: string | null;
   target: number | null;
   actual: number | null;
   weight: number | null;

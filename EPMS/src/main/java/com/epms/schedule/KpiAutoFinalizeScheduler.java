@@ -18,8 +18,12 @@ public class KpiAutoFinalizeScheduler {
     public void autoFinalizePastDue() {
         try {
             int n = employeeKpiWorkflowService.runAutoFinalizePastDueAssignments();
+            int maintenance = employeeKpiWorkflowService.runCycleMaintenance();
             if (n > 0) {
                 log.info("KPI auto-finalize: {} assignment(s) finalized after period end.", n);
+            }
+            if (maintenance > 0) {
+                log.info("KPI cycle maintenance: {} cycle/transition item(s) processed.", maintenance);
             }
         } catch (Exception ex) {
             log.warn("KPI auto-finalize job failed: {}", ex.getMessage());

@@ -23,6 +23,7 @@ public class HrEmployeeKpiRowDto {
     private String positionTitle;
 
     private Integer kpiFormId;
+    private Integer cyclePeriodId;
     private String kpiTitle;
     private EmployeeKpiStatus status;
     private Double totalScore;
@@ -33,6 +34,8 @@ public class HrEmployeeKpiRowDto {
 
     private LocalDate periodStartDate;
     private LocalDate periodEndDate;
+    private String graceReason;
+    private LocalDateTime graceEndsAt;
 
     @Builder.Default
     private List<ManagerKpiScoreLineDto> lines = new ArrayList<>();

@@ -1,7 +1,6 @@
 package com.epms.entity;
 
 import com.epms.entity.enums.FeedbackCampaignEarlyCloseStatus;
-import com.epms.entity.enums.FeedbackCampaignRound;
 import com.epms.entity.enums.FeedbackCampaignStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -31,9 +30,8 @@ public class FeedbackCampaign {
     @Column(name = "review_year")
     private Integer reviewYear;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "review_round")
-    private FeedbackCampaignRound reviewRound;
+    @Column(name = "campaign_type", nullable = false)
+    private String campaignType;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -53,11 +51,26 @@ public class FeedbackCampaign {
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
 
-    @Column(name = "form_id", nullable = false)
+    @Column(name = "form_id")
     private Long formId;
 
     @Column(name = "auto_submit_completed_drafts_on_close", nullable = false)
     private Boolean autoSubmitCompletedDraftsOnClose = false;
+
+    @Column(name = "manager_feedback_anonymous", nullable = false)
+    private Boolean managerFeedbackAnonymous = false;
+
+    @Column(name = "peer_feedback_anonymous", nullable = false)
+    private Boolean peerFeedbackAnonymous = true;
+
+    @Column(name = "subordinate_feedback_anonymous", nullable = false)
+    private Boolean subordinateFeedbackAnonymous = true;
+
+    @Column(name = "self_feedback_anonymous", nullable = false)
+    private Boolean selfFeedbackAnonymous = false;
+
+    @Column(name = "redistribute_missing_relationship_weight", nullable = false)
+    private Boolean redistributeMissingRelationshipWeight = true;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "early_close_request_status", nullable = false)
@@ -136,11 +149,26 @@ public class FeedbackCampaign {
         if (this.reviewYear == null && this.startDate != null) {
             this.reviewYear = this.startDate.getYear();
         }
-        if (this.reviewRound == null) {
-            this.reviewRound = FeedbackCampaignRound.ANNUAL;
+        if (this.campaignType == null || this.campaignType.isBlank()) {
+            this.campaignType = "360 Feedback";
         }
         if (this.autoSubmitCompletedDraftsOnClose == null) {
             this.autoSubmitCompletedDraftsOnClose = false;
+        }
+        if (this.managerFeedbackAnonymous == null) {
+            this.managerFeedbackAnonymous = false;
+        }
+        if (this.peerFeedbackAnonymous == null) {
+            this.peerFeedbackAnonymous = true;
+        }
+        if (this.subordinateFeedbackAnonymous == null) {
+            this.subordinateFeedbackAnonymous = true;
+        }
+        if (this.selfFeedbackAnonymous == null) {
+            this.selfFeedbackAnonymous = false;
+        }
+        if (this.redistributeMissingRelationshipWeight == null) {
+            this.redistributeMissingRelationshipWeight = true;
         }
         if (this.earlyCloseRequestStatus == null) {
             this.earlyCloseRequestStatus = FeedbackCampaignEarlyCloseStatus.NONE;

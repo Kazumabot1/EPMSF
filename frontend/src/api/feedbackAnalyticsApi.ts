@@ -3,6 +3,7 @@ import { extractApiErrorMessage } from '../services/apiError';
 import type {
   ApiEnvelope,
   FeedbackCampaignSummary,
+  FeedbackSummaryPublishRequest,
   FeedbackIntegrationScore,
   FeedbackMyResult,
   FeedbackTeamSummary,
@@ -35,10 +36,11 @@ export const feedbackAnalyticsApi = {
     }
   },
 
-  async publishCampaignSummary(campaignId: number): Promise<FeedbackCampaignSummary> {
+  async publishCampaignSummary(campaignId: number, payload: FeedbackSummaryPublishRequest): Promise<FeedbackCampaignSummary> {
     try {
       const response = await api.post<ApiEnvelope<FeedbackCampaignSummary>>(
           `${FEEDBACK_BASE}/campaigns/${campaignId}/summary/publish`,
+          payload,
       );
       return unwrap(response);
     } catch (error) {

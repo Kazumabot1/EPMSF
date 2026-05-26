@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import './ceo-dashboard.css';
 
 interface AppraisalReview {
   id: number;
@@ -77,7 +79,20 @@ const percentText = (value?: number | null) => {
   return `${Number(value).toFixed(0)}%`;
 };
 
+const scoreColor = (value?: number | null) => {
+  const score = Number(value ?? 0);
+
+  if (score >= 86) return { bg: '#dcfce7', color: '#15803d' };
+  if (score >= 71) return { bg: '#dbeafe', color: '#1d4ed8' };
+  if (score >= 60) return { bg: '#f0fdf4', color: '#16a34a' };
+  if (score >= 40) return { bg: '#ffedd5', color: '#c2410c' };
+
+  return { bg: '#fee2e2', color: '#b91c1c' };
+};
+
 const CeoDashboard = () => {
+  const navigate = useNavigate();
+
   const [reviews, setReviews] = useState<AppraisalReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -94,6 +109,7 @@ const CeoDashboard = () => {
       setReviews(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('Failed to load CEO appraisal reports', err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -115,6 +131,15 @@ const CeoDashboard = () => {
       deptPending: reviews.filter((item) => item.reviewStatus === 'DEPT_HEAD_PENDING').length,
       hrPending: reviews.filter((item) => item.reviewStatus === 'HR_PENDING').length,
       completed: reviews.filter((item) => item.reviewStatus === 'COMPLETED').length,
+      averageScore:
+        reviews.length === 0
+          ? 0
+          : reviews
+              .map((item) => Number(item.scorePercent ?? 0))
+              .filter((score) => Number.isFinite(score))
+              .reduce((sum, score) => sum + score, 0) / reviews.length,
+      highPerformers: reviews.filter((item) => Number(item.scorePercent ?? 0) >= 86).length,
+      lowPerformers: reviews.filter((item) => Number(item.scorePercent ?? 0) < 60).length,
     }),
     [reviews],
   );
@@ -142,6 +167,7 @@ const CeoDashboard = () => {
 
   return (
     <div
+      className="executive-fluxen-dashboard"
       style={{
         padding: '2rem',
         maxWidth: '1200px',
@@ -158,7 +184,7 @@ const CeoDashboard = () => {
             background: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
             color: '#fff',
             fontSize: '.75rem',
-            fontWeight: 600,
+            fontWeight: 700,
             padding: '.3rem .8rem',
             borderRadius: '999px',
             marginBottom: '.75rem',
@@ -166,22 +192,22 @@ const CeoDashboard = () => {
             letterSpacing: '.05em',
           }}
         >
-          <i className="bi bi-eye" /> CEO · Read-Only
+          <i className="bi bi-eye" /> Executive · Read-Only
         </span>
 
         <h1
           style={{
             fontSize: '1.8rem',
-            fontWeight: 700,
+            fontWeight: 800,
             color: '#1e293b',
             margin: '0 0 .25rem',
           }}
         >
-          Report Review Centre
+          Executive Dashboard
         </h1>
 
         <p style={{ color: '#64748b', margin: 0 }}>
-          Executive view of appraisal reports. CEO accounts can review reports only.
+          Executive view of appraisal reports, performance summaries, and organization-level reporting.
         </p>
       </div>
 
@@ -192,7 +218,7 @@ const CeoDashboard = () => {
           gap: '.75rem',
           background: '#ede9fe',
           border: '1px solid #c4b5fd',
-          borderRadius: '10px',
+          borderRadius: '12px',
           padding: '1rem 1.25rem',
           marginBottom: '1.5rem',
           fontSize: '.88rem',
@@ -201,42 +227,192 @@ const CeoDashboard = () => {
       >
         <i className="bi bi-info-circle-fill" style={{ fontSize: '1.1rem', flexShrink: 0 }} />
         <span>
-          CEO access is read-only. Creating, editing, signing, submitting, approving, or
-          deleting records remains restricted to Employee, Manager, Department Head, HR,
-          or Admin workflows.
+          Executive access is read-only. Creating, editing, signing, submitting,
+          approving, or deleting records remains restricted to the relevant operational roles.
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.75rem', marginBottom: '1.5rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+          gap: '.75rem',
+          marginBottom: '1.5rem',
+        }}
+      >
         {[
-          { label: 'Total Reports', value: summary.total, color: '#6366f1' },
-          { label: 'Manager Draft', value: summary.draft, color: '#64748b' },
-          { label: 'Dept Head Pending', value: summary.deptPending, color: '#ca8a04' },
-          { label: 'HR Pending', value: summary.hrPending, color: '#2563eb' },
-          { label: 'Completed', value: summary.completed, color: '#16a34a' },
+          { label: 'Total Reports', value: summary.total, color: '#6366f1', icon: 'bi-files' },
+          { label: 'Manager Draft', value: summary.draft, color: '#64748b', icon: 'bi-pencil' },
+          {
+            label: 'Dept Head Pending',
+            value: summary.deptPending,
+            color: '#ca8a04',
+            icon: 'bi-hourglass-split',
+          },
+          { label: 'HR Pending', value: summary.hrPending, color: '#2563eb', icon: 'bi-person-check' },
+          { label: 'Completed', value: summary.completed, color: '#16a34a', icon: 'bi-check-circle' },
+          {
+            label: 'Avg. Score',
+            value: `${Number(summary.averageScore || 0).toFixed(0)}%`,
+            color: '#7c3aed',
+            icon: 'bi-graph-up-arrow',
+          },
+          { label: 'High Performers', value: summary.highPerformers, color: '#15803d', icon: 'bi-stars' },
+          { label: 'Low Performers', value: summary.lowPerformers, color: '#dc2626', icon: 'bi-exclamation-triangle' },
         ].map((chip) => (
           <div
             key={chip.label}
             style={{
               background: '#fff',
               border: '1px solid #e2e8f0',
-              borderRadius: '10px',
-              padding: '.75rem 1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '.6rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,.04)',
-              minWidth: '145px',
+              borderRadius: '14px',
+              padding: '1rem',
+              display: 'grid',
+              gap: '.45rem',
+              boxShadow: '0 12px 30px rgba(15,23,42,.06)',
+              minHeight: 105,
             }}
           >
-            <strong style={{ fontSize: '1.5rem', fontWeight: 700, color: chip.color }}>
+            <span
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 12,
+                display: 'grid',
+                placeItems: 'center',
+                background: `${chip.color}18`,
+                color: chip.color,
+              }}
+            >
+              <i className={`bi ${chip.icon}`} />
+            </span>
+
+            <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: chip.color }}>
               {chip.value}
             </strong>
-            <span style={{ fontSize: '.78rem', color: '#64748b', lineHeight: 1.2 }}>
+
+            <span style={{ fontSize: '.78rem', color: '#64748b', lineHeight: 1.2, fontWeight: 700 }}>
               {chip.label}
             </span>
           </div>
         ))}
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '1rem',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/executive/reports')}
+          style={{
+            border: '1px solid #ddd6fe',
+            background: '#fff',
+            borderRadius: 18,
+            padding: '1.2rem',
+            textAlign: 'left',
+            cursor: 'pointer',
+            boxShadow: '0 12px 30px rgba(15,23,42,.06)',
+          }}
+        >
+          <span
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              display: 'grid',
+              placeItems: 'center',
+              background: '#faf5ff',
+              color: '#7c3aed',
+              fontSize: 20,
+              marginBottom: 10,
+            }}
+          >
+            <i className="bi bi-bar-chart-line" />
+          </span>
+
+          <strong
+            style={{
+              display: 'block',
+              color: '#1e293b',
+              fontSize: '1rem',
+              fontWeight: 900,
+              marginBottom: 6,
+            }}
+          >
+            Reporting & Analytics
+          </strong>
+
+          <small
+            style={{
+              display: 'block',
+              color: '#64748b',
+              fontWeight: 650,
+              lineHeight: 1.5,
+            }}
+          >
+            Open the full executive report dashboard with department and employee performance details.
+          </small>
+        </button>
+
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          style={{
+            border: '1px solid #bfdbfe',
+            background: '#fff',
+            borderRadius: 18,
+            padding: '1.2rem',
+            textAlign: 'left',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            boxShadow: '0 12px 30px rgba(15,23,42,.06)',
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          <span
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              display: 'grid',
+              placeItems: 'center',
+              background: '#eff6ff',
+              color: '#2563eb',
+              fontSize: 20,
+              marginBottom: 10,
+            }}
+          >
+            <i className={`bi ${loading ? 'bi-arrow-repeat' : 'bi-arrow-clockwise'}`} />
+          </span>
+
+          <strong
+            style={{
+              display: 'block',
+              color: '#1e293b',
+              fontSize: '1rem',
+              fontWeight: 900,
+              marginBottom: 6,
+            }}
+          >
+            Refresh Executive Data
+          </strong>
+
+          <small
+            style={{
+              display: 'block',
+              color: '#64748b',
+              fontWeight: 650,
+              lineHeight: 1.5,
+            }}
+          >
+            Reload the latest appraisal review records and dashboard summary.
+          </small>
+        </button>
       </div>
 
       <div
@@ -271,9 +447,9 @@ const CeoDashboard = () => {
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '.6rem .85rem .6rem 2.2rem',
+              padding: '.65rem .85rem .65rem 2.2rem',
               border: '1.5px solid #e2e8f0',
-              borderRadius: '8px',
+              borderRadius: '10px',
               fontSize: '.88rem',
               outline: 'none',
               background: '#fff',
@@ -291,9 +467,9 @@ const CeoDashboard = () => {
             border: '1px solid #c4b5fd',
             background: '#fff',
             color: '#6d28d9',
-            borderRadius: 8,
-            padding: '.6rem .9rem',
-            fontWeight: 600,
+            borderRadius: 10,
+            padding: '.65rem .95rem',
+            fontWeight: 700,
             cursor: loading ? 'not-allowed' : 'pointer',
           }}
         >
@@ -317,12 +493,12 @@ const CeoDashboard = () => {
             background: '#fee2e2',
             border: '1px solid #fca5a5',
             borderRadius: '10px',
-            padding: '1rem 1.25rem',
-            color: '#dc2626',
-            fontSize: '.9rem',
+            padding: '1rem',
+            color: '#991b1b',
+            marginBottom: '1rem',
           }}
         >
-          <i className="bi bi-exclamation-circle" /> {error}
+          {error}
         </div>
       )}
 
@@ -330,174 +506,188 @@ const CeoDashboard = () => {
         <div
           style={{
             background: '#fff',
+            borderRadius: '16px',
             border: '1px solid #e2e8f0',
-            borderRadius: '14px',
             overflow: 'hidden',
-            boxShadow: '0 1px 4px rgba(0,0,0,.05)',
+            boxShadow: '0 14px 40px rgba(15,23,42,.06)',
           }}
         >
           <div
             style={{
-              padding: '1rem 1.25rem',
-              borderBottom: '1px solid #f1f5f9',
+              padding: '1rem 1.2rem',
+              borderBottom: '1px solid #e2e8f0',
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              gap: '.5rem',
+              gap: '1rem',
+              flexWrap: 'wrap',
             }}
           >
-            <i className="bi bi-file-earmark-text" style={{ color: '#7c3aed' }} />
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: '1.05rem',
+                  fontWeight: 900,
+                  color: '#1e293b',
+                }}
+              >
+                Appraisal Report Review Centre
+              </h2>
+              <p
+                style={{
+                  margin: '.25rem 0 0',
+                  color: '#64748b',
+                  fontSize: '.84rem',
+                  fontWeight: 600,
+                }}
+              >
+                Showing {filtered.length} of {reviews.length} appraisal report records.
+              </p>
+            </div>
 
-            <strong style={{ fontSize: '.95rem', color: '#1e293b' }}>
-              Appraisal Reports
-            </strong>
-
-            <span
+            <Link
+              to="/executive/reports"
               style={{
-                marginLeft: 'auto',
-                background: '#ede9fe',
                 color: '#7c3aed',
-                fontSize: '.72rem',
-                fontWeight: 600,
-                padding: '.2rem .6rem',
-                borderRadius: '999px',
+                fontWeight: 900,
+                textDecoration: 'none',
+                fontSize: '.86rem',
               }}
             >
-              {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-            </span>
+              Open full reports <i className="bi bi-arrow-right" />
+            </Link>
           </div>
 
           {filtered.length === 0 ? (
             <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
               <i
                 className="bi bi-inbox"
-                style={{ fontSize: '2rem', display: 'block', marginBottom: '.5rem' }}
+                style={{ display: 'block', fontSize: '2rem', marginBottom: '.5rem' }}
               />
-              {reviews.length === 0 ? 'No appraisal reports found.' : 'No records match your search.'}
+              No reports found.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <tr style={{ background: '#f8fafc' }}>
                     {[
-                      '#',
                       'Employee',
                       'Department',
                       'Cycle',
-                      'Status',
+                      'Review Status',
                       'Score',
-                      'Label',
+                      'Performance',
                       'Manager',
                       'Dept Head',
                       'Updated',
-                      'Comments',
-                    ].map((header) => (
+                    ].map((head) => (
                       <th
-                        key={header}
+                        key={head}
                         style={{
-                          padding: '.75rem 1rem',
                           textAlign: 'left',
-                          fontWeight: 600,
-                          fontSize: '.78rem',
+                          padding: '.85rem 1rem',
+                          fontSize: '.72rem',
                           color: '#64748b',
                           textTransform: 'uppercase',
                           letterSpacing: '.04em',
-                          whiteSpace: 'nowrap',
+                          borderBottom: '1px solid #e2e8f0',
                         }}
                       >
-                        {header}
+                        {head}
                       </th>
                     ))}
                   </tr>
                 </thead>
 
                 <tbody>
-                  {filtered.map((review, index) => {
+                  {filtered.map((review) => {
                     const status = review.reviewStatus ?? 'UNKNOWN';
-                    const color = statusColor[status] ?? {
+                    const statusStyle = statusColor[status] ?? {
                       bg: '#f1f5f9',
                       color: '#475569',
                     };
+                    const scoreStyle = scoreColor(review.scorePercent);
 
                     return (
-                      <tr key={review.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '.75rem 1rem', color: '#94a3b8', fontSize: '.8rem' }}>
-                          {index + 1}
-                        </td>
-
-                        <td style={{ padding: '.75rem 1rem' }}>
-                          <strong style={{ color: '#1e293b' }}>
-                            {review.employeeName || '—'}
+                      <tr key={`${review.id}-${review.appraisalId}`}>
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <strong style={{ display: 'block', color: '#1e293b' }}>
+                            {review.employeeName ?? '—'}
                           </strong>
-                          <div style={{ color: '#64748b', fontSize: '.78rem' }}>
-                            {review.employeeCode || `Report #${review.appraisalId}`}
-                          </div>
+                          <small style={{ color: '#64748b' }}>
+                            {review.employeeCode ?? `Employee #${review.employeeId ?? '—'}`}
+                          </small>
                         </td>
 
-                        <td style={{ padding: '.75rem 1rem', color: '#334155' }}>
-                          {review.departmentName || '—'}
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          {review.departmentName ?? '—'}
                         </td>
 
-                        <td style={{ padding: '.75rem 1rem', color: '#334155' }}>
-                          {review.cycleName || '—'}
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          <strong style={{ display: 'block', color: '#1e293b' }}>
+                            {review.cycleName ?? '—'}
+                          </strong>
+                          <small style={{ color: '#64748b' }}>
+                            {review.reviewType ? formatStatus(review.reviewType) : 'Review'}
+                          </small>
                         </td>
 
-                        <td style={{ padding: '.75rem 1rem' }}>
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
                           <span
                             style={{
-                              background: color.bg,
-                              color: color.color,
-                              fontSize: '.72rem',
-                              fontWeight: 700,
-                              padding: '.2rem .65rem',
+                              display: 'inline-flex',
                               borderRadius: '999px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '.04em',
-                              whiteSpace: 'nowrap',
+                              padding: '.25rem .6rem',
+                              background: statusStyle.bg,
+                              color: statusStyle.color,
+                              fontSize: '.75rem',
+                              fontWeight: 800,
                             }}
                           >
                             {formatStatus(status)}
                           </span>
                         </td>
 
-                        <td style={{ padding: '.75rem 1rem', fontWeight: 600, color: '#1e293b' }}>
-                          {percentText(review.scorePercent)}
-                        </td>
-
-                        <td style={{ padding: '.75rem 1rem', color: '#334155' }}>
-                          {review.performanceLabel || '—'}
-                        </td>
-
-                        <td style={{ padding: '.75rem 1rem', color: '#334155' }}>
-                          {review.managerName || '—'}
-                        </td>
-
-                        <td style={{ padding: '.75rem 1rem', color: '#334155' }}>
-                          {review.departmentHeadName || '—'}
-                        </td>
-
-                        <td style={{ padding: '.75rem 1rem', color: '#64748b' }}>
-                          {formatDate(review.updatedAt)}
-                        </td>
-
-                        <td
-                          style={{
-                            padding: '.75rem 1rem',
-                            color: '#64748b',
-                            maxWidth: '260px',
-                          }}
-                        >
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
                           <span
                             style={{
-                              display: 'block',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
+                              display: 'inline-flex',
+                              borderRadius: '999px',
+                              padding: '.25rem .6rem',
+                              background: scoreStyle.bg,
+                              color: scoreStyle.color,
+                              fontSize: '.75rem',
+                              fontWeight: 900,
                             }}
-                            title={review.comments || review.recommendation || ''}
                           >
-                            {review.comments || review.recommendation || '—'}
+                            {percentText(review.scorePercent)}
                           </span>
+                          <small style={{ display: 'block', color: '#64748b', marginTop: 3 }}>
+                            {review.totalScore ?? '—'} pts
+                          </small>
+                        </td>
+
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          {review.performanceLabel ?? '—'}
+                        </td>
+
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          {review.managerName ?? '—'}
+                        </td>
+
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          {review.departmentHeadName ?? '—'}
+                        </td>
+
+                        <td style={{ padding: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                          {formatDate(
+                            review.updatedAt ||
+                              review.hrApprovedAt ||
+                              review.deptHeadSubmittedAt ||
+                              review.pmSubmittedAt,
+                          )}
                         </td>
                       </tr>
                     );

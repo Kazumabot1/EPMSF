@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../../components/one-on-one.css';
 import { extractErrorMessage } from '../../services/apiError';
-import { authStorage } from '../../services/authStorage';
 import {
   createContinuousFeedback,
-  getContinuousFeedbackTeamEmployees,
+  getContinuousFeedbackEmployees,
   getContinuousFeedbackTeams,
   getGivenContinuousFeedback,
   getReceivedContinuousFeedback,
@@ -14,9 +13,6 @@ import {
 import type { TeamEmployeeOption, TeamOption } from '../../services/oneOnOneService';
 
 const categories = ['Positive', 'Improvement', 'General'];
-
-const normalizeRoleName = (role: string) =>
-  role.replace(/^ROLE_/i, '').replace(/[\s-]+/g, '_').toUpperCase();
 
 const formatDate = (value?: string | null) => {
   if (!value) return '-';
@@ -27,13 +23,7 @@ const formatDate = (value?: string | null) => {
 
 const ContinuousFeedbackPage = () => {
   const location = useLocation();
-  const user = authStorage.getUser();
-
-  const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
-  const isEmployeeView =
-    location.pathname.startsWith('/employee') ||
-    normalizedRoles.includes('EMPLOYEE') ||
-    user?.dashboard === 'EMPLOYEE_DASHBOARD';
+  const isEmployeeView = location.pathname.startsWith('/employee');
 
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [employees, setEmployees] = useState<TeamEmployeeOption[]>([]);
@@ -74,8 +64,14 @@ const ContinuousFeedbackPage = () => {
 
       try {
         if (!isEmployeeView) {
-          const teamData = await getContinuousFeedbackTeams();
-          if (mounted) setTeams(Array.isArray(teamData) ? teamData : []);
+          const [teamData, employeeData] = await Promise.all([
+            getContinuousFeedbackTeams(),
+            getContinuousFeedbackEmployees(null),
+          ]);
+          if (mounted) {
+            setTeams(Array.isArray(teamData) ? teamData : []);
+            setEmployees(Array.isArray(employeeData) ? employeeData : []);
+          }
         }
 
         const historyData = isEmployeeView
@@ -101,9 +97,7 @@ const ContinuousFeedbackPage = () => {
     let mounted = true;
 
     const loadEmployees = async () => {
-      if (!selectedTeamId) {
-        setEmployees([]);
-        setSelectedEmployeeId('');
+      if (isEmployeeView) {
         return;
       }
 
@@ -114,10 +108,11 @@ const ContinuousFeedbackPage = () => {
       setSelectedEmployeeId('');
 
       try {
-        const data = await getContinuousFeedbackTeamEmployees(Number(selectedTeamId));
+        const teamId = selectedTeamId ? Number(selectedTeamId) : null;
+        const data = await getContinuousFeedbackEmployees(teamId);
         if (mounted) setEmployees(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (mounted) setError(extractErrorMessage(err, 'Failed to load team employees.'));
+        if (mounted) setError(extractErrorMessage(err, 'Failed to load eligible employees.'));
       } finally {
         if (mounted) setLoadingEmployees(false);
       }
@@ -128,7 +123,7 @@ const ContinuousFeedbackPage = () => {
     return () => {
       mounted = false;
     };
-  }, [selectedTeamId]);
+  }, [isEmployeeView, selectedTeamId]);
 
   const resetForm = () => {
     setSelectedEmployeeId('');
@@ -142,11 +137,6 @@ const ContinuousFeedbackPage = () => {
 
     setError('');
     setSuccess('');
-
-    if (!selectedTeamId) {
-      setError('Please select a team.');
-      return;
-    }
 
     if (!selectedEmployeeId) {
       setError('Please select an employee.');
@@ -169,7 +159,7 @@ const ContinuousFeedbackPage = () => {
 
     try {
       await createContinuousFeedback({
-        teamId: Number(selectedTeamId),
+        teamId: selectedTeamId ? Number(selectedTeamId) : null,
         employeeId: Number(selectedEmployeeId),
         feedbackText: feedbackText.trim(),
         category,
@@ -192,8 +182,8 @@ const ContinuousFeedbackPage = () => {
         <h1>Continuous Feedback</h1>
         <p>
           {isEmployeeView
-            ? 'View continuous feedback you received from your Project Manager or Team Leader.'
-            : 'Give feedback to active employees from your own teams only.'}
+            ? 'View continuous feedback you received.'
+            : 'Give feedback to eligible employees in your department. Select a team first to narrow the employee list.'}
         </p>
       </div>
 
@@ -204,16 +194,15 @@ const ContinuousFeedbackPage = () => {
         <div className="oom-card">
           <form className="oom-form" onSubmit={handleSubmit}>
             <div className="oom-field">
-              <label className="oom-label">Team</label>
+              <label className="oom-label">Team Optional</label>
               <select
                 className="oom-select"
                 value={selectedTeamId}
                 onChange={(event) => setSelectedTeamId(event.target.value)}
                 disabled={loading || submitting}
-                required
               >
                 <option value="">
-                  {loading ? 'Loading teams...' : teams.length === 0 ? 'No teams found' : '— Select Team —'}
+                  {loading ? 'Loading teams...' : teams.length === 0 ? 'No teams found' : 'All department employees'}
                 </option>
 
                 {teams.map((team) => (
@@ -230,7 +219,7 @@ const ContinuousFeedbackPage = () => {
                 className="oom-input"
                 value={selectedTeam?.departmentName ?? ''}
                 disabled
-                placeholder="Auto selected by team"
+                placeholder="Uses your own department when no team is selected"
               />
             </div>
 
@@ -240,17 +229,15 @@ const ContinuousFeedbackPage = () => {
                 className="oom-select"
                 value={selectedEmployeeId}
                 onChange={(event) => setSelectedEmployeeId(event.target.value)}
-                disabled={!selectedTeamId || loadingEmployees || submitting}
+                disabled={loadingEmployees || submitting}
                 required
               >
                 <option value="">
-                  {!selectedTeamId
-                    ? '— Select a team first —'
-                    : loadingEmployees
-                      ? 'Loading employees...'
-                      : employees.length === 0
-                        ? 'No active employees in this team'
-                        : '— Select Employee —'}
+                  {loadingEmployees
+                    ? 'Loading employees...'
+                    : employees.length === 0
+                      ? 'No eligible employees found'
+                      : '— Select Employee —'}
                 </option>
 
                 {employees.map((employee) => (
@@ -316,7 +303,7 @@ const ContinuousFeedbackPage = () => {
       )}
 
       <div className="oom-card" style={{ marginTop: 20 }}>
-        <h2>{isEmployeeView ? 'Received Feedback' : 'My Feedback History'}</h2>
+        <h2>{isEmployeeView ? 'Received Continuous Feedback' : 'Given Feedback'}</h2>
 
         {loading ? (
           <p>Loading feedback...</p>

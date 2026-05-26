@@ -11,7 +11,7 @@ import type { KpiPositionAssignment } from '../types/kpiPositionAssignment';
 import type { KpiPositionAvailability } from '../types/kpiPositionAvailability';
 import type { PositionResponse } from '../types/position';
 
-import type { KpiTemplateRequest, KpiTemplateResponse } from '../types/kpiTemplate';
+import type { KpiTemplateRequest, KpiTemplateResponse, KpiVersionDetail, KpiVersionSummary } from '../types/kpiTemplate';
 
 
 
@@ -389,6 +389,33 @@ export const kpiTemplateService = {
 
     }
 
+  },
+
+  async getVersionHistory(): Promise<KpiVersionSummary[]> {
+    try {
+      const response = await api.get<KpiVersionSummary[]>(`${BASE}/version-history`);
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load KPI version history.'));
+    }
+  },
+
+  async getTemplateVersions(id: number): Promise<KpiVersionSummary[]> {
+    try {
+      const response = await api.get<KpiVersionSummary[]>(`${BASE}/${id}/versions`);
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load KPI template versions.'));
+    }
+  },
+
+  async getTemplateVersionDetail(id: number, versionNumber: number): Promise<KpiVersionDetail> {
+    try {
+      const response = await api.get<KpiVersionDetail>(`${BASE}/${id}/versions/${versionNumber}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load KPI version detail.'));
+    }
   },
 
 

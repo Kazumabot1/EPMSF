@@ -1,0 +1,521 @@
+.dhsa-page {
+  min-height: 100vh;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(79, 70, 229, 0.13), transparent 32%),
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #faf5ff 100%);
+  color: #0f172a;
+}
+
+.dhsa-shell {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+}
+
+.dhsa-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 26px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(79, 70, 229, 0.25);
+}
+
+.dhsa-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dhsa-hero h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.dhsa-hero p {
+  margin: 8px 0 0;
+  max-width: 720px;
+  color: #e0e7ff;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.dhsa-refresh-btn,
+.dhsa-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 14px;
+  padding: 10px 15px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dhsa-refresh-btn {
+  background: #fff;
+  color: #4f46e5;
+}
+
+.dhsa-view-btn {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.dhsa-view-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dhsa-alert {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dhsa-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.dhsa-filter-card {
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 16px;
+  cursor: pointer;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+}
+
+.dhsa-filter-card.active {
+  border-color: #4f46e5;
+  box-shadow: 0 18px 40px rgba(79, 70, 229, 0.18);
+}
+
+.dhsa-filter-count {
+  display: inline-grid;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  margin-bottom: 10px;
+  border-radius: 13px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.dhsa-filter-card strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.dhsa-filter-card small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.dhsa-table-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.07);
+}
+
+.dhsa-table-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dhsa-table-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.dhsa-table-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dhsa-table-scroll {
+  overflow-x: auto;
+}
+
+.dhsa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dhsa-table th {
+  background: #f8fafc;
+  color: #64748b;
+  text-align: left;
+  padding: 13px 15px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dhsa-table td {
+  padding: 14px 15px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: top;
+}
+
+.dhsa-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.dhsa-table strong {
+  display: block;
+  color: #0f172a;
+  font-weight: 950;
+}
+
+.dhsa-table small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+}
+
+.dhsa-table .right {
+  text-align: right;
+}
+
+.dhsa-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dhsa-status.draft {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dhsa-status.pending {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.dhsa-status.complete {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.dhsa-status.rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.dhsa-status.default {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.dhsa-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 42px 20px;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.dhsa-empty i {
+  font-size: 32px;
+  color: #94a3b8;
+}
+
+.dhsa-spin {
+  animation: dhsaSpin 0.8s linear infinite;
+}
+
+@keyframes dhsaSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dhsa-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(5px);
+}
+
+.dhsa-modal {
+  width: min(1180px, 100%);
+  max-height: 92vh;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.34);
+}
+
+.dhsa-modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dhsa-modal-kicker {
+  margin: 0 0 5px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dhsa-modal-head h3 {
+  margin: 0 0 8px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.dhsa-close-btn {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.dhsa-modal-body {
+  max-height: calc(92vh - 106px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  background: #f8fafc;
+}
+
+.dhsa-detail-grid,
+.dhsa-review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.dhsa-detail-grid div,
+.dhsa-review-grid div {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  padding: 13px;
+}
+
+.dhsa-detail-grid label,
+.dhsa-review-grid label {
+  display: block;
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.dhsa-detail-grid span,
+.dhsa-review-grid span {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.dhsa-rejected-box {
+  margin-bottom: 18px;
+  border: 1px solid #fecaca;
+  border-radius: 20px;
+  background: #fef2f2;
+  padding: 15px;
+  color: #991b1b;
+}
+
+.dhsa-rejected-box strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.dhsa-rejected-box p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dhsa-section {
+  margin-bottom: 18px;
+}
+
+.dhsa-section h4 {
+  margin: 0 0 12px;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.dhsa-section-card {
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.dhsa-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.dhsa-section-title span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 11px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.dhsa-section-title strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.dhsa-question {
+  padding: 15px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dhsa-question:last-child {
+  border-bottom: 0;
+}
+
+.dhsa-question p {
+  margin: 0 0 10px;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 850;
+}
+
+.dhsa-answer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dhsa-answer-row span {
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dhsa-note {
+  border-radius: 18px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 13px 15px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 800;
+}
+
+@media (max-width: 980px) {
+  .dhsa-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dhsa-detail-grid,
+  .dhsa-review-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dhsa-page {
+    padding: 16px;
+  }
+
+  .dhsa-hero {
+    flex-direction: column;
+  }
+
+  .dhsa-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}

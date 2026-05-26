@@ -21,6 +21,9 @@ const sortTemplateSummaries = (rows: ManagerKpiTemplateSummary[]) =>
     return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
   });
 
+const summaryKey = (summary: Pick<ManagerKpiTemplateSummary, 'kpiFormId' | 'cyclePeriodId'>) =>
+  `${summary.kpiFormId}:${summary.cyclePeriodId ?? 'legacy'}`;
+
 function lineEffectivelyScored(
   line: ManagerKpiAssignment['lines'][number],
   draftRaw: string | undefined,
@@ -28,14 +31,14 @@ function lineEffectivelyScored(
   const raw = draftRaw?.trim() ?? '';
   if (raw !== '') {
     const n = Number(raw);
-    return Number.isFinite(n) && !Number.isNaN(n) && n >= 0;
+    return Number.isFinite(n) && !Number.isNaN(n) && n >= 1 && n <= 100 && (line.target == null || n <= line.target);
   }
   return line.score != null;
 }
 
 const ManagerKpiScoringPage = () => {
   const [summaries, setSummaries] = useState<ManagerKpiTemplateSummary[]>([]);
-  const [selectedFormId, setSelectedFormId] = useState<number | ''>('');
+  const [selectedSummaryKey, setSelectedSummaryKey] = useState('');
   const [assignments, setAssignments] = useState<ManagerKpiAssignment[]>([]);
   const [drafts, setDrafts] = useState<DraftScores>({});
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -52,9 +55,9 @@ const ManagerKpiScoringPage = () => {
       setLoadingMeta(true);
       const data = sortTemplateSummaries(await kpiWorkflowService.listManagerTemplates());
       setSummaries(data);
-      setSelectedFormId((prev) => {
+      setSelectedSummaryKey((prev) => {
         if (prev !== '') return prev;
-        return data.length ? data[0].kpiFormId : '';
+        return data.length ? summaryKey(data[0]) : '';
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load KPI list.');
@@ -67,10 +70,10 @@ const ManagerKpiScoringPage = () => {
     void loadSummaries();
   }, [loadSummaries]);
 
-  const loadAssignments = useCallback(async (kpiFormId: number) => {
+  const loadAssignments = useCallback(async (summary: ManagerKpiTemplateSummary) => {
     try {
       setLoadingAssignments(true);
-      const data = await kpiWorkflowService.listAssignments(kpiFormId);
+      const data = await kpiWorkflowService.listAssignments(summary.kpiFormId, summary.cyclePeriodId);
       setAssignments(data);
       const nextDrafts: DraftScores = {};
       for (const row of data) {
@@ -89,13 +92,14 @@ const ManagerKpiScoringPage = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedFormId === '') return;
-    void loadAssignments(selectedFormId);
-  }, [selectedFormId, loadAssignments]);
+    const summary = summaries.find((s) => summaryKey(s) === selectedSummaryKey);
+    if (!summary) return;
+    void loadAssignments(summary);
+  }, [selectedSummaryKey, summaries, loadAssignments]);
 
   const selectedSummary = useMemo(
-    () => summaries.find((s) => s.kpiFormId === selectedFormId),
-    [summaries, selectedFormId],
+    () => summaries.find((s) => summaryKey(s) === selectedSummaryKey),
+    [summaries, selectedSummaryKey],
   );
 
   const assignmentsByPosition = useMemo(() => {
@@ -133,9 +137,26 @@ const ManagerKpiScoringPage = () => {
     });
     for (const row of scores) {
       const av = 'actualValue' in row ? row.actualValue : undefined;
-      if (av != null && (Number.isNaN(av) || av < 0 || !Number.isFinite(av))) {
-        toast.error('Actual values must be non‑negative numbers.');
+      if (av != null && (Number.isNaN(av) || av < 1 || av > 100 || !Number.isFinite(av))) {
+        toast.error('Actual values must be between 1 and 100.');
         return;
+      }
+    }
+    for (let i = 0; i < assignment.lines.length; i += 1) {
+      const line = assignment.lines[i];
+      const raw = map[line.kpiFormItemId]?.trim() ?? '';
+      if (raw === '') continue;
+      const actual = Number(raw);
+      if (line.target != null && Number.isFinite(actual) && actual > line.target) {
+        toast.error(`Row ${i + 1}: Actual % must be less than or equal to Target %.`);
+        return;
+      }
+      if (line.target != null && line.target > 0 && line.weight != null && Number.isFinite(actual)) {
+        const weightScore = ((actual / line.target) * 100 * line.weight) / 100;
+        if (weightScore > line.weight) {
+          toast.error(`Row ${i + 1}: Weight Score must be less than or equal to Weight %.`);
+          return;
+        }
       }
     }
     try {
@@ -156,7 +177,7 @@ const ManagerKpiScoringPage = () => {
   };
 
   const finalize = async () => {
-    if (selectedFormId === '') return;
+    if (!selectedSummary) return;
     const endLabel = formatIsoDate(selectedSummary?.periodEndDate ?? undefined);
     const earlyNote =
       endLabel && selectedSummary?.periodEndDate
@@ -171,10 +192,10 @@ const ManagerKpiScoringPage = () => {
     }
     try {
       setFinalizing(true);
-      const result = await kpiWorkflowService.finalizeDepartment(selectedFormId);
+      const result = await kpiWorkflowService.finalizeDepartment(selectedSummary.kpiFormId, selectedSummary.cyclePeriodId);
       toast.success(`Finalized ${result.assignmentsCreated} employee record(s).`);
       await loadSummaries();
-      await loadAssignments(selectedFormId);
+      await loadAssignments(selectedSummary);
       setModalAssignment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Finalize failed.');
@@ -241,69 +262,44 @@ const ManagerKpiScoringPage = () => {
 
   const periodEndLabel = formatIsoDate(selectedSummary?.periodEndDate ?? undefined);
   const periodStartLabel = formatIsoDate(selectedSummary?.periodStartDate ?? undefined);
+  const officialEndLabel = formatIsoDate(selectedSummary?.graceEndsAt ?? selectedSummary?.periodEndDate ?? undefined);
+  const cycleClosing =
+    selectedSummary?.periodStatus === 'CLOSING' || Boolean(selectedSummary?.graceEndsAt);
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1100px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-      <header style={{ marginBottom: '1.75rem' }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '.4rem',
-            background: 'linear-gradient(135deg,#059669,#34d399)',
-            color: '#fff',
-            fontSize: '.75rem',
-            fontWeight: 600,
-            padding: '.3rem .8rem',
-            borderRadius: '999px',
-            marginBottom: '.75rem',
-            textTransform: 'uppercase',
-            letterSpacing: '.05em',
-          }}
-        >
-          <i className="bi bi-clipboard-data" /> Manager
+    <div className="mx-auto max-w-6xl px-4 py-8 font-sans">
+      <header className="mb-7">
+        <span className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+          <i className="bi bi-clipboard-data" /> KPI Management
         </span>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>Team KPI scoring</h1>
-        <p style={{ color: '#64748b', margin: 0, maxWidth: '640px' }}>
-          Click an employee name to enter <strong>actual</strong> results and save. Achievement % is (actual ÷ target) × 100.
-          When every KPI line is scored for each employee, use <strong>Finalize department KPI</strong> to lock scores, notify
-          your team, alert HR (sidebar notifications), and publish rows under HR → Employee KPI.
+        <h1 className="mb-1.5 text-3xl font-bold text-slate-800">KPI scoring</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-slate-500">
+          Click an employee name to enter <strong>actual</strong> results and save. Achievement % is (actual / target) x 100.
+          When every KPI line is scored for each person in your evaluator scope, use <strong>Finalize KPI</strong> to lock scores,
+          notify score targets, alert HR, and publish rows under HR - Employee KPI.
         </p>
       </header>
 
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'flex-end',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div style={{ flex: '1 1 240px' }}>
-          <label htmlFor="kpi-template-select" style={{ fontSize: '.72rem', fontWeight: 700, color: '#64748b' }}>
+      <div className="mb-6 flex flex-wrap items-end gap-4">
+        <div className="min-w-60 flex-1">
+          <label htmlFor="kpi-template-select" className="text-xs font-bold text-slate-500">
             KPI template
           </label>
           <select
             id="kpi-template-select"
-            style={{
-              marginTop: '.35rem',
-              width: '100%',
-              padding: '.65rem .75rem',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              fontSize: '.9rem',
-            }}
+            className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
             disabled={loadingMeta || summaries.length === 0}
-            value={selectedFormId === '' ? '' : String(selectedFormId)}
-            onChange={(e) => setSelectedFormId(e.target.value === '' ? '' : Number(e.target.value))}
+            value={selectedSummaryKey}
+            onChange={(e) => setSelectedSummaryKey(e.target.value)}
           >
             {summaries.length === 0 ? (
               <option value="">No KPI assignments yet</option>
             ) : (
               summaries.map((s) => (
-                <option key={s.kpiFormId} value={s.kpiFormId}>
+                <option key={summaryKey(s)} value={summaryKey(s)}>
                   {s.title}
+                  {s.periodStartDate ? ` - ${formatIsoDate(s.periodStartDate)}` : ''}
+                  {s.periodStatus === 'CLOSING' || s.graceEndsAt ? ' (Closing)' : ''}
                   {s.openAssignments > 0 ? ` (${s.openAssignments} open)` : ' (complete)'}
                 </option>
               ))
@@ -313,49 +309,34 @@ const ManagerKpiScoringPage = () => {
         <button
           type="button"
           disabled={
-            selectedFormId === '' ||
+            selectedSummaryKey === '' ||
             finalizing ||
             !selectedSummary ||
             selectedSummary.openAssignments === 0
           }
           onClick={() => void finalize()}
-          style={{
-            padding: '.65rem 1.1rem',
-            borderRadius: '10px',
-            border: 'none',
-            background:
-              selectedSummary && selectedSummary.openAssignments > 0 ? '#059669' : '#94a3b8',
-            color: '#fff',
-            fontWeight: 600,
-            cursor:
-              selectedSummary && selectedSummary.openAssignments > 0 ? 'pointer' : 'not-allowed',
-            opacity: selectedSummary && selectedSummary.openAssignments > 0 ? 1 : 0.7,
-          }}
+          className="inline-flex h-11 items-center justify-center rounded-xl bg-emerald-600 px-4 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {finalizing ? 'Finalizing…' : 'Finalize department KPI'}
+          {finalizing ? 'Finalizing...' : 'Finalize KPI'}
         </button>
       </div>
 
       {selectedSummary && (periodStartLabel || periodEndLabel) && (
-        <p
-          style={{
-            margin: '-0.25rem 0 1.25rem',
-            fontSize: '.82rem',
-            color: '#475569',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            padding: '.65rem .85rem',
-          }}
-        >
-          <strong style={{ color: '#334155' }}>Scoring period</strong>
+        <p className="-mt-1 mb-5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <strong className="text-slate-700">Scoring period</strong>
           {periodStartLabel && periodEndLabel ? (
             <>
-              : {periodStartLabel} – {periodEndLabel}. You can finalize before the end date once all lines are complete.
+              : {periodStartLabel} - {periodEndLabel}.{' '}
+              {cycleClosing
+                ? 'HR has closed this cycle; final scoring is available until the official end date.'
+                : 'You can finalize before the end date once all lines are complete.'}
             </>
           ) : periodEndLabel ? (
             <>
-              : ends {periodEndLabel}. You can finalize before the end date once all lines are complete.
+              : ends {periodEndLabel}.{' '}
+              {cycleClosing
+                ? 'HR has closed this cycle; final scoring is available until the official end date.'
+                : 'You can finalize before the end date once all lines are complete.'}
             </>
           ) : (
             <> starts {periodStartLabel}.</>
@@ -363,21 +344,37 @@ const ManagerKpiScoringPage = () => {
         </p>
       )}
 
-      {loadingAssignments && (
-        <p style={{ color: '#64748b', fontSize: '.9rem' }}>Loading assignments…</p>
+      {selectedSummary && cycleClosing && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="flex items-start gap-3">
+            <i className="bi bi-exclamation-triangle-fill mt-0.5 text-amber-600" aria-hidden />
+            <div>
+              <p className="font-bold">KPI cycle closing</p>
+              <p className="mt-1">
+                {officialEndLabel
+                  ? `Official end date is ${officialEndLabel}. Please finalize actual scores before this date.`
+                  : 'Please finalize actual scores before the cycle officially ends.'}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
-      {!loadingAssignments && selectedFormId !== '' && assignments.length > 0 && (
-        <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#fff' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem' }}>
+      {loadingAssignments && (
+        <p className="text-sm text-slate-500">Loading assignments...</p>
+      )}
+
+      {!loadingAssignments && selectedSummaryKey !== '' && assignments.length > 0 && (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr style={{ textAlign: 'left', color: '#64748b', background: '#f8fafc' }}>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Employee</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Position</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Status</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Lines scored</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0' }}>Weighted total</th>
-                <th style={{ padding: '.65rem', borderBottom: '1px solid #e2e8f0', width: '220px' }} />
+              <tr className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="border-b border-slate-200 px-3 py-3">Employee</th>
+                <th className="border-b border-slate-200 px-3 py-3">Position</th>
+                <th className="border-b border-slate-200 px-3 py-3">Status</th>
+                <th className="border-b border-slate-200 px-3 py-3 text-right">Lines scored</th>
+                <th className="border-b border-slate-200 px-3 py-3 text-right">Weighted total</th>
+                <th className="w-56 border-b border-slate-200 px-3 py-3" />
               </tr>
             </thead>
               {assignmentsByPosition.map(({ position, rows }) => (
@@ -385,16 +382,10 @@ const ManagerKpiScoringPage = () => {
                   <tr>
                     <td
                       colSpan={6}
-                      style={{
-                        padding: '.65rem',
-                        borderBottom: '1px solid #e2e8f0',
-                        background: '#f8fafc',
-                        color: '#0f172a',
-                        fontWeight: 700,
-                      }}
+                      className="border-b border-slate-200 bg-slate-50 px-3 py-3 font-bold text-slate-950"
                     >
                       {position}
-                      <span style={{ marginLeft: '.6rem', color: '#64748b', fontSize: '.78rem', fontWeight: 600 }}>
+                      <span className="ml-2 text-xs font-semibold text-slate-500">
                         {rows.length} employee{rows.length === 1 ? '' : 's'}
                       </span>
                     </td>
@@ -408,53 +399,31 @@ const ManagerKpiScoringPage = () => {
                 const isComplete = scored === totalLines && totalLines > 0;
                 return (
                   <tr key={a.employeeKpiFormId}>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <td className="border-b border-slate-100 px-3 py-3">
                       <button
                         type="button"
                         onClick={() => setModalAssignment(a)}
-                        style={{
-                          border: 'none',
-                          background: 'none',
-                          padding: 0,
-                          margin: 0,
-                          font: 'inherit',
-                          fontWeight: 700,
-                          color: '#047857',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          textDecoration: 'underline',
-                          textDecorationColor: 'rgba(4, 120, 87, 0.35)',
-                        }}
+                        className="text-left font-bold text-emerald-700 underline decoration-emerald-700/30 hover:text-emerald-800"
                       >
                         {a.employeeName}
                       </button>
                     </td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+                    <td className="border-b border-slate-100 px-3 py-3 text-slate-600">
                       {a.positionTitle ?? 'No Position Assigned'}
                     </td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>{a.status}</td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+                    <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{a.status}</td>
+                    <td className="border-b border-slate-100 px-3 py-3 text-right tabular-nums text-slate-600">
                       {scored}/{totalLines}
                     </td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9', color: '#0f172a' }}>
+                    <td className="border-b border-slate-100 px-3 py-3 text-right tabular-nums text-slate-950">
                       {a.totalWeightedScore != null ? a.totalWeightedScore.toFixed(2) : '-'}
                     </td>
-                    <td style={{ padding: '.65rem', borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ display: 'flex', gap: '.45rem', justifyContent: 'flex-end' }}>
+                    <td className="border-b border-slate-100 px-3 py-3">
+                      <div className="flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setModalAssignment(a)}
-                          style={{
-                            padding: '.4rem .65rem',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
-                            background: '#fff',
-                            fontSize: '.78rem',
-                            fontWeight: 600,
-                            color: '#334155',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
+                          className="inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                         >
                           {isFinalized ? 'View KPIs' : 'Score KPIs'}
                         </button>
@@ -463,17 +432,7 @@ const ManagerKpiScoringPage = () => {
                           disabled={isFinalized || !isComplete || finalizingEmployeeId === a.employeeKpiFormId}
                           onClick={() => openEmployeeFinalize(a)}
                           title={!isComplete ? 'Complete all KPI rows before finalizing' : 'Finalize this employee KPI'}
-                          style={{
-                            padding: '.4rem .65rem',
-                            borderRadius: '8px',
-                            border: '1px solid #059669',
-                            background: isFinalized || !isComplete ? '#f1f5f9' : '#ecfdf5',
-                            fontSize: '.78rem',
-                            fontWeight: 700,
-                            color: isFinalized || !isComplete ? '#94a3b8' : '#047857',
-                            cursor: isFinalized || !isComplete ? 'not-allowed' : 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
+                          className="inline-flex h-9 items-center rounded-lg border border-emerald-600 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                         >
                           {finalizingEmployeeId === a.employeeKpiFormId ? 'Finalizing...' : 'Finalized'}
                         </button>
@@ -488,8 +447,8 @@ const ManagerKpiScoringPage = () => {
         </div>
       )}
 
-      {!loadingAssignments && selectedFormId !== '' && assignments.length === 0 && (
-        <p style={{ color: '#64748b' }}>No assignments for this template in your department.</p>
+      {!loadingAssignments && selectedSummaryKey !== '' && assignments.length === 0 && (
+        <p className="text-slate-500">No assignments for this template in your KPI evaluator scope.</p>
       )}
 
       <ManagerEmployeeKpiScoreModal
@@ -506,33 +465,16 @@ const ManagerKpiScoringPage = () => {
         <div
           role="dialog"
           aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 60,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1rem',
-            background: 'rgba(15, 23, 42, 0.45)',
-          }}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4"
         >
-          <div
-            style={{
-              width: 'min(520px, 100%)',
-              borderRadius: '12px',
-              background: '#fff',
-              boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)',
-              padding: '1.25rem',
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>
+          <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-950">
               Finalize {finalizeTarget.employeeName}
             </h2>
-            <p style={{ margin: '.5rem 0 1rem', color: '#64748b', fontSize: '.88rem' }}>
+            <p className="mt-2 text-sm text-slate-500">
               This locks the employee KPI result and publishes it immediately to HR and the employee.
             </p>
-            <label htmlFor="finalize-reason" style={{ display: 'block', fontSize: '.78rem', fontWeight: 700, color: '#475569' }}>
+            <label htmlFor="finalize-reason" className="mt-4 block text-xs font-bold text-slate-600">
               Reason
             </label>
             <textarea
@@ -541,19 +483,9 @@ const ManagerKpiScoringPage = () => {
               onChange={(e) => setFinalizeReason(e.target.value)}
               rows={4}
               maxLength={2000}
-              style={{
-                marginTop: '.35rem',
-                width: '100%',
-                resize: 'vertical',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '.7rem',
-                font: 'inherit',
-                color: '#0f172a',
-                boxSizing: 'border-box',
-              }}
+              className="mt-1.5 w-full resize-y rounded-xl border border-slate-300 p-3 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
             />
-            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '.6rem' }}>
+            <div className="mt-4 flex justify-end gap-3">
               <button
                 type="button"
                 disabled={finalizingEmployeeId === finalizeTarget.employeeKpiFormId}
@@ -561,15 +493,7 @@ const ManagerKpiScoringPage = () => {
                   setFinalizeTarget(null);
                   setFinalizeReason('');
                 }}
-                style={{
-                  padding: '.55rem .9rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#fff',
-                  color: '#334155',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                className="inline-flex h-10 items-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -577,15 +501,7 @@ const ManagerKpiScoringPage = () => {
                 type="button"
                 disabled={finalizingEmployeeId === finalizeTarget.employeeKpiFormId || finalizeReason.trim() === ''}
                 onClick={() => void submitEmployeeFinalize()}
-                style={{
-                  padding: '.55rem .9rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: finalizeReason.trim() === '' ? '#94a3b8' : '#059669',
-                  color: '#fff',
-                  fontWeight: 700,
-                  cursor: finalizeReason.trim() === '' ? 'not-allowed' : 'pointer',
-                }}
+                className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {finalizingEmployeeId === finalizeTarget.employeeKpiFormId ? 'Finalizing...' : 'Submit finalization'}
               </button>
@@ -598,3 +514,4 @@ const ManagerKpiScoringPage = () => {
 };
 
 export default ManagerKpiScoringPage;
+

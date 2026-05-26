@@ -1,20 +1,13 @@
 package com.epms.controller;
 
+import com.epms.dto.GenericApiResponse;
+import com.epms.dto.PositionDetailResponseDto;
 import com.epms.dto.PositionRequestDto;
 import com.epms.dto.PositionResponseDto;
 import com.epms.service.PositionService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -26,31 +19,46 @@ public class PositionController {
     private final PositionService positionService;
 
     @PostMapping
-    public ResponseEntity<PositionResponseDto> createPosition(@Valid @RequestBody PositionRequestDto requestDto) {
-        PositionResponseDto responseDto = positionService.create(requestDto);
-        return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
+    public ResponseEntity<GenericApiResponse<PositionResponseDto>> create(
+            @RequestBody PositionRequestDto request
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Position created successfully", positionService.create(request))
+        );
     }
 
     @GetMapping
-    public ResponseEntity<List<PositionResponseDto>> getAllPosition() {
-        return ResponseEntity.ok(positionService.getAll());
+    public ResponseEntity<GenericApiResponse<List<PositionResponseDto>>> getAll() {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Positions fetched successfully", positionService.getAll())
+        );
     }
 
     @GetMapping("/{id}")
-        public ResponseEntity<PositionResponseDto> getPositionById(@PathVariable Integer id) {
-        return ResponseEntity.ok(positionService.getById(id));
+    public ResponseEntity<GenericApiResponse<PositionResponseDto>> getById(
+            @PathVariable Integer id
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Position fetched successfully", positionService.getById(id))
+        );
+    }
+
+    @GetMapping("/{id}/details")
+    public ResponseEntity<GenericApiResponse<PositionDetailResponseDto>> getDetails(
+            @PathVariable Integer id
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Position details fetched successfully", positionService.getDetails(id))
+        );
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PositionResponseDto> updatePosition(
+    public ResponseEntity<GenericApiResponse<PositionResponseDto>> update(
             @PathVariable Integer id,
-            @Valid @RequestBody PositionRequestDto requestDto) {
-        return ResponseEntity.ok(positionService.update(id, requestDto));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletePosition(@PathVariable Integer id) {
-        positionService.delete(id);
-        return ResponseEntity.noContent().build();
+            @RequestBody PositionRequestDto request
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Position updated successfully", positionService.update(id, request))
+        );
     }
 }

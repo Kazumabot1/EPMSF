@@ -16,6 +16,8 @@ public class FeedbackAssignmentDetailResponse {
     LocalDateTime campaignStartAt;
     Long targetEmployeeId;
     String targetEmployeeName;
+    FeedbackAssignmentEmployeeInfoResponse target;
+    FeedbackAssignmentEmployeeInfoResponse evaluator;
     String relationshipType;
     Boolean anonymous;
     String status;
@@ -26,11 +28,16 @@ public class FeedbackAssignmentDetailResponse {
     Boolean autoSubmitCompletedDraftsOnClose;
     String autoSubmitNotice;
     String comments;
+    String assessmentDateText;
+    String effectiveDateText;
     Integer totalQuestionCount;
     Integer requiredQuestionCount;
     Integer answeredQuestionCount;
     Integer answeredRequiredQuestionCount;
     Integer completionPercent;
+    Integer minRequiredCommentLength;
+    Integer maxCommentLength;
+    Integer maxAdditionalCommentLength;
     Boolean finalSubmissionReady;
     Boolean submittedLocked;
     List<FeedbackAssignmentSectionDetailResponse> sections;

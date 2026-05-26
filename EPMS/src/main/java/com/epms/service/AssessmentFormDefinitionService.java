@@ -1,5 +1,6 @@
 package com.epms.service;
 
+import com.epms.dto.AssessmentFormDtos.AssessmentFormActivationPayload;
 import com.epms.dto.AssessmentFormDtos.AssessmentFormPayload;
 import com.epms.dto.AssessmentFormDtos.AssessmentFormResponse;
 
@@ -14,6 +15,8 @@ public interface AssessmentFormDefinitionService {
     AssessmentFormResponse create(AssessmentFormPayload payload);
 
     AssessmentFormResponse update(Integer id, AssessmentFormPayload payload);
+
+    AssessmentFormResponse updateActivation(Integer id, AssessmentFormActivationPayload payload);
 
     void deactivate(Integer id);
 }

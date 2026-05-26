@@ -4,6 +4,7 @@ import com.epms.dto.FeedbackCampaignSummaryResponse;
 import com.epms.dto.FeedbackIntegrationScoreResponse;
 import com.epms.dto.FeedbackMyResultResponse;
 import com.epms.dto.FeedbackTeamSummaryResponse;
+import com.epms.dto.FeedbackSummaryPublishRequest;
 import com.epms.dto.GenericApiResponse;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.security.SecurityUtils;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -50,12 +52,13 @@ public class FeedbackSummaryController {
 
     @PostMapping("/campaigns/{campaignId}/summary/publish")
     public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> publishCampaignSummary(
-            @PathVariable Long campaignId
+            @PathVariable Long campaignId,
+            @RequestBody(required = false) FeedbackSummaryPublishRequest request
     ) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Feedback campaign summary published successfully",
-                feedbackSummaryService.publishCampaignSummary(campaignId, SecurityUtils.currentUserId().longValue())
+                feedbackSummaryService.publishCampaignSummary(campaignId, SecurityUtils.currentUserId().longValue(), request)
         ));
     }
 

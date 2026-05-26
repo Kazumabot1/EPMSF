@@ -8,15 +8,19 @@ export type UseKpiTemplateResult = {
 
 export type ManagerKpiTemplateSummary = {
   kpiFormId: number;
+  cyclePeriodId?: number | null;
   title: string;
   openAssignments: number;
   periodStartDate?: string | null;
   periodEndDate?: string | null;
+  periodStatus?: string | null;
+  graceEndsAt?: string | null;
 };
 
 export type ManagerKpiScoreLine = {
   kpiFormItemId: number;
   kpiLabel: string | null;
+  kpiCategoryName?: string | null;
   weight: number | null;
   target: number | null;
   unitName: string | null;
@@ -30,8 +34,10 @@ export type ManagerKpiAssignment = {
   employeeKpiFormId: number;
   employeeId: number;
   employeeName: string;
+  departmentName?: string | null;
   positionTitle?: string | null;
   kpiFormId?: number | null;
+  cyclePeriodId?: number | null;
   kpiTitle?: string | null;
   status: string;
   totalScore: number | null;
@@ -41,13 +47,17 @@ export type ManagerKpiAssignment = {
   finalizedBeforeEndDate?: boolean | null;
   periodStartDate?: string | null;
   periodEndDate?: string | null;
+  graceReason?: string | null;
+  graceEndsAt?: string | null;
   lines: ManagerKpiScoreLine[];
 };
 
 export type EmployeeKpiResult = {
   employeeKpiFormId: number;
   kpiFormId: number;
+  cyclePeriodId?: number | null;
   kpiTitle: string;
+  positionTitle?: string | null;
   status: string;
   totalScore: number | null;
   totalWeightedScore: number | null;
@@ -64,4 +74,6 @@ export type HrEmployeeKpiRow = EmployeeKpiResult & {
   positionTitle: string | null;
   periodStartDate?: string | null;
   periodEndDate?: string | null;
+  graceReason?: string | null;
+  graceEndsAt?: string | null;
 };

@@ -5,13 +5,20 @@ import com.epms.dto.KpiFormRequestDTO;
 import com.epms.dto.KpiFormResponseDTO;
 import com.epms.dto.KpiPositionAssignmentDto;
 import com.epms.dto.KpiPositionAvailabilityDto;
+import com.epms.dto.KpiVersionHistoryDetailDTO;
+import com.epms.dto.KpiVersionHistorySummaryDTO;
+import com.epms.dto.KpiVersionRowSnapshotDTO;
 import com.epms.dto.PositionResponseDto;
 import com.epms.entity.*;
+import com.epms.entity.enums.KpiChangeType;
+import com.epms.entity.enums.EmployeeKpiStatus;
 import com.epms.entity.enums.KpiFormStatus;
-import com.epms.entity.enums.KpiPositionStatus;
+import com.epms.entity.enums.KpiVersionRowStatus;
 import com.epms.repository.*;
 import com.epms.exception.KpiTemplatePositionConflictException;
 import com.epms.security.SecurityUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.epms.service.KpiFormService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +29,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,7 +53,12 @@ public class KpiFormServiceImpl implements KpiFormService {
     private final KpiCategoryRepository kpiCategoryRepository;
     private final KpiUnitRepository kpiUnitRepository;
     private final KpiItemRepository kpiItemRepository;
+    private final KpiFormItemRepository kpiFormItemRepository;
+    private final EmployeeKpiFormRepository employeeKpiFormRepository;
     private final UserRepository userRepository;
+    private final KpiVersionHistoryRepository kpiVersionHistoryRepository;
+    private final KpiTemplateVersionRowRepository kpiTemplateVersionRowRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -76,6 +96,7 @@ public class KpiFormServiceImpl implements KpiFormService {
         KpiForm saved = kpiFormRepository.save(form);
         // Ensure INSERT is flushed before the follow-up load query (avoids edge-case visibility issues).
         kpiFormRepository.flush();
+        ensureVersionSnapshot(saved, 1, new ArrayList<>(saved.getItems()), KpiVersionRowStatus.INITIAL, author);
         return getTemplateById(saved.getId());
     }
 
@@ -109,16 +130,44 @@ public class KpiFormServiceImpl implements KpiFormService {
         form.setUpdatedByUser(editor);
         applyLifecycleTimestamps(form, status);
 
-        form.getItems().clear();
-        form.getKpiPositions().clear();
+        Integer submittedPositionId = singleSubmittedPositionId(dto.getPositionIds());
+        Integer currentPositionId = currentPositionId(form);
+        boolean positionChanged = currentPositionId == null || !currentPositionId.equals(submittedPositionId);
+        if (positionChanged) {
+            validatePositionCanMoveTo(form, submittedPositionId);
+        }
+
+        List<KpiFormItem> existingItems = new ArrayList<>(form.getItems());
+        RowDiff rowDiff = buildRowDiff(existingItems, dto);
+        Integer previousVersionNumber = form.getVersion() == null ? 1 : form.getVersion();
+        if (rowDiff.hasChanges()) {
+            validateRowChangeReasons(rowDiff);
+            ensureVersionSnapshot(form, previousVersionNumber, existingItems, previousVersionNumber == 1 ? KpiVersionRowStatus.INITIAL : KpiVersionRowStatus.UNCHANGED, editor);
+            form.setVersion((form.getVersion() == null ? 1 : form.getVersion()) + 1);
+        }
+        Integer versionNumber = form.getVersion() == null ? 1 : form.getVersion();
+        if (rowDiff.hasChanges()) {
+            recordRowVersionHistory(form, rowDiff, editor, versionNumber);
+        }
+
+        if (positionChanged) {
+            form.getKpiPositions().clear();
+        }
         // Orphan deletes must hit the database before we insert new links/rows, or MySQL can reject
         // duplicate (kpi_form_id, position_id) on kpi_positions (insert before delete in one flush).
         kpiFormRepository.flush();
 
-        applyPositions(form, dto.getPositionIds());
-        applyItems(form, dto.getItems());
+        if (positionChanged) {
+            applyPositions(form, dto.getPositionIds());
+        }
+        syncItems(form, dto.getItems());
 
-        kpiFormRepository.save(form);
+        kpiFormRepository.saveAndFlush(form);
+        KpiForm persistedForm = kpiFormRepository.findDetailWithItemsById(id).orElse(form);
+        backfillMissingEmployeeScores(persistedForm);
+        if (rowDiff.hasChanges()) {
+            recordVersionCollection(form, rowDiff, dto.getItems(), editor, versionNumber);
+        }
         return getTemplateById(id);
     }
 
@@ -184,6 +233,103 @@ public class KpiFormServiceImpl implements KpiFormService {
                         "No KPI template is assigned to this position."
                 ));
         return getTemplateById(link.getKpiForm().getId());
+    }
+
+    @Override
+    @Transactional
+    public List<KpiVersionHistorySummaryDTO> getVersionHistory() {
+        List<KpiForm> forms = kpiFormRepository.findAllByOrderByCreatedAtDesc();
+        forms.forEach(this::ensureBaselineSnapshot);
+        List<KpiVersionHistorySummaryDTO> summaries = new ArrayList<>(
+                summarizeVersionRows(kpiTemplateVersionRowRepository.findAllByOrderByChangedAtDesc())
+        );
+        mergeMissingHistorySummaries(summaries, summarizeHistory(kpiVersionHistoryRepository.findAllByOrderByChangedAtDesc()));
+        appendBaselineSummaries(summaries, forms);
+        return sortVersionSummaries(summaries);
+    }
+
+    @Override
+    @Transactional
+    public List<KpiVersionHistorySummaryDTO> getTemplateVersions(Integer templateId) {
+        KpiForm form = kpiFormRepository.findById(templateId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
+        ensureBaselineSnapshot(form);
+        List<KpiVersionHistorySummaryDTO> summaries = new ArrayList<>(
+                summarizeVersionRows(kpiTemplateVersionRowRepository.findByKpiForm_IdOrderByVersionNumberDescChangedAtDesc(templateId))
+        );
+        mergeMissingHistorySummaries(summaries, summarizeHistory(kpiVersionHistoryRepository.findByKpiForm_IdOrderByVersionNumberDescChangedAtDesc(templateId)));
+        appendBaselineSummaries(summaries, List.of(form));
+        return sortVersionSummaries(summaries);
+    }
+
+    @Override
+    @Transactional
+    public KpiVersionHistoryDetailDTO getTemplateVersionDetail(Integer templateId, Integer versionNumber) {
+        KpiForm form = kpiFormRepository.findById(templateId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
+        if (versionNumber == 1) {
+            ensureBaselineSnapshot(form);
+        }
+        List<KpiTemplateVersionRow> collectionRows = kpiTemplateVersionRowRepository
+                .findByKpiForm_IdAndVersionNumberOrderByIdAsc(templateId, versionNumber);
+        if (!collectionRows.isEmpty()) {
+            KpiTemplateVersionRow last = collectionRows.get(collectionRows.size() - 1);
+            return KpiVersionHistoryDetailDTO.builder()
+                    .templateId(form.getId())
+                    .templateTitle(form.getTitle())
+                    .versionNumber(versionNumber)
+                    .versionTitle(versionTitle(form, versionNumber))
+                    .positionName(positionName(form))
+                    .createdAt(form.getCreatedAt())
+                    .editedAt(last.getChangedAt())
+                    .editedBy(displayUser(last))
+                    .changes(collectionRows.stream()
+                            .map(row -> KpiVersionHistoryDetailDTO.RowChangeDTO.builder()
+                                    .historyId(row.getId())
+                                    .changeType(changeTypeForStatus(row.getRowStatus()))
+                                    .rowStatus(row.getRowStatus())
+                                    .reason(row.getReason())
+                                    .changedAt(row.getChangedAt())
+                                    .changedBy(displayUser(row))
+                                    .initialVersion(row.getRowStatus() == KpiVersionRowStatus.INITIAL)
+                                    .row(readSnapshot(row))
+                                    .build())
+                            .toList())
+                    .build();
+        }
+        List<KpiVersionHistory> rows = kpiVersionHistoryRepository
+                .findByKpiForm_IdAndVersionNumberOrderByChangedAtAsc(templateId, versionNumber);
+        if (rows.isEmpty()) {
+            Integer fallbackVersion = form.getVersion() == null ? 1 : form.getVersion();
+            if (!versionNumber.equals(fallbackVersion) && versionNumber != 1) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI version history not found");
+            }
+            KpiForm detailForm = kpiFormRepository.findDetailWithItemsById(templateId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
+            return baselineDetail(detailForm, versionNumber);
+        }
+        KpiVersionHistory last = rows.get(rows.size() - 1);
+        return KpiVersionHistoryDetailDTO.builder()
+                .templateId(form.getId())
+                .templateTitle(form.getTitle())
+                .versionNumber(versionNumber)
+                .versionTitle(versionTitle(form, versionNumber))
+                .positionName(positionName(form))
+                .createdAt(form.getCreatedAt())
+                .editedAt(last.getChangedAt())
+                .editedBy(displayUser(last))
+                .changes(rows.stream()
+                        .map(history -> KpiVersionHistoryDetailDTO.RowChangeDTO.builder()
+                                .historyId(history.getId())
+                                .changeType(history.getChangeType())
+                                .rowStatus(history.getChangeType() == KpiChangeType.DELETED ? KpiVersionRowStatus.REMOVED : KpiVersionRowStatus.ADDED)
+                                .reason(history.getChangedReason())
+                                .changedAt(history.getChangedAt())
+                                .changedBy(displayUser(history))
+                                .row(readSnapshot(history))
+                                .build())
+                        .toList())
+                .build();
     }
 
     @Override
@@ -362,9 +508,11 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .kpiItemId(ki != null ? ki.getId() : null)
                 .kpiItemName(ki != null ? ki.getName() : null)
                 .kpiCategoryId(cat != null ? cat.getId() : null)
-                .kpiCategoryName(cat != null ? cat.getName() : null)
+                .kpiCategoryName(categoryDisplayName(item))
+                .kpiCategoryLabel(item.getKpiCategoryLabel())
                 .kpiUnitId(unit != null ? unit.getId() : null)
-                .kpiUnitName(unit != null ? unit.getName() : null)
+                .kpiUnitName(unitDisplayName(item))
+                .kpiUnitLabel(item.getKpiUnitLabel())
                 .target(item.getTarget())
                 .weight(item.getWeight())
                 .sortOrder(item.getSortOrder())
@@ -372,6 +520,481 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .score(null)
                 .weightedScore(null)
                 .build();
+    }
+
+    private void ensureTemplateExists(Integer templateId) {
+        if (!kpiFormRepository.existsById(templateId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found");
+        }
+    }
+
+    private RowDiff buildRowDiff(List<KpiFormItem> existingItems, KpiFormRequestDTO dto) {
+        Map<Integer, KpiFormItem> existingById = existingItems.stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(KpiFormItem::getId, Function.identity()));
+        Set<Integer> submittedIds = dto.getItems().stream()
+                .map(KpiFormItemDTO::getId)
+                .filter(id -> id != null && existingById.containsKey(id))
+                .collect(Collectors.toSet());
+        List<KpiFormItemDTO> addedRows = dto.getItems().stream()
+                .filter(row -> row.getId() == null || !existingById.containsKey(row.getId()))
+                .toList();
+        List<KpiFormItem> removedRows = existingItems.stream()
+                .filter(item -> item.getId() != null && !submittedIds.contains(item.getId()))
+                .toList();
+        return new RowDiff(addedRows, removedRows, dto.getRemovedItemReasons());
+    }
+
+    private void validateRowChangeReasons(RowDiff rowDiff) {
+        for (KpiFormItemDTO added : rowDiff.addedRows()) {
+            if (isBlank(added.getChangeReason())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required when adding KPI rows.");
+            }
+        }
+        for (KpiFormItem removed : rowDiff.removedRows()) {
+            String reason = rowDiff.removedReasons().get(removed.getId());
+            if (isBlank(reason)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required when removing KPI rows.");
+            }
+        }
+    }
+
+    private void recordRowVersionHistory(KpiForm form, RowDiff rowDiff, User editor, Integer versionNumber) {
+        List<KpiVersionHistory> rows = new ArrayList<>();
+        for (KpiFormItem removed : rowDiff.removedRows()) {
+            String reason = rowDiff.removedReasons().get(removed.getId()).trim();
+            rows.add(KpiVersionHistory.builder()
+                    .kpiForm(form)
+                    .columnName("items")
+                    .oldValue(writeSnapshot(snapshot(removed)))
+                    .changedReason(reason)
+                    .modifiedByUser(editor)
+                    .modifiedBy(displayUser(editor))
+                    .versionNumber(versionNumber)
+                    .changeType(KpiChangeType.DELETED)
+                    .build());
+        }
+        for (KpiFormItemDTO added : rowDiff.addedRows()) {
+            String reason = added.getChangeReason().trim();
+            rows.add(KpiVersionHistory.builder()
+                    .kpiForm(form)
+                    .columnName("items")
+                    .newValue(writeSnapshot(snapshot(added)))
+                    .changedReason(reason)
+                    .modifiedByUser(editor)
+                    .modifiedBy(displayUser(editor))
+                    .versionNumber(versionNumber)
+                    .changeType(KpiChangeType.CREATED)
+                    .build());
+        }
+        kpiVersionHistoryRepository.saveAll(rows);
+    }
+
+    private void ensureVersionSnapshot(
+            KpiForm form,
+            Integer versionNumber,
+            List<KpiFormItem> items,
+            KpiVersionRowStatus rowStatus,
+            User actor
+    ) {
+        if (form.getId() == null || kpiTemplateVersionRowRepository.existsByKpiForm_IdAndVersionNumber(form.getId(), versionNumber)) {
+            return;
+        }
+        List<KpiTemplateVersionRow> rows = items.stream()
+                .sorted(Comparator.comparing(item -> item.getSortOrder() == null ? 0 : item.getSortOrder()))
+                .map(item -> versionRow(
+                        form,
+                        versionNumber,
+                        rowStatus,
+                        snapshot(item),
+                        rowStatus == KpiVersionRowStatus.INITIAL ? "Initial template version" : null,
+                        form.getCreatedAt(),
+                        actor
+                ))
+                .toList();
+        kpiTemplateVersionRowRepository.saveAll(rows);
+    }
+
+    private void ensureBaselineSnapshot(KpiForm form) {
+        if (form.getId() == null || kpiTemplateVersionRowRepository.existsByKpiForm_IdAndVersionNumber(form.getId(), 1)) {
+            return;
+        }
+        KpiForm detailForm = kpiFormRepository.findDetailWithItemsById(form.getId()).orElse(form);
+        ensureVersionSnapshot(
+                detailForm,
+                1,
+                new ArrayList<>(detailForm.getItems()),
+                KpiVersionRowStatus.INITIAL,
+                detailForm.getCreatedByUser()
+        );
+    }
+
+    private void recordVersionCollection(
+            KpiForm form,
+            RowDiff rowDiff,
+            List<KpiFormItemDTO> submittedRows,
+            User editor,
+            Integer versionNumber
+    ) {
+        if (form.getId() == null || kpiTemplateVersionRowRepository.existsByKpiForm_IdAndVersionNumber(form.getId(), versionNumber)) {
+            return;
+        }
+        Set<Integer> removedIds = rowDiff.removedRows().stream()
+                .map(KpiFormItem::getId)
+                .collect(Collectors.toSet());
+        List<KpiTemplateVersionRow> rows = new ArrayList<>();
+        for (KpiFormItemDTO submitted : submittedRows) {
+            KpiVersionRowStatus status = submitted.getId() == null
+                    || removedIds.contains(submitted.getId())
+                    || rowDiff.addedRows().contains(submitted)
+                    ? KpiVersionRowStatus.ADDED
+                    : KpiVersionRowStatus.UNCHANGED;
+            String reason = status == KpiVersionRowStatus.ADDED ? submitted.getChangeReason() : null;
+            rows.add(versionRow(form, versionNumber, status, snapshot(submitted), reason, LocalDateTime.now(), editor));
+        }
+        for (KpiFormItem removed : rowDiff.removedRows()) {
+            rows.add(versionRow(
+                    form,
+                    versionNumber,
+                    KpiVersionRowStatus.REMOVED,
+                    snapshot(removed),
+                    rowDiff.removedReasons().get(removed.getId()),
+                    LocalDateTime.now(),
+                    editor
+            ));
+        }
+        kpiTemplateVersionRowRepository.saveAll(rows);
+    }
+
+    private KpiTemplateVersionRow versionRow(
+            KpiForm form,
+            Integer versionNumber,
+            KpiVersionRowStatus status,
+            KpiVersionRowSnapshotDTO snapshot,
+            String reason,
+            LocalDateTime changedAt,
+            User actor
+    ) {
+        return KpiTemplateVersionRow.builder()
+                .kpiForm(form)
+                .versionNumber(versionNumber)
+                .rowStatus(status)
+                .rowSnapshot(writeSnapshot(snapshot))
+                .reason(reason)
+                .changedAt(changedAt)
+                .changedByUser(actor)
+                .changedBy(displayUser(actor))
+                .build();
+    }
+
+    private List<KpiVersionHistorySummaryDTO> summarizeVersionRows(List<KpiTemplateVersionRow> rows) {
+        Map<String, List<KpiTemplateVersionRow>> grouped = rows.stream()
+                .filter(row -> row.getKpiForm() != null && row.getVersionNumber() != null)
+                .collect(Collectors.groupingBy(
+                        row -> row.getKpiForm().getId() + ":" + row.getVersionNumber(),
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        return grouped.values().stream()
+                .map(group -> {
+                    KpiTemplateVersionRow first = group.get(0);
+                    KpiTemplateVersionRow latest = group.stream()
+                            .max(Comparator.comparing(KpiTemplateVersionRow::getChangedAt))
+                            .orElse(first);
+                    KpiForm form = first.getKpiForm();
+                    return KpiVersionHistorySummaryDTO.builder()
+                            .templateId(form.getId())
+                            .templateTitle(form.getTitle())
+                            .versionNumber(first.getVersionNumber())
+                            .versionTitle(versionTitle(form, first.getVersionNumber()))
+                            .positionName(positionName(form))
+                            .createdAt(form.getCreatedAt())
+                            .editedAt(latest.getChangedAt())
+                            .editedBy(displayUser(latest))
+                            .changeCount((int) group.stream()
+                                    .filter(row -> row.getRowStatus() == KpiVersionRowStatus.ADDED || row.getRowStatus() == KpiVersionRowStatus.REMOVED)
+                                    .count())
+                            .build();
+                })
+                .toList();
+    }
+
+    private void mergeMissingHistorySummaries(
+            List<KpiVersionHistorySummaryDTO> target,
+            List<KpiVersionHistorySummaryDTO> candidates
+    ) {
+        Set<String> existingKeys = target.stream()
+                .map(summary -> summary.getTemplateId() + ":" + summary.getVersionNumber())
+                .collect(Collectors.toSet());
+        for (KpiVersionHistorySummaryDTO candidate : candidates) {
+            String key = candidate.getTemplateId() + ":" + candidate.getVersionNumber();
+            if (!existingKeys.contains(key)) {
+                target.add(candidate);
+                existingKeys.add(key);
+            }
+        }
+    }
+
+    private List<KpiVersionHistorySummaryDTO> summarizeHistory(List<KpiVersionHistory> historyRows) {
+        Map<String, List<KpiVersionHistory>> grouped = historyRows.stream()
+                .filter(row -> row.getKpiForm() != null && row.getVersionNumber() != null)
+                .collect(Collectors.groupingBy(
+                        row -> row.getKpiForm().getId() + ":" + row.getVersionNumber(),
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        return grouped.values().stream()
+                .map(rows -> {
+                    KpiVersionHistory first = rows.get(0);
+                    KpiVersionHistory latest = rows.stream()
+                            .max(Comparator.comparing(KpiVersionHistory::getChangedAt))
+                            .orElse(first);
+                    KpiForm form = first.getKpiForm();
+                    return KpiVersionHistorySummaryDTO.builder()
+                            .templateId(form.getId())
+                            .templateTitle(form.getTitle())
+                            .versionNumber(first.getVersionNumber())
+                            .versionTitle(versionTitle(form, first.getVersionNumber()))
+                            .positionName(positionName(form))
+                            .createdAt(form.getCreatedAt())
+                            .editedAt(latest.getChangedAt())
+                            .editedBy(displayUser(latest))
+                            .changeCount(rows.size())
+                            .build();
+                })
+                .toList();
+    }
+
+    private void appendBaselineSummaries(List<KpiVersionHistorySummaryDTO> summaries, List<KpiForm> forms) {
+        Set<String> existingKeys = summaries.stream()
+                .map(summary -> summary.getTemplateId() + ":" + summary.getVersionNumber())
+                .collect(Collectors.toSet());
+        for (KpiForm form : forms) {
+            appendBaselineSummary(summaries, existingKeys, form, 1);
+            Integer currentVersion = form.getVersion() == null ? 1 : form.getVersion();
+            if (currentVersion > 1) {
+                appendBaselineSummary(summaries, existingKeys, form, currentVersion);
+            }
+        }
+    }
+
+    private void appendBaselineSummary(
+            List<KpiVersionHistorySummaryDTO> summaries,
+            Set<String> existingKeys,
+            KpiForm form,
+            Integer versionNumber
+    ) {
+        String key = form.getId() + ":" + versionNumber;
+        if (existingKeys.contains(key)) {
+            return;
+        }
+        summaries.add(KpiVersionHistorySummaryDTO.builder()
+                .templateId(form.getId())
+                .templateTitle(form.getTitle())
+                .versionNumber(versionNumber)
+                .versionTitle(versionTitle(form, versionNumber))
+                .positionName(positionName(form))
+                .createdAt(form.getCreatedAt())
+                .editedAt(versionNumber == 1 ? form.getCreatedAt() : form.getUpdatedAt())
+                .editedBy(versionNumber == 1 ? form.getCreatedBy() : displayUser(form.getUpdatedByUser()))
+                .changeCount(0)
+                .build());
+        existingKeys.add(key);
+    }
+
+    private List<KpiVersionHistorySummaryDTO> sortVersionSummaries(List<KpiVersionHistorySummaryDTO> summaries) {
+        return summaries.stream()
+                .sorted((a, b) -> {
+                    LocalDateTime aEdited = a.getEditedAt();
+                    LocalDateTime bEdited = b.getEditedAt();
+                    if (aEdited != null && bEdited != null) {
+                        int dateCompare = bEdited.compareTo(aEdited);
+                        if (dateCompare != 0) {
+                            return dateCompare;
+                        }
+                    } else if (aEdited != null) {
+                        return -1;
+                    } else if (bEdited != null) {
+                        return 1;
+                    }
+                    String aTitle = a.getTemplateTitle() == null ? "" : a.getTemplateTitle();
+                    String bTitle = b.getTemplateTitle() == null ? "" : b.getTemplateTitle();
+                    return aTitle.compareToIgnoreCase(bTitle);
+                })
+                .toList();
+    }
+
+    private KpiVersionHistoryDetailDTO baselineDetail(KpiForm form, Integer versionNumber) {
+        return KpiVersionHistoryDetailDTO.builder()
+                .templateId(form.getId())
+                .templateTitle(form.getTitle())
+                .versionNumber(versionNumber)
+                .versionTitle(versionTitle(form, versionNumber))
+                .positionName(positionName(form))
+                .createdAt(form.getCreatedAt())
+                .editedAt(form.getUpdatedAt() != null ? form.getUpdatedAt() : form.getCreatedAt())
+                .editedBy(form.getUpdatedByUser() != null ? displayUser(form.getUpdatedByUser()) : form.getCreatedBy())
+                .changes(form.getItems().stream()
+                        .sorted(Comparator.comparing(item -> item.getSortOrder() == null ? 0 : item.getSortOrder()))
+                        .map(item -> KpiVersionHistoryDetailDTO.RowChangeDTO.builder()
+                                .historyId(item.getId())
+                                .changeType(KpiChangeType.CREATED)
+                                .rowStatus(KpiVersionRowStatus.INITIAL)
+                                .reason("Initial template version")
+                                .changedAt(form.getCreatedAt())
+                                .changedBy(form.getCreatedBy())
+                                .initialVersion(true)
+                                .row(snapshot(item))
+                                .build())
+                        .toList())
+                .build();
+    }
+
+    private String versionTitle(KpiForm form, Integer versionNumber) {
+        return "Version " + (versionNumber == null ? 1 : versionNumber);
+    }
+
+    private String positionName(KpiForm form) {
+        if (form.getKpiPositions() == null) {
+            return null;
+        }
+        return form.getKpiPositions().stream()
+                .filter(link -> link.getPosition() != null)
+                .map(link -> link.getPosition().getPositionTitle())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String displayUser(KpiVersionHistory history) {
+        User user = history.getModifiedByUser();
+        if (user != null) {
+            return displayUser(user);
+        }
+        return history.getModifiedBy();
+    }
+
+    private String displayUser(KpiTemplateVersionRow row) {
+        User user = row.getChangedByUser();
+        if (user != null) {
+            return displayUser(user);
+        }
+        return row.getChangedBy();
+    }
+
+    private String displayUser(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (!isBlank(user.getFullName())) {
+            return user.getFullName();
+        }
+        return user.getEmail();
+    }
+
+    private KpiVersionRowSnapshotDTO readSnapshot(KpiVersionHistory history) {
+        String source = history.getChangeType() == KpiChangeType.DELETED
+                ? history.getOldValue()
+                : history.getNewValue();
+        if (isBlank(source)) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(source, KpiVersionRowSnapshotDTO.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Could not parse KPI version history snapshot {}: {}", history.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private KpiVersionRowSnapshotDTO readSnapshot(KpiTemplateVersionRow row) {
+        if (isBlank(row.getRowSnapshot())) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(row.getRowSnapshot(), KpiVersionRowSnapshotDTO.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Could not parse KPI version collection snapshot {}: {}", row.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private KpiChangeType changeTypeForStatus(KpiVersionRowStatus status) {
+        if (status == KpiVersionRowStatus.REMOVED) {
+            return KpiChangeType.DELETED;
+        }
+        return KpiChangeType.CREATED;
+    }
+
+    private String writeSnapshot(KpiVersionRowSnapshotDTO snapshot) {
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not record KPI row history.");
+        }
+    }
+
+    private KpiVersionRowSnapshotDTO snapshot(KpiFormItem item) {
+        KpiItem master = item.getKpiItem();
+        KpiCategory category = item.getKpiCategory();
+        KpiUnit unit = item.getKpiUnit();
+        return KpiVersionRowSnapshotDTO.builder()
+                .itemId(item.getId())
+                .kpiName(master != null ? master.getName() : item.getKpiLabel())
+                .kpiItemId(master != null ? master.getId() : null)
+                .kpiCategoryId(category != null ? category.getId() : null)
+                .kpiCategoryName(categoryDisplayName(item))
+                .kpiCategoryLabel(item.getKpiCategoryLabel())
+                .kpiUnitId(unit != null ? unit.getId() : null)
+                .kpiUnitName(unitDisplayName(item))
+                .kpiUnitLabel(item.getKpiUnitLabel())
+                .target(item.getTarget())
+                .weight(item.getWeight())
+                .sortOrder(item.getSortOrder())
+                .build();
+    }
+
+    private KpiVersionRowSnapshotDTO snapshot(KpiFormItemDTO row) {
+        KpiItem master = row.getKpiItemId() == null
+                ? null
+                : kpiItemRepository.findById(row.getKpiItemId()).orElse(null);
+        KpiCategory category = row.getKpiCategoryId() == null
+                ? null
+                : kpiCategoryRepository.findById(row.getKpiCategoryId()).orElse(null);
+        KpiUnit unit = row.getKpiUnitId() == null
+                ? null
+                : kpiUnitRepository.findById(row.getKpiUnitId()).orElse(null);
+        return KpiVersionRowSnapshotDTO.builder()
+                .itemId(row.getId())
+                .kpiName(master != null ? master.getName() : row.getKpiLabel())
+                .kpiItemId(master != null ? master.getId() : row.getKpiItemId())
+                .kpiCategoryId(category != null ? category.getId() : row.getKpiCategoryId())
+                .kpiCategoryName(category != null ? category.getName() : categoryLabel(row))
+                .kpiCategoryLabel(categoryLabel(row))
+                .kpiUnitId(unit != null ? unit.getId() : row.getKpiUnitId())
+                .kpiUnitName(unit != null ? unit.getName() : unitLabel(row))
+                .kpiUnitLabel(unitLabel(row))
+                .target(row.getTarget())
+                .weight(row.getWeight())
+                .sortOrder(row.getSortOrder())
+                .build();
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private record RowDiff(
+            List<KpiFormItemDTO> addedRows,
+            List<KpiFormItem> removedRows,
+            Map<Integer, String> removedReasons
+    ) {
+        private RowDiff {
+            removedReasons = removedReasons == null ? Map.of() : removedReasons;
+        }
+
+        private boolean hasChanges() {
+            return !addedRows.isEmpty() || !removedRows.isEmpty();
+        }
     }
 
     private void validateItems(List<KpiFormItemDTO> items) {
@@ -386,9 +1009,21 @@ public class KpiFormServiceImpl implements KpiFormService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Row " + (i + 1) + ": enter a KPI name or select a KPI item.");
             }
-            if (row.getKpiCategoryId() == null || row.getKpiUnitId() == null || row.getTarget() == null || row.getWeight() == null) {
+            boolean hasMasterCategory = row.getKpiCategoryId() != null;
+            boolean hasCategoryLabel = categoryLabel(row) != null;
+            boolean hasMasterUnit = row.getKpiUnitId() != null;
+            boolean hasUnitLabel = unitLabel(row) != null;
+            if ((!hasMasterCategory && !hasCategoryLabel) || (!hasMasterUnit && !hasUnitLabel) || row.getTarget() == null || row.getWeight() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Row " + (i + 1) + ": category, unit, target, and weight are required.");
+            }
+            if (!Double.isFinite(row.getTarget()) || row.getTarget() < 1 || row.getTarget() > 100) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": target must be between 1 and 100.");
+            }
+            if (row.getWeight() < 1 || row.getWeight() > 100) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": weight must be between 1 and 100.");
             }
         }
     }
@@ -408,6 +1043,42 @@ public class KpiFormServiceImpl implements KpiFormService {
         if ((status == KpiFormStatus.ACTIVE || status == KpiFormStatus.FINALIZED) && total != 100) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Total weight must equal 100% before status can be ACTIVE or FINALIZED.");
+        }
+    }
+
+    private Integer singleSubmittedPositionId(List<Integer> positionIds) {
+        if (positionIds == null || positionIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select a position.");
+        }
+        List<Integer> distinctIds = positionIds.stream().distinct().toList();
+        if (distinctIds.size() > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only one position can be assigned per KPI form.");
+        }
+        return distinctIds.get(0);
+    }
+
+    private Integer currentPositionId(KpiForm form) {
+        if (form.getKpiPositions() == null) {
+            return null;
+        }
+        return form.getKpiPositions().stream()
+                .filter(link -> link.getPosition() != null)
+                .map(link -> link.getPosition().getId())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void validatePositionCanMoveTo(KpiForm form, Integer positionId) {
+        positionRepository.findById(positionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Position not found: " + positionId));
+        Optional<KpiPosition> existingLink = findOccupyingLink(positionId, form.getId());
+        logDuplicateCheck(positionId, form.getId(), existingLink);
+        if (existingLink.isPresent()) {
+            Integer existingTemplateId = existingLink.get().getKpiForm().getId();
+            throw new KpiTemplatePositionConflictException(
+                    existingTemplateId,
+                    "This position already has a KPI form. Choose another position or edit the existing form."
+            );
         }
     }
 
@@ -456,31 +1127,151 @@ public class KpiFormServiceImpl implements KpiFormService {
         for (int i = 0; i < rows.size(); i++) {
             KpiFormItemDTO row = rows.get(i);
 
-            KpiCategory category = kpiCategoryRepository.findById(row.getKpiCategoryId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI category not found."));
-            KpiUnit unit = kpiUnitRepository.findById(row.getKpiUnitId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI unit not found."));
-
-            KpiItem masterItem = null;
-            if (row.getKpiItemId() != null) {
-                masterItem = kpiItemRepository.findById(row.getKpiItemId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI item not found."));
-            }
-
-            String label = row.getKpiLabel() != null ? row.getKpiLabel().trim() : null;
-
             KpiFormItem entity = KpiFormItem.builder()
                     .kpiForm(form)
-                    .kpiCategory(category)
-                    .kpiUnit(unit)
-                    .kpiItem(masterItem)
-                    .kpiLabel(masterItem == null ? label : null)
-                    .target(row.getTarget())
-                    .weight(row.getWeight())
-                    .sortOrder(row.getSortOrder() != null ? row.getSortOrder() : i)
                     .build();
-
+            applyItemFields(entity, row, i);
             form.addItem(entity);
         }
+    }
+
+    private void syncItems(KpiForm form, List<KpiFormItemDTO> rows) {
+        Map<Integer, KpiFormItem> existingById = form.getItems().stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(KpiFormItem::getId, Function.identity()));
+        Set<Integer> submittedIds = rows.stream()
+                .map(KpiFormItemDTO::getId)
+                .filter(id -> id != null && existingById.containsKey(id))
+                .collect(Collectors.toSet());
+
+        List<KpiFormItem> removedItems = form.getItems().stream()
+                .filter(item -> item.getId() != null && !submittedIds.contains(item.getId()))
+                .toList();
+        for (KpiFormItem removed : removedItems) {
+            if (kpiFormItemRepository.isReferencedByEmployeeScores(removed.getId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "This KPI row is already used in employee KPI records and cannot be removed."
+                );
+            }
+            form.removeItem(removed);
+        }
+
+        for (int i = 0; i < rows.size(); i++) {
+            KpiFormItemDTO row = rows.get(i);
+            KpiFormItem entity = row.getId() == null ? null : existingById.get(row.getId());
+            if (entity == null) {
+                entity = KpiFormItem.builder().kpiForm(form).build();
+                form.addItem(entity);
+            }
+            applyItemFields(entity, row, i);
+        }
+    }
+
+    private void backfillMissingEmployeeScores(KpiForm form) {
+        if (form.getId() == null || form.getItems() == null || form.getItems().isEmpty()) {
+            return;
+        }
+
+        List<KpiFormItem> currentItems = form.getItems().stream()
+                .filter(item -> item.getId() != null)
+                .toList();
+        if (currentItems.isEmpty()) {
+            return;
+        }
+
+        List<EmployeeKpiForm> assignments = employeeKpiFormRepository.findNonFinalizedByKpiFormIdWithScores(
+                form.getId(),
+                EmployeeKpiStatus.FINALIZED
+        );
+
+        for (EmployeeKpiForm assignment : assignments) {
+            if (assignment.getScores() == null) {
+                assignment.setScores(new LinkedHashSet<>());
+            }
+
+            Set<Integer> existingItemIds = assignment.getScores().stream()
+                    .filter(score -> score.getKpiFormItem() != null && score.getKpiFormItem().getId() != null)
+                    .map(score -> score.getKpiFormItem().getId())
+                    .collect(Collectors.toCollection(HashSet::new));
+
+            boolean changed = false;
+            for (KpiFormItem item : currentItems) {
+                if (existingItemIds.add(item.getId())) {
+                    assignment.addScore(EmployeeKpiScore.builder()
+                            .kpiFormItem(item)
+                            .build());
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                employeeKpiFormRepository.save(assignment);
+            }
+        }
+    }
+
+    private void applyItemFields(KpiFormItem entity, KpiFormItemDTO row, int index) {
+        KpiCategory category = null;
+        if (row.getKpiCategoryId() != null) {
+            category = kpiCategoryRepository.findById(row.getKpiCategoryId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI category not found."));
+        }
+        KpiUnit unit = null;
+        if (row.getKpiUnitId() != null) {
+            unit = kpiUnitRepository.findById(row.getKpiUnitId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI unit not found."));
+        }
+
+        KpiItem masterItem = null;
+        if (row.getKpiItemId() != null) {
+            masterItem = kpiItemRepository.findById(row.getKpiItemId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "KPI item not found."));
+        }
+
+        String label = row.getKpiLabel() != null ? row.getKpiLabel().trim() : null;
+        String categoryLabel = categoryLabel(row);
+        String unitLabel = unitLabel(row);
+        entity.setKpiCategory(category);
+        entity.setKpiCategoryLabel(category == null ? categoryLabel : null);
+        entity.setKpiUnit(unit);
+        entity.setKpiUnitLabel(unit == null ? unitLabel : null);
+        entity.setKpiItem(masterItem);
+        entity.setKpiLabel(masterItem == null ? label : null);
+        entity.setTarget(row.getTarget());
+        entity.setWeight(row.getWeight());
+        entity.setSortOrder(row.getSortOrder() != null ? row.getSortOrder() : index);
+    }
+
+    private String categoryDisplayName(KpiFormItem item) {
+        KpiCategory category = item.getKpiCategory();
+        if (category != null) {
+            return category.getName();
+        }
+        return item.getKpiCategoryLabel();
+    }
+
+    private String unitDisplayName(KpiFormItem item) {
+        KpiUnit unit = item.getKpiUnit();
+        if (unit != null) {
+            return unit.getName();
+        }
+        return item.getKpiUnitLabel();
+    }
+
+    private String unitLabel(KpiFormItemDTO row) {
+        String label = row.getKpiUnitLabel() != null ? row.getKpiUnitLabel() : row.getKpiUnitName();
+        if (label == null || label.trim().isEmpty()) {
+            return null;
+        }
+        return label.trim();
+    }
+
+    private String categoryLabel(KpiFormItemDTO row) {
+        String label = row.getKpiCategoryLabel() != null ? row.getKpiCategoryLabel() : row.getKpiCategoryName();
+        if (label == null || label.trim().isEmpty()) {
+            return null;
+        }
+        return label.trim();
     }
 }
