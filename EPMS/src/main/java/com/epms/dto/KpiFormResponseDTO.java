@@ -47,5 +47,7 @@ public class KpiFormResponseDTO {
         private Integer id;
         private Integer positionId;
         private String positionTitle;
+        private Integer durationMonths;
+        private String durationLabel;
     }
 }

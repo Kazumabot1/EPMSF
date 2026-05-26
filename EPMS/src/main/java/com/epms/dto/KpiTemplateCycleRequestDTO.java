@@ -24,9 +24,14 @@ public class KpiTemplateCycleRequestDTO {
     @NotNull
     private LocalDate startDate;
 
-    @NotNull
     private Integer durationMonths;
 
+    private Integer durationYears;
+
+    @Builder.Default
     @NotEmpty
     private List<Integer> kpiFormIds = new ArrayList<>();
+
+    /** Required when updating a cycle; ignored on create. */
+    private String editReason;
 }

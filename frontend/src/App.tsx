@@ -36,6 +36,7 @@ import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import CeoDashboard from './pages/ceo/CeoDashboard';
+import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -222,6 +223,8 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<CeoDashboard />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/approval/kpi" element={<KpiApprovalPage />} />
+              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
               <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />
               <Route path="/executive/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />

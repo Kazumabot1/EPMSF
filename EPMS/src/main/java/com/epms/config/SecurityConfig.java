@@ -256,6 +256,8 @@ public class SecurityConfig {
                                 "/api/kpi-items/**",
                                 "/api/hr/kpi-templates",
                                 "/api/hr/kpi-templates/**",
+                                "/api/hr/kpi-template-cycles",
+                                "/api/hr/kpi-template-cycles/**",
                                 "/api/hr/department-kpi-templates",
                                 "/api/hr/department-kpi-templates/**",
                                 "/api/hr/department-kpi-cycles",

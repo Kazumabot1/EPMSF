@@ -38,6 +38,7 @@ public class KpiPosition {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
+    @Builder.Default
     private KpiPositionStatus status = KpiPositionStatus.ACTIVE;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -51,6 +52,10 @@ public class KpiPosition {
     @Column(name = "assigned_at", nullable = false)
     private LocalDateTime assignedAt;
 
+    @Column(name = "duration_months", nullable = false)
+    @Builder.Default
+    private Integer durationMonths = 12;
+
     @Column(name = "removed_at")
     private LocalDateTime removedAt;
 
@@ -62,6 +67,9 @@ public class KpiPosition {
 
         if (status == null) {
             status = KpiPositionStatus.ACTIVE;
+        }
+        if (durationMonths == null) {
+            durationMonths = 12;
         }
     }
 

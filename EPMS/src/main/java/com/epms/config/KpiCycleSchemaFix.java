@@ -34,6 +34,9 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             if (!product.contains("mysql") && !product.contains("mariadb")) {
                 return;
             }
+            alignEarlyCloseColumns(conn);
+            alignCycleDurationColumns(conn);
+            alignCyclePeriodTemplateColumn(conn);
             alignCycleStatusEnum(conn);
             alignEmployeeKpiStatusEnum(conn);
         } catch (SQLException e) {
@@ -46,15 +49,67 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             return;
         }
         String columnType = columnType(conn, "kpi_template_cycle", "status");
-        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'closing'")) {
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
             return;
         }
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(
                     "ALTER TABLE kpi_template_cycle "
-                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','CLOSING','DEACTIVATED') NOT NULL"
+                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
             );
-            log.info("Aligned kpi_template_cycle.status enum with CLOSING status.");
+            log.info("Aligned kpi_template_cycle.status enum with early close approval status.");
+        }
+    }
+
+    private void alignEarlyCloseColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle")) {
+            return;
+        }
+        addColumnIfMissing(conn, "early_close_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "grace_extension", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "early_close_requested_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "early_close_requested_by", "INT NULL");
+        addColumnIfMissing(conn, "early_close_reviewed_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "early_close_reviewed_by", "INT NULL");
+        addColumnIfMissing(conn, "early_close_review_decision", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "early_close_review_reason", "VARCHAR(1000) NULL");
+    }
+
+    private void alignCycleDurationColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle")) {
+            return;
+        }
+        if (!columnExists(conn, "kpi_template_cycle", "duration_years")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE kpi_template_cycle ADD COLUMN duration_years INT NOT NULL DEFAULT 1");
+                stmt.executeUpdate(
+                        "UPDATE kpi_template_cycle "
+                                + "SET duration_years = GREATEST(1, LEAST(5, CEIL(COALESCE(duration_months, 12) / 12)))"
+                );
+                log.info("Added kpi_template_cycle.duration_years column.");
+            }
+        }
+    }
+
+    private void alignCyclePeriodTemplateColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle_period")) {
+            return;
+        }
+        if (!columnExists(conn, "kpi_template_cycle_period", "kpi_form_id")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE kpi_template_cycle_period ADD COLUMN kpi_form_id INT NULL");
+                log.info("Added kpi_template_cycle_period.kpi_form_id column.");
+            }
+        }
+    }
+
+    private void addColumnIfMissing(Connection conn, String columnName, String definition) throws SQLException {
+        if (columnExists(conn, "kpi_template_cycle", columnName)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE kpi_template_cycle ADD COLUMN " + columnName + " " + definition);
+            log.info("Added kpi_template_cycle.{} column.", columnName);
         }
     }
 

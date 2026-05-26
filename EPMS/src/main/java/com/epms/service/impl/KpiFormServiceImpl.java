@@ -46,6 +46,7 @@ import java.util.stream.Collectors;
 public class KpiFormServiceImpl implements KpiFormService {
 
     private static final String KPI_POSITIONS_TABLE = "kpi_positions";
+    private static final Set<Integer> ALLOWED_POSITION_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 
     private final KpiFormRepository kpiFormRepository;
     private final KpiPositionRepository kpiPositionRepository;
@@ -63,7 +64,7 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public KpiFormResponseDTO createTemplate(KpiFormRequestDTO dto) {
-        validateDates(dto);
+        validatePositionDuration(dto.getPositionDurationMonths());
         validateItems(dto.getItems());
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
@@ -82,15 +83,15 @@ public class KpiFormServiceImpl implements KpiFormService {
 
         KpiForm form = KpiForm.builder()
                 .title(dto.getTitle().trim())
-                .startDate(dto.getStartDate())
-                .endDate(dto.getEndDate())
+                .startDate(null)
+                .endDate(null)
                 .status(status)
                 .createdByUser(author)
                 .createdBy(author.getEmail())
                 .build();
         applyLifecycleTimestamps(form, status);
 
-        applyPositions(form, dto.getPositionIds());
+        applyPositions(form, dto.getPositionIds(), dto.getPositionDurationMonths());
         applyItems(form, dto.getItems());
 
         KpiForm saved = kpiFormRepository.save(form);
@@ -103,7 +104,7 @@ public class KpiFormServiceImpl implements KpiFormService {
     @Override
     @Transactional
     public KpiFormResponseDTO updateTemplate(Integer id, KpiFormRequestDTO dto) {
-        validateDates(dto);
+        validatePositionDuration(dto.getPositionDurationMonths());
         validateItems(dto.getItems());
         KpiFormStatus status = dto.getStatus() != null ? dto.getStatus() : KpiFormStatus.DRAFT;
         validateWeights(status, dto.getItems());
@@ -124,8 +125,8 @@ public class KpiFormServiceImpl implements KpiFormService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
 
         form.setTitle(dto.getTitle().trim());
-        form.setStartDate(dto.getStartDate());
-        form.setEndDate(dto.getEndDate());
+        form.setStartDate(null);
+        form.setEndDate(null);
         form.setStatus(status);
         form.setUpdatedByUser(editor);
         applyLifecycleTimestamps(form, status);
@@ -158,7 +159,9 @@ public class KpiFormServiceImpl implements KpiFormService {
         kpiFormRepository.flush();
 
         if (positionChanged) {
-            applyPositions(form, dto.getPositionIds());
+            applyPositions(form, dto.getPositionIds(), dto.getPositionDurationMonths());
+        } else {
+            updateCurrentPositionDuration(form, dto.getPositionDurationMonths());
         }
         syncItems(form, dto.getItems());
 
@@ -493,8 +496,21 @@ public class KpiFormServiceImpl implements KpiFormService {
                         .id(kp.getId())
                         .positionId(kp.getPosition().getId())
                         .positionTitle(kp.getPosition().getPositionTitle())
+                        .durationMonths(positionDuration(kp))
+                        .durationLabel(durationLabel(positionDuration(kp)))
                         .build())
                 .toList();
+    }
+
+    private static Integer positionDuration(KpiPosition link) {
+        return link.getDurationMonths() == null ? 12 : link.getDurationMonths();
+    }
+
+    private static String durationLabel(Integer months) {
+        if (months == null || months == 12) {
+            return "1 year";
+        }
+        return months + " months";
     }
 
     private KpiFormItemDTO toItemDto(KpiFormItem item) {
@@ -1028,11 +1044,12 @@ public class KpiFormServiceImpl implements KpiFormService {
         }
     }
 
-    private void validateDates(KpiFormRequestDTO dto) {
-        if (dto.getStartDate() != null
-                && dto.getEndDate() != null
-                && dto.getEndDate().isBefore(dto.getStartDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date cannot be before start date.");
+    private void validatePositionDuration(Integer durationMonths) {
+        if (durationMonths == null || !ALLOWED_POSITION_DURATION_MONTHS.contains(durationMonths)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Position duration must be between 3 months and 1 year."
+            );
         }
     }
 
@@ -1092,7 +1109,7 @@ public class KpiFormServiceImpl implements KpiFormService {
         }
     }
 
-    private void applyPositions(KpiForm form, List<Integer> positionIds) {
+    private void applyPositions(KpiForm form, List<Integer> positionIds, Integer durationMonths) {
         if (positionIds == null || positionIds.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select a position.");
         }
@@ -1119,8 +1136,16 @@ public class KpiFormServiceImpl implements KpiFormService {
         KpiPosition link = KpiPosition.builder()
                 .kpiForm(form)
                 .position(position)
+                .durationMonths(durationMonths)
                 .build();
         form.getKpiPositions().add(link);
+    }
+
+    private void updateCurrentPositionDuration(KpiForm form, Integer durationMonths) {
+        if (form.getKpiPositions() == null || form.getKpiPositions().isEmpty()) {
+            return;
+        }
+        form.getKpiPositions().stream().findFirst().ifPresent(link -> link.setDurationMonths(durationMonths));
     }
 
     private void applyItems(KpiForm form, List<KpiFormItemDTO> rows) {

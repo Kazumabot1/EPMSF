@@ -13,4 +13,6 @@ public interface KpiTemplateCycleRepository extends JpaRepository<KpiTemplateCyc
     List<KpiTemplateCycle> findAllByOrderByCreatedAtDesc();
 
     List<KpiTemplateCycle> findByStatus(KpiTemplateCycleStatus status);
+
+    List<KpiTemplateCycle> findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus status);
 }
