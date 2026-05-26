@@ -361,11 +361,6 @@ const departmentHeadNavItems: NavItem[] = [
   { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
   { to: '/department-head/teams', label: 'View Teams', icon: 'bi bi-people-fill' },
   {
-    to: '/department-head/self-assessment-forms',
-    label: 'View Self-assessment Form',
-    icon: 'bi bi-eye',
-  },
-  {
     to: '/notifications',
     label: 'Notifications',
     icon: 'bi bi-bell',

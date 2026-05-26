@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
     private static final String TYPE_DEPARTMENT_KPI_FINALIZED = "DEPARTMENT_KPI_FINALIZED";
+    private static final String TYPE_DEPARTMENT_KPI_ASSIGNED = "DEPARTMENT_KPI_ASSIGNED";
 
     private final DepartmentKpiTemplateRepository templateRepository;
     private final DepartmentKpiCycleRepository cycleRepository;
@@ -372,7 +373,8 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 for (DepartmentKpiTemplateRow row : template.getRows()) {
                     result.addScore(DepartmentKpiScore.builder().templateRow(row).build());
                 }
-                resultRepository.save(result);
+                DepartmentKpiResult savedResult = resultRepository.save(result);
+                notifyDepartmentKpiAssigned(savedResult);
             }
         }
         resultRepository.flush();
@@ -629,6 +631,23 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .weight(r.getWeight())
                 .sortOrder(r.getSortOrder())
                 .build();
+    }
+
+    private void notifyDepartmentKpiAssigned(DepartmentKpiResult result) {
+        if (result == null || result.getDepartment() == null || result.getTemplate() == null) {
+            return;
+        }
+
+        for (User head : userRepository.findActiveDepartmentHeadsByDepartmentId(result.getDepartment().getId())) {
+            notificationService.send(
+                    head.getId(),
+                    "Department KPI assigned",
+                    "A Department KPI \"" + result.getTemplate().getTitle() + "\" was assigned to "
+                            + result.getDepartment().getDepartmentName() + ". Please review and update actual performance values.",
+                    TYPE_DEPARTMENT_KPI_ASSIGNED,
+                    result.getId()
+            );
+        }
     }
 
     private void notifyDepartmentHeads(DepartmentKpiResult result) {

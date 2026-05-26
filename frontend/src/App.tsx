@@ -84,7 +84,6 @@ import { appraisalRoutes } from './routes/appraisalRoutes';
 import { useAuth } from './contexts/AuthContext';
 import { dashboardPathByRole, resolveUserRole } from './config/roleNavigation';
 
-import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
 
 
 type RedirectWithMessageProps = {
@@ -200,7 +199,7 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/manager/dashboard" element={<ManagerDashboard />} />
               <Route path="/manager/kpis" element={<EmployeeKpiResultsPage />} />
-              <Route path="/manager/self-assessment" element={<EmployeeSelfAssessmentPage />} />
+              <Route path="/manager/self-assessment" element={<Navigate to="/manager/assessment-review" replace />} />
               <Route path="/manager/assessment-review" element={<ManagerAssessmentReviewPage />} />
               <Route path="/manager/self-assessment-review" element={<ManagerAssessmentReviewPage />} />
               <Route path="/manager/kpi" element={<Navigate to="/manager/kpi-scoring" replace />} />
@@ -247,15 +246,8 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
               <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
-<Route
-  path="/department-head/self-assessment"
-  element={<Navigate to="/department-head/self-assessment-forms" replace />}
-/>
-
-<Route
-  path="/department-head/self-assessment-forms"
-  element={<DepartmentHeadSelfAssessmentViewPage />}
-/>
+<Route path="/department-head/self-assessment" element={<Navigate to="/department-head/assessment-review" replace />} />
+<Route path="/department-head/self-assessment-forms" element={<Navigate to="/department-head/assessment-review" replace />} />
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />

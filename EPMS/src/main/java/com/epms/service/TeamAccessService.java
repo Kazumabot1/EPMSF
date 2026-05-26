@@ -10,6 +10,7 @@ import com.epms.entity.EmployeeDepartment;
 import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
+import com.epms.exception.BusinessValidationException;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeRepository;
@@ -23,10 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -56,9 +59,13 @@ public class TeamAccessService {
                     .build();
         }
 
-        if (canSelectDepartment) {
+        Optional<Department> defaultDepartment = resolveDefaultDepartment(current);
+
+        if (isHr(current) || isAdmin(current)) {
             return OneOnOneAccessContextResponseDto.builder()
                     .accessMode("DEPARTMENT_SELECTION")
+                    .departmentId(defaultDepartment.map(Department::getId).orElse(null))
+                    .departmentName(defaultDepartment.map(Department::getDepartmentName).orElse(null))
                     .canCreate(true)
                     .canSelectDepartment(true)
                     .canSelectTeam(true)
@@ -67,13 +74,50 @@ public class TeamAccessService {
                     .build();
         }
 
-        Department defaultDepartment = resolveDefaultDepartment(current).orElse(null);
+        if (isDepartmentHead(current)) {
+            return OneOnOneAccessContextResponseDto.builder()
+                    .accessMode("DEPARTMENT_SCOPE")
+                    .departmentId(defaultDepartment.map(Department::getId).orElse(null))
+                    .departmentName(defaultDepartment.map(Department::getDepartmentName).orElse(null))
+                    .canCreate(true)
+                    .canSelectDepartment(false)
+                    .canSelectTeam(true)
+                    .teamRequired(false)
+                    .canUseDepartmentEmployeeScope(true)
+                    .build();
+        }
+
+        if (isManager(current)) {
+            return OneOnOneAccessContextResponseDto.builder()
+                    .accessMode("DIRECT_REPORTS")
+                    .departmentId(defaultDepartment.map(Department::getId).orElse(null))
+                    .departmentName(defaultDepartment.map(Department::getDepartmentName).orElse(null))
+                    .canCreate(true)
+                    .canSelectDepartment(false)
+                    .canSelectTeam(false)
+                    .teamRequired(false)
+                    .canUseDepartmentEmployeeScope(true)
+                    .build();
+        }
+
+        if (canSelectDepartment) {
+            return OneOnOneAccessContextResponseDto.builder()
+                    .accessMode("DEPARTMENT_SELECTION")
+                    .departmentId(defaultDepartment.map(Department::getId).orElse(null))
+                    .departmentName(defaultDepartment.map(Department::getDepartmentName).orElse(null))
+                    .canCreate(true)
+                    .canSelectDepartment(true)
+                    .canSelectTeam(true)
+                    .teamRequired(false)
+                    .canUseDepartmentEmployeeScope(true)
+                    .build();
+        }
 
         if (canSelectAnyTeamInDefaultDepartment) {
             return OneOnOneAccessContextResponseDto.builder()
                     .accessMode("TEAM_SELECTION")
-                    .departmentId(defaultDepartment == null ? null : defaultDepartment.getId())
-                    .departmentName(defaultDepartment == null ? null : defaultDepartment.getDepartmentName())
+                    .departmentId(defaultDepartment.map(Department::getId).orElse(null))
+                    .departmentName(defaultDepartment.map(Department::getDepartmentName).orElse(null))
                     .canCreate(true)
                     .canSelectDepartment(false)
                     .canSelectTeam(true)
@@ -84,8 +128,8 @@ public class TeamAccessService {
 
         return OneOnOneAccessContextResponseDto.builder()
                 .accessMode("MANAGED_TEAM_ONLY")
-                .departmentId(defaultDepartment == null ? null : defaultDepartment.getId())
-                .departmentName(defaultDepartment == null ? null : defaultDepartment.getDepartmentName())
+                .departmentId(defaultDepartment.map(Department::getId).orElse(null))
+                .departmentName(defaultDepartment.map(Department::getDepartmentName).orElse(null))
                 .canCreate(true)
                 .canSelectDepartment(false)
                 .canSelectTeam(true)
@@ -98,15 +142,11 @@ public class TeamAccessService {
     public List<TeamOptionResponseDto> getOneOnOneTeamOptions(Integer departmentId) {
         assertCanCreateOneOnOne();
 
+        UserPrincipal current = SecurityUtils.currentUser();
         boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
         boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
 
-        if (canSelectDepartment) {
-            Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(departmentId);
-            return findActiveTeamsByDepartment(allowedDepartmentId);
-        }
-
-        if (canSelectAnyTeamInDefaultDepartment) {
+        if (isHr(current) || isAdmin(current) || canSelectDepartment || isDepartmentHead(current) || canSelectAnyTeamInDefaultDepartment) {
             Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(departmentId);
             return findActiveTeamsByDepartment(allowedDepartmentId);
         }
@@ -143,14 +183,22 @@ public class TeamAccessService {
     public List<TeamEmployeeOptionResponseDto> getActiveEmployeesForDepartmentScope(Integer departmentId) {
         assertCanCreateOneOnOne();
 
-        if (!canUseDepartmentEmployeeScope()) {
-            throw new UnauthorizedActionException("Please select one of your managed teams first.");
+        UserPrincipal current = SecurityUtils.currentUser();
+        List<Employee> employees;
+
+        if (isManager(current)) {
+            employees = findDirectReportEmployees(current.getId());
+        } else {
+            Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(departmentId);
+            employees = employeeRepository.findActiveDropdownEmployeesByDepartmentId(allowedDepartmentId);
         }
 
-        Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(departmentId);
+        Integer currentEmployeeId = currentEmployeeId(current).orElse(null);
 
-        return employeeRepository.findActiveDropdownEmployeesByDepartmentId(allowedDepartmentId)
-                .stream()
+        return employees.stream()
+                .filter(this::isActiveEmployee)
+                .filter(employee -> !Objects.equals(employee.getId(), currentEmployeeId))
+                .filter(employee -> isAllowedOneOnOneTarget(current, employee))
                 .map(this::toEmployeeOption)
                 .sorted(Comparator
                         .comparing(TeamEmployeeOptionResponseDto::getFirstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
@@ -160,11 +208,28 @@ public class TeamAccessService {
 
     @Transactional(readOnly = true)
     public void validateOneOnOneCreateRequest(OneOnOneMeetingRequestDto request) {
-        if (request == null || request.getEmployeeId() == null) {
-            throw new RuntimeException("Employee is required.");
+        if (request == null) {
+            throw new BusinessValidationException("Meeting request is required.");
+        }
+        if (request.getEmployeeId() == null) {
+            throw new BusinessValidationException("Employee is required.");
         }
 
         assertCanCreateOneOnOne();
+
+        UserPrincipal current = SecurityUtils.currentUser();
+        Employee selectedEmployee = employeeRepository.findById(request.getEmployeeId())
+                .orElseThrow(() -> new BusinessValidationException("Employee not found."));
+
+        if (!isActiveEmployee(selectedEmployee)) {
+            throw new BusinessValidationException("Selected employee is not active.");
+        }
+
+        currentEmployeeId(current).ifPresent(currentEmpId -> {
+            if (Objects.equals(currentEmpId, selectedEmployee.getId())) {
+                throw new UnauthorizedActionException("You cannot create a one-on-one meeting with yourself.");
+            }
+        });
 
         if (request.getTeamId() != null) {
             Team team = requireTeamWithinOneOnOneScope(request.getTeamId(), request.getDepartmentId());
@@ -176,36 +241,46 @@ public class TeamAccessService {
                 throw new UnauthorizedActionException("You can select only active employees from the selected team.");
             }
 
+            if (!isAllowedOneOnOneTarget(current, selectedEmployee)) {
+                throw new UnauthorizedActionException("Selected employee is outside your one-on-one meeting scope.");
+            }
+
             return;
         }
 
-        if (!canUseDepartmentEmployeeScope()) {
-            throw new RuntimeException("Team is required.");
+        if (!canUseDepartmentEmployeeScope(current)) {
+            throw new BusinessValidationException("Team is required.");
+        }
+
+        if (isManager(current)) {
+            if (!isDirectReport(current.getId(), selectedEmployee)) {
+                throw new UnauthorizedActionException("Managers can create one-on-one meetings only with employees assigned to them.");
+            }
+            return;
         }
 
         Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(request.getDepartmentId());
 
-        boolean exists = employeeRepository
-                .findActiveDropdownEmployeesByDepartmentId(allowedDepartmentId)
-                .stream()
-                .anyMatch(employee -> Objects.equals(employee.getId(), request.getEmployeeId()));
-
-        if (!exists) {
+        if (!employeeBelongsToDepartment(selectedEmployee, allowedDepartmentId)) {
             throw new UnauthorizedActionException("You can create one-on-one meetings only with active employees from the allowed department.");
+        }
+
+        if (!isAllowedOneOnOneTarget(current, selectedEmployee)) {
+            throw new UnauthorizedActionException("Selected employee is outside your one-on-one meeting scope.");
         }
     }
 
     @Transactional(readOnly = true)
     public Team requireManagedTeam(Integer teamId, Integer currentUserId) {
         if (teamId == null) {
-            throw new RuntimeException("Team is required.");
+            throw new BusinessValidationException("Team is required.");
         }
 
         Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found."));
+                .orElseThrow(() -> new BusinessValidationException("Team not found."));
 
         if (!isActiveTeam(team)) {
-            throw new RuntimeException("Selected team is not active.");
+            throw new BusinessValidationException("Selected team is not active.");
         }
 
         if (!isManagedByUser(team, currentUserId)) {
@@ -227,22 +302,23 @@ public class TeamAccessService {
 
     private Team requireTeamWithinOneOnOneScope(Integer teamId, Integer requestedDepartmentId) {
         if (teamId == null) {
-            throw new RuntimeException("Team is required.");
+            throw new BusinessValidationException("Team is required.");
         }
 
         assertCanCreateOneOnOne();
 
+        UserPrincipal current = SecurityUtils.currentUser();
         Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found."));
+                .orElseThrow(() -> new BusinessValidationException("Team not found."));
 
         if (!isActiveTeam(team)) {
-            throw new RuntimeException("Selected team is not active.");
+            throw new BusinessValidationException("Selected team is not active.");
         }
 
         boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
         boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
 
-        if (canSelectDepartment || canSelectAnyTeamInDefaultDepartment) {
+        if (isHr(current) || isAdmin(current) || canSelectDepartment || isDepartmentHead(current) || canSelectAnyTeamInDefaultDepartment) {
             Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(requestedDepartmentId);
             Integer teamDepartmentId = team.getDepartment() == null ? null : team.getDepartment().getId();
 
@@ -264,25 +340,47 @@ public class TeamAccessService {
         UserPrincipal current = SecurityUtils.currentUser();
         boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
 
+        if (isHr(current) || isAdmin(current)) {
+            if (requestedDepartmentId == null) {
+                throw new BusinessValidationException("Department is required.");
+            }
+            return requestedDepartmentId;
+        }
+
+        if (isDepartmentHead(current) || isManager(current)) {
+            Department defaultDepartment = resolveDefaultDepartment(current)
+                    .orElseThrow(() -> new BusinessValidationException("Your account has no assigned department for one-on-one meetings."));
+
+            if (requestedDepartmentId != null && !Objects.equals(requestedDepartmentId, defaultDepartment.getId())) {
+                throw new UnauthorizedActionException("You can create one-on-one meetings only in your assigned department.");
+            }
+
+            return defaultDepartment.getId();
+        }
+
         if (canSelectDepartment) {
             if (requestedDepartmentId == null) {
-                throw new RuntimeException("Department is required.");
+                throw new BusinessValidationException("Department is required.");
             }
             return requestedDepartmentId;
         }
 
         Department defaultDepartment = resolveDefaultDepartment(current)
-                .orElseThrow(() -> new RuntimeException("Your account has no default department for one-on-one meetings."));
+                .orElseThrow(() -> new BusinessValidationException("Your account has no assigned department for one-on-one meetings."));
 
         if (requestedDepartmentId != null && !Objects.equals(requestedDepartmentId, defaultDepartment.getId())) {
-            throw new UnauthorizedActionException("You can create one-on-one meetings only in your default department.");
+            throw new UnauthorizedActionException("You can create one-on-one meetings only in your assigned department.");
         }
 
         return defaultDepartment.getId();
     }
 
-    private boolean canUseDepartmentEmployeeScope() {
-        return positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection")
+    private boolean canUseDepartmentEmployeeScope(UserPrincipal current) {
+        return isHr(current)
+                || isAdmin(current)
+                || isDepartmentHead(current)
+                || isManager(current)
+                || positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection")
                 || positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
     }
 
@@ -295,18 +393,27 @@ public class TeamAccessService {
 
     private Optional<Department> resolveDefaultDepartment(UserPrincipal current) {
         Optional<User> user = userRepository.findById(current.getId());
-        if (user.isPresent() && user.get().getEmployeeId() != null) {
-            Optional<Employee> employee = employeeRepository.findById(user.get().getEmployeeId());
-            if (employee.isPresent()) {
-                Optional<Department> workingDepartment = employee.get().getEmployeeDepartments()
-                        .stream()
-                        .filter(ed -> ed.getEnddate() == null)
-                        .findFirst()
-                        .map(this::workingDepartmentFromAssignment)
-                        .filter(Objects::nonNull);
+        if (user.isPresent()) {
+            if (user.get().getDepartmentId() != null) {
+                Optional<Department> accountDepartment = departmentRepository.findById(user.get().getDepartmentId());
+                if (accountDepartment.isPresent()) {
+                    return accountDepartment;
+                }
+            }
 
-                if (workingDepartment.isPresent()) {
-                    return workingDepartment;
+            if (user.get().getEmployeeId() != null) {
+                Optional<Employee> employee = employeeRepository.findById(user.get().getEmployeeId());
+                if (employee.isPresent()) {
+                    Optional<Department> workingDepartment = employee.get().getEmployeeDepartments()
+                            .stream()
+                            .filter(ed -> ed.getEnddate() == null)
+                            .findFirst()
+                            .map(this::workingDepartmentFromAssignment)
+                            .filter(Objects::nonNull);
+
+                    if (workingDepartment.isPresent()) {
+                        return workingDepartment;
+                    }
                 }
             }
         }
@@ -323,11 +430,11 @@ public class TeamAccessService {
             return null;
         }
 
-        if (assignment.getCurrentDepartment() != null) {
-            return assignment.getCurrentDepartment();
+        if (assignment.getParentDepartment() != null) {
+            return assignment.getParentDepartment();
         }
 
-        return assignment.getParentDepartment();
+        return assignment.getCurrentDepartment();
     }
 
     private List<TeamOptionResponseDto> findActiveTeamsByDepartment(Integer departmentId) {
@@ -351,7 +458,11 @@ public class TeamAccessService {
     }
 
     private List<TeamEmployeeOptionResponseDto> getActiveEmployeeOptions(Team team) {
+        Integer currentEmployeeId = currentEmployeeId(SecurityUtils.currentUser()).orElse(null);
+
         return getActiveEmployeesFromTeam(team).stream()
+                .filter(employee -> !Objects.equals(employee.getId(), currentEmployeeId))
+                .filter(employee -> isAllowedOneOnOneTarget(SecurityUtils.currentUser(), employee))
                 .map(employee -> {
                     User user = findUserByEmployeeId(team, employee.getId());
 
@@ -454,6 +565,141 @@ public class TeamAccessService {
     private boolean isManagedByUser(Team team, Integer userId) {
         return team.getTeamLeader() != null && Objects.equals(team.getTeamLeader().getId(), userId)
                 || team.getProjectManager() != null && Objects.equals(team.getProjectManager().getId(), userId);
+    }
+
+    private List<Employee> findDirectReportEmployees(Integer managerUserId) {
+        return userRepository.findByManagerIdAndActiveTrue(managerUserId).stream()
+                .filter(user -> user.getEmployeeId() != null)
+                .map(user -> employeeRepository.findById(user.getEmployeeId()))
+                .flatMap(Optional::stream)
+                .filter(this::isActiveEmployee)
+                .toList();
+    }
+
+    private boolean isDirectReport(Integer managerUserId, Employee employee) {
+        if (employee == null) {
+            return false;
+        }
+
+        return userRepository.findActiveByEmployeeId(employee.getId())
+                .map(user -> Objects.equals(user.getManagerId(), managerUserId))
+                .orElse(false);
+    }
+
+    private boolean employeeBelongsToDepartment(Employee employee, Integer departmentId) {
+        if (employee == null || departmentId == null) {
+            return false;
+        }
+
+        Set<Integer> departmentIds = employeeDepartmentIds(employee);
+        return departmentIds.contains(departmentId);
+    }
+
+    private Set<Integer> employeeDepartmentIds(Employee employee) {
+        Set<Integer> ids = new LinkedHashSet<>();
+
+        if (employee == null) {
+            return ids;
+        }
+
+        employee.getEmployeeDepartments().stream()
+                .filter(ed -> ed.getEnddate() == null)
+                .forEach(ed -> {
+                    if (ed.getCurrentDepartment() != null) {
+                        ids.add(ed.getCurrentDepartment().getId());
+                    }
+                    if (ed.getParentDepartment() != null) {
+                        ids.add(ed.getParentDepartment().getId());
+                    }
+                });
+
+        userRepository.findActiveByEmployeeId(employee.getId())
+                .map(User::getDepartmentId)
+                .filter(Objects::nonNull)
+                .ifPresent(ids::add);
+
+        return ids;
+    }
+
+    private Optional<Integer> currentEmployeeId(UserPrincipal current) {
+        return userRepository.findById(current.getId())
+                .map(User::getEmployeeId)
+                .filter(Objects::nonNull);
+    }
+
+    private boolean isAllowedOneOnOneTarget(UserPrincipal current, Employee employee) {
+        if (employee == null) {
+            return false;
+        }
+
+        if (isManager(current)) {
+            return isDirectReport(current.getId(), employee);
+        }
+
+        if (isDepartmentHead(current)) {
+            Integer allowedDepartmentId = resolveDefaultDepartment(current).map(Department::getId).orElse(null);
+            return allowedDepartmentId != null && employeeBelongsToDepartment(employee, allowedDepartmentId);
+        }
+
+        if (isHr(current)) {
+            return !targetHasAnyRole(employee, Set.of("ADMIN", "CEO", "EXECUTIVE", "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT"));
+        }
+
+        return true;
+    }
+
+    private boolean targetHasAnyRole(Employee employee, Set<String> roleNames) {
+        if (employee == null) {
+            return false;
+        }
+
+        User user = userRepository.findActiveByEmployeeId(employee.getId()).orElse(null);
+        if (user == null || user.getId() == null) {
+            return false;
+        }
+
+        return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
+                .map(this::normalizeRole)
+                .anyMatch(roleNames::contains);
+    }
+
+    private boolean isAdmin(UserPrincipal current) {
+        return hasRole(current, Set.of("ADMIN", "SYSTEM_ADMIN", "SYSTEM_ADMINISTRATOR"));
+    }
+
+    private boolean isHr(UserPrincipal current) {
+        return hasRole(current, Set.of("HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_ADMIN", "HR_MANAGER"));
+    }
+
+    private boolean isDepartmentHead(UserPrincipal current) {
+        return hasRole(current, Set.of("DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT"));
+    }
+
+    private boolean isManager(UserPrincipal current) {
+        return hasRole(current, Set.of("MANAGER", "PROJECT_MANAGER", "TEAM_MANAGER"));
+    }
+
+    private boolean hasRole(UserPrincipal current, Set<String> candidates) {
+        if (current == null || current.getRoles() == null) {
+            return false;
+        }
+
+        return current.getRoles().stream()
+                .map(this::normalizeRole)
+                .anyMatch(candidates::contains);
+    }
+
+    private String normalizeRole(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
     }
 
     private String displayUser(User user) {

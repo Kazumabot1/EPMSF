@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowService {
 
     public static final String TYPE_KPI_MANAGER_ASSIGNMENT = "KPI_MANAGER_ASSIGNMENT";
+    public static final String TYPE_KPI_EMPLOYEE_ASSIGNMENT = "KPI_EMPLOYEE_ASSIGNMENT";
     public static final String TYPE_KPI_FINALIZED_EMPLOYEE = "KPI_FINALIZED_EMPLOYEE";
     public static final String TYPE_KPI_FINALIZED_HR = "KPI_FINALIZED_HR";
     public static final String TYPE_KPI_CYCLE_GRACE = "KPI_CYCLE_GRACE";
@@ -282,6 +283,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             }
 
             EmployeeKpiForm saved = employeeKpiFormRepository.save(ekf);
+            notifyEmployeeKpiAssigned(emp, form, cycle, cyclePeriod, saved);
             for (Integer evaluatorId : routing.evaluatorIdsForEmployee(emp.getId())) {
                 userRepository.findById(evaluatorId).ifPresent(evaluator -> {
                     if (!employeeKpiFormEvaluatorRepository.existsByEmployeeKpiForm_IdAndEvaluatorUser_Id(saved.getId(), evaluator.getId())) {
@@ -310,6 +312,30 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 managerIds.size()
         );
         return new DeptApplySlice(matched > 0, created, skipped, managerIds);
+    }
+
+    private void notifyEmployeeKpiAssigned(
+            Employee employee,
+            KpiForm form,
+            KpiTemplateCycle cycle,
+            KpiTemplateCyclePeriod period,
+            EmployeeKpiForm assignment
+    ) {
+        if (employee == null || employee.getId() == null || form == null || assignment == null || assignment.getId() == null) {
+            return;
+        }
+
+        userRepository.findActiveByEmployeeId(employee.getId()).ifPresent(user -> {
+            String cycleName = cycle == null || cycle.getCycleName() == null ? "the active KPI cycle" : cycle.getCycleName();
+            String periodText = period == null || period.getPeriodNumber() == null ? "" : " period " + period.getPeriodNumber();
+            notificationService.sendOnce(
+                    user.getId(),
+                    "KPI target assigned",
+                    "A KPI target from template \"" + form.getTitle() + "\" was assigned to you for " + cycleName + periodText + ".",
+                    TYPE_KPI_EMPLOYEE_ASSIGNMENT,
+                    assignment.getId()
+            );
+        });
     }
 
     private boolean hasExistingKpiAssignment(
@@ -727,9 +753,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         Position oldPosition = oldPositionId == null ? null : positionRepository.findById(oldPositionId).orElse(null);
         Position newPosition = positionRepository.findById(newPositionId).orElse(employee.getPosition());
         List<EmployeeKpiForm> openAssignments = employeeKpiFormRepository.findOpenByEmployeeIdWithDetail(
-                employeeId,
-                List.of(EmployeeKpiStatus.FINALIZED, EmployeeKpiStatus.CLOSED)
-        ).stream()
+                        employeeId,
+                        List.of(EmployeeKpiStatus.FINALIZED, EmployeeKpiStatus.CLOSED)
+                ).stream()
                 .filter(assignment -> assignment.getPositionIdAtAssignment() == null
                         || Objects.equals(assignment.getPositionIdAtAssignment(), oldPositionId))
                 .toList();
@@ -1000,7 +1026,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     String rowLabel = item == null
                             ? ("#" + row.getKpiFormItemId())
                             : Optional.ofNullable(item.getKpiItem()).map(KpiItem::getName).filter(s -> !s.isBlank())
-                                    .orElse(Optional.ofNullable(item.getKpiLabel()).filter(s -> !s.isBlank()).orElse("#" + item.getId()));
+                            .orElse(Optional.ofNullable(item.getKpiLabel()).filter(s -> !s.isBlank()).orElse("#" + item.getId()));
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "KPI row \"" + rowLabel + "\" has no valid target for (actual/target)×100."
@@ -1338,10 +1364,10 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     .collect(Collectors.joining(", "));
             String hrMessage = periodEndAuto
                     ? ("KPI \"" + form.getTitle() + "\" auto-finalized after period end for "
-                            + finalizedThisRun.size() + " employee(s): " + summary + ".")
+                    + finalizedThisRun.size() + " employee(s): " + summary + ".")
                     : ("KPI \"" + form.getTitle() + "\" finalized for "
-                            + finalizedThisRun.size() + " employee(s): " + summary + "."
-                            + firstReasonSummary(finalizedThisRun));
+                    + finalizedThisRun.size() + " employee(s): " + summary + "."
+                    + firstReasonSummary(finalizedThisRun));
             for (User hr : hrUsers) {
                 notificationService.send(hr.getId(), "KPI finalized", hrMessage, TYPE_KPI_FINALIZED_HR, form.getId());
             }
@@ -1756,8 +1782,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private boolean hasActiveEmployeeAccount(Integer employeeId) {
         return employeeId != null
                 && employeeRepository.findById(employeeId)
-                        .filter(this::hasActiveEmployeeAccount)
-                        .isPresent();
+                .filter(this::hasActiveEmployeeAccount)
+                .isPresent();
     }
 
     private boolean isActiveUser(User user) {

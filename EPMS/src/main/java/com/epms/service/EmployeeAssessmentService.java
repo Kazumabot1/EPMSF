@@ -26,6 +26,7 @@ import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.AssessmentFormDefinitionRepository;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeAssessmentRepository;
+import com.epms.repository.EmployeeAssessmentAnswerRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.SignatureRepository;
@@ -34,6 +35,8 @@ import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -93,6 +96,8 @@ public class EmployeeAssessmentService {
     );
 
     private final EmployeeAssessmentRepository assessmentRepository;
+    private final EmployeeAssessmentAnswerRepository assessmentAnswerRepository;
+    private final JdbcTemplate jdbcTemplate;
     private final AssessmentFormDefinitionRepository formRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
@@ -154,9 +159,7 @@ public class EmployeeAssessmentService {
 
     @Transactional(readOnly = true)
     public AssessmentResponse getById(Long id) {
-        EmployeeAssessment assessment = findAssessment(id);
-        assertCanView(assessment);
-        return toResponse(assessment);
+        return getByIdSnapshot(id);
     }
 
     @Transactional
@@ -594,13 +597,387 @@ public class EmployeeAssessmentService {
     }
 
     private String scoreLabel(double scorePercent, AssessmentFormDefinition form) {
-        List<AssessmentScoreBandResponse> bands = selfAssessmentScoreBandService.getActiveBandsForAssessment();
+        List<AssessmentScoreBandResponse> bands = safeScoreBands();
 
         return bands.stream()
                 .filter(band -> scorePercent >= band.getMinScore() && scorePercent <= band.getMaxScore())
                 .findFirst()
                 .map(AssessmentScoreBandResponse::getLabel)
                 .orElse("Not scored");
+    }
+
+
+    private AssessmentResponse getByIdSnapshot(Long id) {
+        Map<String, Object> row;
+
+        try {
+            row = jdbcTemplate.queryForMap("""
+                    select
+                        id,
+                        user_id,
+                        employee_id,
+                        employee_name,
+                        employee_code,
+                        current_position,
+                        department_id,
+                        department_name,
+                        manager_user_id,
+                        manager_name,
+                        department_head_user_id,
+                        department_head_name,
+                        assessment_form_id,
+                        form_name,
+                        company_name,
+                        assessment_date,
+                        period_label,
+                        status,
+                        total_score,
+                        max_score,
+                        score_percent,
+                        performance_label,
+                        remarks,
+                        manager_comment,
+                        hr_comment,
+                        department_head_comment,
+                        decline_reason,
+                        employee_signature_id,
+                        employee_signature_name,
+                        employee_signature_image_data,
+                        employee_signature_image_type,
+                        employee_signed_at,
+                        manager_signature_id,
+                        manager_signature_name,
+                        manager_signature_image_data,
+                        manager_signature_image_type,
+                        manager_signed_at,
+                        department_head_signature_id,
+                        department_head_signature_name,
+                        department_head_signature_image_data,
+                        department_head_signature_image_type,
+                        department_head_signed_at,
+                        hr_signature_id,
+                        hr_signature_name,
+                        hr_signature_image_data,
+                        hr_signature_image_type,
+                        hr_signed_at,
+                        created_at,
+                        updated_at,
+                        submitted_at,
+                        approved_at,
+                        declined_at
+                    from employee_assessments
+                    where id = ?
+                    """, id);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ResourceNotFoundException("Assessment not found.");
+        }
+
+        Integer ownerUserId = toInteger(row.get("user_id"));
+        Integer employeeId = toInteger(row.get("employee_id"));
+        Integer managerUserId = toInteger(row.get("manager_user_id"));
+        Integer departmentId = toInteger(row.get("department_id"));
+
+        assertCanViewSnapshot(ownerUserId, employeeId, managerUserId, departmentId);
+
+        List<Map<String, Object>> answerRows = jdbcTemplate.queryForList("""
+                select
+                    id,
+                    question_id,
+                    section_title,
+                    question_text,
+                    item_order,
+                    response_type,
+                    is_required,
+                    weight,
+                    rating,
+                    max_rating,
+                    comment,
+                    yes_no_answer
+                from employee_assessment_answers
+                where assessment_id = ?
+                order by coalesce(item_order, 999999), id
+                """, id);
+
+        return AssessmentResponse.builder()
+                .id(toLong(row.get("id")))
+                .formId(toInteger(row.get("assessment_form_id")))
+                .assessmentFormId(toInteger(row.get("assessment_form_id")))
+                .formName(toStringValue(row.get("form_name")))
+                .companyName(toStringValue(row.get("company_name")))
+                .userId(ownerUserId)
+                .employeeId(employeeId)
+                .employeeName(toStringValue(row.get("employee_name")))
+                .employeeCode(toStringValue(row.get("employee_code")))
+                .currentPosition(toStringValue(row.get("current_position")))
+                .departmentId(departmentId)
+                .departmentName(toStringValue(row.get("department_name")))
+                .managerUserId(managerUserId)
+                .managerName(toStringValue(row.get("manager_name")))
+                .departmentHeadUserId(toInteger(row.get("department_head_user_id")))
+                .departmentHeadName(toStringValue(row.get("department_head_name")))
+                .assessmentDate(toLocalDate(row.get("assessment_date")))
+                .period(toStringValue(row.get("period_label")))
+                .status(toStringValue(row.get("status")))
+                .totalScore(nullToZero(toDouble(row.get("total_score"))))
+                .maxScore(nullToZero(toDouble(row.get("max_score"))))
+                .scorePercent(nullToZero(toDouble(row.get("score_percent"))))
+                .performanceLabel(toStringValue(row.get("performance_label")))
+                .remarks(toStringValue(row.get("remarks")))
+                .managerComment(toStringValue(row.get("manager_comment")))
+                .hrComment(toStringValue(row.get("hr_comment")))
+                .departmentHeadComment(toStringValue(row.get("department_head_comment")))
+                .declineReason(toStringValue(row.get("decline_reason")))
+                .employeeSignatureId(toLong(row.get("employee_signature_id")))
+                .employeeSignatureName(toStringValue(row.get("employee_signature_name")))
+                .employeeSignatureImageData(toStringValue(row.get("employee_signature_image_data")))
+                .employeeSignatureImageType(toStringValue(row.get("employee_signature_image_type")))
+                .employeeSignedAt(toLocalDateTime(row.get("employee_signed_at")))
+                .managerSignatureId(toLong(row.get("manager_signature_id")))
+                .managerSignatureName(toStringValue(row.get("manager_signature_name")))
+                .managerSignatureImageData(toStringValue(row.get("manager_signature_image_data")))
+                .managerSignatureImageType(toStringValue(row.get("manager_signature_image_type")))
+                .managerSignedAt(toLocalDateTime(row.get("manager_signed_at")))
+                .departmentHeadSignatureId(toLong(row.get("department_head_signature_id")))
+                .departmentHeadSignatureName(toStringValue(row.get("department_head_signature_name")))
+                .departmentHeadSignatureImageData(toStringValue(row.get("department_head_signature_image_data")))
+                .departmentHeadSignatureImageType(toStringValue(row.get("department_head_signature_image_type")))
+                .departmentHeadSignedAt(toLocalDateTime(row.get("department_head_signed_at")))
+                .hrSignatureId(toLong(row.get("hr_signature_id")))
+                .hrSignatureName(toStringValue(row.get("hr_signature_name")))
+                .hrSignatureImageData(toStringValue(row.get("hr_signature_image_data")))
+                .hrSignatureImageType(toStringValue(row.get("hr_signature_image_type")))
+                .hrSignedAt(toLocalDateTime(row.get("hr_signed_at")))
+                .createdAt(toLocalDateTime(row.get("created_at")))
+                .updatedAt(toLocalDateTime(row.get("updated_at")))
+                .submittedAt(toLocalDateTime(row.get("submitted_at")))
+                .approvedAt(toLocalDateTime(row.get("approved_at")))
+                .declinedAt(toLocalDateTime(row.get("declined_at")))
+                .sections(groupSectionsFromRows(answerRows))
+                .scoreBands(safeScoreBands())
+                .build();
+    }
+
+    private List<AssessmentSectionResponse> groupSectionsFromRows(List<Map<String, Object>> answerRows) {
+        Map<String, List<AssessmentItemResponse>> grouped = new LinkedHashMap<>();
+
+        if (answerRows == null || answerRows.isEmpty()) {
+            return List.of();
+        }
+
+        for (Map<String, Object> answer : answerRows) {
+            String sectionTitle = toStringValue(answer.get("section_title"));
+            if (sectionTitle == null || sectionTitle.isBlank()) {
+                sectionTitle = "Assessment";
+            }
+
+            String responseType = toStringValue(answer.get("response_type"));
+            grouped.computeIfAbsent(sectionTitle, ignored -> new ArrayList<>())
+                    .add(AssessmentItemResponse.builder()
+                            .id(toLong(answer.get("id")))
+                            .questionId(toInteger(answer.get("question_id")))
+                            .sectionTitle(sectionTitle)
+                            .questionText(toStringValue(answer.get("question_text")))
+                            .itemOrder(toInteger(answer.get("item_order")))
+                            .responseType(responseType == null ? RESPONSE_TYPE_YES_NO_RATING : responseType)
+                            .isRequired(toBoolean(answer.get("is_required"), true))
+                            .weight(toDouble(answer.get("weight")) == null ? 1.0 : toDouble(answer.get("weight")))
+                            .rating(toInteger(answer.get("rating")))
+                            .maxRating(toInteger(answer.get("max_rating")) == null ? MAX_RATING : toInteger(answer.get("max_rating")))
+                            .comment(toStringValue(answer.get("comment")))
+                            .yesNoAnswer(toBoolean(answer.get("yes_no_answer"), null))
+                            .build());
+        }
+
+        int sectionOrder = 1;
+        List<AssessmentSectionResponse> sections = new ArrayList<>();
+
+        for (Map.Entry<String, List<AssessmentItemResponse>> entry : grouped.entrySet()) {
+            sections.add(AssessmentSectionResponse.builder()
+                    .id(null)
+                    .title(entry.getKey())
+                    .orderNo(sectionOrder++)
+                    .items(entry.getValue())
+                    .build());
+        }
+
+        return sections;
+    }
+
+    private void assertCanViewSnapshot(
+            Integer ownerUserId,
+            Integer employeeId,
+            Integer managerUserId,
+            Integer departmentId
+    ) {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        Integer currentUserId = SecurityUtils.currentUserId();
+
+        if (sameId(ownerUserId, currentUserId)) {
+            return;
+        }
+
+        if (currentUserId != null && employeeId != null) {
+            Optional<User> currentUser = userRepository.findById(currentUserId);
+            if (currentUser.isPresent() && sameId(employeeId, currentUser.get().getEmployeeId())) {
+                return;
+            }
+        }
+
+        Set<String> roles = currentUserTargetRoles(principal);
+
+        if (roles.contains("HR") || roles.contains("ADMIN")) {
+            return;
+        }
+
+        if (roles.contains("MANAGER")) {
+            if (sameId(managerUserId, currentUserId)) {
+                return;
+            }
+
+            if (ownerUserId != null && currentUserId != null) {
+                Optional<User> owner = userRepository.findById(ownerUserId);
+                if (owner.isPresent() && sameId(owner.get().getManagerId(), currentUserId)) {
+                    return;
+                }
+            }
+        }
+
+        if (isDepartmentHeadRole(roles)
+                && departmentId != null
+                && currentUserDepartmentIds(principal).contains(departmentId)
+                && positionPermissionService.currentUserHasPermission("selfAssessmentView")) {
+            return;
+        }
+
+        throw new UnauthorizedActionException("You do not have permission to view this assessment.");
+    }
+
+    private Integer toInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Double toDouble(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Boolean toBoolean(Object value, Boolean defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+
+        if (value instanceof Number number) {
+            return number.intValue() != 0;
+        }
+
+        if (value instanceof byte[] bytes && bytes.length > 0) {
+            return bytes[0] != 0;
+        }
+
+        String normalized = value.toString().trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("true") || normalized.equals("1") || normalized.equals("yes")) {
+            return true;
+        }
+        if (normalized.equals("false") || normalized.equals("0") || normalized.equals("no")) {
+            return false;
+        }
+
+        return defaultValue;
+    }
+
+    private String toStringValue(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+
+        if (value instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+
+        if (value instanceof java.util.Date date) {
+            return new java.sql.Date(date.getTime()).toLocalDate();
+        }
+
+        try {
+            return LocalDate.parse(value.toString());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+
+        if (value instanceof java.util.Date date) {
+            return new java.sql.Timestamp(date.getTime()).toLocalDateTime();
+        }
+
+        try {
+            return LocalDateTime.parse(value.toString().replace(" ", "T"));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private AssessmentResponse toTemplateResponse(User user, EmployeeProfile profile, AssessmentFormDefinition form) {
@@ -636,11 +1013,15 @@ public class EmployeeAssessmentService {
                 .hrComment(null)
                 .declineReason(null)
                 .sections(templateSectionsFromForm(form))
-                .scoreBands(selfAssessmentScoreBandService.getActiveBandsForAssessment())
+                .scoreBands(safeScoreBands())
                 .build();
     }
 
     private AssessmentResponse toResponse(EmployeeAssessment assessment) {
+        return toResponse(assessment, assessment.getAnswers() == null ? List.of() : assessment.getAnswers());
+    }
+
+    private AssessmentResponse toResponse(EmployeeAssessment assessment, List<EmployeeAssessmentAnswer> answers) {
         EmployeeProfile profile = userRepository
                 .findById(assessment.getUserId())
                 .map(this::resolveProfile)
@@ -709,8 +1090,8 @@ public class EmployeeAssessmentService {
                 .submittedAt(assessment.getSubmittedAt())
                 .approvedAt(assessment.getApprovedAt())
                 .declinedAt(assessment.getDeclinedAt())
-                .sections(groupSections(assessment.getAnswers()))
-                .scoreBands(selfAssessmentScoreBandService.getActiveBandsForAssessment())
+                .sections(groupSections(answers))
+                .scoreBands(safeScoreBands())
                 .build();
     }
 
@@ -887,6 +1268,10 @@ public class EmployeeAssessmentService {
     private Set<String> currentUserTargetRoles(UserPrincipal principal) {
         Set<String> roles = new LinkedHashSet<>();
 
+        if (principal == null) {
+            return roles;
+        }
+
         if (principal.getRoles() != null) {
             principal.getRoles().forEach(role -> addRoleWithAliases(roles, role));
         }
@@ -961,6 +1346,54 @@ public class EmployeeAssessmentService {
                 || roles.contains("HEAD_OF_DEPARTMENT");
     }
 
+
+    private List<AssessmentScoreBandResponse> safeScoreBands() {
+        try {
+            List<AssessmentScoreBandResponse> bands = selfAssessmentScoreBandService.getActiveBandsForAssessment();
+
+            if (bands != null && !bands.isEmpty()) {
+                return bands;
+            }
+        } catch (Exception ignored) {
+            // The assessment detail view must not fail only because the score-band setup table is empty or misaligned.
+        }
+
+        return defaultScoreBands();
+    }
+
+    private List<AssessmentScoreBandResponse> defaultScoreBands() {
+        List<AssessmentScoreBandResponse> bands = new ArrayList<>();
+
+        bands.add(defaultScoreBand(86, 100, "Outstanding",
+                "Performance exceptional and far exceeds expectations. Consistently demonstrates excellent standards in all job requirements.", 1));
+        bands.add(defaultScoreBand(71, 85, "Good",
+                "Performance is consistent. Clearly meets essential requirements of job.", 2));
+        bands.add(defaultScoreBand(60, 70, "Meet Requirement",
+                "Performance is satisfactory. Meets requirements of the job.", 3));
+        bands.add(defaultScoreBand(40, 59, "Need Improvement",
+                "Performance is inconsistent. Meets requirements of job occasionally. Supervision and training is required for most problem areas.", 4));
+        bands.add(defaultScoreBand(0, 39, "Unsatisfactory",
+                "Performance does not meet the minimum requirement of the job.", 5));
+
+        return bands;
+    }
+
+    private AssessmentScoreBandResponse defaultScoreBand(
+            Integer minScore,
+            Integer maxScore,
+            String label,
+            String description,
+            Integer sortOrder
+    ) {
+        return AssessmentScoreBandResponse.builder()
+                .minScore(minScore)
+                .maxScore(maxScore)
+                .label(label)
+                .description(description)
+                .sortOrder(sortOrder)
+                .build();
+    }
+
     private Signature currentDefaultSignature() {
         Integer userId = SecurityUtils.currentUserId();
 
@@ -1009,7 +1442,7 @@ public class EmployeeAssessmentService {
 
     private EmployeeAssessment findAssessment(Long id) {
         return assessmentRepository
-                .findById(id)
+                .findWithAnswersById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment not found."));
     }
 
@@ -1168,7 +1601,9 @@ public class EmployeeAssessmentService {
             return;
         }
 
-        if (roles.contains("MANAGER") && isEligibleManagerReviewer(assessment, principal)) {
+        if (roles.contains("MANAGER")
+                && (isEligibleManagerReviewer(assessment, principal)
+                || isDirectReportAssessment(assessment, principal))) {
             return;
         }
 
@@ -1406,9 +1841,25 @@ public class EmployeeAssessmentService {
             return true;
         }
 
+        if (isDirectReportAssessment(assessment, principal)) {
+            return true;
+        }
+
         return eligibleManagersForAssessment(assessment)
                 .stream()
                 .anyMatch(manager -> Objects.equals(manager.getId(), principal.getId()));
+    }
+
+    private boolean isDirectReportAssessment(EmployeeAssessment assessment, UserPrincipal principal) {
+        if (assessment == null || assessment.getUserId() == null || principal == null || principal.getId() == null) {
+            return false;
+        }
+
+        return userRepository.findById(assessment.getUserId())
+                .map(User::getManagerId)
+                .filter(Objects::nonNull)
+                .map(managerId -> Objects.equals(managerId, principal.getId()))
+                .orElse(false);
     }
 
     private List<TeamMember> activeTeamMembershipsForUser(Integer userId) {
