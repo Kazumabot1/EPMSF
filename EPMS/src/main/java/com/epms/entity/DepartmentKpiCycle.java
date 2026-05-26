@@ -32,6 +32,10 @@ public class DepartmentKpiCycle {
     @Column(name = "duration_months", nullable = false)
     private Integer durationMonths;
 
+    @Column(name = "duration_years", nullable = false)
+    @Builder.Default
+    private Integer durationYears = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
@@ -70,10 +74,14 @@ public class DepartmentKpiCycle {
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (status == null) status = KpiTemplateCycleStatus.DRAFT;
+        if (durationYears == null) durationYears = 1;
+        if (durationMonths == null) durationMonths = durationYears * 12;
     }
 
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
+        if (durationYears == null) durationYears = durationMonths == null ? 1 : Math.max(1, (int) Math.ceil(durationMonths / 12.0));
+        if (durationMonths == null) durationMonths = durationYears * 12;
     }
 }

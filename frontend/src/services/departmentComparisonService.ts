@@ -17,6 +17,12 @@ export interface DepartmentComparisonSummary {
   status?: boolean | number | null;
   createdAt?: string | null;
   createdBy?: string | null;
+  departmentKpiScore?: number | null;
+  departmentKpiWeightedScore?: number | null;
+  departmentKpiTemplateTitle?: string | null;
+  departmentKpiPeriodStartDate?: string | null;
+  departmentKpiPeriodEndDate?: string | null;
+  departmentKpiFinalizedAt?: string | null;
 }
 
 export interface DepartmentComparisonEmployee {
@@ -60,6 +66,12 @@ export interface DepartmentComparisonDetail {
   currentDepartmentEmployeeCount?: number | null;
   parentDepartmentEmployeeCount?: number | null;
   teamCount?: number | null;
+  departmentKpiScore?: number | null;
+  departmentKpiWeightedScore?: number | null;
+  departmentKpiTemplateTitle?: string | null;
+  departmentKpiPeriodStartDate?: string | null;
+  departmentKpiPeriodEndDate?: string | null;
+  departmentKpiFinalizedAt?: string | null;
 
   employees?: DepartmentComparisonEmployee[];
   teams?: DepartmentComparisonTeam[];

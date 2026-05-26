@@ -201,6 +201,75 @@ class KpiTemplateCycleServiceImplTest {
     }
 
     @Test
+    void updateRejectsPendingApprovalCycle() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = pendingCycle();
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+
+        KpiTemplateCycleRequestDTO request = cycleUpdateRequest("Adjusted", "Because");
+
+        assertThatThrownBy(() -> service.update(100, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(CONFLICT))
+                .hasMessageContaining("pending CEO approval");
+    }
+
+    @Test
+    void updateAllowsClosingCycleBeforeGraceEnds() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = closingCycle(LocalDateTime.now().plusHours(1));
+        KpiForm form = new KpiForm();
+        form.setId(200);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        stubCycle(cycle);
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
+        when(kpiFormRepository.findById(200)).thenReturn(Optional.of(form));
+        when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection())).thenReturn(List.of());
+
+        KpiTemplateCycleRequestDTO request = cycleUpdateRequest("Adjusted", "Still inside grace");
+
+        service.update(100, request);
+
+        assertThat(cycle.getCycleName()).isEqualTo("Adjusted");
+        assertThat(cycle.getLastEditReason()).isEqualTo("Still inside grace");
+        verify(cycleRepository).save(cycle);
+    }
+
+    @Test
+    void updateRejectsCeoApprovedClosingCycleBeforeGraceEnds() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = closingCycle(LocalDateTime.now().plusHours(1));
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+
+        KpiTemplateCycleRequestDTO request = cycleUpdateRequest("Adjusted", "Because");
+
+        assertThatThrownBy(() -> service.update(100, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(CONFLICT))
+                .hasMessageContaining("CEO approved closure");
+    }
+
+    @Test
+    void updateRejectsClosingCycleWhenGraceHasEnded() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = closingCycle(LocalDateTime.now().minusSeconds(1));
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+
+        KpiTemplateCycleRequestDTO request = cycleUpdateRequest("Adjusted", "Because");
+
+        assertThatThrownBy(() -> service.update(100, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode()).isEqualTo(CONFLICT))
+                .hasMessageContaining("Grace period has ended");
+    }
+
+    @Test
     void updateRequiresEditReason() {
         User hr = user(17, "HR User");
         KpiTemplateCycle cycle = draftCycle();
@@ -228,6 +297,7 @@ class KpiTemplateCycleServiceImplTest {
                 .kpiForm(form)
                 .build();
         authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
         when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection()))
                 .thenReturn(List.of(link));
 
@@ -245,6 +315,13 @@ class KpiTemplateCycleServiceImplTest {
     private KpiTemplateCycle draftCycle() {
         KpiTemplateCycle cycle = activeCycle();
         cycle.setStatus(KpiTemplateCycleStatus.DRAFT);
+        return cycle;
+    }
+
+    private KpiTemplateCycle closingCycle(LocalDateTime graceEndsAt) {
+        KpiTemplateCycle cycle = activeCycle();
+        cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
+        cycle.setGraceEndsAt(graceEndsAt);
         return cycle;
     }
 

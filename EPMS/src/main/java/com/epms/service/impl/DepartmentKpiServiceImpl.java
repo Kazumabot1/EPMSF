@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    private static final Set<Integer> ALLOWED_DURATION_YEARS = Set.of(1, 2, 3, 4, 5);
     private static final String TYPE_DEPARTMENT_KPI_FINALIZED = "DEPARTMENT_KPI_FINALIZED";
 
     private final DepartmentKpiTemplateRepository templateRepository;
@@ -47,8 +48,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         User user = currentUser();
         DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
                 .title(request.getTitle().trim())
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
+                .durationMonths(request.getDurationMonths())
                 .status(request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus())
                 .createdByUser(user)
                 .build();
@@ -65,8 +65,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         DepartmentKpiTemplate template = templateRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI template not found."));
         template.setTitle(request.getTitle().trim());
-        template.setStartDate(request.getStartDate());
-        template.setEndDate(request.getEndDate());
+        template.setDurationMonths(request.getDurationMonths());
         template.setStatus(request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus());
         template.setUpdatedByUser(currentUser());
         template.getRows().clear();
@@ -106,11 +105,13 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     @Transactional
     public DepartmentKpiCycleResponseDto createCycle(DepartmentKpiCycleRequestDto request) {
         validateCycleRequest(request);
+        Integer durationYears = normalizedDurationYears(request);
         DepartmentKpiCycle cycle = DepartmentKpiCycle.builder()
                 .cycleName(request.getCycleName().trim())
                 .startDate(request.getStartDate())
-                .durationMonths(request.getDurationMonths())
-                .endDate(request.getStartDate().plusMonths(request.getDurationMonths()).minusDays(1))
+                .durationMonths(durationYears * 12)
+                .durationYears(durationYears)
+                .endDate(calculateEndDate(request.getStartDate(), durationYears))
                 .status(KpiTemplateCycleStatus.DRAFT)
                 .createdByUser(currentUser())
                 .build();
@@ -132,11 +133,13 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (editReason == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
         }
+        Integer durationYears = normalizedDurationYears(request);
         cycle.setLastEditReason(editReason);
         cycle.setCycleName(request.getCycleName().trim());
         cycle.setStartDate(request.getStartDate());
-        cycle.setDurationMonths(request.getDurationMonths());
-        cycle.setEndDate(request.getStartDate().plusMonths(request.getDurationMonths()).minusDays(1));
+        cycle.setDurationMonths(durationYears * 12);
+        cycle.setDurationYears(durationYears);
+        cycle.setEndDate(calculateEndDate(request.getStartDate(), durationYears));
         cycle.setUpdatedByUser(currentUser());
         cycle.getCycleTemplates().clear();
         cycleRepository.flush();
@@ -384,7 +387,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                         .cycle(cycle)
                         .periodNumber(1)
                         .startDate(cycle.getStartDate())
-                        .endDate(cycle.getStartDate().plusMonths(cycle.getDurationMonths()).minusDays(1))
+                        .endDate(calculateEndDate(cycle.getStartDate(), responseDurationYears(cycle)))
                         .status(KpiTemplateCyclePeriodStatus.OPEN)
                         .build()));
     }
@@ -396,8 +399,8 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (request.getDepartmentIds() == null || request.getDepartmentIds().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one department.");
         }
-        if (request.getStartDate() != null && request.getEndDate() != null && request.getEndDate().isBefore(request.getStartDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date cannot be before start date.");
+        if (request.getDurationMonths() == null || !ALLOWED_DURATION_MONTHS.contains(request.getDurationMonths())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Template duration must be between 3 months and 1 year.");
         }
         validateRows(request.getItems());
         KpiFormStatus status = request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus();
@@ -434,8 +437,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (request.getCycleName() == null || request.getCycleName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cycle name is required.");
         }
-        if (request.getStartDate() == null || request.getDurationMonths() == null || !ALLOWED_DURATION_MONTHS.contains(request.getDurationMonths())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duration must be between 3 and 12 months.");
+        Integer durationYears = normalizedDurationYears(request);
+        if (request.getStartDate() == null || !ALLOWED_DURATION_YEARS.contains(durationYears)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duration must be between 1 and 5 years.");
         }
         if (request.getTemplateIds() == null || request.getTemplateIds().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one Department KPI template.");
@@ -549,6 +553,8 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .title(t.getTitle())
                 .startDate(t.getStartDate())
                 .endDate(t.getEndDate())
+                .durationMonths(t.getDurationMonths())
+                .durationLabel(durationMonthLabel(t.getDurationMonths()))
                 .status(t.getStatus())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
@@ -565,13 +571,15 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .filter(link -> link.getTemplate() != null)
                 .map(link -> DepartmentKpiCycleResponseDto.TemplateSummary.builder().id(link.getTemplate().getId()).title(link.getTemplate().getTitle()).build())
                 .toList();
+        Integer durationYears = responseDurationYears(c);
         return DepartmentKpiCycleResponseDto.builder()
                 .id(c.getId())
                 .cycleName(c.getCycleName())
                 .startDate(c.getStartDate())
                 .endDate(c.getEndDate())
                 .durationMonths(c.getDurationMonths())
-                .durationLabel(c.getDurationMonths() == 12 ? "1 year" : c.getDurationMonths() + " months")
+                .durationYears(durationYears)
+                .durationLabel(durationYearLabel(durationYears))
                 .status(c.getStatus())
                 .currentPeriodId(period == null ? null : period.getId())
                 .currentPeriodNumber(period == null ? null : period.getPeriodNumber())
@@ -642,6 +650,38 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                     result.getId()
             );
         }
+    }
+
+    private Integer normalizedDurationYears(DepartmentKpiCycleRequestDto request) {
+        if (request.getDurationYears() != null) {
+            return request.getDurationYears();
+        }
+        if (request.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(request.getDurationMonths() / 12.0)));
+        }
+        return null;
+    }
+
+    private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
+        return startDate.plusYears(durationYears).minusDays(1);
+    }
+
+    private Integer responseDurationYears(DepartmentKpiCycle cycle) {
+        if (cycle.getDurationYears() != null && ALLOWED_DURATION_YEARS.contains(cycle.getDurationYears())) {
+            return cycle.getDurationYears();
+        }
+        if (cycle.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(cycle.getDurationMonths() / 12.0)));
+        }
+        return 1;
+    }
+
+    private String durationYearLabel(Integer years) {
+        return years == null || years == 1 ? "1 year" : years + " years";
+    }
+
+    private String durationMonthLabel(Integer months) {
+        return months == null || months == 12 ? "1 year" : months + " months";
     }
 
     private User currentUser() {

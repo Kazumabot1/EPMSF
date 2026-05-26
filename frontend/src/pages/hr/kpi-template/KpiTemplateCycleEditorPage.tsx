@@ -30,6 +30,25 @@ type CycleEditorLocationState = {
   preselectFormId?: number;
 };
 
+const hasGracePeriodEnded = (cycle: KpiTemplateCycleResponse) => {
+  if (!cycle.graceEndsAt) return false;
+  const graceEnd = new Date(cycle.graceEndsAt);
+  if (Number.isNaN(graceEnd.getTime())) return false;
+  return graceEnd <= new Date();
+};
+
+const getCycleEditDisabledReason = (cycle: KpiTemplateCycleResponse) => {
+  if (cycle.status === 'ACTIVE') return 'Active cycles cannot be edited.';
+  if (cycle.status === 'PENDING_APPROVAL') return 'Cycles pending CEO approval cannot be edited.';
+  if (cycle.status === 'CLOSING' && cycle.earlyCloseReviewDecision === 'APPROVED') {
+    return 'CEO approved closure; this cycle can no longer be edited.';
+  }
+  if (cycle.status === 'CLOSING' && hasGracePeriodEnded(cycle)) {
+    return 'Grace period has ended; this cycle can no longer be edited.';
+  }
+  return null;
+};
+
 const KpiTemplateCycleEditorPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -63,8 +82,9 @@ const KpiTemplateCycleEditorPage = () => {
 
         if (isEdit && !Number.isNaN(cycleId)) {
           const cycle = await kpiTemplateCycleService.getById(cycleId);
-          if (cycle.status === 'ACTIVE') {
-            toast.error('Active cycles cannot be edited.');
+          const editDisabledReason = getCycleEditDisabledReason(cycle);
+          if (editDisabledReason) {
+            toast.error(editDisabledReason);
             navigate('/hr/kpi-template-cycle');
             return;
           }

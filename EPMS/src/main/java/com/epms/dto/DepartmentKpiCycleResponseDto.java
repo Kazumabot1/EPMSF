@@ -18,6 +18,7 @@ public class DepartmentKpiCycleResponseDto {
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer durationMonths;
+    private Integer durationYears;
     private String durationLabel;
     private KpiTemplateCycleStatus status;
     private Integer currentPeriodId;

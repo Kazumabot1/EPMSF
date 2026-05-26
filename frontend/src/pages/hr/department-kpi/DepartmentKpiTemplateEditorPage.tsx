@@ -15,6 +15,7 @@ import type { KpiFormStatus, KpiTemplateRowDraft } from '../../../types/kpiTempl
 import type { KpiUnit } from '../../../types/kpiUnit';
 
 const fieldClass = 'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm';
+const TEMPLATE_DURATIONS = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 const DepartmentKpiTemplateEditorPage = () => {
   const { id } = useParams();
@@ -23,6 +24,7 @@ const DepartmentKpiTemplateEditorPage = () => {
   const templateId = isEdit ? Number(id) : NaN;
 
   const [title, setTitle] = useState('');
+  const [durationMonths, setDurationMonths] = useState(3);
   const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [departmentIds, setDepartmentIds] = useState<number[]>([]);
   const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newKpiTemplateRow()]);
@@ -50,6 +52,7 @@ const DepartmentKpiTemplateEditorPage = () => {
         if (isEdit && !Number.isNaN(templateId)) {
           const template = await departmentKpiTemplateService.get(templateId);
           setTitle(template.title);
+          setDurationMonths(template.durationMonths ?? 3);
           setStatus(template.status);
           setDepartmentIds(template.departments.map((d) => d.id));
           setRows(template.items.length > 0 ? template.items.map((line) => ({
@@ -78,6 +81,7 @@ const DepartmentKpiTemplateEditorPage = () => {
 
   const validate = () => {
     if (!title.trim()) return 'Title is required.';
+    if (!TEMPLATE_DURATIONS.includes(durationMonths)) return 'Select a valid template duration.';
     if (departmentIds.length === 0) return 'Select at least one department.';
     if (rows.length === 0) return 'Add at least one KPI row.';
     for (let i = 0; i < rows.length; i += 1) {
@@ -102,6 +106,7 @@ const DepartmentKpiTemplateEditorPage = () => {
       setSaving(true);
       const payload = {
         title: title.trim(),
+        durationMonths,
         status,
         departmentIds,
         items: rows.map((row, index) => ({
@@ -148,10 +153,18 @@ const DepartmentKpiTemplateEditorPage = () => {
 
         <form onSubmit={submit} className="space-y-6">
           <section className="kpi-tpl-card p-6">
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-4">
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Title</span>
                 <input className={fieldClass} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Finance Department KPI" />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</span>
+                <select className={fieldClass} value={durationMonths} onChange={(e) => setDurationMonths(Number(e.target.value))}>
+                  {TEMPLATE_DURATIONS.map((months) => (
+                    <option key={months} value={months}>{months === 12 ? '1 year' : `${months} months`}</option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</span>

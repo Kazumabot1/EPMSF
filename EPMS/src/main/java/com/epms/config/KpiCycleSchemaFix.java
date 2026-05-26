@@ -36,6 +36,7 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             }
             alignEarlyCloseColumns(conn);
             alignCycleDurationColumns(conn);
+            alignDepartmentKpiDurationColumns(conn);
             alignCyclePeriodTemplateColumn(conn);
             alignCycleStatusEnum(conn);
             alignEmployeeKpiStatusEnum(conn);
@@ -87,6 +88,27 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
                                 + "SET duration_years = GREATEST(1, LEAST(5, CEIL(COALESCE(duration_months, 12) / 12)))"
                 );
                 log.info("Added kpi_template_cycle.duration_years column.");
+            }
+        }
+    }
+
+    private void alignDepartmentKpiDurationColumns(Connection conn) throws SQLException {
+        if (tableExists(conn, "department_kpi_template")
+                && !columnExists(conn, "department_kpi_template", "duration_months")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE department_kpi_template ADD COLUMN duration_months INT NOT NULL DEFAULT 3");
+                log.info("Added department_kpi_template.duration_months column.");
+            }
+        }
+        if (tableExists(conn, "department_kpi_cycle")
+                && !columnExists(conn, "department_kpi_cycle", "duration_years")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE department_kpi_cycle ADD COLUMN duration_years INT NOT NULL DEFAULT 1");
+                stmt.executeUpdate(
+                        "UPDATE department_kpi_cycle "
+                                + "SET duration_years = GREATEST(1, LEAST(5, CEIL(COALESCE(duration_months, 12) / 12)))"
+                );
+                log.info("Added department_kpi_cycle.duration_years column.");
             }
         }
     }

@@ -49,6 +49,9 @@ public interface DepartmentKpiResultRepository extends JpaRepository<DepartmentK
     })
     List<DepartmentKpiResult> findByDepartment_IdAndStatusOrderByFinalizedAtDesc(Integer departmentId, DepartmentKpiResultStatus status);
 
+    @EntityGraph(attributePaths = {"department", "template", "cyclePeriod"})
+    Optional<DepartmentKpiResult> findTopByDepartment_IdAndStatusOrderByFinalizedAtDesc(Integer departmentId, DepartmentKpiResultStatus status);
+
     @Query("""
             SELECT new com.epms.dto.DepartmentKpiTemplateSummaryDto(
                 t.id,

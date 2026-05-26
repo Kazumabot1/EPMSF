@@ -260,7 +260,7 @@ function App() {
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
               <Route path="/department-head/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
-              <Route path="/department-head/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
+              <Route path="/department-head/reports/department-performance" element={<DepartmentKpiResultsPage departmentHead />} />
               <Route path="/department-head/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
               <Route path="/department-head/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />

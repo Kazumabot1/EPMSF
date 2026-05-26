@@ -85,9 +85,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
 
-        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
-        }
+        ensureCycleEditable(cycle);
         String editReason = normalizeText(dto.getEditReason(), 1000);
         if (editReason == null || editReason.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
@@ -252,6 +250,30 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycle.setEarlyCloseReviewDecision(null);
         cycle.setEarlyCloseReviewReason(null);
         cycle.setUpdatedByUser(cycle.getEarlyCloseRequestedByUser());
+    }
+
+    private void ensureCycleEditable(KpiTemplateCycle cycle) {
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cycles pending CEO approval cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getEarlyCloseReviewDecision() == KpiEarlyCloseReviewDecision.APPROVED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "CEO approved closure; this cycle can no longer be edited."
+            );
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getGraceEndsAt() != null
+                && !cycle.getGraceEndsAt().isAfter(LocalDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Grace period has ended; this cycle can no longer be edited."
+            );
+        }
     }
 
     private boolean isBeforeOfficialEndDate(KpiTemplateCycle cycle) {

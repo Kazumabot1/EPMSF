@@ -11,8 +11,8 @@ export interface DepartmentKpiTemplateDepartment {
 export interface DepartmentKpiTemplate {
   id: number;
   title: string;
-  startDate?: string | null;
-  endDate?: string | null;
+  durationMonths: number;
+  durationLabel: string;
   status: KpiFormStatus;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -25,8 +25,7 @@ export interface DepartmentKpiTemplate {
 export interface DepartmentKpiTemplateRequest {
   title: string;
   status: KpiFormStatus;
-  startDate?: string | null;
-  endDate?: string | null;
+  durationMonths: number;
   departmentIds: number[];
   items: KpiTemplateItem[];
 }
@@ -42,6 +41,7 @@ export interface DepartmentKpiCycle {
   startDate: string;
   endDate: string;
   durationMonths: number;
+  durationYears: number;
   durationLabel: string;
   status: KpiTemplateCycleStatus;
   currentPeriodId: number | null;
@@ -56,7 +56,8 @@ export interface DepartmentKpiCycle {
 export interface DepartmentKpiCycleRequest {
   cycleName: string;
   startDate: string;
-  durationMonths: number;
+  durationYears: number;
+  durationMonths?: number;
   templateIds: number[];
   /** Required when updating an existing cycle. */
   editReason?: string;

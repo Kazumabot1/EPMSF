@@ -42,7 +42,7 @@ const DepartmentKpiCycleListPage = () => {
             <tbody>{cycles.length === 0 ? <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No Department KPI cycles yet.</td></tr> : cycles.map((cycle) => (
               <tr key={cycle.id} className="border-t border-gray-100">
                 <td className="px-4 py-3 font-semibold text-gray-900">{cycle.cycleName}</td>
-                <td className="px-4 py-3 text-gray-600">{cycle.startDate} - {cycle.endDate}</td>
+                <td className="px-4 py-3 text-gray-600">{cycle.startDate} - {cycle.endDate} ({cycle.durationLabel})</td>
                 <td className="px-4 py-3 text-gray-600">{cycle.templates.map((t) => t.title).join(', ') || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{cycle.status}</td>
                 <td className="px-4 py-3 text-right">

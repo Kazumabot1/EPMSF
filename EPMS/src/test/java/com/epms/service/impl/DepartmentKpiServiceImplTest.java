@@ -2,6 +2,9 @@ package com.epms.service.impl;
 
 import com.epms.dto.DepartmentKpiCycleRequestDto;
 import com.epms.dto.DepartmentKpiResultDto;
+import com.epms.dto.DepartmentKpiTemplateRequestDto;
+import com.epms.dto.DepartmentKpiTemplateResponseDto;
+import com.epms.dto.KpiFormItemDTO;
 import com.epms.dto.UpdateDepartmentKpiScoresRequest;
 import com.epms.entity.Department;
 import com.epms.entity.DepartmentKpiCycle;
@@ -39,6 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -148,6 +152,88 @@ class DepartmentKpiServiceImplTest {
     }
 
     @Test
+    void createTemplateAcceptsDurationBetweenThreeMonthsAndOneYear() {
+        User hr = user(1);
+        Department department = new Department();
+        department.setId(7);
+        department.setDepartmentName("Finance");
+        authenticate(hr);
+        AtomicReference<DepartmentKpiTemplate> savedTemplate = new AtomicReference<>();
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(departmentRepository.findById(7)).thenReturn(Optional.of(department));
+        when(templateRepository.saveAndFlush(any(DepartmentKpiTemplate.class))).thenAnswer(invocation -> {
+            DepartmentKpiTemplate template = invocation.getArgument(0);
+            template.setId(100);
+            savedTemplate.set(template);
+            return template;
+        });
+        when(templateRepository.findDetailById(100)).thenAnswer(invocation -> Optional.of(savedTemplate.get()));
+
+        DepartmentKpiTemplateResponseDto created = service.createTemplate(templateRequest(6));
+
+        assertThat(created.getDurationMonths()).isEqualTo(6);
+        assertThat(created.getDurationLabel()).isEqualTo("6 months");
+    }
+
+    @Test
+    void createTemplateRejectsMissingOrOutOfRangeDuration() {
+        assertThatThrownBy(() -> service.createTemplate(templateRequest(null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Template duration must be between 3 months and 1 year");
+
+        assertThatThrownBy(() -> service.createTemplate(templateRequest(13)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Template duration must be between 3 months and 1 year");
+    }
+
+    @Test
+    void createCycleUsesDurationYearsToCalculateEndDate() {
+        User hr = user(1);
+        DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
+                .id(100)
+                .title("Finance KPI")
+                .status(KpiFormStatus.ACTIVE)
+                .build();
+        authenticate(hr);
+        AtomicReference<DepartmentKpiCycle> savedCycle = new AtomicReference<>();
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(cycleTemplateRepository.findConflictingLinks(any(), any(), anyCollection())).thenReturn(List.of());
+        when(templateRepository.findById(100)).thenReturn(Optional.of(template));
+        when(cycleRepository.saveAndFlush(any(DepartmentKpiCycle.class))).thenAnswer(invocation -> {
+            DepartmentKpiCycle cycle = invocation.getArgument(0);
+            cycle.setId(10);
+            savedCycle.set(cycle);
+            return cycle;
+        });
+        when(cycleRepository.findDetailById(10)).thenAnswer(invocation -> Optional.of(savedCycle.get()));
+        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(10)).thenReturn(Optional.empty());
+        when(cycleTemplateRepository.findByCycle_Id(10)).thenReturn(List.of(
+                DepartmentKpiCycleTemplate.builder().cycle(departmentCycle(KpiTemplateCycleStatus.DRAFT)).template(template).build()
+        ));
+
+        DepartmentKpiCycleRequestDto request = cycleCreateRequest(List.of(100));
+        request.setDurationYears(2);
+        request.setDurationMonths(null);
+
+        var created = service.createCycle(request);
+
+        assertThat(created.getDurationYears()).isEqualTo(2);
+        assertThat(created.getDurationMonths()).isEqualTo(24);
+        assertThat(created.getEndDate()).isEqualTo(LocalDate.of(2027, 12, 31));
+    }
+
+    @Test
+    void createCycleRejectsOutOfRangeDurationYears() {
+        DepartmentKpiCycleRequestDto request = cycleCreateRequest(List.of(100));
+        request.setDurationYears(6);
+        request.setDurationMonths(null);
+
+        assertThatThrownBy(() -> service.createCycle(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Duration must be between 1 and 5 years");
+    }
+
+    @Test
     void updateScoresRejectsActualGreaterThanTarget() {
         User hr = user(1);
         DepartmentKpiResult result = result(700, row(501, 80.0, 40, 0));
@@ -225,8 +311,25 @@ class DepartmentKpiServiceImplTest {
         DepartmentKpiCycleRequestDto request = new DepartmentKpiCycleRequestDto();
         request.setCycleName("New cycle");
         request.setStartDate(LocalDate.of(2026, 1, 1));
-        request.setDurationMonths(3);
+        request.setDurationYears(1);
         request.setTemplateIds(templateIds);
+        return request;
+    }
+
+    private static DepartmentKpiTemplateRequestDto templateRequest(Integer durationMonths) {
+        DepartmentKpiTemplateRequestDto request = new DepartmentKpiTemplateRequestDto();
+        request.setTitle("Finance KPI");
+        request.setStatus(KpiFormStatus.ACTIVE);
+        request.setDurationMonths(durationMonths);
+        request.setDepartmentIds(List.of(7));
+        request.setItems(List.of(KpiFormItemDTO.builder()
+                .kpiLabel("Delivery")
+                .kpiCategoryLabel("Operations")
+                .kpiUnitLabel("%")
+                .target(100.0)
+                .weight(100)
+                .sortOrder(0)
+                .build()));
         return request;
     }
 
