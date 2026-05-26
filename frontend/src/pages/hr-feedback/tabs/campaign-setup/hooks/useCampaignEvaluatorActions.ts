@@ -27,6 +27,7 @@ type CampaignEvaluatorActionsParams = {
     hasAssignmentPreview: boolean;
     activeEvaluatorTargetId: number;
     manualForm: ManualAssignmentInput;
+    manualEvaluatorEligibilityError: string;
     displayedAssignmentDetails: FeedbackAssignmentDetailItem[];
     hasSavedEvaluatorAssignments: boolean;
     canEditEvaluators: boolean;
@@ -62,6 +63,7 @@ export function useCampaignEvaluatorActions({
                                                 hasAssignmentPreview,
                                                 activeEvaluatorTargetId,
                                                 manualForm,
+                                                manualEvaluatorEligibilityError,
                                                 displayedAssignmentDetails,
                                                 hasSavedEvaluatorAssignments,
                                                 canEditEvaluators,
@@ -225,6 +227,10 @@ export function useCampaignEvaluatorActions({
             setError('Add a short reason before saving this evaluator.');
             return;
         }
+        if (manualEvaluatorEligibilityError) {
+            setError(manualEvaluatorEligibilityError);
+            return;
+        }
         const payload: ManualAssignmentInput = {
             ...manualForm,
             targetEmployeeId,
@@ -266,7 +272,8 @@ export function useCampaignEvaluatorActions({
             setSuccess('Evaluator added.');
             await refreshAfterAssignmentChange(selectedCampaign);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Evaluator could not be added.');
+            const message = err instanceof Error ? err.message : 'Evaluator could not be added.';
+            setError(message || 'Evaluator could not be added. Review the selected role and eligibility rules.');
         } finally {
             setAddingEvaluator(false);
         }

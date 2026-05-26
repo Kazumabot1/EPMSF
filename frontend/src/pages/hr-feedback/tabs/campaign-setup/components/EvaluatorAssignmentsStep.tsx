@@ -52,6 +52,7 @@ interface Props {
     evaluatorSearch: any;
     setEvaluatorSearch: StateSetter;
     evaluatorCandidates: any;
+    manualEvaluatorEligibilityError: any;
     addingEvaluator: any;
     addEvaluator: any;
 }
@@ -104,6 +105,7 @@ export function EvaluatorAssignmentsStep({
                                              evaluatorSearch,
                                              setEvaluatorSearch,
                                              evaluatorCandidates,
+                                             manualEvaluatorEligibilityError,
                                              addingEvaluator,
                                              addEvaluator,
                                          }: Props) {
@@ -359,19 +361,34 @@ export function EvaluatorAssignmentsStep({
                                     {evaluatorCandidates.length === 0 ? (
                                         <span className="hfde-empty-line">No evaluator found.</span>
                                     ) : evaluatorCandidates.map((employee: any) => (
-                                        <button key={employee.id} type="button" className={`hfde-candidate ${manualForm.evaluatorEmployeeId === employee.id ? 'selected' : ''}`} onClick={() => setManualForm((current: any) => ({ ...current, evaluatorEmployeeId: employee.id }))}>
+                                        <button
+                                            key={employee.id}
+                                            type="button"
+                                            className={`hfde-candidate ${manualForm.evaluatorEmployeeId === employee.id ? 'selected' : ''} ${employee.eligibilityMessage ? 'disabled' : ''}`}
+                                            disabled={Boolean(employee.eligibilityMessage)}
+                                            title={employee.eligibilityMessage || undefined}
+                                            onClick={() => setManualForm((current: any) => ({ ...current, evaluatorEmployeeId: employee.id }))}
+                                        >
                                             <span className="hfde-avatar">{initials(employee.fullName)}</span>
-                                            <span><strong>{employee.fullName}</strong><small>{employee.currentDepartment ?? 'Department not set'}</small></span>
+                                            <span>
+                                      <strong>{employee.fullName}</strong>
+                                      <small>{employee.eligibilityMessage || [employee.currentDepartment ?? 'Department not set', employee.positionTitle].filter(Boolean).join(' · ')}</small>
+                                    </span>
                                             {manualForm.evaluatorEmployeeId === employee.id && <i className="bi bi-check-circle-fill" />}
                                         </button>
                                     ))}
+                                </div>
+                            )}
+                            {manualEvaluatorEligibilityError && (
+                                <div className="hfdt-response-warnings blocked">
+                                    <span><i className="bi bi-x-circle" /> {manualEvaluatorEligibilityError}</span>
                                 </div>
                             )}
                             <label className="hfdc-field full">
                                 <span>Reason</span>
                                 <textarea className="hfd-input hfdc-textarea" rows={2} disabled={!canEditEvaluators || !hasAssignmentPreview} value={manualForm.reason ?? ''} onChange={(event: any) => setManualForm((current: any) => ({ ...current, reason: event.target.value }))} placeholder="Example: Confirmed after reviewing the reporting line." />
                             </label>
-                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditEvaluators || !hasAssignmentPreview || addingEvaluator || !manualForm.evaluatorEmployeeId || !manualForm.reason?.trim()} onClick={() => void addEvaluator()}>
+                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditEvaluators || !hasAssignmentPreview || addingEvaluator || !manualForm.evaluatorEmployeeId || Boolean(manualEvaluatorEligibilityError) || !manualForm.reason?.trim()} onClick={() => void addEvaluator()}>
                                 <i className="bi bi-plus-lg" /> {addingEvaluator ? 'Adding...' : 'Add Evaluator'}
                             </button>
                         </div>

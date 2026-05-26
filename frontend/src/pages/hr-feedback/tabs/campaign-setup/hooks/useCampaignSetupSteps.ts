@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { FeedbackCampaign } from '../../../../../types/feedbackCampaign';
 import type { SetupStepKey } from '../types/campaignSetupTypes';
 
-type CampaignSetupStep = {
+export type CampaignSetupStep = {
     key: SetupStepKey;
     label: string;
     note: string;

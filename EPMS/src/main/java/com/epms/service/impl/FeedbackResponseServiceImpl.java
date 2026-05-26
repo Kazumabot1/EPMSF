@@ -26,7 +26,7 @@ import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackOperationalService;
 import com.epms.util.FeedbackPrivacyUtil;
 import com.epms.util.FeedbackScoreUtil;
-import com.epms.service.FeedbackQuestionResolverService;
+import com.epms.service.FeedbackAssignmentQuestionSnapshotService;
 import com.epms.service.FeedbackResponseService;
 import com.epms.service.FeedbackSummaryService;
 import lombok.RequiredArgsConstructor;
@@ -68,7 +68,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private final UserRepository userRepository;
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackSummaryService feedbackSummaryService;
-    private final FeedbackQuestionResolverService questionResolverService;
+    private final FeedbackAssignmentQuestionSnapshotService assignmentQuestionSnapshotService;
     private final FeedbackCampaignCompetencyWeightRepository competencyWeightRepository;
 
     @Override
@@ -422,7 +422,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     }
 
     private Map<Long, FeedbackAssignmentQuestion> loadAssignmentQuestions(FeedbackEvaluatorAssignment assignment) {
-        return questionResolverService.findOrCreateAssignmentQuestions(assignment).stream()
+        return assignmentQuestionSnapshotService.findOrCreateAssignmentQuestions(assignment).stream()
                 .collect(Collectors.toMap(FeedbackAssignmentQuestion::getId, Function.identity(), (first, duplicate) -> first));
     }
 

@@ -25,7 +25,7 @@ import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.RatingScaleRepository;
 import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackEvaluatorTaskService;
-import com.epms.service.FeedbackQuestionResolverService;
+import com.epms.service.FeedbackAssignmentQuestionSnapshotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,7 +52,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final RatingScaleRepository ratingScaleRepository;
-    private final FeedbackQuestionResolverService questionResolverService;
+    private final FeedbackAssignmentQuestionSnapshotService assignmentQuestionSnapshotService;
 
     @Override
     @Transactional
@@ -73,7 +73,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                         .thenComparing(FeedbackEvaluatorAssignment::getId))
                 .map(assignment -> {
                     FeedbackResponse response = assignment.getResponse();
-                    List<FeedbackAssignmentQuestion> questions = questionResolverService.findOrCreateAssignmentQuestions(assignment);
+                    List<FeedbackAssignmentQuestion> questions = assignmentQuestionSnapshotService.findOrCreateAssignmentQuestions(assignment);
                     Map<Long, FeedbackResponseItem> existingItems = mapExistingItemsByAssignmentQuestion(response, questions);
                     int totalQuestionCount = questions.size();
                     int requiredQuestionCount = (int) questions.stream()
@@ -131,7 +131,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         FeedbackResponse response = feedbackResponseRepository.findByEvaluatorAssignmentId(assignmentId).orElse(null);
         ensureAssignmentVisibleToEvaluator(assignment, response);
 
-        List<FeedbackAssignmentQuestion> questions = questionResolverService.findOrCreateAssignmentQuestions(assignment);
+        List<FeedbackAssignmentQuestion> questions = assignmentQuestionSnapshotService.findOrCreateAssignmentQuestions(assignment);
         Map<Long, FeedbackResponseItem> existingItems = mapExistingItemsByAssignmentQuestion(response, questions);
 
         int totalQuestionCount = questions.size();

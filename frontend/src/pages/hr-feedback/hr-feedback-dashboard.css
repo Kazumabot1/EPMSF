@@ -10641,6 +10641,18 @@
     background: #f5f3ff;
 }
 
+.hfde-candidate.disabled,
+.hfde-candidate:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+    background: #f8fafc;
+}
+
+.hfde-candidate.disabled small,
+.hfde-candidate:disabled small {
+    color: #b91c1c;
+}
+
 .hfde-candidate > i {
     color: #4f46e5;
 }
