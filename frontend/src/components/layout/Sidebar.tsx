@@ -37,48 +37,37 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
   const normalizedDashboard = normalizeRoleName(dashboard);
 
-const isAdmin =
-  normalizedRoles.includes('ADMIN') ||
-  normalizedDashboard === 'ADMIN_DASHBOARD';
   const isAdmin =
-      normalizedRoles.includes('ADMIN') ||
-      normalizedDashboard === 'ADMIN_DASHBOARD';
-
-const isHr =
-  normalizedRoles.includes('HR') ||
-  normalizedDashboard === 'HR_DASHBOARD';
-  const isEmployee =
-      normalizedRoles.includes('EMPLOYEE') ||
-      normalizedDashboard === 'EMPLOYEE_DASHBOARD';
+    normalizedRoles.includes('ADMIN') ||
+    normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isHr =
-      normalizedRoles.includes('HR') ||
-      normalizedDashboard === 'HR_DASHBOARD';
+    normalizedRoles.includes('HR') ||
+    normalizedDashboard === 'HR_DASHBOARD';
 
-const isDepartmentHead =
-  normalizedRoles.includes('DEPARTMENT_HEAD') ||
-  normalizedRoles.includes('DEPARTMENTHEAD') ||
-  normalizedRoles.includes('DEPT_HEAD') ||
-  normalizedRoles.includes('HEAD_OF_DEPARTMENT') ||
-  normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD';
+  const isDepartmentHead =
+    normalizedRoles.includes('DEPARTMENT_HEAD') ||
+    normalizedRoles.includes('DEPARTMENTHEAD') ||
+    normalizedRoles.includes('DEPT_HEAD') ||
+    normalizedRoles.includes('HEAD_OF_DEPARTMENT') ||
+    normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD';
 
-const isManager =
-  normalizedRoles.includes('MANAGER') ||
-  normalizedRoles.includes('PROJECT_MANAGER') ||
-  normalizedRoles.includes('TEAM_MANAGER') ||
-  normalizedDashboard === 'MANAGER_DASHBOARD';
+  const isManager =
+    normalizedRoles.includes('MANAGER') ||
+    normalizedRoles.includes('PROJECT_MANAGER') ||
+    normalizedRoles.includes('TEAM_MANAGER') ||
+    normalizedDashboard === 'MANAGER_DASHBOARD';
 
-const isEmployee =
-  !isAdmin &&
-  !isHr &&
-  !isDepartmentHead &&
-  !isManager &&
-  (normalizedRoles.includes('EMPLOYEE') ||
-    normalizedDashboard === 'EMPLOYEE_DASHBOARD');
+  const isEmployee =
+    !isAdmin &&
+    !isHr &&
+    !isDepartmentHead &&
+    !isManager &&
+    (normalizedRoles.includes('EMPLOYEE') ||
+      normalizedDashboard === 'EMPLOYEE_DASHBOARD');
 
   const isHrOnly = variant === 'hr' || isHr;
   const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
-
 const roleLabel =
   variant === 'admin'
     ? 'Admin'
