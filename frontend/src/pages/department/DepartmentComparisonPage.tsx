@@ -560,7 +560,7 @@ const DepartmentComparisonPage = () => {
                             type="button"
                             className="dept-compare-btn dept-compare-btn-soft"
                             onClick={() => addDepartmentToSide(department, 'left')}
-                            disabled={rightDepartment?.id === department.id}
+                            disabled={Boolean(leftDepartment) || rightDepartment?.id === department.id}
                           >
                             Add Left
                           </button>
@@ -569,7 +569,7 @@ const DepartmentComparisonPage = () => {
                             type="button"
                             className="dept-compare-btn dept-compare-btn-soft"
                             onClick={() => addDepartmentToSide(department, 'right')}
-                            disabled={leftDepartment?.id === department.id}
+                            disabled={Boolean(rightDepartment) || leftDepartment?.id === department.id}
                           >
                             Add Right
                           </button>
@@ -599,8 +599,8 @@ const DepartmentComparisonPage = () => {
           onClose={() => setModalDepartment(null)}
           onAddLeft={() => addDepartmentToSide(modalDepartment, 'left')}
           onAddRight={() => addDepartmentToSide(modalDepartment, 'right')}
-          leftDisabled={rightDepartment?.id === modalDepartment.id}
-          rightDisabled={leftDepartment?.id === modalDepartment.id}
+          leftDisabled={Boolean(leftDepartment) || rightDepartment?.id === modalDepartment.id}
+          rightDisabled={Boolean(rightDepartment) || leftDepartment?.id === modalDepartment.id}
         />
       )}
     </div>
