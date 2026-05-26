@@ -25,6 +25,7 @@ import EmployeeSelfAssessmentPage from './pages/employee/EmployeeSelfAssessmentP
 import EmployeeAssessmentScoresPage from './pages/employee/EmployeeAssessmentScoresPage';
 
 import TeamManagement from './pages/team/TeamManagement';
+import MyTeamPage from './pages/team/MyTeamPage';
 import TeamCreate from './pages/team/TeamCreate';
 import TeamHistoryPage from './pages/team/TeamHistoryPage';
 import DepartmentManagement from './pages/department/DepartmentManagement';
@@ -36,7 +37,6 @@ import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import CeoDashboard from './pages/ceo/CeoDashboard';
-import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -172,6 +172,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Employee']} />}>
             <Route element={<AppLayout />}>
               <Route path="/employee/dashboard" element={<EmployeeMyDashboard />} />
+              <Route path="/employee/my-team" element={<MyTeamPage />} />
               <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/employee/dashboard" />}>
                 <Route path="/employee/team-management" element={<TeamManagement />} />
               </Route>
@@ -198,6 +199,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Manager']} />}>
             <Route element={<AppLayout />}>
               <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+              <Route path="/manager/my-team" element={<MyTeamPage />} />
               <Route path="/manager/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/manager/self-assessment" element={<Navigate to="/manager/assessment-review" replace />} />
               <Route path="/manager/assessment-review" element={<ManagerAssessmentReviewPage />} />
@@ -222,8 +224,6 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<CeoDashboard />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
-              <Route path="/executive/approval/kpi" element={<KpiApprovalPage />} />
-              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
               <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />
               <Route path="/executive/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />

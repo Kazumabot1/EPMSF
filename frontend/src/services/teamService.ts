@@ -290,6 +290,6 @@ export const isReasonOverLimit = (reason: string): boolean => {
   return countReasonWords(reason) > 250;
 };
 export const fetchMyTeams = async (): Promise<TeamResponse[]> => {
-  const response = await api.get('/teams/my-teams');
+  const response = await api.get('/my-team');
   return unwrap<TeamResponse[]>(response);
 };
