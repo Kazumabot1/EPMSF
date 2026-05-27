@@ -137,6 +137,8 @@ const mapEmployee = (employee: EmployeeResponse): FeedbackTargetEmployee => ({
       `Employee #${employee.id}`,
   currentDepartmentId: employee.currentDepartmentId ?? null,
   currentDepartment: employee.currentDepartment ?? null,
+  positionTitle: employee.positionTitle ?? null,
+  positionLevelCode: employee.positionLevelCode ?? null,
   userId: employee.userId ?? null,
 });
 

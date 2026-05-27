@@ -38,60 +38,60 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const normalizedDashboard = normalizeRoleName(dashboard);
 
   const isAdmin =
-    normalizedRoles.includes('ADMIN') ||
-    normalizedDashboard === 'ADMIN_DASHBOARD';
+      normalizedRoles.includes('ADMIN') ||
+      normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isHr =
-    normalizedRoles.includes('HR') ||
-    normalizedDashboard === 'HR_DASHBOARD';
+      normalizedRoles.includes('HR') ||
+      normalizedDashboard === 'HR_DASHBOARD';
 
   const isDepartmentHead =
-    normalizedRoles.includes('DEPARTMENT_HEAD') ||
-    normalizedRoles.includes('DEPARTMENTHEAD') ||
-    normalizedRoles.includes('DEPT_HEAD') ||
-    normalizedRoles.includes('HEAD_OF_DEPARTMENT') ||
-    normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD';
+      normalizedRoles.includes('DEPARTMENT_HEAD') ||
+      normalizedRoles.includes('DEPARTMENTHEAD') ||
+      normalizedRoles.includes('DEPT_HEAD') ||
+      normalizedRoles.includes('HEAD_OF_DEPARTMENT') ||
+      normalizedDashboard === 'DEPARTMENT_HEAD_DASHBOARD';
 
   const isManager =
-    normalizedRoles.includes('MANAGER') ||
-    normalizedRoles.includes('PROJECT_MANAGER') ||
-    normalizedRoles.includes('TEAM_MANAGER') ||
-    normalizedDashboard === 'MANAGER_DASHBOARD';
+      normalizedRoles.includes('MANAGER') ||
+      normalizedRoles.includes('PROJECT_MANAGER') ||
+      normalizedRoles.includes('TEAM_MANAGER') ||
+      normalizedDashboard === 'MANAGER_DASHBOARD';
 
   const isEmployee =
-    !isAdmin &&
-    !isHr &&
-    !isDepartmentHead &&
-    !isManager &&
-    (normalizedRoles.includes('EMPLOYEE') ||
-      normalizedDashboard === 'EMPLOYEE_DASHBOARD');
+      !isAdmin &&
+      !isHr &&
+      !isDepartmentHead &&
+      !isManager &&
+      (normalizedRoles.includes('EMPLOYEE') ||
+          normalizedDashboard === 'EMPLOYEE_DASHBOARD');
 
   const isExecutive =
-    normalizedRoles.includes('CEO') ||
-    normalizedRoles.includes('EXECUTIVE') ||
-    normalizedDashboard === 'CEO_DASHBOARD' ||
-    normalizedDashboard === 'EXECUTIVE_DASHBOARD';
+      normalizedRoles.includes('CEO') ||
+      normalizedRoles.includes('EXECUTIVE') ||
+      normalizedDashboard === 'CEO_DASHBOARD' ||
+      normalizedDashboard === 'EXECUTIVE_DASHBOARD';
 
   const isHrOnly = variant === 'hr' || isHr;
   const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
-const roleLabel =
-  variant === 'admin'
-    ? 'Admin'
-    : variant === 'hr'
-      ? 'HR'
-      : isAdmin
-        ? 'Admin'
-        : isHr
-          ? 'HR'
-          : isDepartmentHead
-            ? 'Department Head'
-            : isManager
-              ? 'Manager'
-              : isEmployee
-                ? 'Employee'
-                : isExecutive
-                  ? 'Executive'
-                  : 'User';
+  const roleLabel =
+      variant === 'admin'
+          ? 'Admin'
+          : variant === 'hr'
+              ? 'HR'
+              : isAdmin
+                  ? 'Admin'
+                  : isHr
+                      ? 'HR'
+                      : isDepartmentHead
+                          ? 'Department Head'
+                          : isManager
+                              ? 'Manager'
+                              : isEmployee
+                                  ? 'Employee'
+                                  : isExecutive
+                                      ? 'Executive'
+                                      : 'User';
 
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
@@ -357,31 +357,46 @@ const roleLabel =
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
     ];
 
-const departmentHeadNavItems: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
-  { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-  { to: '/department-head/teams', label: 'View Teams', icon: 'bi bi-people-fill' },
-  {
-    to: '/notifications',
-    label: 'Notifications',
-    icon: 'bi bi-bell',
-    children: [
-      { to: '/notifications', label: 'System Notification', icon: 'bi bi-bell' },
-    ],
-  },
-];
+    const departmentHeadNavItems: NavItem[] = [
+      { to: '/department-head/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
+      { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
+      {
+        to: '/department-head/feedback',
+        label: '360 Feedback',
+        icon: 'bi bi-chat-dots',
+        children: [
+          { to: '/department-head/feedback', label: 'My Assignments', icon: 'bi bi-chat-dots', end: true },
+          { to: '/department-head/feedback/summary', label: 'Department Summary', icon: 'bi bi-building-check' },
+          { to: '/department-head/reports/feedback-completion', label: 'Feedback Completion', icon: 'bi bi-activity' },
+        ],
+      },
+      { to: '/department-head/teams', label: 'View Teams', icon: 'bi bi-people-fill' },
+      {
+        to: '/department-head/self-assessment-forms',
+        label: 'View Self-assessment Form',
+        icon: 'bi bi-eye',
+      },
+      {
+        to: '/notifications',
+        label: 'Notifications',
+        icon: 'bi bi-bell',
+        children: [
+          { to: '/notifications', label: 'System Notification', icon: 'bi bi-bell' },
+        ],
+      },
+    ];
 
-  if (variant === 'admin') return adminNavItems;
-  if (variant === 'hr') return hrNavItems;
-  if (isAdmin) return adminNavItems;
-  if (isHr) return hrNavItems;
-  if (isDepartmentHead) return departmentHeadNavItems;
-  if (isExecutive) return executiveNavItems;
-  if (isEmployee) return employeeNavItems;
+    if (variant === 'admin') return adminNavItems;
+    if (variant === 'hr') return hrNavItems;
+    if (isAdmin) return adminNavItems;
+    if (isHr) return hrNavItems;
+    if (isDepartmentHead) return departmentHeadNavItems;
+    if (isExecutive) return executiveNavItems;
+    if (isEmployee) return employeeNavItems;
 
-  return hrNavItems;
+    return hrNavItems;
 
-}, [variant, isAdmin, isHr, isDepartmentHead, isExecutive, isEmployee, canCreatePip]);
+  }, [variant, isAdmin, isHr, isDepartmentHead, isExecutive, isEmployee, canCreatePip]);
   const loadUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/notifications/unread-count');

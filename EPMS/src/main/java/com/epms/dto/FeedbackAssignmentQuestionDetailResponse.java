@@ -24,7 +24,8 @@ public class FeedbackAssignmentQuestionDetailResponse {
     Integer ratingScaleId;
     Integer ratingScaleMin;
     Integer ratingScaleMax;
-    List<FeedbackRatingOptionResponse> ratingOptions;
+    @Builder.Default
+    List<FeedbackRatingOptionResponse> ratingOptions = List.of();
     Double weight;
     Boolean required;
     Integer minRequiredCommentLength;

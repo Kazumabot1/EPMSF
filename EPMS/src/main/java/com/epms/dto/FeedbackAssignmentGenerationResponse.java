@@ -12,7 +12,10 @@ public class FeedbackAssignmentGenerationResponse {
     int totalTargets;
     int totalEvaluatorsGenerated;
     EvaluatorConfigDTO evaluatorConfig;
-    List<FeedbackAssignmentPreviewItemResponse> requests;
-    List<FeedbackAssignmentDetailItemResponse> assignmentDetails;
-    List<String> warnings;
+    @Builder.Default
+    List<FeedbackAssignmentPreviewItemResponse> requests = List.of();
+    @Builder.Default
+    List<FeedbackAssignmentDetailItemResponse> assignmentDetails = List.of();
+    @Builder.Default
+    List<String> warnings = List.of();
 }

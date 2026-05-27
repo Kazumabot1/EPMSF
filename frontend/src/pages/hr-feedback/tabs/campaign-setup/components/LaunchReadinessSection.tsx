@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type {
     FeedbackCampaign,
     FeedbackCampaignActivationCheck,
@@ -163,7 +164,7 @@ export function LaunchReadinessSection({
                         <h4>{selectedCampaign.status === 'ACTIVE' ? 'Feedback collection is active.' : `Campaign status: ${statusLabels[selectedCampaign.status] ?? selectedCampaign.status}`}</h4>
                         <p>Use Monitoring to track evaluator progress, follow up on incomplete assignments, and manage submission activity.</p>
                     </div>
-                    <a className="hfd-btn hfd-btn-primary" href="/hr/feedback/monitoring"><i className="bi bi-graph-up-arrow" /> Open Monitoring</a>
+                    <Link className="hfd-btn hfd-btn-primary" to="/hr/feedback/monitoring"><i className="bi bi-graph-up-arrow" /> Open Monitoring</Link>
                 </div>
             ) : !questionReviewReady && selectedCampaign.status === 'DRAFT' ? (
                 <div className="hfd-empty-state hfdt-empty"><i className="bi bi-ui-checks-grid" /><strong>Save question review first</strong><p>Launch requires saved recipients, evaluator assignments, questions, and scoring weights.</p></div>

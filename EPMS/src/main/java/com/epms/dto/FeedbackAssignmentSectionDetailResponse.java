@@ -12,5 +12,6 @@ public class FeedbackAssignmentSectionDetailResponse {
     String sectionCode;
     String title;
     Integer orderNo;
-    List<FeedbackAssignmentQuestionDetailResponse> questions;
+    @Builder.Default
+    List<FeedbackAssignmentQuestionDetailResponse> questions = List.of();
 }

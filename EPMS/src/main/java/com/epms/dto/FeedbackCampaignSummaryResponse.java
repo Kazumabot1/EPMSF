@@ -27,9 +27,14 @@ public class FeedbackCampaignSummaryResponse {
     Long publishedByUserId;
     String publishNote;
     LocalDateTime summarizedAt;
-    List<FeedbackScoreDistributionResponse> scoreDistribution;
-    List<FeedbackRelationshipAverageResponse> relationshipAverages;
-    List<FeedbackCompetencyAverageResponse> competencyAverages;
-    List<FeedbackConfidenceBreakdownResponse> confidenceBreakdown;
-    List<FeedbackResultItemResponse> items;
+    @Builder.Default
+    List<FeedbackScoreDistributionResponse> scoreDistribution = List.of();
+    @Builder.Default
+    List<FeedbackRelationshipAverageResponse> relationshipAverages = List.of();
+    @Builder.Default
+    List<FeedbackCompetencyAverageResponse> competencyAverages = List.of();
+    @Builder.Default
+    List<FeedbackConfidenceBreakdownResponse> confidenceBreakdown = List.of();
+    @Builder.Default
+    List<FeedbackResultItemResponse> items = List.of();
 }

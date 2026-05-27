@@ -6,6 +6,7 @@ import com.epms.dto.FeedbackMyResultResponse;
 import com.epms.dto.FeedbackResultItemResponse;
 import com.epms.dto.FeedbackTeamSummaryResponse;
 import com.epms.dto.FeedbackSummaryPublishRequest;
+import com.epms.entity.Department;
 import com.epms.entity.Employee;
 import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackCampaignRelationshipWeight;
@@ -21,6 +22,8 @@ import com.epms.entity.enums.FeedbackSummaryVisibilityStatus;
 import com.epms.entity.enums.ResponseStatus;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.exception.UnauthorizedActionException;
+import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.FeedbackCampaignRelationshipWeightRepository;
 import com.epms.repository.FeedbackCampaignRepository;
@@ -62,6 +65,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final DepartmentRepository departmentRepository;
     private final FeedbackOperationalService feedbackOperationalService;
 
     @Override
@@ -197,6 +201,19 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     @Override
     @Transactional
     public FeedbackTeamSummaryResponse getTeamSummary(Long userId) {
+        User viewer = getUser(userId);
+
+        if (isDepartmentHeadViewer(viewer)) {
+            return getDepartmentHeadSummary(viewer, userId);
+        }
+        if (isManagerViewer(viewer)) {
+            return getDirectReportSummary(userId);
+        }
+
+        throw new UnauthorizedActionException("Only Managers and Department Heads can access team or department 360 feedback summaries.");
+    }
+
+    private FeedbackTeamSummaryResponse getDirectReportSummary(Long userId) {
         List<User> directReports = userRepository.findByManagerIdAndActiveTrue(userId.intValue());
         List<Long> employeeIds = directReports.stream()
                 .map(User::getEmployeeId)
@@ -208,8 +225,15 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         if (employeeIds.isEmpty()) {
             return FeedbackTeamSummaryResponse.builder()
                     .managerUserId(userId)
+                    .ownerUserId(userId)
+                    .viewScope("MANAGER_DIRECT_REPORTS")
                     .totalDirectReports(0)
+                    .totalDepartmentEmployees(0)
                     .totalClosedResults(0)
+                    .accessTitle("Team published feedback summary")
+                    .accessDescription("Managers can view only published 360 feedback results for their direct reports.")
+                    .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and direct-report detail remains masked when confidentiality thresholds are not met.")
+                    .emptyStateMessage("No published direct-report 360 results are available yet.")
                     .items(List.of())
                     .build();
         }
@@ -222,10 +246,157 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
         return FeedbackTeamSummaryResponse.builder()
                 .managerUserId(userId)
+                .ownerUserId(userId)
+                .viewScope("MANAGER_DIRECT_REPORTS")
                 .totalDirectReports(employeeIds.size())
+                .totalDepartmentEmployees(0)
                 .totalClosedResults(summaries.size())
+                .accessTitle("Team published feedback summary")
+                .accessDescription("Managers can view only published 360 feedback results for their direct reports.")
+                .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and direct-report detail remains masked when confidentiality thresholds are not met.")
+                .emptyStateMessage("No published direct-report 360 results are available yet.")
                 .items(mapResults(summaries, loadEmployeeNames(employeeIds), true))
                 .build();
+    }
+
+    private FeedbackTeamSummaryResponse getDepartmentHeadSummary(User departmentHead, Long userId) {
+        Integer departmentId = departmentHead.getDepartmentId();
+        if (departmentId == null) {
+            return FeedbackTeamSummaryResponse.builder()
+                    .managerUserId(userId)
+                    .ownerUserId(userId)
+                    .viewScope("DEPARTMENT")
+                    .totalDirectReports(0)
+                    .totalDepartmentEmployees(0)
+                    .totalClosedResults(0)
+                    .accessTitle("Department published 360 summary")
+                    .accessDescription("Department Heads can view privacy-safe published 360 results only for employees in their own department.")
+                    .privacyNotice("Department Head access is a department-level view. It does not expose evaluator identities or hidden peer/direct-report relationship scores.")
+                    .emptyStateMessage("Your user account is not linked to a department, so no department 360 summary can be shown.")
+                    .items(List.of())
+                    .build();
+        }
+
+        List<Long> employeeIds = employeeRepository.findCurrentByWorkingDepartmentId(departmentId, false).stream()
+                .map(Employee::getId)
+                .filter(Objects::nonNull)
+                .map(Integer::longValue)
+                .distinct()
+                .toList();
+
+        if (employeeIds.isEmpty()) {
+            return FeedbackTeamSummaryResponse.builder()
+                    .managerUserId(userId)
+                    .ownerUserId(userId)
+                    .viewScope("DEPARTMENT")
+                    .departmentId(departmentId)
+                    .departmentName(resolveDepartmentName(departmentId))
+                    .totalDirectReports(0)
+                    .totalDepartmentEmployees(0)
+                    .totalClosedResults(0)
+                    .accessTitle("Department published 360 summary")
+                    .accessDescription("Department Heads can view privacy-safe published 360 results only for employees in their own department.")
+                    .privacyNotice("Department Head access is a department-level view. It does not expose evaluator identities or hidden peer/direct-report relationship scores.")
+                    .emptyStateMessage("No published 360 results are available for your department yet.")
+                    .items(List.of())
+                    .build();
+        }
+
+        refreshClosedCampaignSummariesForEmployees(employeeIds);
+        List<FeedbackSummary> summaries = feedbackSummaryRepository.findByTargetEmployeeIdInOrderByCampaignEndDateDesc(employeeIds)
+                .stream()
+                .filter(this::isPublishedClosedSummary)
+                .toList();
+
+        return FeedbackTeamSummaryResponse.builder()
+                .managerUserId(userId)
+                .ownerUserId(userId)
+                .viewScope("DEPARTMENT")
+                .departmentId(departmentId)
+                .departmentName(resolveDepartmentName(departmentId))
+                .totalDirectReports(userRepository.findByManagerIdAndActiveTrue(userId.intValue()).size())
+                .totalDepartmentEmployees(employeeIds.size())
+                .totalClosedResults(summaries.size())
+                .accessTitle("Department published 360 summary")
+                .accessDescription("Department Heads can view privacy-safe published 360 results only for employees in their own department.")
+                .privacyNotice("Department Head access is a department-level view. It does not create a separate evaluator relationship. Department Heads are treated as Manager only when the employee directly reports to them.")
+                .emptyStateMessage("No published 360 results are available for your department yet.")
+                .items(mapResults(summaries, loadEmployeeNames(employeeIds), true))
+                .build();
+    }
+
+    private boolean isManagerViewer(User viewer) {
+        if (viewer == null) {
+            return false;
+        }
+        if (isManagerDashboard(viewer.getDashboard())) {
+            return true;
+        }
+        return userRepository.findNormalizedRoleNamesByUserId(viewer.getId()).stream()
+                .map(this::normalizeRoleName)
+                .anyMatch(this::isManagerRole);
+    }
+
+    private boolean isManagerDashboard(String dashboard) {
+        String normalized = normalizeRoleName(dashboard);
+        return normalized.equals("MANAGER_DASHBOARD")
+                || normalized.equals("PROJECT_MANAGER_DASHBOARD");
+    }
+
+    private boolean isManagerRole(String role) {
+        String normalized = normalizeRoleName(role);
+        return normalized.equals("MANAGER")
+                || normalized.equals("PROJECT_MANAGER")
+                || normalized.equals("TEAM_MANAGER");
+    }
+
+    private boolean isDepartmentHeadViewer(User viewer) {
+        if (viewer == null) {
+            return false;
+        }
+        if (isDepartmentHeadDashboard(viewer.getDashboard())) {
+            return true;
+        }
+        return userRepository.findNormalizedRoleNamesByUserId(viewer.getId()).stream()
+                .map(this::normalizeRoleName)
+                .anyMatch(this::isDepartmentHeadRole);
+    }
+
+    private boolean isDepartmentHeadDashboard(String dashboard) {
+        String normalized = normalizeRoleName(dashboard);
+        return normalized.equals("DEPARTMENT_HEAD_DASHBOARD")
+                || normalized.equals("DEPARTMENTHEAD_DASHBOARD")
+                || normalized.equals("DEPT_HEAD_DASHBOARD");
+    }
+
+    private boolean isDepartmentHeadRole(String role) {
+        String normalized = normalizeRoleName(role);
+        return normalized.equals("DEPARTMENT_HEAD")
+                || normalized.equals("DEPARTMENTHEAD")
+                || normalized.equals("DEPT_HEAD")
+                || normalized.equals("HEAD_OF_DEPARTMENT");
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
+    }
+
+    private String resolveDepartmentName(Integer departmentId) {
+        if (departmentId == null) {
+            return null;
+        }
+        return departmentRepository.findById(departmentId)
+                .map(Department::getDepartmentName)
+                .orElse("Department #" + departmentId);
     }
 
     @Override

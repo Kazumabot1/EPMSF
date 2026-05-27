@@ -25,7 +25,8 @@ public class FeedbackAssignmentDetailItemResponse {
     String manualReason;
     String selectionReason;
     String confidence;
-    List<String> warnings;
+    @Builder.Default
+    List<String> warnings = List.of();
     FeedbackRelationshipType relationshipType;
     EvaluatorSelectionMethod selectionMethod;
     AssignmentStatus status;

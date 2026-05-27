@@ -417,6 +417,8 @@ export interface FeedbackTargetEmployee {
   fullName: string;
   currentDepartmentId: number | null;
   currentDepartment: string | null;
+  positionTitle?: string | null;
+  positionLevelCode?: string | null;
   userId: number | null;
 }
 

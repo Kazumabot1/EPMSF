@@ -10,5 +10,6 @@ import java.util.List;
 public class FeedbackMyResultResponse {
     Long employeeId;
     String employeeName;
-    List<FeedbackResultItemResponse> results;
+    @Builder.Default
+    List<FeedbackResultItemResponse> results = List.of();
 }

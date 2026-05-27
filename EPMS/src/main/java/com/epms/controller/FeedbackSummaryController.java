@@ -105,31 +105,67 @@ public class FeedbackSummaryController {
 
     @GetMapping("/team-summary")
     public ResponseEntity<GenericApiResponse<FeedbackTeamSummaryResponse>> getTeamSummary() {
-        ensureManagerOrAbove();
+        ensureManagerOrDepartmentHead();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Team feedback summary retrieved successfully",
                 feedbackSummaryService.getTeamSummary(SecurityUtils.currentUserId().longValue())
         ));
     }
 
-    private void ensureManagerOrAbove() {
+    private void ensureManagerOrDepartmentHead() {
         List<String> roles = SecurityUtils.currentUser().getRoles();
-        boolean authorized = roles != null && roles.stream()
-                .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("MANAGER") || role.equals("HR") || role.equals("ADMIN")
-                        || role.equals("ROLE_MANAGER") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+        String dashboard = normalizeRoleName(SecurityUtils.currentUser().getDashboard());
+        boolean authorized = isManagerDashboard(dashboard)
+                || isDepartmentHeadDashboard(dashboard)
+                || roles != null && roles.stream()
+                .map(this::normalizeRoleName)
+                .anyMatch(role -> isManagerRole(role) || isDepartmentHeadRole(role));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only Manager/HR/Admin can access team feedback summaries.");
+            throw new UnauthorizedActionException("Only Managers and Department Heads can access team or department 360 feedback summaries.");
         }
     }
 
     private void ensureHrOrAdmin() {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
-                .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+                .map(this::normalizeRoleName)
+                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN"));
         if (!authorized) {
             throw new UnauthorizedActionException("Only HR/Admin can access feedback summaries.");
         }
+    }
+
+    private boolean isManagerDashboard(String dashboard) {
+        return dashboard.equals("MANAGER_DASHBOARD") || dashboard.equals("PROJECT_MANAGER_DASHBOARD");
+    }
+
+    private boolean isDepartmentHeadDashboard(String dashboard) {
+        return dashboard.equals("DEPARTMENT_HEAD_DASHBOARD")
+                || dashboard.equals("DEPARTMENTHEAD_DASHBOARD")
+                || dashboard.equals("DEPT_HEAD_DASHBOARD");
+    }
+
+    private boolean isManagerRole(String role) {
+        return role.equals("MANAGER") || role.equals("PROJECT_MANAGER") || role.equals("TEAM_MANAGER");
+    }
+
+    private boolean isDepartmentHeadRole(String role) {
+        return role.equals("DEPARTMENT_HEAD")
+                || role.equals("DEPARTMENTHEAD")
+                || role.equals("DEPT_HEAD")
+                || role.equals("HEAD_OF_DEPARTMENT");
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
     }
 }

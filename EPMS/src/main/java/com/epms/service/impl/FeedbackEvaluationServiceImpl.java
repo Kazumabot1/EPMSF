@@ -161,7 +161,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             int manualAssignmentsForTarget = preservedManualAssignments.size();
 
             if (Boolean.TRUE.equals(config.getIncludeManager())) {
-                managerEmployeeId = resolveManagerEmployeeId(targetUser, workingDepartmentId);
+                managerEmployeeId = resolveManagerEmployeeId(targetUser);
                 if (managerEmployeeId != null && !Objects.equals(managerEmployeeId, request.getTargetEmployeeId())) {
                     if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, managerEmployeeId,
                             FeedbackRelationshipType.MANAGER, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
@@ -169,7 +169,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                         autoAssignmentsForTarget++;
                     }
                 } else {
-                    targetWarnings.add("No active manager or department head evaluator found. Manager feedback will be skipped for this target.");
+                    targetWarnings.add("No active direct manager found. Department Head is assigned as Manager only when the employee directly reports to them.");
                 }
             }
 
@@ -497,7 +497,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         // This keeps the workflow usable when reporting hierarchy data is incomplete or temporarily wrong.
         if (relationshipType == FeedbackRelationshipType.PEER) {
             if (!hasAutoPeerLevel(evaluator) || hasManagerLikePositionTitle(evaluator)) {
-                throw new BusinessValidationException("This evaluator cannot be added as a peer for this recipient.");
+                throw new BusinessValidationException("This employee is not eligible as a peer for this recipient. Choose an eligible same-level individual contributor, or use Manager / Direct Report when that relationship is correct.");
             }
             if (Objects.equals(target.getManagerId(), evaluator.getId())) {
                 throw new BusinessValidationException("The recipient's manager cannot be added as a peer evaluator.");
@@ -859,30 +859,16 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
     }
 
-    private Long resolveManagerEmployeeId(User targetUser, Integer workingDepartmentId) {
-        Long directManagerEmployeeId = null;
-        if (targetUser.getManagerId() != null) {
-            directManagerEmployeeId = userRepository.findById(targetUser.getManagerId())
-                    .filter(manager -> !Boolean.FALSE.equals(manager.getActive()))
-                    .map(User::getEmployeeId)
-                    .filter(Objects::nonNull)
-                    .map(Integer::longValue)
-                    .orElse(null);
-        }
-        if (directManagerEmployeeId != null) {
-            return directManagerEmployeeId;
-        }
-
-        Integer departmentId = workingDepartmentId != null ? workingDepartmentId : targetUser.getDepartmentId();
-        if (departmentId == null) {
+    private Long resolveManagerEmployeeId(User targetUser) {
+        if (targetUser.getManagerId() == null) {
             return null;
         }
-        return userRepository.findActiveDepartmentHeadsByDepartmentId(departmentId).stream()
-                .filter(head -> head.getEmployeeId() != null)
-                .filter(head -> !Objects.equals(head.getEmployeeId(), targetUser.getEmployeeId()))
+        return userRepository.findById(targetUser.getManagerId())
+                .filter(manager -> !Boolean.FALSE.equals(manager.getActive()))
                 .map(User::getEmployeeId)
+                .filter(Objects::nonNull)
                 .map(Integer::longValue)
-                .findFirst()
+                .filter(managerEmployeeId -> !Objects.equals(managerEmployeeId, targetUser.getEmployeeId()))
                 .orElse(null);
     }
 

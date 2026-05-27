@@ -35,12 +35,16 @@ public class FeedbackCampaignTargetResponse {
 
     private String employmentStatus;
     private Boolean eligible;
-    private List<String> blockReasons;
-    private List<String> warnings;
-    private List<String> notes;
+    @Builder.Default
+    private List<String> blockReasons = List.of();
+    @Builder.Default
+    private List<String> warnings = List.of();
+    @Builder.Default
+    private List<String> notes = List.of();
 
     private Integer activeTeamCount;
-    private List<String> activeTeamNames;
+    @Builder.Default
+    private List<String> activeTeamNames = List.of();
     private Integer peerCandidateCount;
     private Integer subordinateCandidateCount;
 

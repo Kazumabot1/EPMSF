@@ -27,7 +27,10 @@ public class FeedbackCampaignQuestionReviewResponse {
     private Double totalCompetencyWeight;
     private Boolean competencyWeightsReady;
     private LocalDateTime lastSavedAt;
-    private List<String> warnings;
-    private List<FeedbackCampaignCompetencyWeightResponse> competencyWeights;
-    private List<FeedbackCampaignQuestionGroupResponse> groups;
+    @Builder.Default
+    private List<String> warnings = List.of();
+    @Builder.Default
+    private List<FeedbackCampaignCompetencyWeightResponse> competencyWeights = List.of();
+    @Builder.Default
+    private List<FeedbackCampaignQuestionGroupResponse> groups = List.of();
 }

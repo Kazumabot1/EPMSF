@@ -249,7 +249,16 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-clipboard-data',
       permissionField: 'selfAssessmentView',
     },
-    { label: '360 Feedback', path: '/department-head/feedback', icon: 'bi-chat-dots' },
+    {
+      label: '360 Feedback',
+      path: '/department-head/feedback',
+      icon: 'bi-chat-dots',
+      children: [
+        { label: 'My Assignments', path: '/department-head/feedback', icon: 'bi-chat-dots', end: true },
+        { label: 'Department Summary', path: '/department-head/feedback/summary', icon: 'bi-building-check' },
+        { label: 'Feedback Completion', path: '/department-head/reports/feedback-completion', icon: 'bi-activity' },
+      ],
+    },
     { label: 'Department KPIs', path: '/department-head/department-kpis', icon: 'bi-building-check' },
     {
       label: 'Teams',
@@ -326,7 +335,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
       ],
     },
-    { label: '360 Feedback', path: '/manager/feedback', icon: 'bi-chat-dots' },
+    {
+      label: '360 Feedback',
+      path: '/manager/feedback',
+      icon: 'bi-chat-dots',
+      children: [
+        { label: 'My Assignments', path: '/manager/feedback', icon: 'bi-chat-dots', end: true },
+        { label: 'Team Summary', path: '/manager/feedback/summary', icon: 'bi-people' },
+      ],
+    },
     {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',

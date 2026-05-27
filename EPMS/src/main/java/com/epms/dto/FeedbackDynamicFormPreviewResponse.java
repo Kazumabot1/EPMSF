@@ -14,5 +14,6 @@ public class FeedbackDynamicFormPreviewResponse {
     Long targetPositionId;
     Long targetDepartmentId;
     Integer totalQuestions;
-    List<FeedbackAssignmentSectionDetailResponse> sections;
+    @Builder.Default
+    List<FeedbackAssignmentSectionDetailResponse> sections = List.of();
 }

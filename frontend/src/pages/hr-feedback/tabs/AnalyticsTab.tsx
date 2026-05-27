@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackAnalyticsApi } from '../../../api/feedbackAnalyticsApi';
-import type { FeedbackCampaign } from '../../../types/feedbackCampaign';
+import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
+import type {
+  FeedbackCampaign,
+  FeedbackCampaignScoringConfig,
+  FeedbackRelationshipWeight,
+} from '../../../types/feedbackCampaign';
 import type {
   FeedbackCampaignSummary,
   FeedbackCompetencyAverage,
@@ -42,7 +47,33 @@ const sourceCount = (value?: number | null) => Number(value ?? 0);
 const visibilityLabel = (status?: string | null) => status === 'PUBLISHED' ? 'Published' : status === 'READY_TO_PUBLISH' ? 'Ready' : 'Hidden';
 const confidenceLabel = (item: FeedbackResultItem) => item.insufficientFeedback ? 'Insufficient' : item.confidenceLevel || 'Not calculated';
 const MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES = 2;
-const isReadyToPublish = (item: FeedbackResultItem) => sourceCount(item.totalResponses) > 0 && !item.insufficientFeedback;
+const isPublished = (item: FeedbackResultItem) => item.visibilityStatus === 'PUBLISHED';
+const isReadyToPublish = (item: FeedbackResultItem) => sourceCount(item.totalResponses) > 0 && !item.insufficientFeedback && !isPublished(item);
+
+const relationshipDisplayName = (relationshipType?: string | null) => {
+  switch (String(relationshipType ?? '').toUpperCase()) {
+    case 'MANAGER': return 'Manager';
+    case 'PEER': return 'Peers';
+    case 'SUBORDINATE': return 'Direct Reports';
+    case 'SELF': return 'Self';
+    default: return relationshipType || 'Relationship';
+  }
+};
+
+const relationshipPrivacyThreshold = (relationshipType?: string | null) => {
+  const normalized = String(relationshipType ?? '').toUpperCase();
+  return normalized === 'PEER' || normalized === 'SUBORDINATE' ? MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES : 1;
+};
+
+const relationshipDescription = (relationshipType?: string | null) => {
+  switch (String(relationshipType ?? '').toUpperCase()) {
+    case 'MANAGER': return 'Manager ratings are shown when at least one manager response exists.';
+    case 'PEER': return `Peer results are masked outside HR analytics until at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} peer responses exist.`;
+    case 'SUBORDINATE': return `Direct report results are masked outside HR analytics until at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} direct report responses exist.`;
+    case 'SELF': return 'Self review is included only when configured and submitted.';
+    default: return 'This evaluator relationship contributes only when responses exist.';
+  }
+};
 
 const scoreBand = (score?: number | null) => {
   if (score == null) return 'No score';
@@ -105,8 +136,8 @@ const BarList = ({
           {subtitle && <span>{subtitle}</span>}
         </div>
         <div className="hfd-analytics-bars">
-          {rows.length === 0 ? <p className="hfd-muted">No data yet.</p> : rows.map(row => (
-              <div className="hfd-analytics-bar-row" key={row.label}>
+          {rows.length === 0 ? <p className="hfd-muted">No data yet.</p> : rows.map((row, index) => (
+              <div className="hfd-analytics-bar-row" key={`${row.label}-${index}`}>
                 <span>{row.label}</span>
                 <div className="hfd-monitor-bar-track"><div className="hfd-monitor-bar-fill" style={{ width: `${Math.max(2, (row.value / max) * 100)}%` }} /></div>
                 <strong>{row.meta ?? row.value}</strong>
@@ -161,6 +192,233 @@ const CompetencyChart = ({ competencies }: { competencies: FeedbackCompetencyAve
   );
 };
 
+const scoringRelationshipRows = (scoringConfig: FeedbackCampaignScoringConfig | null, summary: FeedbackCampaignSummary | null) => {
+  const apiRows = scoringConfig?.relationshipWeights?.length ? scoringConfig.relationshipWeights : [];
+  const summaryRows = summary?.relationshipAverages ?? [];
+  const allTypes = Array.from(new Set([
+    ...apiRows.map(row => String(row.relationshipType ?? '').toUpperCase()).filter(Boolean),
+    ...summaryRows.map(row => String(row.relationshipType ?? '').toUpperCase()).filter(Boolean),
+    'MANAGER',
+    'PEER',
+    'SUBORDINATE',
+    'SELF',
+  ]));
+
+  const findWeight = (type: string): FeedbackRelationshipWeight | undefined => apiRows.find(row => String(row.relationshipType ?? '').toUpperCase() === type);
+  const findSummary = (type: string) => summaryRows.find(row => String(row.relationshipType ?? '').toUpperCase() === type);
+
+  return allTypes.map(type => {
+    const weight = findWeight(type);
+    const relationshipAverage = findSummary(type);
+    return {
+      type,
+      label: relationshipDisplayName(weight?.relationshipType ?? relationshipAverage?.relationshipType ?? type),
+      weightPercent: Number(weight?.weightPercent ?? 0),
+      assignmentCount: Number(weight?.assignmentCount ?? 0),
+      targetCountWithRole: Number(weight?.targetCountWithRole ?? 0),
+      currentlyAvailable: weight?.currentlyAvailable !== false,
+      averageScore: relationshipAverage?.averageScore ?? null,
+      responseCount: Number(relationshipAverage?.responseCount ?? 0),
+      threshold: relationshipPrivacyThreshold(type),
+      description: relationshipDescription(type),
+    };
+  }).filter(row => row.weightPercent > 0 || row.responseCount > 0 || row.assignmentCount > 0);
+};
+
+type AnalyticsInsight = {
+  icon: string;
+  label: string;
+  value: string | number;
+  helper: string;
+  tone?: 'good' | 'warning' | 'danger' | 'neutral';
+};
+
+const ScoringExplanationPanel = ({
+                                   summary,
+                                   scoringConfig,
+                                   scoringLoading,
+                                 }: {
+  summary: FeedbackCampaignSummary;
+  scoringConfig: FeedbackCampaignScoringConfig | null;
+  scoringLoading: boolean;
+}) => {
+  const rows = scoringRelationshipRows(scoringConfig, summary);
+  const calculationNote = summary.items?.find(item => item.scoreCalculationNote)?.scoreCalculationNote;
+  const method = summary.items?.find(item => item.scoreCalculationMethod)?.scoreCalculationMethod;
+
+  return (
+      <section className="hfd-analytics-explain-card hfd-analytics-score-explain">
+        <div className="hfd-analytics-section-heading">
+          <div>
+            <span className="hfd-eyebrow">Score explanation</span>
+            <h3>How this campaign score is calculated</h3>
+            <p>Relationship weights come from Campaign Setup. Only submitted responses are counted, then privacy rules decide what employees can see.</p>
+          </div>
+          <span className={`hfd-status-chip ${scoringConfig?.relationshipWeightsReady ? 'published' : 'hidden'}`}>
+            {scoringLoading ? 'Loading weights' : scoringConfig?.relationshipWeightsReady ? 'Weights ready' : 'Review weights'}
+          </span>
+        </div>
+
+        <div className="hfd-score-method-box">
+          <strong>{method || 'Relationship-weighted average'}</strong>
+          <span>{calculationNote || 'Final score combines submitted evaluator ratings using the configured relationship weights and available response data.'}</span>
+          <small>Missing role handling: {scoringConfig?.redistributeMissingRelationshipWeight ? 'Redistribute available weighted roles' : 'Require configured weighted roles when available'}</small>
+        </div>
+
+        <div className="hfd-score-weight-grid">
+          {rows.length === 0 ? (
+              <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-sliders" /><strong>No scoring weights loaded</strong><p>Open Campaign Setup to review relationship weights for this campaign.</p></div>
+          ) : rows.map(row => (
+              <article key={row.type} className="hfd-score-weight-card">
+                <div>
+                  <strong>{row.label}</strong>
+                  <span>{row.description}</span>
+                </div>
+                <div className="hfd-score-weight-meter" aria-label={`${row.label} weight ${row.weightPercent}%`}>
+                  <i style={{ width: `${Math.min(100, Math.max(0, row.weightPercent))}%` }} />
+                </div>
+                <dl>
+                  <div><dt>Weight</dt><dd>{row.weightPercent}%</dd></div>
+                  <div><dt>Avg.</dt><dd>{row.responseCount > 0 ? formatScore(row.averageScore) : 'No responses'}</dd></div>
+                  <div><dt>Responses</dt><dd>{row.responseCount}</dd></div>
+                  <div><dt>Visibility threshold</dt><dd>{row.threshold}</dd></div>
+                </dl>
+              </article>
+          ))}
+        </div>
+
+        {scoringConfig?.warnings?.length ? (
+            <div className="hfd-analytics-note-list warning">
+              {scoringConfig.warnings.map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
+            </div>
+        ) : null}
+      </section>
+  );
+};
+
+const PrivacyAndConfidencePanel = ({ summary }: { summary: FeedbackCampaignSummary }) => {
+  const items = summary.items ?? [];
+  const peerMasked = items.filter(item => sourceCount(item.peerResponses) > 0 && sourceCount(item.peerResponses) < MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES).length;
+  const subordinateMasked = items.filter(item => sourceCount(item.subordinateResponses) > 0 && sourceCount(item.subordinateResponses) < MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES).length;
+  const lowConfidence = items.filter(item => String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
+  const insufficient = items.filter(item => Boolean(item.insufficientFeedback)).length;
+  const insights: AnalyticsInsight[] = [
+    {
+      icon: 'bi-shield-lock',
+      label: 'Peer masking',
+      value: peerMasked,
+      helper: `Peer score/comment visibility needs at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} submitted peer responses.`,
+      tone: peerMasked > 0 ? 'warning' : 'good',
+    },
+    {
+      icon: 'bi-people',
+      label: 'Direct report masking',
+      value: subordinateMasked,
+      helper: `Direct report visibility needs at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} submitted direct report responses.`,
+      tone: subordinateMasked > 0 ? 'warning' : 'good',
+    },
+    {
+      icon: 'bi-exclamation-diamond',
+      label: 'Insufficient summaries',
+      value: insufficient,
+      helper: 'These employee summaries cannot be published until they pass backend confidence checks.',
+      tone: insufficient > 0 ? 'danger' : 'good',
+    },
+    {
+      icon: 'bi-activity',
+      label: 'Low confidence',
+      value: lowConfidence,
+      helper: 'Low confidence results should be reviewed before HR publishes employee summaries.',
+      tone: lowConfidence > 0 ? 'warning' : 'good',
+    },
+  ];
+
+  return (
+      <section className="hfd-analytics-explain-card">
+        <div className="hfd-analytics-section-heading">
+          <div>
+            <span className="hfd-eyebrow">Privacy and confidence</span>
+            <h3>What HR can publish safely</h3>
+            <p>HR analytics can show internal review data, but employee-facing results remain masked when confidentiality thresholds are not met.</p>
+          </div>
+          <span className="hfd-status-chip hidden">Threshold {MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES}</span>
+        </div>
+        <div className="hfd-analytics-insight-grid">
+          {insights.map(item => (
+              <article key={item.label} className={`hfd-analytics-insight-card ${item.tone ?? 'neutral'}`}>
+                <i className={`bi ${item.icon}`} />
+                <strong>{item.value}</strong>
+                <span>{item.label}</span>
+                <small>{item.helper}</small>
+              </article>
+          ))}
+        </div>
+      </section>
+  );
+};
+
+const PublishReadinessPanel = ({
+                                 readyCount,
+                                 blockedItems,
+                                 publishedCount,
+                                 totalEmployees,
+                               }: {
+  readyCount: number;
+  blockedItems: FeedbackResultItem[];
+  publishedCount: number;
+  totalEmployees: number;
+}) => {
+  const noResponses = blockedItems.filter(item => sourceCount(item.totalResponses) === 0).length;
+  const insufficient = blockedItems.filter(item => Boolean(item.insufficientFeedback)).length;
+  const blockedButHasResponses = Math.max(0, blockedItems.length - noResponses - insufficient);
+  const rows = [
+    { label: 'Ready to publish', value: readyCount, helper: 'Passed response and confidence checks.', tone: 'good' },
+    { label: 'Already published', value: publishedCount, helper: 'Currently visible to employees and HR.', tone: 'neutral' },
+    { label: 'No submitted responses', value: noResponses, helper: 'Cannot calculate an employee result yet.', tone: noResponses ? 'danger' : 'good' },
+    { label: 'Insufficient feedback', value: insufficient, helper: 'Blocked by confidence or minimum feedback checks.', tone: insufficient ? 'warning' : 'good' },
+    { label: 'Needs HR review', value: blockedButHasResponses, helper: 'Has data but still not ready for employee publishing.', tone: blockedButHasResponses ? 'warning' : 'good' },
+  ];
+
+  return (
+      <section className="hfd-analytics-explain-card hfd-publish-readiness-panel">
+        <div className="hfd-analytics-section-heading">
+          <div>
+            <span className="hfd-eyebrow">Publish readiness</span>
+            <h3>Publication status before release</h3>
+            <p>{readyCount} of {totalEmployees} employee summaries are ready for publishing. Blocked results stay hidden from employees.</p>
+          </div>
+        </div>
+        <div className="hfd-publish-readiness-list">
+          {rows.map(row => (
+              <article key={row.label} className={`hfd-publish-readiness-item ${row.tone}`}>
+                <strong>{row.value}</strong>
+                <div><span>{row.label}</span><small>{row.helper}</small></div>
+              </article>
+          ))}
+        </div>
+      </section>
+  );
+};
+
+const EmployeeRelationshipDetail = ({ item }: { item: FeedbackResultItem }) => {
+  const rows = relationshipBreakdown(item);
+  return (
+      <div className="hfd-relationship-detail-grid">
+        {rows.map(row => {
+          const count = sourceCount(row.count);
+          const visible = count >= row.threshold;
+          return (
+              <article key={row.label} className={visible ? 'visible' : 'masked'}>
+                <strong>{row.label}</strong>
+                <span>{visible ? formatScore(row.score) : 'Masked'}</span>
+                <small>{count} response{count === 1 ? '' : 's'} · {visible ? 'Visible when published' : `Needs ${row.threshold} responses`}</small>
+              </article>
+          );
+        })}
+      </div>
+  );
+};
+
 const contentSummary = (options: PublishOptions) => [
   options.includeOverallScore && 'Overall score and rating band',
   options.includeCompetencyBreakdown && 'Competency breakdown',
@@ -173,7 +431,9 @@ export default function AnalyticsTab() {
   const [campaigns, setCampaigns] = useState<FeedbackCampaign[]>([]);
   const [selectedId, setSelectedId] = useState<number | ''>('');
   const [summary, setSummary] = useState<FeedbackCampaignSummary | null>(null);
+  const [scoringConfig, setScoringConfig] = useState<FeedbackCampaignScoringConfig | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scoringLoading, setScoringLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -206,13 +466,22 @@ export default function AnalyticsTab() {
   }, []);
 
   const refreshSummary = () => {
-    if (!selectedId) { setSummary(null); return; }
+    if (!selectedId) {
+      setSummary(null);
+      setScoringConfig(null);
+      return;
+    }
     setLoading(true);
+    setScoringLoading(true);
     setError('');
     feedbackAnalyticsApi.getCampaignSummary(selectedId as number)
         .then(setSummary)
         .catch(e => setError(e.message))
         .finally(() => setLoading(false));
+    feedbackCampaignApi.getScoringConfig(selectedId as number)
+        .then(setScoringConfig)
+        .catch(() => setScoringConfig(null))
+        .finally(() => setScoringLoading(false));
   };
 
   useEffect(() => {
@@ -226,8 +495,8 @@ export default function AnalyticsTab() {
   }, [selectedId]);
 
   const readyItems = useMemo(() => (summary?.items ?? []).filter(isReadyToPublish), [summary?.items]);
-  const blockedItems = useMemo(() => (summary?.items ?? []).filter(item => !isReadyToPublish(item)), [summary?.items]);
-  const publishedCount = useMemo(() => (summary?.items ?? []).filter(item => item.visibilityStatus === 'PUBLISHED').length, [summary?.items]);
+  const blockedItems = useMemo(() => (summary?.items ?? []).filter(item => !isReadyToPublish(item) && !isPublished(item)), [summary?.items]);
+  const publishedCount = useMemo(() => (summary?.items ?? []).filter(isPublished).length, [summary?.items]);
   const readyCount = readyItems.length;
   const selectedReadyCount = publishOptions.scope === 'ALL_READY'
       ? readyCount
@@ -420,6 +689,12 @@ export default function AnalyticsTab() {
                 <StatCard label="Published" value={`${publishedCount}/${summary.totalEmployees}`} />
               </div>
 
+              <div className="hfd-analytics-explain-grid">
+                <ScoringExplanationPanel summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
+                <PrivacyAndConfidencePanel summary={summary} />
+                <PublishReadinessPanel readyCount={readyCount} blockedItems={blockedItems} publishedCount={publishedCount} totalEmployees={summary.totalEmployees} />
+              </div>
+
               <div className="hfd-analytics-chart-grid">
                 <ScoreDistributionChart summary={summary} />
                 <RelationshipAverageChart summary={summary} />
@@ -526,7 +801,8 @@ export default function AnalyticsTab() {
                             <>
                               <strong>{item.targetEmployeeName}</strong>
                               <span>{item.scoreCalculationNote ?? 'Score is calculated from submitted 360 feedback responses.'}</span>
-                              <span>Manager {formatScore(item.managerAverageScore)} · Peer {sourceCount(item.peerResponses) >= 2 ? formatScore(item.peerAverageScore) : 'Not enough feedback'} · Direct Report {sourceCount(item.subordinateResponses) >= 2 ? formatScore(item.subordinateAverageScore) : 'Not enough feedback'} · Self {formatScore(item.selfAverageScore)}</span>
+                              <EmployeeRelationshipDetail item={item} />
+                              <span>{item.insufficientFeedback ? 'Publishing blocked: this employee result does not have enough reliable feedback yet.' : item.visibilityStatus === 'PUBLISHED' ? 'Published result is visible to the employee and HR.' : 'Ready results can be published after HR confirms visibility.'}</span>
                             </>
                         );
                       })()}
@@ -556,7 +832,8 @@ export default function AnalyticsTab() {
                     <div className="hfd-publish-step-body">
                       <div className="hfd-publish-readiness-grid">
                         <strong>{readyCount} ready employees</strong>
-                        <span>{blockedItems.length} blocked by confidence or confidentiality checks.</span>
+                        <span>{blockedItems.length} blocked by confidence or confidentiality checks. {publishedCount} already published.</span>
+                        <small>Peer and direct report detail remains masked when the relationship response threshold is not met.</small>
                       </div>
 
                       <section className="hfd-publish-section">
@@ -611,6 +888,8 @@ export default function AnalyticsTab() {
                           <div><dt>Notification</dt><dd>Employees will be notified</dd></div>
                           <div><dt>Included</dt><dd>{contentSummary(publishOptions) || 'No content selected'}</dd></div>
                           <div><dt>Comments</dt><dd>{publishOptions.includeComments ? 'Anonymous comments included when confidentiality allows' : 'Not included'}</dd></div>
+                          <div><dt>Blocked results</dt><dd>{blockedItems.length} remain hidden</dd></div>
+                          <div><dt>Confidentiality rule</dt><dd>Peer/direct report detail requires {MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES}+ submitted responses</dd></div>
                         </dl>
                       </section>
                       <div className="hfd-alert hfd-alert-info">

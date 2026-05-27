@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { authStorage } from '../../../services/authStorage';
 import type { FeedbackCampaign } from '../../../types/feedbackCampaign';
@@ -505,9 +506,9 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
                     <i className="bi bi-lock" /> Close Campaign
                   </button>
                   {closedStatus && (
-                      <a className="hfd-btn hfd-btn-primary" href="/hr/feedback/analytics">
+                      <Link className="hfd-btn hfd-btn-primary" to="/hr/feedback/analytics">
                         <i className="bi bi-bar-chart-line" /> Open Analytics
-                      </a>
+                      </Link>
                   )}
                 </div>
               </div>
