@@ -40,12 +40,12 @@ import CeoDashboard from './pages/ceo/CeoDashboard';
 import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
+import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
-import SelfAssessmentFormRecordsPage from './pages/hr/SelfAssessmentFormRecordsPage';
 import ReportingDashboardPage from './pages/reports/ReportingDashboardPage';
 
 import PositionCreate from './pages/position/Create';
