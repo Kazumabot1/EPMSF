@@ -739,3 +739,16 @@
   color: #475569;
   line-height: 1.6;
 }
+
+.feedback-result-access-denied {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%);
+}
+
+.feedback-result-access-denied strong {
+  color: #991b1b;
+}
+
+.feedback-result-access-denied p {
+  color: #7f1d1d;
+}

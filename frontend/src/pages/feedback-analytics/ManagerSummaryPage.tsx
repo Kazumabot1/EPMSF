@@ -5,6 +5,11 @@ import './feedback-analytics.css';
 
 const MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES = 2;
 type TeamSummaryFilter = 'ALL' | 'LOW_CONFIDENCE' | 'MASKED' | 'STRONG' | 'NEEDS_ATTENTION';
+type ExpectedSummaryScope = 'MANAGER_DIRECT_REPORTS' | 'DEPARTMENT';
+
+type ManagerSummaryPageProps = {
+    expectedScope?: ExpectedSummaryScope;
+};
 
 const formatScore = (value?: number | null) => (value == null ? '—' : `${Number(value).toFixed(1)}%`);
 const countOf = (value?: number | null) => Number(value ?? 0);
@@ -41,6 +46,20 @@ const relationshipRows = (item: FeedbackResultItem) => [
     { key: 'SUBORDINATE', label: 'Direct reports', count: countOf(item.subordinateResponses), score: item.subordinateAverageScore, threshold: MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES },
     { key: 'SELF', label: 'Self review', count: countOf(item.selfResponses), score: item.selfAverageScore, threshold: 1 },
 ];
+
+const isUnauthorizedError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return /unauthorized|not authorized|permission|only managers|only manager|department heads/i.test(message);
+};
+
+const errorMessage = (error: unknown, departmentView: boolean) => {
+    if (isUnauthorizedError(error)) {
+        return departmentView
+            ? 'You do not have permission to view department 360 summaries. Department summaries are available only to Department Heads for their own department.'
+            : 'You do not have permission to view team 360 summaries. Team summaries are available only to managers for their direct reports.';
+    }
+    return error instanceof Error ? error.message : 'Unable to load the 360 feedback summary.';
+};
 
 const ManagerRelationshipBreakdown = ({ item }: { item: FeedbackResultItem }) => (
     <div className="feedback-result-manager-relationships">
@@ -95,13 +114,15 @@ const ManagerResultCard = ({ item, departmentView }: { item: FeedbackResultItem;
     </article>
 );
 
-const ManagerSummaryPage = () => {
+const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
     const summaryQuery = useFeedbackTeamSummary();
     const summary = summaryQuery.data;
     const [filter, setFilter] = useState<TeamSummaryFilter>('ALL');
 
+    const declaredScope = String(summary?.viewScope ?? expectedScope ?? 'MANAGER_DIRECT_REPORTS').toUpperCase();
+    const departmentView = declaredScope === 'DEPARTMENT';
+    const actualScopeMismatch = Boolean(summary?.viewScope && expectedScope && String(summary.viewScope).toUpperCase() !== expectedScope);
     const items = summary?.items ?? [];
-    const departmentView = String(summary?.viewScope ?? '').toUpperCase() === 'DEPARTMENT';
     const filteredItems = useMemo(() => items.filter((item) => filterMatches(item, filter)), [items, filter]);
     const representedEmployees = new Set(items.map((item) => item.targetEmployeeId)).size;
     const scoredItems = items.filter((item) => item.averageScore != null);
@@ -111,20 +132,20 @@ const ManagerSummaryPage = () => {
     const privacyMaskedCount = items.filter(isMasked).length;
     const lowConfidenceCount = items.filter((item) => Boolean(item.insufficientFeedback) || String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
 
-    const title = departmentView ? 'Department published 360 summary' : 'Team published feedback summary';
-    const description = departmentView
+    const title = summary?.accessTitle || (departmentView ? 'Department published 360 summary' : 'Team published feedback summary');
+    const description = summary?.accessDescription || (departmentView
         ? 'Review published 360 results for employees in your department. Relationship details stay aggregated and privacy-safe.'
-        : 'Review direct-report results from published closed campaigns. Relationship details stay aggregated and privacy-safe.';
+        : 'Review direct-report results from published closed campaigns. Relationship details stay aggregated and privacy-safe.');
     const emptyTitle = departmentView ? 'No published department results yet' : 'No published team results yet';
-    const emptyDescription = departmentView
+    const emptyDescription = summary?.emptyStateMessage || (departmentView
         ? 'Department 360 results will appear here only after HR closes and publishes a campaign.'
-        : 'Direct-report 360 results will appear here only after HR closes and publishes a campaign.';
+        : 'Direct-report 360 results will appear here only after HR closes and publishes a campaign.');
 
     return (
         <div className="feedback-results-stack">
             <section className="feedback-results-hero feedback-results-hero-soft">
                 <div>
-                    <p className="feedback-results-kicker">{departmentView ? 'Department Head 360 Feedback' : '360 Feedback'}</p>
+                    <p className="feedback-results-kicker">{departmentView ? 'Department Head 360 Feedback' : 'Manager 360 Feedback'}</p>
                     <h1>{title}</h1>
                     <p>{description}</p>
                     {departmentView && summary?.departmentName && <p className="feedback-result-muted-on-dark">Department: {summary.departmentName}</p>}
@@ -138,8 +159,16 @@ const ManagerSummaryPage = () => {
 
             {summaryQuery.isLoading ? (
                 <div className="feedback-results-empty">Loading {departmentView ? 'department' : 'team'} summary...</div>
-            ) : summaryQuery.error instanceof Error ? (
-                <div className="feedback-results-banner error">{summaryQuery.error.message}</div>
+            ) : summaryQuery.error ? (
+                <div className="feedback-results-empty feedback-result-empty-state feedback-result-access-denied">
+                    <strong>{isUnauthorizedError(summaryQuery.error) ? 'Access restricted' : 'Unable to load summary'}</strong>
+                    <p>{errorMessage(summaryQuery.error, departmentView)}</p>
+                </div>
+            ) : actualScopeMismatch ? (
+                <div className="feedback-results-empty feedback-result-empty-state feedback-result-access-denied">
+                    <strong>Summary access mismatch</strong>
+                    <p>This page expected a {expectedScope === 'DEPARTMENT' ? 'Department Head department' : 'Manager direct-report'} view, but the server returned a different 360 summary scope. Please reopen the correct sidebar item.</p>
+                </div>
             ) : !summary || items.length === 0 ? (
                 <div className="feedback-results-empty feedback-result-empty-state">
                     <strong>{emptyTitle}</strong>
@@ -186,15 +215,15 @@ const ManagerSummaryPage = () => {
                         </div>
                     </section>
 
-                    {departmentView && (
-                        <section className="feedback-results-card feedback-result-policy-card">
-                            <p className="feedback-results-kicker">Department Head access rule</p>
-                            <h2>Department Head is not a separate evaluator relationship</h2>
-                            <p>
-                                Relationship types remain simple: Self, Manager, Peer, and Direct Report. A Department Head is treated as Manager only when the employee directly reports to them. Department Heads can review department summaries, but peer and direct-report anonymity rules still apply.
-                            </p>
-                        </section>
-                    )}
+                    <section className="feedback-results-card feedback-result-policy-card">
+                        <p className="feedback-results-kicker">360 access and confidentiality</p>
+                        <h2>{departmentView ? 'Department Head access rule' : 'Manager access rule'}</h2>
+                        <p>
+                            {summary.privacyNotice || (departmentView
+                                ? 'Department Head access is a department-level view, not a separate evaluator relationship. Peer and direct-report anonymity rules still apply.'
+                                : 'Managers can review only published direct-report summaries. Peer and direct-report anonymity rules still apply.')}
+                        </p>
+                    </section>
 
                     <section className="feedback-result-team-grid">
                         {filteredItems.length === 0 ? (

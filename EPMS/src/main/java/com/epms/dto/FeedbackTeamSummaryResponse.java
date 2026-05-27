@@ -20,5 +20,9 @@ public class FeedbackTeamSummaryResponse {
     Integer totalDirectReports;
     Integer totalDepartmentEmployees;
     Integer totalClosedResults;
+    String accessTitle;
+    String accessDescription;
+    String privacyNotice;
+    String emptyStateMessage;
     List<FeedbackResultItemResponse> items;
 }

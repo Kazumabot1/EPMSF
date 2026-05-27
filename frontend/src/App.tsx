@@ -210,7 +210,7 @@ function App() {
                 <Route path="/manager/appraisals" element={<EmployeePerformanceReviewPage />} />
                 <Route path="/manager/appraisals/history" element={<AppraisalHistoryListPage role="pm" />} />
                 <Route path="/manager/feedback" element={<EmployeeFeedbackDashboardPage />} />
-                <Route path="/manager/feedback/summary" element={<ManagerSummaryPage />} />
+                <Route path="/manager/feedback/summary" element={<ManagerSummaryPage expectedScope="MANAGER_DIRECT_REPORTS" />} />
                 <Route path="/manager/feedback/assignments/:assignmentId" element={<FeedbackFormPage />} />
                 <Route path="/manager/reports" element={<Navigate to="/manager/reports/performance" replace />} />
                 <Route path="/manager/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
@@ -270,7 +270,7 @@ function App() {
                 <Route path="/department-head/appraisals/review" element={<AppraisalReviewQueuePage mode="dept-head" />} />
                 <Route path="/department-head/appraisals/history" element={<AppraisalHistoryListPage role="dept-head" />} />
                 <Route path="/department-head/feedback" element={<EmployeeFeedbackDashboardPage />} />
-                <Route path="/department-head/feedback/summary" element={<ManagerSummaryPage />} />
+                <Route path="/department-head/feedback/summary" element={<ManagerSummaryPage expectedScope="DEPARTMENT" />} />
                 <Route path="/department-head/feedback/assignments/:assignmentId" element={<FeedbackFormPage />} />
                 <Route path="/department-head/kpi" element={<Navigate to="/department-head/kpi-scoring" replace />} />
                 <Route path="/department-head/kpi/history" element={<ManagerKpiHistoryPage />} />
