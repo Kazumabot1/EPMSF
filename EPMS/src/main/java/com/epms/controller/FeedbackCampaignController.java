@@ -413,7 +413,7 @@ public class FeedbackCampaignController {
                 .description(campaign.getDescription())
                 .instructions(campaign.getInstructions())
                 .status(campaign.getStatus().name())
-                .formId(campaign.getFormId())
+                .formId(null)
                 .autoSubmitCompletedDraftsOnClose(Boolean.TRUE.equals(campaign.getAutoSubmitCompletedDraftsOnClose()))
                 .managerFeedbackAnonymous(Boolean.TRUE.equals(campaign.getManagerFeedbackAnonymous()))
                 .peerFeedbackAnonymous(Boolean.TRUE.equals(campaign.getPeerFeedbackAnonymous()))

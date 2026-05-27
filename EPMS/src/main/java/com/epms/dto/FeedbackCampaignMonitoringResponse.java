@@ -22,9 +22,12 @@ public class FeedbackCampaignMonitoringResponse {
     private Integer submittedCount;
     private Integer cancelledCount;
     private Double completionPercent;
-    private List<RoleProgress> byRole;
-    private List<TargetProgress> targets;
-    private List<String> warnings;
+    @Builder.Default
+    private List<RoleProgress> byRole = List.of();
+    @Builder.Default
+    private List<TargetProgress> targets = List.of();
+    @Builder.Default
+    private List<String> warnings = List.of();
 
     @Data
     @Builder

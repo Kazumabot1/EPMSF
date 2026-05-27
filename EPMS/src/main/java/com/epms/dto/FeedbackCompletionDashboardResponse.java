@@ -39,12 +39,14 @@ public class FeedbackCompletionDashboardResponse {
 
     private FeedbackAssignmentStatusBreakdownResponse statusBreakdown;
     private FeedbackTargetStatusBreakdownResponse targetStatusBreakdown;
-    private List<FeedbackRelationshipProgressResponse> relationshipProgress;
+    @Builder.Default
+    private List<FeedbackRelationshipProgressResponse> relationshipProgress = List.of();
 
     private Double completionPercent;
     private String healthStatus;
     private String healthMessage;
     private LocalDateTime generatedAt;
 
-    private List<FeedbackCompletionItemResponse> requests;
+    @Builder.Default
+    private List<FeedbackCompletionItemResponse> requests = List.of();
 }

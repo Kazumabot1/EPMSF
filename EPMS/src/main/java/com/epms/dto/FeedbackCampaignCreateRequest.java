@@ -40,6 +40,7 @@ public class FeedbackCampaignCreateRequest {
      * Legacy static form link. Optional for the new dynamic campaign wizard; activation/question review
      * will create campaign-specific snapshots in a later patch.
      */
+    @Deprecated
     private Long formId;
 
     private String description;

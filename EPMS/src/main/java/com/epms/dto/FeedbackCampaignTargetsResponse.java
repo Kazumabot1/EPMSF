@@ -19,6 +19,8 @@ public class FeedbackCampaignTargetsResponse {
     private Integer readyCount;
     private Integer warningCount;
     private Integer blockedCount;
-    private List<FeedbackCampaignTargetResponse> targets;
-    private List<String> warnings;
+    @Builder.Default
+    private List<FeedbackCampaignTargetResponse> targets = List.of();
+    @Builder.Default
+    private List<String> warnings = List.of();
 }

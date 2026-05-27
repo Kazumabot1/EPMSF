@@ -40,5 +40,6 @@ public class FeedbackAssignmentDetailResponse {
     Integer maxAdditionalCommentLength;
     Boolean finalSubmissionReady;
     Boolean submittedLocked;
-    List<FeedbackAssignmentSectionDetailResponse> sections;
+    @Builder.Default
+    List<FeedbackAssignmentSectionDetailResponse> sections = List.of();
 }

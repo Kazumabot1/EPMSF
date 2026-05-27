@@ -21,6 +21,7 @@ public class FeedbackCampaignResponse {
     String description;
     String instructions;
     String status;
+    @Deprecated
     Long formId;
     Boolean autoSubmitCompletedDraftsOnClose;
     Boolean managerFeedbackAnonymous;
@@ -43,5 +44,6 @@ public class FeedbackCampaignResponse {
     LocalDateTime createdAt;
     int targetCount;
     int assignmentCount;
-    List<Long> targetEmployeeIds;
+    @Builder.Default
+    List<Long> targetEmployeeIds = List.of();
 }

@@ -18,5 +18,6 @@ public class FeedbackAssignmentPreviewItemResponse {
     int totalAssignments;
     int autoAssignments;
     int manualAssignments;
-    List<String> warnings;
+    @Builder.Default
+    List<String> warnings = List.of();
 }

@@ -22,6 +22,7 @@ import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackAssignmentManagementService;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackOperationalService;
+import com.epms.util.FeedbackEvaluatorConfigNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -166,7 +167,7 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
                 .campaignId(campaignId)
                 .totalTargets(requests.size())
                 .totalEvaluatorsGenerated(assignments.size())
-                .evaluatorConfig(config)
+                .evaluatorConfig(config == null ? null : FeedbackEvaluatorConfigNormalizer.normalize(config))
                 .requests(previewItems)
                 .assignmentDetails(buildAssignmentDetails(assignments))
                 .warnings(warnings.stream().distinct().toList())

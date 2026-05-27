@@ -29,6 +29,7 @@ import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackOperationalService;
 import com.epms.service.FeedbackAssignmentManagementService;
 import com.epms.service.ProjectPeerDirectory;
+import com.epms.util.FeedbackEvaluatorConfigNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,7 +82,8 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             Long actorUserId,
             boolean persist
     ) {
-        validateConfig(config);
+        config = FeedbackEvaluatorConfigNormalizer.normalize(config);
+        FeedbackEvaluatorConfigNormalizer.validate(config);
 
         FeedbackCampaign campaign = getCampaignOrThrow(campaignId);
         ensureDraftCampaign(campaign, persist
@@ -180,16 +182,16 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                         .filter(employeeId -> !Objects.equals(employeeId, excludedManagerEmployeeId))
                         .filter(employeeId -> !assignedEvaluatorEmployeeIds.contains(employeeId))
                         .sorted()
-                        .limit(requestedSubordinateMaxCount(config))
+                        .limit(FeedbackEvaluatorConfigNormalizer.requestedSubordinateMaxCount(config))
                         .toList();
 
                 if (subordinateEmployeeIds.isEmpty()) {
                     targetWarnings.add("No direct reports found. Subordinate feedback will be skipped for this target.");
                 }
-                if (selectedSubordinates.size() < requestedSubordinateMinCount(config)) {
+                if (selectedSubordinates.size() < FeedbackEvaluatorConfigNormalizer.requestedSubordinateMinCount(config)) {
                     targetWarnings.add("Only " + selectedSubordinates.size()
                             + " eligible subordinate evaluator(s) found; minimum rule is "
-                            + requestedSubordinateMinCount(config) + ".");
+                            + FeedbackEvaluatorConfigNormalizer.requestedSubordinateMinCount(config) + ".");
                 }
 
                 for (Long subordinateEmployeeId : selectedSubordinates) {
@@ -202,14 +204,14 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             }
 
             LinkedHashSet<Long> peerPool = new LinkedHashSet<>();
-            if (isPeerSelectionEnabled(config)) {
-                if (isTeamPeerSelectionEnabled(config)) {
+            if (FeedbackEvaluatorConfigNormalizer.isPeerSelectionEnabled(config)) {
+                if (FeedbackEvaluatorConfigNormalizer.isTeamPeerSelectionEnabled(config)) {
                     if (targetTeamIds.isEmpty()) {
                         targetWarnings.add("No active team found. Team peer selection cannot be applied for this target.");
                     }
                     peerPool.addAll(findTeamPeerEmployeeIds(targetUser));
                 }
-                if (isDepartmentPeerSelectionEnabled(config)) {
+                if (FeedbackEvaluatorConfigNormalizer.isDepartmentPeerSelectionEnabled(config)) {
                     if (workingDepartmentId == null) {
                         targetWarnings.add("No current department found. Department peer fallback cannot be applied.");
                     } else {
@@ -238,12 +240,12 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                     targetWarnings
             );
 
-            int requestedPeerMinCount = requestedPeerMinCount(config);
-            int requestedPeerMaxCount = requestedPeerMaxCount(config);
-            List<Long> selectedPeers = isPeerSelectionEnabled(config)
+            int requestedPeerMinCount = FeedbackEvaluatorConfigNormalizer.requestedPeerMinCount(config);
+            int requestedPeerMaxCount = FeedbackEvaluatorConfigNormalizer.requestedPeerMaxCount(config);
+            List<Long> selectedPeers = FeedbackEvaluatorConfigNormalizer.isPeerSelectionEnabled(config)
                     ? selectPeers(peerPool, requestedPeerMaxCount, campaignId, request.getTargetEmployeeId())
                     : List.of();
-            if (isPeerSelectionEnabled(config) && selectedPeers.size() < requestedPeerMinCount) {
+            if (FeedbackEvaluatorConfigNormalizer.isPeerSelectionEnabled(config) && selectedPeers.size() < requestedPeerMinCount) {
                 targetWarnings.add("Only " + selectedPeers.size()
                         + " eligible peer evaluator(s) found; minimum rule is "
                         + requestedPeerMinCount + ".");
@@ -344,98 +346,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
     @Transactional(readOnly = true)
     public List<PendingEvaluatorProjection> getPendingEvaluators(Long requestId) {
         return assignmentRepository.findPendingEvaluatorsByRequestId(requestId);
-    }
-
-    private void validateConfig(EvaluatorConfigDTO config) {
-        if (config == null) {
-            throw new BusinessValidationException("Evaluator configuration is required.");
-        }
-        boolean anyEvaluatorSourceSelected = Boolean.TRUE.equals(config.getIncludeManager())
-                || Boolean.TRUE.equals(config.getIncludeSelf())
-                || Boolean.TRUE.equals(config.getIncludeSubordinates())
-                || isPeerSelectionEnabled(config);
-        if (!anyEvaluatorSourceSelected) {
-            throw new BusinessValidationException("Choose at least one evaluator role.");
-        }
-        if (isPeerSelectionEnabled(config)) {
-            int peerMin = requestedPeerMinCount(config);
-            int peerMax = requestedPeerMaxCount(config);
-            if (peerMax <= 0) {
-                throw new BusinessValidationException("Maximum peer count must be greater than zero when peer evaluators are enabled.");
-            }
-            if (peerMin > peerMax) {
-                throw new BusinessValidationException("Minimum peer count cannot be greater than maximum peer count.");
-            }
-        }
-        if (Boolean.TRUE.equals(config.getIncludeSubordinates())) {
-            int subordinateMin = requestedSubordinateMinCount(config);
-            int subordinateMax = requestedSubordinateMaxCount(config);
-            if (subordinateMin > subordinateMax) {
-                throw new BusinessValidationException("Minimum subordinate count cannot be greater than maximum subordinate count.");
-            }
-        }
-    }
-
-    private FeedbackCampaign getCampaignOrThrow(Long campaignId) {
-        return feedbackCampaignRepository.findById(campaignId)
-                .orElseThrow(() -> new ResourceNotFoundException("Feedback campaign not found."));
-    }
-
-    private void ensureDraftCampaign(FeedbackCampaign campaign, String message) {
-        if (campaign.getStatus() != FeedbackCampaignStatus.DRAFT) {
-            throw new BusinessValidationException(message);
-        }
-    }
-
-    private boolean isPeerSelectionEnabled(EvaluatorConfigDTO config) {
-        if (config == null) {
-            return false;
-        }
-        if (config.getIncludePeers() != null) {
-            return config.getIncludePeers()
-                    && (isTeamPeerSelectionEnabled(config)
-                    || isDepartmentPeerSelectionEnabled(config)
-                    || Boolean.TRUE.equals(config.getIncludeProjectPeers())
-                    || Boolean.TRUE.equals(config.getIncludeCrossTeamPeers()));
-        }
-        return Boolean.TRUE.equals(config.getIncludeTeamPeers())
-                || Boolean.TRUE.equals(config.getIncludeDepartmentPeers())
-                || Boolean.TRUE.equals(config.getIncludeProjectPeers())
-                || Boolean.TRUE.equals(config.getIncludeCrossTeamPeers());
-    }
-
-    private boolean isTeamPeerSelectionEnabled(EvaluatorConfigDTO config) {
-        return config != null
-                && !Boolean.FALSE.equals(config.getIncludePeers())
-                && !Boolean.FALSE.equals(config.getIncludeTeamPeers());
-    }
-
-    private boolean isDepartmentPeerSelectionEnabled(EvaluatorConfigDTO config) {
-        return config != null
-                && !Boolean.FALSE.equals(config.getIncludePeers())
-                && !Boolean.FALSE.equals(config.getIncludeDepartmentPeers());
-    }
-
-    private int requestedPeerMinCount(EvaluatorConfigDTO config) {
-        if (config.getPeerMinCount() != null) {
-            return Math.max(0, config.getPeerMinCount());
-        }
-        return config.getPeerCount() == null ? 2 : Math.max(0, config.getPeerCount());
-    }
-
-    private int requestedPeerMaxCount(EvaluatorConfigDTO config) {
-        if (config.getPeerMaxCount() != null) {
-            return Math.max(1, config.getPeerMaxCount());
-        }
-        return config.getPeerCount() == null ? 5 : Math.max(1, config.getPeerCount());
-    }
-
-    private int requestedSubordinateMinCount(EvaluatorConfigDTO config) {
-        return config.getSubordinateMinCount() == null ? 0 : Math.max(0, config.getSubordinateMinCount());
-    }
-
-    private int requestedSubordinateMaxCount(EvaluatorConfigDTO config) {
-        return config.getSubordinateMaxCount() == null ? 5 : Math.max(0, config.getSubordinateMaxCount());
     }
 
     private Integer resolveWorkingDepartmentId(FeedbackRequest request, User targetUser) {

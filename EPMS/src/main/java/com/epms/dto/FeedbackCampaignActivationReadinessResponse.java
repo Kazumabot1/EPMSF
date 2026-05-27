@@ -19,9 +19,12 @@ public class FeedbackCampaignActivationReadinessResponse {
     private Boolean canMarkReady;
     private Boolean canActivate;
     private FeedbackCampaignActivationSummary summary;
-    private List<FeedbackCampaignActivationCheck> checks;
-    private List<String> blockingIssues;
-    private List<String> warnings;
+    @Builder.Default
+    private List<FeedbackCampaignActivationCheck> checks = List.of();
+    @Builder.Default
+    private List<String> blockingIssues = List.of();
+    @Builder.Default
+    private List<String> warnings = List.of();
 
     @Data
     @Builder

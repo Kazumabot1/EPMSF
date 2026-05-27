@@ -15,6 +15,8 @@ public class FeedbackCampaignScoringConfigResponse {
     Boolean redistributeMissingRelationshipWeight;
     BigDecimal totalRelationshipWeight;
     Boolean relationshipWeightsReady;
-    List<FeedbackRelationshipWeightResponse> relationshipWeights;
-    List<String> warnings;
+    @Builder.Default
+    List<FeedbackRelationshipWeightResponse> relationshipWeights = List.of();
+    @Builder.Default
+    List<String> warnings = List.of();
 }

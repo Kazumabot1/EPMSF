@@ -23,6 +23,8 @@ public class FeedbackCampaignQuestionGroupResponse {
     private Integer includedQuestionCount;
     private Integer scoredQuestionCount;
     private Integer includedScoredQuestionCount;
-    private List<String> warnings;
-    private List<FeedbackCampaignQuestionItemResponse> questions;
+    @Builder.Default
+    private List<String> warnings = List.of();
+    @Builder.Default
+    private List<FeedbackCampaignQuestionItemResponse> questions = List.of();
 }

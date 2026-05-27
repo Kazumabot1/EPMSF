@@ -24,8 +24,11 @@ public class FeedbackCampaignQuestionItemResponse {
     private Boolean required;
     private Boolean included;
     private Double weight;
+    @Deprecated
     private String sectionCode;
+    @Deprecated
     private String sectionTitle;
+    @Deprecated
     private Integer sectionOrder;
     private Integer displayOrder;
 }

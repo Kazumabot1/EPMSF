@@ -11,5 +11,6 @@ public class FeedbackTeamSummaryResponse {
     Long managerUserId;
     Integer totalDirectReports;
     Integer totalClosedResults;
-    List<FeedbackResultItemResponse> items;
+    @Builder.Default
+    List<FeedbackResultItemResponse> items = List.of();
 }

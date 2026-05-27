@@ -15,8 +15,12 @@ public class FeedbackDashboardResponse {
     private Long totalResponses;
     private Long totalPendingAssignments;
     private Double averageScore;
-    private List<FeedbackSubmissionStatusResponse> pendingFeedbackToSubmit;
-    private List<FeedbackReceivedItemResponse> ownFeedbackResults;
-    private List<TeamFeedbackSummaryResponse> teamFeedbackSummary;
-    private List<CampaignDashboardItemResponse> campaigns;
+    @Builder.Default
+    private List<FeedbackSubmissionStatusResponse> pendingFeedbackToSubmit = List.of();
+    @Builder.Default
+    private List<FeedbackReceivedItemResponse> ownFeedbackResults = List.of();
+    @Builder.Default
+    private List<TeamFeedbackSummaryResponse> teamFeedbackSummary = List.of();
+    @Builder.Default
+    private List<CampaignDashboardItemResponse> campaigns = List.of();
 }

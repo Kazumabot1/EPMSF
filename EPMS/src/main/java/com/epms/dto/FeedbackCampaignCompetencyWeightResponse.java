@@ -20,10 +20,14 @@ public class FeedbackCampaignCompetencyWeightResponse {
     private Integer questionCountPerForm;
     private Boolean questionCountVariesByForm;
     private Integer formCount;
-    private List<String> usedInForms;
-    private Map<String, Integer> includedScoredQuestionCountByForm;
+    @Deprecated
+    @Builder.Default
+    private List<String> usedInForms = List.of();
+    @Builder.Default
+    private Map<String, Integer> includedScoredQuestionCountByForm = Map.of();
     private Double defaultWeightPercent;
     private Double weightPercent;
     private Boolean saved;
-    private List<String> warnings;
+    @Builder.Default
+    private List<String> warnings = List.of();
 }
