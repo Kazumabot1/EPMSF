@@ -31,12 +31,27 @@ const normalizeRoleName = (role?: string | null) =>
     .replace(/[\s-]+/g, '_')
     .toUpperCase();
 
+const readPermission = (permissions: PositionPermission, key: string) => {
+  const raw = permissions as unknown as Record<string, unknown>;
+
+  return Boolean(raw[key]);
+};
+
 const allow = (permissions: PositionPermission, key: keyof PositionPermission) => {
   switch (key) {
     case 'teamPermission':
     case 'teamView':
     case 'teamHistory':
-      return Boolean(permissions.teamPermission);
+      return (
+        readPermission(permissions, 'teamPermission') ||
+        readPermission(permissions, 'teamView') ||
+        readPermission(permissions, 'teamCreate') ||
+        readPermission(permissions, 'teamHistory') ||
+        readPermission(permissions, 'team_permission') ||
+        readPermission(permissions, 'team_view') ||
+        readPermission(permissions, 'team_create') ||
+        readPermission(permissions, 'team_history')
+      );
 
     case 'departmentCrud':
     case 'departmentComparisonView':
@@ -51,7 +66,7 @@ const allow = (permissions: PositionPermission, key: keyof PositionPermission) =
     case 'appraisalPermission':
       return Boolean(permissions.appraisalPermission);
 
-   case 'continuousFeedbackView':
+    case 'continuousFeedbackView':
     case 'continuousFeedbackGive':
       return Boolean(permissions.continuousFeedbackView);
 
@@ -173,7 +188,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
       ? [
-          { to: '/pip/create', label: 'Create', icon: 'bi bi-plus-square' },
+          { to: '/pip/create', label: 'Create PIP', icon: 'bi bi-plus-square' },
           { to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' },
         ]
       : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
@@ -223,12 +238,20 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-columns-gap',
         end: true,
       },
+
       allow(positionPermissions, 'employeeCrud') && {
         to: '/hr/employee',
         label: 'Employee',
         icon: 'bi bi-people',
         end: true,
       },
+
+   allow(positionPermissions, 'employeeCrud') && {
+      to: '/hr/workforce-changes',
+      label: 'Workforce Changes',
+      icon: 'bi bi-arrow-left-right',
+      end: true,
+    },
     ]);
 
     const hrNavItems: NavItem[] = compactItems([
@@ -371,8 +394,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
           { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
-          // { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
-          // { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
           { to: '/hr/feedback/audit', label: 'Audit Log', icon: 'bi bi-shield-check' },
@@ -482,353 +503,346 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/employee/notifications', label: 'Notifications', icon: 'bi bi-bell' },
     ];
 
-const managerNavItems: NavItem[] = compactItems([
-  {
-    to: '/manager/dashboard',
-    label: 'Manager Dashboard',
-    icon: 'bi bi-grid-1x2',
-  },
-  {
-    to: '/profile',
-    label: 'Profile',
-    icon: 'bi bi-person',
-  },
-  {
-    to: '/manager/self-assessment',
-    label: 'My Self-Assessment',
-    icon: 'bi bi-pencil-square',
-  },
-  {
-    to: '/manager/assessment-review',
-    label: 'Assessment Review',
-    icon: 'bi bi-clipboard-check',
-  },
-  {
-    to: '/manager/kpi-scoring',
-    label: 'Team KPIs',
-    icon: 'bi bi-bullseye',
-    children: [
+    const managerNavItems: NavItem[] = compactItems([
+      {
+        to: '/manager/dashboard',
+        label: 'Manager Dashboard',
+        icon: 'bi bi-grid-1x2',
+      },
+      {
+        to: '/profile',
+        label: 'Profile',
+        icon: 'bi bi-person',
+      },
+      {
+        to: '/manager/self-assessment',
+        label: 'My Self-Assessment',
+        icon: 'bi bi-pencil-square',
+      },
+      {
+        to: '/manager/assessment-review',
+        label: 'Assessment Review',
+        icon: 'bi bi-clipboard-check',
+      },
       {
         to: '/manager/kpi-scoring',
-        label: 'KPI Scoring',
-        icon: 'bi bi-clipboard2-check',
-        end: true,
+        label: 'Team KPIs',
+        icon: 'bi bi-bullseye',
+        children: [
+          {
+            to: '/manager/kpi-scoring',
+            label: 'KPI Scoring',
+            icon: 'bi bi-clipboard2-check',
+            end: true,
+          },
+          {
+            to: '/manager/kpi/history',
+            label: 'KPI History',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
-      {
-        to: '/manager/kpi/history',
-        label: 'KPI History',
-        icon: 'bi bi-clock-history',
-      },
-    ],
-  },
 
-  allow(positionPermissions, 'appraisalPermission') && {
-    to: '/manager/appraisals',
-    label: 'Appraisal Review',
-    icon: 'bi bi-clipboard-data',
-    children: [
-      {
+      allow(positionPermissions, 'appraisalPermission') && {
         to: '/manager/appraisals',
-        label: 'Review Forms',
-        icon: 'bi bi-ui-checks',
-        end: true,
+        label: 'Appraisal Review',
+        icon: 'bi bi-clipboard-data',
+        children: [
+          {
+            to: '/manager/appraisals',
+            label: 'Review Forms',
+            icon: 'bi bi-ui-checks',
+            end: true,
+          },
+          {
+            to: '/manager/appraisals/history',
+            label: 'Review History',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
+
       {
-        to: '/manager/appraisals/history',
-        label: 'Review History',
-        icon: 'bi bi-clock-history',
+        to: '/manager/feedback',
+        label: '360 Feedback',
+        icon: 'bi bi-chat-square-dots',
       },
-    ],
-  },
 
-{
-  to: '/manager/feedback',
-  label: '360 Feedback',
-  icon: 'bi bi-chat-square-dots',
-},
+      allow(positionPermissions, 'continuousFeedbackView') && {
+        to: '/continuous-feedback',
+        label: 'Continuous Feedback',
+        icon: 'bi bi-chat-dots',
+      },
 
-  allow(positionPermissions, 'continuousFeedbackView') && {
-    to: '/continuous-feedback',
-    label: 'Continuous Feedback',
-    icon: 'bi bi-chat-dots',
-  },
-
-  allow(positionPermissions, 'oneOnOnePermission') && {
-    to: '/one-on-one-meetings',
-    label: 'One-on-One',
-    icon: 'bi bi-chat-left-text',
-    children: [
-      {
+      allow(positionPermissions, 'oneOnOnePermission') && {
         to: '/one-on-one-meetings',
-        label: '1:1 Meetings',
-        icon: 'bi bi-chat-dots',
+        label: 'One-on-One',
+        icon: 'bi bi-chat-left-text',
+        children: [
+          {
+            to: '/one-on-one-meetings',
+            label: '1:1 Meetings',
+            icon: 'bi bi-chat-dots',
+          },
+          {
+            to: '/one-on-one-action-items',
+            label: 'Action Items',
+            icon: 'bi bi-list-check',
+          },
+        ],
       },
-      {
-        to: '/one-on-one-action-items',
-        label: 'Action Items',
-        icon: 'bi bi-list-check',
-      },
-    ],
-  },
 
-  allow(positionPermissions, 'pipViewAll') && {
-    to: '/pip',
-    label: 'PIP',
-    icon: 'bi bi-clipboard2-pulse',
-    children: [
-      {
-        to: '/pip/create',
-        label: 'Create PIP',
-        icon: 'bi bi-plus-square',
-      },
-      {
-        to: '/pip/past-plans',
-        label: 'Past Plans',
-        icon: 'bi bi-clock-history',
-      },
-    ],
-  },
-
-  {
-    to: '/manager/reports',
-    label: 'Reports',
-    icon: 'bi bi-file-earmark-bar-graph',
-    children: [
-      {
-        to: '/manager/reports/performance',
-        label: 'Performance Reports',
-        icon: 'bi bi-file-earmark-bar-graph',
-      },
-      {
-        to: '/manager/reports/pip-status',
-        label: 'PIP Status',
+      allow(positionPermissions, 'pipViewAll') && {
+        to: '/pip',
+        label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
+        children: [
+          {
+            to: '/pip/create',
+            label: 'Create PIP',
+            icon: 'bi bi-plus-square',
+          },
+          {
+            to: '/pip/past-plans',
+            label: 'Past Plans',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
-      {
-        to: '/manager/reports/feedback-completion',
-        label: 'Feedback Completion',
-        icon: 'bi bi-chat-dots',
-      },
-      {
-        to: '/manager/reports/recommendations',
-        label: 'Recommendations',
-        icon: 'bi bi-stars',
-      },
-    ],
-  },
 
-  {
-    to: '/notifications',
-    label: 'Notifications',
-    icon: 'bi bi-bell',
-    children: [
+      {
+        to: '/manager/reports',
+        label: 'Reports',
+        icon: 'bi bi-file-earmark-bar-graph',
+        children: [
+          {
+            to: '/manager/reports/performance',
+            label: 'Performance Reports',
+            icon: 'bi bi-file-earmark-bar-graph',
+          },
+          {
+            to: '/manager/reports/pip-status',
+            label: 'PIP Status',
+            icon: 'bi bi-clipboard2-pulse',
+          },
+          {
+            to: '/manager/reports/feedback-completion',
+            label: 'Feedback Completion',
+            icon: 'bi bi-chat-dots',
+          },
+          {
+            to: '/manager/reports/recommendations',
+            label: 'Recommendations',
+            icon: 'bi bi-stars',
+          },
+        ],
+      },
+
       {
         to: '/notifications',
-        label: 'System Notification',
+        label: 'Notifications',
         icon: 'bi bi-bell',
+        children: [
+          {
+            to: '/notifications',
+            label: 'System Notification',
+            icon: 'bi bi-bell',
+          },
+        ],
       },
-    ],
-  },
-]);
+    ]);
 
-const departmentHeadNavItems: NavItem[] = compactItems([
-  {
-    to: '/department-head/dashboard',
-    label: 'Department Dashboard',
-    icon: 'bi bi-grid-1x2',
-  },
-  {
-    to: '/profile',
-    label: 'Profile',
-    icon: 'bi bi-person',
-  },
-  {
-    to: '/department-head/self-assessment-forms',
-    label: 'View Self-assessment Form',
-    icon: 'bi bi-eye',
-  },
-  {
-    to: '/department-head/assessment-scores',
-    label: 'Assessment Review',
-    icon: 'bi bi-clipboard-data',
-  },
-
-  allow(positionPermissions, 'continuousFeedbackView') && {
-    to: '/continuous-feedback',
-    label: 'Continuous Feedback',
-    icon: 'bi bi-chat-dots',
-  },
-
-{
-  to: '/department-head/feedback',
-  label: '360 Feedback',
-  icon: 'bi bi-chat-square-dots',
-},
-
-  allow(positionPermissions, 'departmentKpiPermission') && {
-    to: '/department-head/department-kpis',
-    label: 'Department KPIs',
-    icon: 'bi bi-building-check',
-  },
-
-  allow(positionPermissions, 'teamPermission') && {
-    to: '/department-head/teams',
-    label: 'Teams',
-    icon: 'bi bi-people-fill',
-    children: [
+    const departmentHeadNavItems: NavItem[] = compactItems([
       {
-        to: '/department-head/teams',
-        label: 'View Teams',
+        to: '/department-head/dashboard',
+        label: 'Department Dashboard',
+        icon: 'bi bi-grid-1x2',
+      },
+      {
+        to: '/profile',
+        label: 'Profile',
+        icon: 'bi bi-person',
+      },
+      {
+        to: '/department-head/self-assessment-forms',
+        label: 'View Self-assessment Form',
         icon: 'bi bi-eye',
-        end: true,
       },
       {
-        to: '/department-head/teams/create',
-        label: 'Create Team',
-        icon: 'bi bi-plus-square',
-      },
-      {
-        to: '/department-head/team-history',
-        label: 'Team History',
-        icon: 'bi bi-clock-history',
-      },
-    ],
-  },
-
-  {
-    to: '/department-head/reports',
-    label: 'Reports',
-    icon: 'bi bi-file-earmark-bar-graph',
-    children: [
-      {
-        to: '/department-head/reports/performance',
-        label: 'Performance Reports',
-        icon: 'bi bi-file-earmark-bar-graph',
-      },
-      {
-        to: '/department-head/reports/department-performance',
-        label: 'Department Performance',
-        icon: 'bi bi-graph-up-arrow',
-      },
-      {
-        to: '/department-head/reports/assessment-scores',
-        label: 'Assessment Scores',
+        to: '/department-head/assessment-scores',
+        label: 'Assessment Review',
         icon: 'bi bi-clipboard-data',
       },
-      {
-        to: '/department-head/reports/pip-status',
-        label: 'PIP Status',
-        icon: 'bi bi-clipboard2-pulse',
-      },
-      {
-        to: '/department-head/reports/feedback-completion',
-        label: 'Feedback Completion',
+
+      allow(positionPermissions, 'continuousFeedbackView') && {
+        to: '/continuous-feedback',
+        label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
-      {
-        to: '/department-head/reports/recommendations',
-        label: 'Recommendations',
-        icon: 'bi bi-stars',
-      },
-    ],
-  },
 
-  allow(positionPermissions, 'appraisalPermission') && {
-    to: '/department-head/appraisals/review',
-    label: 'Appraisals',
-    icon: 'bi bi-clipboard-check',
-    children: [
       {
+        to: '/department-head/feedback',
+        label: '360 Feedback',
+        icon: 'bi bi-chat-square-dots',
+      },
+
+      allow(positionPermissions, 'departmentKpiPermission') && {
+        to: '/department-head/department-kpis',
+        label: 'Department KPIs',
+        icon: 'bi bi-building-check',
+      },
+
+      allow(positionPermissions, 'teamPermission') && {
+        to: '/department-head/teams',
+        label: 'Teams',
+        icon: 'bi bi-people-fill',
+        children: [
+          {
+            to: '/department-head/teams',
+            label: 'View Teams',
+            icon: 'bi bi-eye',
+            end: true,
+          },
+          {
+            to: '/department-head/teams/create',
+            label: 'Create Team',
+            icon: 'bi bi-plus-square',
+          },
+          {
+            to: '/department-head/team-history',
+            label: 'Team History',
+            icon: 'bi bi-clock-history',
+          },
+        ],
+      },
+
+      {
+        to: '/department-head/reports',
+        label: 'Reports',
+        icon: 'bi bi-file-earmark-bar-graph',
+        children: [
+          {
+            to: '/department-head/reports/performance',
+            label: 'Performance Reports',
+            icon: 'bi bi-file-earmark-bar-graph',
+          },
+          {
+            to: '/department-head/reports/department-performance',
+            label: 'Department Performance',
+            icon: 'bi bi-graph-up-arrow',
+          },
+          {
+            to: '/department-head/reports/assessment-scores',
+            label: 'Assessment Scores',
+            icon: 'bi bi-clipboard-data',
+          },
+          {
+            to: '/department-head/reports/pip-status',
+            label: 'PIP Status',
+            icon: 'bi bi-clipboard2-pulse',
+          },
+          {
+            to: '/department-head/reports/feedback-completion',
+            label: 'Feedback Completion',
+            icon: 'bi bi-chat-dots',
+          },
+          {
+            to: '/department-head/reports/recommendations',
+            label: 'Recommendations',
+            icon: 'bi bi-stars',
+          },
+        ],
+      },
+
+      allow(positionPermissions, 'appraisalPermission') && {
         to: '/department-head/appraisals/review',
-        label: 'Review Check',
-        icon: 'bi bi-shield-check',
-        end: true,
+        label: 'Appraisals',
+        icon: 'bi bi-clipboard-check',
+        children: [
+          {
+            to: '/department-head/appraisals/review',
+            label: 'Review Check',
+            icon: 'bi bi-shield-check',
+            end: true,
+          },
+          {
+            to: '/department-head/appraisals/history',
+            label: 'Review History',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
-      {
-        to: '/department-head/appraisals/history',
-        label: 'Review History',
-        icon: 'bi bi-clock-history',
-      },
-    ],
-  },
 
-  allow(positionPermissions, 'oneOnOnePermission') && {
-    to: '/one-on-one-meetings',
-    label: 'One-on-One',
-    icon: 'bi bi-chat-left-text',
-    children: [
-      {
+      allow(positionPermissions, 'oneOnOnePermission') && {
         to: '/one-on-one-meetings',
-        label: '1:1 Meetings',
-        icon: 'bi bi-chat-dots',
+        label: 'One-on-One',
+        icon: 'bi bi-chat-left-text',
+        children: [
+          {
+            to: '/one-on-one-meetings',
+            label: '1:1 Meetings',
+            icon: 'bi bi-chat-dots',
+          },
+          {
+            to: '/one-on-one-action-items',
+            label: 'Action Items',
+            icon: 'bi bi-list-check',
+          },
+        ],
       },
-      {
-        to: '/one-on-one-action-items',
-        label: 'Action Items',
-        icon: 'bi bi-list-check',
-      },
-    ],
-  },
 
-  {
-    to: '/notifications',
-    label: 'Notifications',
-    icon: 'bi bi-bell',
-    children: [
       {
         to: '/notifications',
-        label: 'System Notification',
+        label: 'Notifications',
         icon: 'bi bi-bell',
+        children: [
+          {
+            to: '/notifications',
+            label: 'System Notification',
+            icon: 'bi bi-bell',
+          },
+        ],
       },
-    ],
-  },
 
-  allow(positionPermissions, 'pipViewAll') && {
-    to: '/pip',
-    label: 'PIP',
-    icon: 'bi bi-clipboard2-pulse',
-    children: [
-      {
-        to: '/pip/create',
-        label: 'Create PIP',
-        icon: 'bi bi-plus-square',
+      allow(positionPermissions, 'pipViewAll') && {
+        to: '/pip',
+        label: 'PIP',
+        icon: 'bi bi-clipboard2-pulse',
+        children: [
+          {
+            to: '/pip/create',
+            label: 'Create PIP',
+            icon: 'bi bi-plus-square',
+          },
+          {
+            to: '/pip/past-plans',
+            label: 'Past Plans',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
-      {
-        to: '/pip/past-plans',
-        label: 'Past Plans',
-        icon: 'bi bi-clock-history',
-      },
-    ],
-  },
-]);
+    ]);
 
-if (variant === 'admin') return adminNavItems;
-if (variant === 'hr') return hrNavItems;
-if (isAdmin) return adminNavItems;
-if (isHr) return hrNavItems;
-if (isDepartmentHead) return departmentHeadNavItems;
-if (isManager) return managerNavItems;
-if (isEmployee) return employeeNavItems;
-  if (variant === 'admin') return adminNavItems;
-  if (variant === 'hr') return hrNavItems;
-  if (isAdmin) return adminNavItems;
-  if (isHr) return hrNavItems;
-  if (isDepartmentHead) return departmentHeadNavItems;
-  if (isExecutive) return executiveNavItems;
-  if (isEmployee) return employeeNavItems;
+    if (variant === 'admin') return adminNavItems;
+    if (variant === 'hr') return hrNavItems;
+    if (isAdmin) return adminNavItems;
+    if (isHr) return hrNavItems;
+    if (isDepartmentHead) return departmentHeadNavItems;
+    if (isManager) return managerNavItems;
+    if (isEmployee) return employeeNavItems;
 
-    return hrNavItems;
+    return employeeNavItems;
   }, [
     variant,
     isAdmin,
     isHr,
     isDepartmentHead,
+    isManager,
     isEmployee,
     canCreatePip,
     positionPermissions,
   ]);
 
-}, [variant, isAdmin, isHr, isDepartmentHead, isExecutive, isEmployee, canCreatePip]);
   const loadUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/notifications/unread-count');
@@ -925,45 +939,46 @@ if (isEmployee) return employeeNavItems;
   const renderSubmenuItem = (child: NavItem, depth = 0) => {
     const childExpanded = expanded.has(child.to);
     const childActive = child.end
-        ? location.pathname === child.to
-        : location.pathname === child.to || location.pathname.startsWith(`${child.to}/`) || hasActiveChild(child);
+      ? location.pathname === child.to
+      : location.pathname === child.to ||
+        location.pathname.startsWith(`${child.to}/`) ||
+        hasActiveChild(child);
 
     if (child.children?.length) {
       return (
-          <div key={child.to} className="hr-submenu-group">
-            <button
-                type="button"
-                className={`hr-submenu-link hr-submenu-toggle ${childActive ? 'active' : ''}`}
-                style={{ marginLeft: depth * 12 }}
-                onClick={() => toggleParent(child)}
-            >
-              <i className={child.icon} />
-              <span>{child.label}</span>
-              <i className={`bi ${childExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} hr-submenu-caret`} />
-            </button>
-            {childExpanded && (
-                <div className="hr-submenu hr-submenu-nested">
-                  {child.children.map((grandchild) => renderSubmenuItem(grandchild, depth + 1))}
-                </div>
-            )}
-          </div>
+        <div key={child.to} className="hr-submenu-group">
+          <button
+            type="button"
+            className={`hr-submenu-link hr-submenu-toggle ${childActive ? 'active' : ''}`}
+            style={{ marginLeft: depth * 12 }}
+            onClick={() => toggleParent(child)}
+          >
+            <i className={child.icon} />
+            <span>{child.label}</span>
+            <i className={`bi ${childExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} hr-submenu-caret`} />
+          </button>
+
+          {childExpanded && (
+            <div className="hr-submenu hr-submenu-nested">
+              {child.children.map((grandchild) => renderSubmenuItem(grandchild, depth + 1))}
+            </div>
+          )}
+        </div>
       );
     }
 
     return (
-        <NavLink
-            key={child.to}
-            to={child.to}
-            end={child.end}
-            className={({ isActive }) =>
-                `hr-submenu-link ${isActive ? 'active' : ''}`
-            }
-            style={{ marginLeft: depth * 12 }}
-        >
-          <i className={child.icon} />
-          <span>{child.label}</span>
-          {child.to.includes('notifications') && notificationBadge}
-        </NavLink>
+      <NavLink
+        key={child.to}
+        to={child.to}
+        end={child.end}
+        className={({ isActive }) => `hr-submenu-link ${isActive ? 'active' : ''}`}
+        style={{ marginLeft: depth * 12 }}
+      >
+        <i className={child.icon} />
+        <span>{child.label}</span>
+        {child.to.includes('notifications') && notificationBadge}
+      </NavLink>
     );
   };
 
@@ -1026,45 +1041,27 @@ if (isEmployee) return employeeNavItems;
                   <>
                     <span>{item.label}</span>
                     {item.to.includes('notifications') && notificationBadge}
-<i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} hr-submenu-caret`} />                  </>
+                    <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} hr-submenu-caret`} />
+                  </>
                 )}
               </button>
 
               {!collapsed && isExpanded && (
-               <div className="hr-submenu">
-                  {item.children.map((child) => (
-                    <NavLink
-                      key={child.to}
-                      to={child.to}
-                      end={child.end}
-className={({ isActive }) => `hr-submenu-link ${isActive ? 'active' : ''}`}
-                    >
-                      <i className={child.icon} />
-                      <span>{child.label}</span>
-                    </NavLink>
-                  ))}
+                <div className="hr-submenu">
+                  {item.children.map((child) => renderSubmenuItem(child))}
                 </div>
               )}
             </div>
           );
         })}
       </nav>
-                  {!collapsed && isExpanded && (
-                      <div className="hr-submenu">
-                        {item.children.map((child) => renderSubmenuItem(child))}
-                      </div>
-                  )}
-                </div>
-            );
-          })}
-        </nav>
 
-             <div className="hr-sidebar-footer">
-               <button type="button" className="hr-sidebar-collapse" onClick={onToggle}>
-                 <i className={`bi bi-chevron-${collapsed ? 'right' : 'left'}`} />
-                 {!collapsed && <span>Collapse</span>}
-               </button>
-             </div>
+      <div className="hr-sidebar-footer">
+        <button type="button" className="hr-sidebar-collapse" onClick={onToggle}>
+          <i className={`bi bi-chevron-${collapsed ? 'right' : 'left'}`} />
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </div>
     </aside>
   );
 };

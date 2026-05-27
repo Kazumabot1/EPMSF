@@ -26,6 +26,11 @@ public interface EmployeeAssessmentRepository extends JpaRepository<EmployeeAsse
             AssessmentStatus status
     );
 
+    boolean existsByEmployeeIdAndStatusIn(
+            Integer employeeId,
+            Collection<AssessmentStatus> statuses
+    );
+
     Optional<EmployeeAssessment> findFirstByUserIdAndAssessmentFormIdAndStatusOrderByUpdatedAtDesc(
             Integer userId,
             Integer assessmentFormId,

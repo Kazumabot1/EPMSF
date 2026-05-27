@@ -23,6 +23,8 @@ import EmployeeRoutePlaceholder from './pages/employee/EmployeeRoutePlaceholder'
 import EmployeeKpiResultsPage from './pages/employee/EmployeeKpiResultsPage';
 import EmployeeSelfAssessmentPage from './pages/employee/EmployeeSelfAssessmentPage';
 import EmployeeAssessmentScoresPage from './pages/employee/EmployeeAssessmentScoresPage';
+import EmployeeChangeCenterPage from './pages/hr/employee-change/EmployeeChangeCenterPage';
+import EmployeeChangeApprovalPage from './pages/ceo/EmployeeChangeApprovalPage';
 
 import TeamManagement from './pages/team/TeamManagement';
 import MyTeamPage from './pages/team/MyTeamPage';
@@ -246,6 +248,9 @@ function App() {
               <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
               <Route path="/executive/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
               <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/approval/department-kpi" replace />} />
+             <Route path="/executive/approval/changes" element={<EmployeeChangeApprovalPage />} />
+<Route path="/ceo/approval/changes" element={<Navigate to="/executive/approval/changes" replace />} />
+
               <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />
               <Route path="/executive/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />
@@ -315,6 +320,8 @@ function App() {
       <Route path="/hr/employee" element={<EmployeeManagement />} />
       <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
       <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
+      <Route path="/hr/workforce-changes" element={<EmployeeChangeCenterPage />} />
+
     </Route>
 
     <Route element={<PositionPermissionRoute permission="teamPermission" fallbackPath="/dashboard" />}>

@@ -11,6 +11,20 @@ import java.util.List;
 
 public interface EmployeeDepartmentRepository extends JpaRepository<EmployeeDepartment, Integer> {
 
+
+    @Query("""
+    SELECT ed
+    FROM EmployeeDepartment ed
+    LEFT JOIN FETCH ed.currentDepartment cd
+    LEFT JOIN FETCH ed.parentDepartment pd
+    WHERE ed.employee.id = :employeeId
+    ORDER BY ed.startdate DESC, ed.id DESC
+    """)
+    List<EmployeeDepartment> findHistoryByEmployeeId(
+            @Param("employeeId") Integer employeeId
+    );
+
+
     @Query("""
         SELECT ed
         FROM EmployeeDepartment ed

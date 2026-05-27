@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -46,6 +47,24 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Integer>
             "memberUser.position"
     })
     List<TeamMember> findByMemberUserIdAndEndedDateIsNull(Integer userId);
+
+    @EntityGraph(attributePaths = {
+            "team",
+            "team.department",
+            "team.teamLeader",
+            "team.projectManager",
+            "memberUser",
+            "memberUser.position"
+    })
+    @Query("""
+    SELECT tm
+    FROM TeamMember tm
+    JOIN tm.team t
+    WHERE tm.memberUser.id = :userId
+      AND tm.endedDate IS NULL
+      AND LOWER(t.status) = 'active'
+    """)
+    List<TeamMember> findActiveMembershipsByMemberUserId(@Param("userId") Integer userId);
 
     @EntityGraph(attributePaths = {"team", "team.department", "memberUser", "memberUser.position"})
     @Query("""
