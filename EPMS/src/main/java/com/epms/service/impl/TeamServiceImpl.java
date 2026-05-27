@@ -26,6 +26,7 @@ import com.epms.security.SecurityUtils;
 import com.epms.service.NotificationService;
 import com.epms.service.PositionPermissionService;
 import com.epms.service.TeamService;
+import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,7 @@ public class TeamServiceImpl implements TeamService {
     private final UserRoleRepository userRoleRepository;
     private final RoleRepository roleRepository;
     private final PositionPermissionService positionPermissionService;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional(readOnly = true)
@@ -1152,6 +1154,31 @@ public class TeamServiceImpl implements TeamService {
         history.setChangedAt(new Date());
 
         teamHistoryRepository.save(history);
+        auditLogService.log(
+                changedBy == null ? null : changedBy.getId(),
+                auditActionFromTeamHistory(actionType),
+                "TEAM",
+                team == null ? null : team.getId(),
+                fieldName,
+                oldValue,
+                newValue,
+                reason
+        );
+    }
+
+    private String auditActionFromTeamHistory(String actionType) {
+        if (actionType == null) {
+            return "UPDATE";
+        }
+
+        String normalized = actionType.trim().toUpperCase(Locale.ROOT);
+        if (normalized.contains("CREATED")) {
+            return "CREATE";
+        }
+        if (normalized.contains("DEACTIVATED") || normalized.contains("INACTIVE")) {
+            return "DEACTIVATE";
+        }
+        return "UPDATE";
     }
 
     private void sendTeamNotification(

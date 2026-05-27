@@ -88,6 +88,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
+    { label: 'Audit Logs', path: '/admin/audit-logs', icon: 'bi-clock-history' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Access Control',

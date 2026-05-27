@@ -17,6 +17,8 @@ import com.epms.repository.PositionRepository;
 import com.epms.repository.RoleRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
+import com.epms.security.SecurityUtils;
+import com.epms.service.AuditLogService;
 import com.epms.service.PositionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,7 @@ public class PositionServiceImpl implements PositionService {
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final TeamRepository teamRepository;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -62,7 +65,9 @@ public class PositionServiceImpl implements PositionService {
         position.setStatus(request.getStatus() == null || Boolean.TRUE.equals(request.getStatus()));
         position.setCreatedBy(cleanRequired(request.getCreatedBy(), "Created by"));
 
-        return toResponse(positionRepository.save(position));
+        Position saved = positionRepository.save(position);
+        auditLogService.log(currentUserId(), "CREATE", "POSITION", saved.getId(), null, null, "title: " + saved.getPositionTitle(), null);
+        return toResponse(saved);
     }
 
     @Override
@@ -159,13 +164,35 @@ public class PositionServiceImpl implements PositionService {
             throw new RuntimeException("Dashboard role is required. Every position must connect to a dashboard role.");
         }
 
+        String oldTitle = position.getPositionTitle();
+        String oldDescription = position.getDescription();
+        String oldStatus = String.valueOf(Boolean.TRUE.equals(position.getStatus()));
         position.setPositionTitle(cleanRequired(request.getPositionTitle(), "Position title"));
         position.setLevel(level);
         position.setRole(role);
         position.setDescription(cleanNullable(request.getDescription()));
         position.setStatus(request.getStatus() == null || Boolean.TRUE.equals(request.getStatus()));
 
-        return toResponse(positionRepository.save(position));
+        Position saved = positionRepository.save(position);
+        String reason = cleanNullable(request.getReason());
+        auditIfChanged(saved.getId(), "positionTitle", oldTitle, saved.getPositionTitle(), reason);
+        auditIfChanged(saved.getId(), "description", oldDescription, saved.getDescription(), reason);
+        auditIfChanged(saved.getId(), "status", oldStatus, String.valueOf(Boolean.TRUE.equals(saved.getStatus())), reason);
+        return toResponse(saved);
+    }
+
+    private void auditIfChanged(Integer positionId, String field, String oldValue, String newValue, String reason) {
+        if (!Objects.equals(oldValue == null ? "" : oldValue, newValue == null ? "" : newValue)) {
+            auditLogService.log(currentUserId(), "UPDATE", "POSITION", positionId, field, oldValue, newValue, reason);
+        }
+    }
+
+    private Integer currentUserId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private PositionResponseDto toResponse(Position position) {

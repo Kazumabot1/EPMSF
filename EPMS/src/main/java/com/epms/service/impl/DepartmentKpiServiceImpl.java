@@ -11,6 +11,7 @@ import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.*;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
+import com.epms.service.AuditLogService;
 import com.epms.service.DepartmentKpiService;
 import com.epms.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final Clock clock;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -61,6 +63,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         applyTemplateRows(template, request.getItems());
         applyTemplateDepartments(template, request.getDepartmentIds());
         DepartmentKpiTemplate saved = templateRepository.saveAndFlush(template);
+        audit(user.getId(), "CREATE", "DEPARTMENT_KPI_TEMPLATE", saved.getId(), null, null, "title: " + saved.getTitle(), null);
         return getTemplate(saved.getId());
     }
 
@@ -70,6 +73,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         validateTemplateRequest(request);
         DepartmentKpiTemplate template = templateRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI template not found."));
+        String oldTitle = template.getTitle();
         template.setTitle(request.getTitle().trim());
         template.setDurationMonths(request.getDurationMonths());
         template.setStatus(request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus());
@@ -80,6 +84,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         applyTemplateRows(template, request.getItems());
         applyTemplateDepartments(template, request.getDepartmentIds());
         templateRepository.saveAndFlush(template);
+        audit(currentUserId(), "UPDATE", "DEPARTMENT_KPI_TEMPLATE", template.getId(), "title", oldTitle, template.getTitle(), null);
         backfillMissingScores(templateRepository.findDetailById(id).orElse(template));
         return getTemplate(id);
     }
@@ -123,6 +128,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .build();
         applyCycleTemplates(cycle, request.getTemplateIds());
         DepartmentKpiCycle saved = cycleRepository.saveAndFlush(cycle);
+        audit(currentUserId(), "CREATE", "DEPARTMENT_KPI_CYCLE", saved.getId(), null, null, "title: " + saved.getCycleName(), null);
         return getCycle(saved.getId());
     }
 
@@ -139,6 +145,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         }
         Integer durationYears = normalizedDurationYears(request);
         cycle.setLastEditReason(editReason);
+        String oldCycleName = cycle.getCycleName();
         cycle.setCycleName(request.getCycleName().trim());
         cycle.setStartDate(request.getStartDate());
         cycle.setDurationMonths(durationYears * 12);
@@ -149,6 +156,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         cycleRepository.flush();
         applyCycleTemplates(cycle, request.getTemplateIds());
         cycleRepository.saveAndFlush(cycle);
+        audit(currentUserId(), "UPDATE", "DEPARTMENT_KPI_CYCLE", cycle.getId(), "cycleName", oldCycleName, cycle.getCycleName(), editReason);
         return getCycle(id);
     }
 
@@ -325,6 +333,16 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
             score.setEvaluatedAt(LocalDateTime.now());
             score.calculateWeightedScore();
             validateWeightScoreWithinWeight(result, score);
+            audit(
+                    evaluator.getId(),
+                    "SCORE",
+                    "DEPARTMENT_KPI_SCORE",
+                    score.getId(),
+                    "actualValue",
+                    null,
+                    "title: " + resultTitle(result) + " | score: " + score.getScore(),
+                    null
+            );
         }
         result.calculateTotals();
         if (result.getStatus() == DepartmentKpiResultStatus.ASSIGNED) {
@@ -959,6 +977,41 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private User currentUser() {
         return userRepository.findById(SecurityUtils.currentUserId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found."));
+    }
+
+    private Integer currentUserId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String resultTitle(DepartmentKpiResult result) {
+        if (result == null) {
+            return "Department KPI Result";
+        }
+
+        String departmentName = result.getDepartment() == null ? null : result.getDepartment().getDepartmentName();
+        String templateName = result.getTemplate() == null ? null : result.getTemplate().getTitle();
+        return (departmentName == null || departmentName.isBlank() ? "Department" : departmentName)
+                + " - "
+                + (templateName == null || templateName.isBlank() ? "KPI Result" : templateName);
+    }
+
+    private void audit(
+            Integer userId,
+            String action,
+            String entityType,
+            Integer entityId,
+            String changedColumn,
+            String oldValue,
+            String newValue,
+            String reason
+    ) {
+        if (auditLogService != null) {
+            auditLogService.log(userId, action, entityType, entityId, changedColumn, oldValue, newValue, reason);
+        }
     }
 
     private String displayUser(User user) {

@@ -165,7 +165,26 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuditLogController {
 
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of(
+            "TEAM",
+            "DEPARTMENT",
+            "EMPLOYEE",
+            "ASSESSMENT_FORM",
+            "APPRAISAL_TEMPLATE",
+            "APPRAISAL_CYCLE",
+            "ONE_ON_ONE_MEETING",
+            "POSITION_LEVEL",
+            "POSITION",
+            "ROLE",
+            "KPI_TEMPLATE_FORM",
+            "KPI_TEMPLATE_CYCLE",
+            "KPI_UNIT",
+            "KPI_CATEGORY",
+            "KPI_ITEM",
+            "DEPARTMENT_KPI_TEMPLATE",
+            "DEPARTMENT_KPI_CYCLE",
+            "DEPARTMENT_KPI_SCORE"
+    );
     private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
     private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of("APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
 
@@ -311,7 +330,26 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuditLogController {
 
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of(
+            "TEAM",
+            "DEPARTMENT",
+            "EMPLOYEE",
+            "ASSESSMENT_FORM",
+            "APPRAISAL_TEMPLATE",
+            "APPRAISAL_CYCLE",
+            "ONE_ON_ONE_MEETING",
+            "POSITION_LEVEL",
+            "POSITION",
+            "ROLE",
+            "KPI_TEMPLATE_FORM",
+            "KPI_TEMPLATE_CYCLE",
+            "KPI_UNIT",
+            "KPI_CATEGORY",
+            "KPI_ITEM",
+            "DEPARTMENT_KPI_TEMPLATE",
+            "DEPARTMENT_KPI_CYCLE",
+            "DEPARTMENT_KPI_SCORE"
+    );
     private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
     private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of("APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
 
@@ -322,7 +360,10 @@ public class AuditLogController {
     public ResponseEntity<GenericApiResponse<List<AuditLogResponse>>> getAuditLogs(
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) Integer entityId,
-            @RequestParam(required = false) Integer userId
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String actorRole,
+            @RequestParam(required = false) String search
     ) {
         boolean admin = isAdmin();
         boolean hr = isHr();
@@ -346,18 +387,34 @@ public class AuditLogController {
             logs = auditLogService.getRecentForEntityTypes(allowedTypes, effectiveUserId);
         }
 
-        Map<Integer, String> names = userRepository.findAllById(
-                        logs.stream()
-                                .map(AuditLog::getUserId)
-                                .filter(id -> id != null)
-                                .distinct()
-                                .toList()
-                )
-                .stream()
-                .collect(Collectors.toMap(User::getId, this::displayName));
+        List<Integer> actorIds = logs.stream()
+                .map(AuditLog::getUserId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+        Map<Integer, UserRepository.AuditLogEditorProjection> actors = actorIds.isEmpty()
+                ? Map.of()
+                : userRepository
+                        .findAuditLogEditorOptionsByUserIds(actorIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                UserRepository.AuditLogEditorProjection::getUserId,
+                                Function.identity(),
+                                (left, ignored) -> left,
+                                LinkedHashMap::new
+                        ));
+
+        String normalizedAction = normalizeToken(action);
+        String normalizedActorRole = normalizeRole(actorRole);
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim().toLowerCase(Locale.ROOT);
 
         List<AuditLogResponse> response = logs.stream()
-                .map(log -> map(log, names))
+                .map(log -> map(log, actors))
+                .filter(row -> admin || !isAdminOrSystemRole(row.getDashboardRole()))
+                .filter(row -> !admin || isTrackedHumanActor(row.getDashboardRole()))
+                .filter(row -> normalizedAction == null || normalizeToken(row.getAction()).equals(normalizedAction))
+                .filter(row -> normalizedActorRole == null || normalizeRole(row.getDashboardRole()).equals(normalizedActorRole))
+                .filter(row -> normalizedSearch == null || searchableText(row).contains(normalizedSearch))
                 .toList();
 
         return ResponseEntity.ok(GenericApiResponse.success("Audit logs retrieved successfully", response));
@@ -430,23 +487,191 @@ public class AuditLogController {
         return currentUserId;
     }
 
-    private AuditLogResponse map(AuditLog auditLog, Map<Integer, String> names) {
+    private AuditLogResponse map(
+            AuditLog auditLog,
+            Map<Integer, UserRepository.AuditLogEditorProjection> actors
+    ) {
+        UserRepository.AuditLogEditorProjection actor = actors.get(auditLog.getUserId());
+        String changedByName = actor == null
+                ? (auditLog.getUserId() == null ? "System" : "User #" + auditLog.getUserId())
+                : defaultText(actor.getDisplayName(), "User #" + auditLog.getUserId());
+        String roleName = actor == null ? "System" : defaultText(actor.getRoleName(), "User");
+        String titleName = resolveTitleName(auditLog);
+        String summary = buildSummary(auditLog, titleName);
+
         return AuditLogResponse.builder()
                 .id(auditLog.getId())
                 .userId(auditLog.getUserId())
-                .changedByName(names.getOrDefault(
-                        auditLog.getUserId(),
-                        auditLog.getUserId() == null ? "System" : "User #" + auditLog.getUserId()
-                ))
+                .changedByName(changedByName)
+                .dashboardRole(roleName)
                 .action(auditLog.getAction())
                 .entityType(auditLog.getEntityType())
                 .entityId(auditLog.getEntityId())
+                .titleName(titleName)
                 .changedColumn(auditLog.getChangedColumn())
                 .oldValue(auditLog.getOldValue())
                 .newValue(auditLog.getNewValue())
                 .reason(auditLog.getReason())
+                .summary(summary)
+                .targetEmployeeName(extractLabeledValue(auditLog.getNewValue(), "targetEmployee"))
                 .timestamp(auditLog.getTimestamp())
                 .build();
+    }
+
+    private String buildSummary(AuditLog auditLog, String titleName) {
+        String action = prettyAction(auditLog.getAction());
+        String entity = prettyEntity(auditLog.getEntityType());
+        String column = auditLog.getChangedColumn();
+
+        if (column != null && !column.isBlank()) {
+            return action + " " + entity + " \"" + titleName + "\" (" + column + ")";
+        }
+
+        return action + " " + entity + " \"" + titleName + "\"";
+    }
+
+    private String resolveTitleName(AuditLog auditLog) {
+        String explicitTitle = firstPresent(
+                extractLabeledValue(auditLog.getNewValue(), "title"),
+                extractLabeledValue(auditLog.getNewValue(), "name"),
+                extractLabeledValue(auditLog.getNewValue(), "template"),
+                extractLabeledValue(auditLog.getNewValue(), "cycle"),
+                extractLabeledValue(auditLog.getOldValue(), "title"),
+                extractLabeledValue(auditLog.getOldValue(), "name")
+        );
+
+        if (explicitTitle != null) {
+            return explicitTitle;
+        }
+
+        String directValue = firstPresent(auditLog.getNewValue(), auditLog.getOldValue());
+        if (directValue != null && directValue.length() <= 80 && !directValue.contains("|") && !directValue.contains(":")) {
+            return directValue;
+        }
+
+        return prettyEntity(auditLog.getEntityType()) + " #" + auditLog.getEntityId();
+    }
+
+    private String extractLabeledValue(String value, String label) {
+        if (value == null || label == null) {
+            return null;
+        }
+
+        String[] parts = value.split("\\|");
+        for (String part : parts) {
+            int separator = part.indexOf(':');
+            if (separator < 0) {
+                separator = part.indexOf('=');
+            }
+
+            if (separator < 0) {
+                continue;
+            }
+
+            String key = normalizeToken(part.substring(0, separator));
+            if (key != null && key.equals(normalizeToken(label))) {
+                String found = part.substring(separator + 1).trim();
+                return found.isBlank() ? null : found;
+            }
+        }
+
+        return null;
+    }
+
+    private String searchableText(AuditLogResponse row) {
+        return String.join(" ",
+                defaultText(row.getChangedByName(), ""),
+                defaultText(row.getDashboardRole(), ""),
+                defaultText(row.getAction(), ""),
+                defaultText(row.getEntityType(), ""),
+                defaultText(row.getTitleName(), ""),
+                defaultText(row.getSummary(), ""),
+                defaultText(row.getReason(), ""),
+                defaultText(row.getChangedColumn(), ""),
+                defaultText(row.getOldValue(), ""),
+                defaultText(row.getNewValue(), "")
+        ).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isTrackedHumanActor(String roleName) {
+        String role = normalizeRole(roleName);
+        return role.equals("HR")
+                || role.equals("HUMAN_RESOURCE")
+                || role.equals("HUMAN_RESOURCES")
+                || role.equals("HR_MANAGER")
+                || role.equals("HR_ADMIN")
+                || role.equals("MANAGER")
+                || role.equals("PROJECT_MANAGER")
+                || role.equals("TEAM_MANAGER")
+                || role.equals("DEPARTMENT_HEAD")
+                || role.equals("DEPARTMENTHEAD")
+                || role.equals("DEPT_HEAD")
+                || role.equals("HEAD_OF_DEPARTMENT");
+    }
+
+    private boolean isAdminOrSystemRole(String roleName) {
+        String role = normalizeRole(roleName);
+        return role.equals("ADMIN") || role.equals("SYSTEM");
+    }
+
+    private String prettyEntity(String value) {
+        if (value == null || value.isBlank()) {
+            return "Entity";
+        }
+
+        String lower = value.toLowerCase(Locale.ROOT).replace('_', ' ');
+        String[] words = lower.split("\\s+");
+        List<String> pretty = new ArrayList<>();
+        for (String word : words) {
+            if (word.isBlank()) {
+                continue;
+            }
+            if (word.equals("kpi")) {
+                pretty.add("KPI");
+            } else {
+                pretty.add(word.substring(0, 1).toUpperCase(Locale.ROOT) + word.substring(1));
+            }
+        }
+        return String.join(" ", pretty);
+    }
+
+    private String prettyAction(String value) {
+        if (value == null || value.isBlank()) {
+            return "Updated";
+        }
+
+        String normalized = normalizeToken(value);
+        if (normalized == null) {
+            return value;
+        }
+
+        return switch (normalized) {
+            case "UPDATE", "EDIT" -> "Edited";
+            case "CREATE" -> "Created";
+            case "DEACTIVATE" -> "Deactivated";
+            case "ACTIVATE", "ACTIVE" -> "Activated";
+            case "CLOSE" -> "Closed";
+            case "CANCEL" -> "Cancelled";
+            case "SUBMIT" -> "Submitted";
+            case "SCORE", "GRADE" -> "Scored";
+            default -> normalized.substring(0, 1) + normalized.substring(1).toLowerCase(Locale.ROOT);
+        };
+    }
+
+    private String firstPresent(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private String normalizeToken(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().replace('-', '_').replace(' ', '_').toUpperCase(Locale.ROOT);
     }
 
     private String displayName(User user) {
@@ -471,9 +696,11 @@ public class AuditLogController {
     }
 
     private boolean isAdmin() {
-        return SecurityUtils.currentUser().getRoles().stream()
+        boolean hasAdminRole = SecurityUtils.currentUser().getRoles().stream()
                 .map(this::normalizeRole)
                 .anyMatch(role -> role.equals("ADMIN"));
+        String dashboard = normalizeRole(SecurityUtils.currentUser().getDashboard());
+        return hasAdminRole || dashboard.equals("ADMIN_DASHBOARD");
     }
 
     private boolean isHr() {

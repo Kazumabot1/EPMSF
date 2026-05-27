@@ -78,6 +78,7 @@ import FeedbackLayoutPage from './pages/feedback/FeedbackLayoutPage';
 import EmployeeFeedbackDashboardPage from './pages/feedback-evaluator/EmployeeFeedbackDashboardPage';
 import FeedbackFormPage from './pages/feedback-evaluator/FeedbackFormPage';
 import ContinuousFeedbackPage from './pages/continuous-feedback/ContinuousFeedbackPage';
+import AdminAuditLogsPage from './pages/audit/AdminAuditLogsPage';
 
 import EmployeePerformanceReviewPage from './pages/appraisal/EmployeePerformanceReviewPage';
 import AppraisalHistoryListPage from './pages/appraisal/AppraisalHistoryListPage';
@@ -167,6 +168,7 @@ function App() {
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminDashboard />} />
               <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
+              <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
               <Route path="/position-permissions" element={<PositionPermissions />} />
             </Route>
           </Route>

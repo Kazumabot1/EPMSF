@@ -16,6 +16,8 @@ import com.epms.entity.AssessmentFormSectionDefinition;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.AssessmentFormDefinitionRepository;
+import com.epms.security.SecurityUtils;
+import com.epms.service.AuditLogService;
 import com.epms.service.AssessmentFormDefinitionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     private static final String TARGET_ROLE_EMPLOYEE = "Employee";
 
     private final AssessmentFormDefinitionRepository repository;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -70,7 +73,9 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         AssessmentFormDefinition form = new AssessmentFormDefinition();
         applyCreatePayload(form, payload);
 
-        return toResponse(repository.save(form));
+        AssessmentFormDefinition saved = repository.save(form);
+        auditLogService.log(currentUserId(), "CREATE", "ASSESSMENT_FORM", saved.getId(), null, null, "title: " + saved.getFormName(), null);
+        return toResponse(saved);
     }
 
     @Override
@@ -94,14 +99,34 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
             setInactive(form);
         }
 
-        return toResponse(repository.save(form));
+        AssessmentFormDefinition saved = repository.save(form);
+        auditLogService.log(
+                currentUserId(),
+                Boolean.TRUE.equals(payload.getActive()) ? "ACTIVATE" : "DEACTIVATE",
+                "ASSESSMENT_FORM",
+                saved.getId(),
+                "active",
+                null,
+                String.valueOf(Boolean.TRUE.equals(saved.getActive())) + " | title: " + saved.getFormName(),
+                null
+        );
+        return toResponse(saved);
     }
 
     @Override
     public void deactivate(Integer id) {
         AssessmentFormDefinition form = getEntity(id);
         setInactive(form);
-        repository.save(form);
+        AssessmentFormDefinition saved = repository.save(form);
+        auditLogService.log(currentUserId(), "DEACTIVATE", "ASSESSMENT_FORM", saved.getId(), "active", "true", "false | title: " + saved.getFormName(), null);
+    }
+
+    private Integer currentUserId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private void expireEndedActiveForms() {

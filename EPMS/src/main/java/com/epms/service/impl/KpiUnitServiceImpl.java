@@ -6,6 +6,8 @@ import com.epms.entity.KpiUnit;
 import com.epms.exception.DuplicateResourceException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.KpiUnitRepository;
+import com.epms.security.SecurityUtils;
+import com.epms.service.AuditLogService;
 import com.epms.service.KpiUnitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.util.List;
 public class KpiUnitServiceImpl implements KpiUnitService {
 
     private final KpiUnitRepository kpiUnitRepository;
+    private final AuditLogService auditLogService;
 
     @Override
     public KpiUnitResponseDto create(KpiUnitRequestDto dto) {
@@ -30,6 +33,7 @@ public class KpiUnitServiceImpl implements KpiUnitService {
         kpiUnit.setName(normalizedName);
 
         KpiUnit savedKpiUnit = kpiUnitRepository.save(kpiUnit);
+        auditLogService.log(currentUserId(), "CREATE", "KPI_UNIT", savedKpiUnit.getId(), null, null, "name: " + savedKpiUnit.getName(), null);
         return mapToResponseDto(savedKpiUnit);
     }
 
@@ -58,15 +62,26 @@ public class KpiUnitServiceImpl implements KpiUnitService {
                     throw new DuplicateResourceException("KPI unit already exists with name: " + normalizedName);
                 });
 
+        String oldName = existingKpiUnit.getName();
         existingKpiUnit.setName(normalizedName);
         KpiUnit updatedKpiUnit = kpiUnitRepository.save(existingKpiUnit);
+        auditLogService.log(currentUserId(), "UPDATE", "KPI_UNIT", updatedKpiUnit.getId(), "name", oldName, updatedKpiUnit.getName(), null);
         return mapToResponseDto(updatedKpiUnit);
     }
 
     @Override
     public void delete(Integer id) {
         KpiUnit existingKpiUnit = getEntityById(id);
+        auditLogService.log(currentUserId(), "DEACTIVATE", "KPI_UNIT", existingKpiUnit.getId(), "name", existingKpiUnit.getName(), null, null);
         kpiUnitRepository.delete(existingKpiUnit);
+    }
+
+    private Integer currentUserId() {
+        try {
+            return SecurityUtils.currentUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private KpiUnit getEntityById(Integer id) {

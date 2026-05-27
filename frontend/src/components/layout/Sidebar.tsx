@@ -104,6 +104,7 @@ const roleLabel =
     const adminNavItems: NavItem[] = [
       { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
+      { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
