@@ -8,6 +8,7 @@ import com.epms.entity.enums.KpiGraceReason;
 import com.epms.entity.enums.KpiPositionTransitionStatus;
 import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.*;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
@@ -138,8 +139,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         String notifyDetail = buildNotifyDetailPhrase(phraseKind, targetDepartmentIds);
         for (Integer mgrId : aggregated.managerIds()) {
-            notificationService.send(
+            notificationService.sendEvent(
                     mgrId,
+                    NotificationEventKey.KPI_SCORING_REQUESTED,
                     "KPI scoring requested",
                     "HR applied KPI template \"" + form.getTitle() + "\" " + notifyDetail
                             + ". Enter scores for assigned KPI accounts.",
@@ -328,8 +330,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         userRepository.findActiveByEmployeeId(employee.getId()).ifPresent(user -> {
             String cycleName = cycle == null || cycle.getCycleName() == null ? "the active KPI cycle" : cycle.getCycleName();
             String periodText = period == null || period.getPeriodNumber() == null ? "" : " period " + period.getPeriodNumber();
-            notificationService.sendOnce(
+            notificationService.sendEventOnce(
                     user.getId(),
+                    NotificationEventKey.KPI_EMPLOYEE_TARGET_ASSIGNED,
                     "KPI target assigned",
                     "A KPI target from template \"" + form.getTitle() + "\" was assigned to you for " + cycleName + periodText + ".",
                     TYPE_KPI_EMPLOYEE_ASSIGNMENT,
@@ -424,8 +427,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         List<KpiForm> forms = period.getKpiForm() == null
                 ? links.stream()
-                .map(link -> link.getKpiForm())
-                .toList()
+                  .map(link -> link.getKpiForm())
+                  .toList()
                 : List.of(period.getKpiForm());
 
         int created = 0;
@@ -481,8 +484,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 targetDepartmentIds
         );
         for (Integer mgrId : aggregated.managerIds()) {
-            notificationService.send(
+            notificationService.sendEvent(
                     mgrId,
+                    NotificationEventKey.KPI_SCORING_REQUESTED,
                     "KPI scoring requested",
                     "HR activated KPI cycle \"" + cycle.getCycleName() + "\" with template \""
                             + form.getTitle()
@@ -580,6 +584,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         }
         notifyEvaluatorsForAssignments(
                 openAssignments,
+                NotificationEventKey.KPI_CYCLE_WRAP_UP,
                 "KPI cycle ending in 1 week",
                 "The current KPI cycle \"" + cycle.getCycleName()
                         + "\" will officially end in one week. Please finalize actual scores before "
@@ -611,8 +616,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
     private void notifyExecutivesForCycleGrace(KpiTemplateCycle cycle, LocalDateTime graceEnds) {
         for (User executive : activeUsersByRoles(EXECUTIVE_ROLE_NAMES)) {
-            notificationService.sendOnce(
+            notificationService.sendEventOnce(
                     executive.getId(),
+                    NotificationEventKey.KPI_CYCLE_WRAP_UP,
                     "KPI cycle wrapping up",
                     "KPI cycle \"" + cycle.getCycleName()
                             + "\" is being wrapped up. Pending KPI evaluations can continue until "
@@ -789,6 +795,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         notifyEvaluatorsForAssignments(
                 openAssignments,
+                NotificationEventKey.KPI_POSITION_CHANGE_SCORING_REQUIRED,
                 "KPI scoring required before position change closes",
                 "Please compute and submit the scores within 1 week before the cycle closes.",
                 TYPE_KPI_POSITION_CHANGE_GRACE
@@ -894,6 +901,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
     private void notifyEvaluatorsForAssignments(
             List<EmployeeKpiForm> assignments,
+            String eventKey,
             String title,
             String message,
             String type
@@ -905,7 +913,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 assignments.stream().map(EmployeeKpiForm::getId).toList()
         );
         for (Integer evaluatorId : evaluatorIds) {
-            notificationService.sendOnce(evaluatorId, title, message, type);
+            notificationService.sendEventOnce(evaluatorId, eventKey, title, message, type);
         }
     }
 
@@ -1026,7 +1034,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     String rowLabel = item == null
                             ? ("#" + row.getKpiFormItemId())
                             : Optional.ofNullable(item.getKpiItem()).map(KpiItem::getName).filter(s -> !s.isBlank())
-                            .orElse(Optional.ofNullable(item.getKpiLabel()).filter(s -> !s.isBlank()).orElse("#" + item.getId()));
+                              .orElse(Optional.ofNullable(item.getKpiLabel()).filter(s -> !s.isBlank()).orElse("#" + item.getId()));
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "KPI row \"" + rowLabel + "\" has no valid target for (actual/target)×100."
@@ -1343,8 +1351,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     ? ("KPI \"" + form.getTitle() + "\" was finalized after the scoring period ended. Weighted score: " + weighted + ".")
                     : ("Your manager finalized KPI \"" + form.getTitle() + "\". Weighted score: " + weighted + "." + reason);
             userRepository.findActiveByEmployeeId(ekf.getEmployee().getId()).ifPresent(u ->
-                    notificationService.send(
+                    notificationService.sendEvent(
                             u.getId(),
+                            NotificationEventKey.KPI_RESULT_FINALIZED,
                             "KPI results finalized",
                             empDetail,
                             TYPE_KPI_FINALIZED_EMPLOYEE,
@@ -1364,12 +1373,12 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     .collect(Collectors.joining(", "));
             String hrMessage = periodEndAuto
                     ? ("KPI \"" + form.getTitle() + "\" auto-finalized after period end for "
-                    + finalizedThisRun.size() + " employee(s): " + summary + ".")
+                       + finalizedThisRun.size() + " employee(s): " + summary + ".")
                     : ("KPI \"" + form.getTitle() + "\" finalized for "
-                    + finalizedThisRun.size() + " employee(s): " + summary + "."
-                    + firstReasonSummary(finalizedThisRun));
+                       + finalizedThisRun.size() + " employee(s): " + summary + "."
+                       + firstReasonSummary(finalizedThisRun));
             for (User hr : hrUsers) {
-                notificationService.send(hr.getId(), "KPI finalized", hrMessage, TYPE_KPI_FINALIZED_HR, form.getId());
+                notificationService.sendEvent(hr.getId(), NotificationEventKey.KPI_HR_SUMMARY, "KPI finalized", hrMessage, TYPE_KPI_FINALIZED_HR, form.getId());
             }
         }
     }

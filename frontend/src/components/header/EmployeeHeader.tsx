@@ -82,8 +82,8 @@ function formatNotifTime(createdAt: NotifItem['createdAt']) {
 
 function notifIconClass(type?: string | null) {
   const t = String(type ?? '')
-    .trim()
-    .toUpperCase();
+      .trim()
+      .toUpperCase();
 
   if (t === 'GENERAL') return 'bi bi-info-circle';
   if (t === 'MEETING') return 'bi bi-calendar-event';
@@ -96,10 +96,10 @@ function notifIconClass(type?: string | null) {
 }
 
 const EmployeeHeader = ({
-  user,
-  role = 'Employee',
-  collapsed = false,
-}: EmployeeHeaderProps) => {
+                          user,
+                          role = 'Employee',
+                          collapsed = false,
+                        }: EmployeeHeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
@@ -116,6 +116,8 @@ const EmployeeHeader = ({
   const email = user?.email || authUser?.email || '-';
   const roleLabel = displayRoleName(role);
   const notificationsPath = role === 'Employee' ? '/employee/notifications' : '/notifications';
+  const notificationSettingsPath =
+      role === 'Employee' ? '/employee/notification-settings' : '/notification-settings';
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
@@ -260,77 +262,83 @@ const EmployeeHeader = ({
     navigate(notificationsPath);
   };
 
+  const goToNotificationSettings = () => {
+    closeNotif();
+    closeMenu();
+    navigate(notificationSettingsPath);
+  };
+
   return (
-    <header className={`employee-header ${collapsed ? 'collapsed' : ''}`}>
-      <div className="employee-header-search">
-        <i className="bi bi-search" />
-        <input type="text" placeholder="Search employees, KPIs, appraisals..." />
-      </div>
+      <header className={`employee-header ${collapsed ? 'collapsed' : ''}`}>
+        <div className="employee-header-search">
+          <i className="bi bi-search" />
+          <input type="text" placeholder="Search employees, KPIs, appraisals..." />
+        </div>
 
-      <div className="employee-header-actions">
-        <div className="hr-notification-wrap" ref={notifRef}>
-          <button
-            type="button"
-            aria-label="Notifications"
-            className={`hr-icon-button hr-notification-trigger ${notifOpen ? 'is-open' : ''}`}
-            aria-expanded={notifOpen}
-            aria-haspopup="dialog"
-            onClick={() => {
-              setMenuOpen(false);
-              setNotifOpen((prev) => !prev);
-            }}
-          >
-            <i className="bi bi-bell" />
+        <div className="employee-header-actions">
+          <div className="hr-notification-wrap" ref={notifRef}>
+            <button
+                type="button"
+                aria-label="Notifications"
+                className={`hr-icon-button hr-notification-trigger ${notifOpen ? 'is-open' : ''}`}
+                aria-expanded={notifOpen}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setNotifOpen((prev) => !prev);
+                }}
+            >
+              <i className="bi bi-bell" />
 
-            {unreadCount > 0 ? (
-              <span className="hr-notification-badge">
+              {unreadCount > 0 ? (
+                  <span className="hr-notification-badge">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
-            ) : null}
-          </button>
+              ) : null}
+            </button>
 
-          {notifOpen && (
-            <div className="hr-notif-popover" role="dialog" aria-label="Notifications">
-              <div className="hr-notif-popover__header">
-                <span className="hr-notif-popover__title">Notifications</span>
+            {notifOpen && (
+                <div className="hr-notif-popover" role="dialog" aria-label="Notifications">
+                  <div className="hr-notif-popover__header">
+                    <span className="hr-notif-popover__title">Notifications</span>
 
-                <button type="button" className="hr-notif-popover__mark-all" onClick={markAllRead}>
-                  Mark all read
-                </button>
-              </div>
+                    <button type="button" className="hr-notif-popover__mark-all" onClick={markAllRead}>
+                      Mark all read
+                    </button>
+                  </div>
 
-              <div className="hr-notif-popover__body">
-                {notifItems.length === 0 ? (
-                  <p className="hr-notif-popover__empty">No notifications yet.</p>
-                ) : (
-                  notifItems.map((n) => (
-                    <div
-                      key={n.id}
-                      role="button"
-                      tabIndex={0}
-                      className={`hr-notif-popover__item ${n.isRead ? '' : 'is-unread'}`}
-                      onClick={() => onNotifItemClick(n.id, n.isRead)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onNotifItemClick(n.id, n.isRead);
-                        }
-                      }}
-                    >
-                      <i
-                        className={`hr-notif-popover__item-icon ${notifIconClass(n.type)}`}
-                        aria-hidden
-                      />
+                  <div className="hr-notif-popover__body">
+                    {notifItems.length === 0 ? (
+                        <p className="hr-notif-popover__empty">No notifications yet.</p>
+                    ) : (
+                        notifItems.map((n) => (
+                            <div
+                                key={n.id}
+                                role="button"
+                                tabIndex={0}
+                                className={`hr-notif-popover__item ${n.isRead ? '' : 'is-unread'}`}
+                                onClick={() => onNotifItemClick(n.id, n.isRead)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onNotifItemClick(n.id, n.isRead);
+                                  }
+                                }}
+                            >
+                              <i
+                                  className={`hr-notif-popover__item-icon ${notifIconClass(n.type)}`}
+                                  aria-hidden
+                              />
 
-                      <span className="hr-notif-popover__item-main">
+                              <span className="hr-notif-popover__item-main">
                         <span className="hr-notif-popover__item-title">{n.title}</span>
                         <span className="hr-notif-popover__item-msg">
                           <KpiNotificationMessageBody
-                            message={n.message}
-                            type={n.type}
-                            referenceId={n.referenceId}
-                            user={authUser}
-                            onKpiLinkNavigate={() => onNotifItemClick(n.id, n.isRead)}
+                              message={n.message}
+                              type={n.type}
+                              referenceId={n.referenceId}
+                              user={authUser}
+                              onKpiLinkNavigate={() => onNotifItemClick(n.id, n.isRead)}
                           />
                         </span>
                         <span className="hr-notif-popover__item-time">
@@ -338,100 +346,117 @@ const EmployeeHeader = ({
                         </span>
                       </span>
 
-                      <span
-                        className={`hr-notif-popover__item-dot ${n.isRead ? 'is-read' : ''}`}
-                        aria-hidden
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
+                              <span
+                                  className={`hr-notif-popover__item-dot ${n.isRead ? 'is-read' : ''}`}
+                                  aria-hidden
+                              />
+                            </div>
+                        ))
+                    )}
+                  </div>
 
-              <div className="hr-notif-popover__footer">
-                <button
-                  type="button"
-                  className="hr-notif-popover__view-all"
-                  style={{ border: 0, background: 'transparent', cursor: 'pointer' }}
-                  onClick={goToNotifications}
-                >
-                  View all notifications
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+                  <div className="hr-notif-popover__footer">
+                    <button
+                        type="button"
+                        className="hr-notif-popover__footer-action"
+                        onClick={goToNotificationSettings}
+                    >
+                      <i className="bi bi-sliders" aria-hidden />
+                      Settings
+                    </button>
 
-        <div className="employee-header-divider" />
+                    <button
+                        type="button"
+                        className="hr-notif-popover__footer-action hr-notif-popover__view-all"
+                        onClick={goToNotifications}
+                    >
+                      View all
+                    </button>
+                  </div>
+                </div>
+            )}
+          </div>
 
-        <div className="employee-user-menu" ref={menuRef}>
-          <button
-            type="button"
-            className="employee-user-chip"
-            onClick={() => {
-              setNotifOpen(false);
-              setMenuOpen((prev) => !prev);
-            }}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            aria-controls="employee-user-dropdown"
-          >
-            <ProfileHeaderAvatar
-              className="employee-user-avatar"
-              name={displayName}
-              email={email}
-            />
+          <div className="employee-header-divider" />
 
-            <span className="employee-user-meta">
+          <div className="employee-user-menu" ref={menuRef}>
+            <button
+                type="button"
+                className="employee-user-chip"
+                onClick={() => {
+                  setNotifOpen(false);
+                  setMenuOpen((prev) => !prev);
+                }}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-controls="employee-user-dropdown"
+            >
+              <ProfileHeaderAvatar
+                  className="employee-user-avatar"
+                  name={displayName}
+                  email={email}
+              />
+
+              <span className="employee-user-meta">
               <span>{displayName}</span>
               <small>{roleLabel}</small>
             </span>
 
-            <i className={`bi ${menuOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-          </button>
+              <i className={`bi ${menuOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+            </button>
 
-          {menuOpen && (
-            <div className="employee-user-dropdown" id="employee-user-dropdown" role="menu">
-              <button
-                type="button"
-                className="employee-user-dropdown-item"
-                onClick={goToProfile}
-              >
-                <i className="bi bi-person" />
-                Profile
-              </button>
+            {menuOpen && (
+                <div className="employee-user-dropdown" id="employee-user-dropdown" role="menu">
+                  <button
+                      type="button"
+                      className="employee-user-dropdown-item"
+                      onClick={goToProfile}
+                  >
+                    <i className="bi bi-person" />
+                    Profile
+                  </button>
 
-              <button type="button" className="employee-user-dropdown-item" onClick={goToDashboard}>
-                <i className="bi bi-house-door" />
-                Dashboard
-              </button>
+                  <button type="button" className="employee-user-dropdown-item" onClick={goToDashboard}>
+                    <i className="bi bi-house-door" />
+                    Dashboard
+                  </button>
 
-              <button
-                type="button"
-                className="employee-user-dropdown-item"
-                onClick={() => {
-                  closeMenu();
-                  setSignatureOpen(true);
-                }}
-              >
-                <i className="bi bi-pen" />
-                Signature
-              </button>
+                  <button
+                      type="button"
+                      className="employee-user-dropdown-item"
+                      onClick={() => {
+                        closeMenu();
+                        setSignatureOpen(true);
+                      }}
+                  >
+                    <i className="bi bi-pen" />
+                    Signature
+                  </button>
 
-              <button
-                type="button"
-                className="employee-user-dropdown-item employee-user-dropdown-item-danger"
-                onClick={handleLogout}
-              >
-                <i className="bi bi-box-arrow-right" />
-                Log out
-              </button>
-            </div>
-          )}
+                  <button
+                      type="button"
+                      className="employee-user-dropdown-item"
+                      onClick={goToNotificationSettings}
+                  >
+                    <i className="bi bi-sliders" />
+                    Notification Settings
+                  </button>
+
+                  <button
+                      type="button"
+                      className="employee-user-dropdown-item employee-user-dropdown-item-danger"
+                      onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right" />
+                    Log out
+                  </button>
+                </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
-    </header>
+        <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
+      </header>
   );
 };
 

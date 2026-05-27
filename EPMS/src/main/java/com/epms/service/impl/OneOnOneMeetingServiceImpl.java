@@ -8,6 +8,7 @@ import com.epms.entity.Employee;
 import com.epms.entity.OneOnOneActionItem;
 import com.epms.entity.OneOnOneMeeting;
 import com.epms.entity.User;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.OneOnOneMeetingRepository;
 import com.epms.repository.UserRepository;
@@ -152,8 +153,9 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         String meetingTime = formatDateTime(stageStartDate(meeting));
 
         findUserByEmployee(meeting.getEmployee()).ifPresent(employeeUser ->
-                notificationService.send(
+                notificationService.sendEvent(
                         employeeUser.getId(),
+                        NotificationEventKey.MEETING_CANCELLED,
                         "One-on-One Meeting Cancelled",
                         "Your one-on-one meeting at " + meetingTime + " was cancelled.",
                         "MEETING"
@@ -162,6 +164,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
 
         notifyCreator(
                 meeting,
+                NotificationEventKey.MEETING_CANCELLED,
                 "One-on-One Meeting Cancelled",
                 "The one-on-one meeting with "
                         + employeeName(meeting.getEmployee())
@@ -386,8 +389,9 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         String creatorTitle = followUpStage ? "One-on-One Follow-Up Created" : "One-on-One Meeting Created";
 
         findUserByEmployee(meeting.getEmployee()).ifPresent(employeeUser ->
-                notificationService.send(
+                notificationService.sendEvent(
                         employeeUser.getId(),
+                        NotificationEventKey.MEETING_CREATED,
                         title,
                         creatorName + " scheduled a one-on-one "
                                 + (followUpStage ? "follow-up " : "")
@@ -401,6 +405,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
 
         notifyCreator(
                 meeting,
+                NotificationEventKey.MEETING_CREATED,
                 creatorTitle,
                 "You scheduled a one-on-one "
                         + (followUpStage ? "follow-up " : "")
@@ -421,8 +426,9 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         String employeeName = employeeName(meeting.getEmployee());
 
         findUserByEmployee(meeting.getEmployee()).ifPresent(employeeUser ->
-                notificationService.send(
+                notificationService.sendEvent(
                         employeeUser.getId(),
+                        NotificationEventKey.MEETING_UPDATED,
                         "One-on-One Meeting Updated",
                         "Your one-on-one meeting with " + creatorName
                                 + " was updated to " + meetingTime
@@ -434,6 +440,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
 
         notifyCreator(
                 meeting,
+                NotificationEventKey.MEETING_UPDATED,
                 "One-on-One Meeting Updated",
                 "Your one-on-one meeting with " + employeeName
                         + " was updated to " + meetingTime
@@ -449,8 +456,9 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         String label = followUpStage ? "follow-up meeting" : "meeting";
 
         findUserByEmployee(meeting.getEmployee()).ifPresent(employeeUser ->
-                notificationService.send(
+                notificationService.sendEvent(
                         employeeUser.getId(),
+                        NotificationEventKey.MEETING_REMINDER,
                         "Meeting Reminder",
                         "Reminder: your one-on-one "
                                 + label
@@ -465,6 +473,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
 
         notifyCreator(
                 meeting,
+                NotificationEventKey.MEETING_REMINDER,
                 "Meeting Reminder",
                 "Reminder: your one-on-one "
                         + label
@@ -476,10 +485,11 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         );
     }
 
-    private void notifyCreator(OneOnOneMeeting meeting, String title, String message) {
+    private void notifyCreator(OneOnOneMeeting meeting, String eventKey, String title, String message) {
         if (meeting.getCreatedByUser() != null && meeting.getCreatedByUser().getId() != null) {
-            notificationService.send(
+            notificationService.sendEvent(
                     meeting.getCreatedByUser().getId(),
+                    eventKey,
                     title,
                     message,
                     "MEETING"
@@ -488,8 +498,9 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         findUserByEmployee(meeting.getManager()).ifPresent(managerUser ->
-                notificationService.send(
+                notificationService.sendEvent(
                         managerUser.getId(),
+                        eventKey,
                         title,
                         message,
                         "MEETING"

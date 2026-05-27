@@ -9,6 +9,7 @@ import com.epms.entity.enums.AppraisalCycleStatus;
 import com.epms.entity.enums.AppraisalCycleType;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.*;
 import com.epms.service.AppraisalCycleService;
 import com.epms.service.AuditLogService;
@@ -927,7 +928,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         String message = cycleDisplayName(cycle)
                 + " manager review deadline is on " + displayDate(deadline) + ". "
                 + remainingDaysText(daysLeft) + " remaining.";
-        return notifyUsers(targetManagers(cycle), title, message, "APPRAISAL", cycle.getId());
+        return notifyUsers(targetManagers(cycle), NotificationEventKey.APPRAISAL_DEADLINE_REMINDER, title, message, "APPRAISAL", cycle.getId());
     }
 
     private int sendDeptHeadDeadlineReminderIfDue(AppraisalCycle cycle) {
@@ -941,7 +942,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         String message = cycleDisplayName(cycle)
                 + " Dept Head review deadline is on " + displayDate(deadline) + ". "
                 + remainingDaysText(daysLeft) + " remaining.";
-        return notifyUsers(targetDepartmentHeads(cycle), title, message, "APPRAISAL", cycle.getId());
+        return notifyUsers(targetDepartmentHeads(cycle), NotificationEventKey.APPRAISAL_DEADLINE_REMINDER, title, message, "APPRAISAL", cycle.getId());
     }
 
     private int sendHrEndDateReminderIfDue(AppraisalCycle cycle) {
@@ -954,7 +955,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         String message = cycleDisplayName(cycle)
                 + " end date is on " + displayDate(cycle.getEndDate()) + ". "
                 + remainingDaysText(daysLeft) + " remaining.";
-        return notifyUsers(hrUsers(), title, message, "APPRAISAL", cycle.getId());
+        return notifyUsers(hrUsers(), NotificationEventKey.APPRAISAL_DEADLINE_REMINDER, title, message, "APPRAISAL", cycle.getId());
     }
 
     private Integer daysLeftIfReminderWindow(LocalDate targetDate) {
@@ -968,13 +969,13 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
     private void notifyManagersAndDeptHeadsCycleLocked(AppraisalCycle cycle) {
         String title = "Appraisal Cycle Locked";
         String message = cycleDisplayName(cycle) + " appraisal cycle has been locked.";
-        notifyUsers(targetManagersAndDeptHeads(cycle), title, message, "APPRAISAL", cycle.getId());
+        notifyUsers(targetManagersAndDeptHeads(cycle), NotificationEventKey.APPRAISAL_CYCLE_LOCKED, title, message, "APPRAISAL", cycle.getId());
     }
 
     private void notifyManagersAndDeptHeadsCycleCompleted(AppraisalCycle cycle) {
         String title = "Appraisal Cycle Completed";
         String message = cycleDisplayName(cycle) + " appraisal cycle has been completed.";
-        notifyUsers(targetManagersAndDeptHeads(cycle), title, message, "APPRAISAL", cycle.getId());
+        notifyUsers(targetManagersAndDeptHeads(cycle), NotificationEventKey.APPRAISAL_CYCLE_COMPLETED, title, message, "APPRAISAL", cycle.getId());
     }
 
     private List<User> targetManagersAndDeptHeads(AppraisalCycle cycle) {
@@ -1033,11 +1034,11 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         return uniqueUsers;
     }
 
-    private int notifyUsers(List<User> users, String title, String message, String type, Integer referenceId) {
+    private int notifyUsers(List<User> users, String eventKey, String title, String message, String type, Integer referenceId) {
         int sent = 0;
         for (User user : users) {
             if (user != null && user.getId() != null
-                    && notificationService.sendOnce(user.getId(), title, message, type, referenceId)) {
+                    && notificationService.sendEventOnce(user.getId(), eventKey, title, message, type, referenceId)) {
                 sent++;
             }
         }
@@ -1062,12 +1063,12 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         Set<Integer> targetDepartmentIds = cycle.getCycleDepartments() == null
                 ? Set.of()
                 : cycle.getCycleDepartments()
-                .stream()
-                .map(AppraisalCycleDepartment::getDepartment)
-                .filter(Objects::nonNull)
-                .map(Department::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+                  .stream()
+                  .map(AppraisalCycleDepartment::getDepartment)
+                  .filter(Objects::nonNull)
+                  .map(Department::getId)
+                  .filter(Objects::nonNull)
+                  .collect(Collectors.toSet());
 
         if (targetDepartmentIds.isEmpty()) {
             return;
@@ -1079,7 +1080,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
 
         managers.stream()
                 .filter(manager -> manager.getDepartmentId() != null && targetDepartmentIds.contains(manager.getDepartmentId()))
-                .forEach(manager -> notificationService.sendOnce(manager.getId(), title, message, "APPRAISAL"));
+                .forEach(manager -> notificationService.sendEventOnce(manager.getId(), NotificationEventKey.APPRAISAL_CYCLE_ACTIVATED, title, message, "APPRAISAL"));
     }
 
     private AppraisalCycle getCycleEntity(Integer cycleId) {

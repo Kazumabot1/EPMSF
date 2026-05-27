@@ -71,6 +71,7 @@ import DepartmentKpiResultsPage from './pages/hr/department-kpi/DepartmentKpiRes
 
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
 import Notifications from './pages/Notifications';
+import NotificationSettings from './pages/NotificationSettings';
 
 import PipCreatePage from './pages/pip/PipCreatePage';
 import PipPastPlansPage from './pages/pip/PipPastPlansPage';
@@ -118,7 +119,9 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/notifications" element={<Notifications />} />
+              <Route path="/notification-settings" element={<NotificationSettings />} />
               <Route path="/employee/notifications" element={<Notifications />} />
+              <Route path="/employee/notification-settings" element={<NotificationSettings />} />
               <Route path="/my-kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/pip/past-plans" element={<PipPastPlansPage />} />
               <Route

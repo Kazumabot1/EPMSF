@@ -27,8 +27,8 @@ function unwrapList(res) {
 
 function normType(n) {
   return String(n?.type ?? '')
-    .trim()
-    .toUpperCase();
+      .trim()
+      .toUpperCase();
 }
 
 function typeForTab(tabId) {
@@ -124,10 +124,10 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
 
   const canTemplates =
-    user?.roles?.some((r) => {
-      const x = String(r).toUpperCase().replace(/^ROLE_/, '');
-      return x === 'HR' || x === 'ADMIN';
-    }) ?? false;
+      user?.roles?.some((r) => {
+        const x = String(r).toUpperCase().replace(/^ROLE_/, '');
+        return x === 'HR' || x === 'ADMIN';
+      }) ?? false;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,7 +167,7 @@ export default function Notifications() {
     const unread = notifications.filter((n) => !n.isRead).length;
     const byType = (want) => notifications.filter((n) => matchesType(n, want)).length;
     const unreadByType = (want) =>
-      notifications.filter((n) => matchesType(n, want) && !n.isRead).length;
+        notifications.filter((n) => matchesType(n, want) && !n.isRead).length;
 
     return {
       all: notifications.length,
@@ -232,98 +232,103 @@ export default function Notifications() {
   };
 
   return (
-    <div className="notif-page">
-      <div className="notif-breadcrumb">
-        Dashboard <span>/</span> Notifications
-      </div>
-
-      <div className="notif-page-header">
-        <div className="notif-page-title-block">
-          <h1>Notifications</h1>
-          <p>Stay updated on your tasks and activities.</p>
+      <div className="notif-page">
+        <div className="notif-breadcrumb">
+          Dashboard <span>/</span> Notifications
         </div>
 
-        <div className="notif-page-actions">
-          <button type="button" className="notif-btn-ghost" onClick={markAllRead}>
-            Mark all read
-          </button>
-
-          {canTemplates && (
-            <Link to="/notification-templates" className="notif-btn-outline">
-              <i className="bi bi-gear" aria-hidden />
-              Templates
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <div className="notif-tabs" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`notif-tab ${tab === t.id ? 'notif-tab-active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-            <span className="notif-tab-count">{tabBadge(t.id)}</span>
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="notif-empty">Loading notifications…</div>
-      ) : filtered.length === 0 ? (
-        <div className="notif-empty">No notifications in this view.</div>
-      ) : (
-        filtered.map((n) => (
-          <div
-            key={n.id}
-            role="button"
-            tabIndex={0}
-            className={`notif-card ${n.isRead ? '' : 'notif-card-unread'}`}
-            onClick={() => {
-              if (!n.isRead) markAsRead(n.id);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                if (!n.isRead) markAsRead(n.id);
-              }
-            }}
-          >
-            <i className={iconClass(n.type)} aria-hidden />
-
-            <div className="notif-card-body">
-              <div className="notif-card-headline">
-                <span className="notif-card-title">{n.title}</span>
-                <span className="notif-card-badge">{categoryLabel(n.type)}</span>
-              </div>
-
-              <p className="notif-card-msg">
-                <KpiNotificationMessageBody
-                  message={n.message}
-                  type={n.type}
-                  referenceId={n.referenceId}
-                  user={user}
-                  onKpiLinkNavigate={() => {
-                    if (!n.isRead) markAsRead(n.id);
-                  }}
-                />
-              </p>
-
-              <div className="notif-card-time">{formatTime(n.createdAt)}</div>
-            </div>
-
-            <span
-              className={`notif-card-dot ${n.isRead ? 'notif-card-dot-read' : ''}`}
-              aria-hidden
-            />
+        <div className="notif-page-header">
+          <div className="notif-page-title-block">
+            <h1>Notifications</h1>
+            <p>Stay updated on your tasks and activities.</p>
           </div>
-        ))
-      )}
-    </div>
+
+          <div className="notif-page-actions">
+            <button type="button" className="notif-btn-ghost" onClick={markAllRead}>
+              Mark all read
+            </button>
+
+            <Link to="/notification-settings" className="notif-btn-outline">
+              <i className="bi bi-sliders" aria-hidden />
+              Settings
+            </Link>
+
+            {canTemplates && (
+                <Link to="/notification-templates" className="notif-btn-outline">
+                  <i className="bi bi-gear" aria-hidden />
+                  Templates
+                </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="notif-tabs" role="tablist">
+          {TABS.map((t) => (
+              <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.id}
+                  className={`notif-tab ${tab === t.id ? 'notif-tab-active' : ''}`}
+                  onClick={() => setTab(t.id)}
+              >
+                {t.label}
+                <span className="notif-tab-count">{tabBadge(t.id)}</span>
+              </button>
+          ))}
+        </div>
+
+        {loading ? (
+            <div className="notif-empty">Loading notifications…</div>
+        ) : filtered.length === 0 ? (
+            <div className="notif-empty">No notifications in this view.</div>
+        ) : (
+            filtered.map((n) => (
+                <div
+                    key={n.id}
+                    role="button"
+                    tabIndex={0}
+                    className={`notif-card ${n.isRead ? '' : 'notif-card-unread'}`}
+                    onClick={() => {
+                      if (!n.isRead) markAsRead(n.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (!n.isRead) markAsRead(n.id);
+                      }
+                    }}
+                >
+                  <i className={iconClass(n.type)} aria-hidden />
+
+                  <div className="notif-card-body">
+                    <div className="notif-card-headline">
+                      <span className="notif-card-title">{n.title}</span>
+                      <span className="notif-card-badge">{categoryLabel(n.type)}</span>
+                    </div>
+
+                    <p className="notif-card-msg">
+                      <KpiNotificationMessageBody
+                          message={n.message}
+                          type={n.type}
+                          referenceId={n.referenceId}
+                          user={user}
+                          onKpiLinkNavigate={() => {
+                            if (!n.isRead) markAsRead(n.id);
+                          }}
+                      />
+                    </p>
+
+                    <div className="notif-card-time">{formatTime(n.createdAt)}</div>
+                  </div>
+
+                  <span
+                      className={`notif-card-dot ${n.isRead ? 'notif-card-dot-read' : ''}`}
+                      aria-hidden
+                  />
+                </div>
+            ))
+        )}
+      </div>
   );
 }

@@ -59,8 +59,8 @@ function formatNotifTime(createdAt: NotifItem['createdAt']) {
 
 function notifIconClass(type?: string | null) {
   const t = String(type ?? '')
-    .trim()
-    .toUpperCase();
+      .trim()
+      .toUpperCase();
 
   if (t === 'GENERAL') return 'bi bi-info-circle';
   if (t === 'MEETING') return 'bi bi-calendar-event';
@@ -219,74 +219,80 @@ const Header = ({ collapsed }: HeaderProps) => {
     }
   };
 
+  const goToNotificationSettings = () => {
+    closeNotif();
+    closeMenu();
+    navigate('/notification-settings');
+  };
+
   return (
-    <header className={`hr-header ${collapsed ? 'collapsed' : ''}`}>
-      <div className="hr-header-search">
-        <i className="bi bi-search" />
-        <input type="text" placeholder="Search employees, KPI, appraisals..." />
-      </div>
+      <header className={`hr-header ${collapsed ? 'collapsed' : ''}`}>
+        <div className="hr-header-search">
+          <i className="bi bi-search" />
+          <input type="text" placeholder="Search employees, KPI, appraisals..." />
+        </div>
 
-      <div className="hr-header-actions">
-        <div className="hr-notification-wrap" ref={notifRef}>
-          <button
-            type="button"
-            className={`hr-icon-button hr-notification-trigger ${notifOpen ? 'is-open' : ''}`}
-            aria-label="Notifications"
-            aria-expanded={notifOpen}
-            aria-haspopup="dialog"
-            onClick={() => {
-              setMenuOpen(false);
-              setNotifOpen((o) => !o);
-            }}
-          >
-            <i className="bi bi-bell" />
+        <div className="hr-header-actions">
+          <div className="hr-notification-wrap" ref={notifRef}>
+            <button
+                type="button"
+                className={`hr-icon-button hr-notification-trigger ${notifOpen ? 'is-open' : ''}`}
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setNotifOpen((o) => !o);
+                }}
+            >
+              <i className="bi bi-bell" />
 
-            {unreadCount > 0 ? (
-              <span className="hr-notification-badge">
+              {unreadCount > 0 ? (
+                  <span className="hr-notification-badge">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
-            ) : null}
-          </button>
+              ) : null}
+            </button>
 
-          {notifOpen && (
-            <div className="hr-notif-popover" role="dialog" aria-label="Notifications">
-              <div className="hr-notif-popover__header">
-                <span className="hr-notif-popover__title">Notifications</span>
+            {notifOpen && (
+                <div className="hr-notif-popover" role="dialog" aria-label="Notifications">
+                  <div className="hr-notif-popover__header">
+                    <span className="hr-notif-popover__title">Notifications</span>
 
-                <button type="button" className="hr-notif-popover__mark-all" onClick={markAllRead}>
-                  Mark all read
-                </button>
-              </div>
+                    <button type="button" className="hr-notif-popover__mark-all" onClick={markAllRead}>
+                      Mark all read
+                    </button>
+                  </div>
 
-              <div className="hr-notif-popover__body">
-                {notifItems.length === 0 ? (
-                  <p className="hr-notif-popover__empty">No notifications yet.</p>
-                ) : (
-                  notifItems.map((n) => (
-                    <div
-                      key={n.id}
-                      role="button"
-                      tabIndex={0}
-                      className={`hr-notif-popover__item ${n.isRead ? '' : 'is-unread'}`}
-                      onClick={() => onNotifItemClick(n.id, n.isRead)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onNotifItemClick(n.id, n.isRead);
-                        }
-                      }}
-                    >
-                      <i className={`hr-notif-popover__item-icon ${notifIconClass(n.type)}`} aria-hidden />
+                  <div className="hr-notif-popover__body">
+                    {notifItems.length === 0 ? (
+                        <p className="hr-notif-popover__empty">No notifications yet.</p>
+                    ) : (
+                        notifItems.map((n) => (
+                            <div
+                                key={n.id}
+                                role="button"
+                                tabIndex={0}
+                                className={`hr-notif-popover__item ${n.isRead ? '' : 'is-unread'}`}
+                                onClick={() => onNotifItemClick(n.id, n.isRead)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onNotifItemClick(n.id, n.isRead);
+                                  }
+                                }}
+                            >
+                              <i className={`hr-notif-popover__item-icon ${notifIconClass(n.type)}`} aria-hidden />
 
-                      <span className="hr-notif-popover__item-main">
+                              <span className="hr-notif-popover__item-main">
                         <span className="hr-notif-popover__item-title">{n.title}</span>
                         <span className="hr-notif-popover__item-msg">
                           <KpiNotificationMessageBody
-                            message={n.message}
-                            type={n.type}
-                            referenceId={n.referenceId}
-                            user={user}
-                            onKpiLinkNavigate={() => onNotifItemClick(n.id, n.isRead)}
+                              message={n.message}
+                              type={n.type}
+                              referenceId={n.referenceId}
+                              user={user}
+                              onKpiLinkNavigate={() => onNotifItemClick(n.id, n.isRead)}
                           />
                         </span>
                         <span className="hr-notif-popover__item-time">
@@ -294,106 +300,125 @@ const Header = ({ collapsed }: HeaderProps) => {
                         </span>
                       </span>
 
-                      <span
-                        className={`hr-notif-popover__item-dot ${n.isRead ? 'is-read' : ''}`}
-                        aria-hidden
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
+                              <span
+                                  className={`hr-notif-popover__item-dot ${n.isRead ? 'is-read' : ''}`}
+                                  aria-hidden
+                              />
+                            </div>
+                        ))
+                    )}
+                  </div>
 
-              <div className="hr-notif-popover__footer">
-                <Link
-                  to="/notifications"
-                  className="hr-notif-popover__view-all"
-                  onClick={closeNotif}
-                >
-                  View all notifications
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+                  <div className="hr-notif-popover__footer">
+                    <button
+                        type="button"
+                        className="hr-notif-popover__footer-action"
+                        onClick={goToNotificationSettings}
+                    >
+                      <i className="bi bi-sliders" aria-hidden />
+                      Settings
+                    </button>
 
-        <div className="hr-user-menu" ref={menuRef}>
-          <button
-            type="button"
-            className="hr-user-chip"
-            onClick={() => {
-              setNotifOpen(false);
-              setMenuOpen((o) => !o);
-            }}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            aria-controls="hr-user-dropdown"
-            id="hr-user-menu-button"
-          >
-            <ProfileHeaderAvatar
-              className="hr-user-avatar"
-              name={userName}
-              email={email}
-            />
+                    <Link
+                        to="/notifications"
+                        className="hr-notif-popover__footer-action hr-notif-popover__view-all"
+                        onClick={closeNotif}
+                    >
+                      View all
+                    </Link>
+                  </div>
+                </div>
+            )}
+          </div>
 
-            <div className="hr-user-chip-meta">
-              <strong>{userName}</strong>
-              <small>{primaryRole}</small>
-            </div>
-
-            <i
-              className={`bi hr-user-chevron ${
-                menuOpen ? 'bi-chevron-up' : 'bi-chevron-down'
-              }`}
-              aria-hidden
-            />
-          </button>
-
-          {menuOpen && (
-            <div
-              className="hr-user-dropdown"
-              id="hr-user-dropdown"
-              role="menu"
-              aria-labelledby="hr-user-menu-button"
-            >
-              <Link
-                to="/profile"
-                className="hr-user-dropdown-item"
-                role="menuitem"
-                onClick={closeMenu}
-              >
-                <i className="bi bi-person" />
-                Profile
-              </Link>
-
-              <button
+          <div className="hr-user-menu" ref={menuRef}>
+            <button
                 type="button"
-                className="hr-user-dropdown-item"
-                role="menuitem"
+                className="hr-user-chip"
                 onClick={() => {
-                  closeMenu();
-                  setSignatureOpen(true);
+                  setNotifOpen(false);
+                  setMenuOpen((o) => !o);
                 }}
-              >
-                <i className="bi bi-pen" />
-                Signature
-              </button>
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-controls="hr-user-dropdown"
+                id="hr-user-menu-button"
+            >
+              <ProfileHeaderAvatar
+                  className="hr-user-avatar"
+                  name={userName}
+                  email={email}
+              />
 
-              <button
-                type="button"
-                className="hr-user-dropdown-item hr-user-dropdown-item-danger"
-                role="menuitem"
-                onClick={handleLogout}
-              >
-                <i className="bi bi-box-arrow-right" />
-                Log out
-              </button>
-            </div>
-          )}
+              <div className="hr-user-chip-meta">
+                <strong>{userName}</strong>
+                <small>{primaryRole}</small>
+              </div>
+
+              <i
+                  className={`bi hr-user-chevron ${
+                      menuOpen ? 'bi-chevron-up' : 'bi-chevron-down'
+                  }`}
+                  aria-hidden
+              />
+            </button>
+
+            {menuOpen && (
+                <div
+                    className="hr-user-dropdown"
+                    id="hr-user-dropdown"
+                    role="menu"
+                    aria-labelledby="hr-user-menu-button"
+                >
+                  <Link
+                      to="/profile"
+                      className="hr-user-dropdown-item"
+                      role="menuitem"
+                      onClick={closeMenu}
+                  >
+                    <i className="bi bi-person" />
+                    Profile
+                  </Link>
+
+                  <button
+                      type="button"
+                      className="hr-user-dropdown-item"
+                      role="menuitem"
+                      onClick={() => {
+                        closeMenu();
+                        setSignatureOpen(true);
+                      }}
+                  >
+                    <i className="bi bi-pen" />
+                    Signature
+                  </button>
+
+                  <button
+                      type="button"
+                      className="hr-user-dropdown-item"
+                      role="menuitem"
+                      onClick={goToNotificationSettings}
+                  >
+                    <i className="bi bi-sliders" />
+                    Notification Settings
+                  </button>
+
+                  <button
+                      type="button"
+                      className="hr-user-dropdown-item hr-user-dropdown-item-danger"
+                      role="menuitem"
+                      onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right" />
+                    Log out
+                  </button>
+                </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
-    </header>
+        <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
+      </header>
   );
 };
 
