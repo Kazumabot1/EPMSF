@@ -80,9 +80,9 @@ public final class FeedbackEvaluatorConfigNormalizer {
 
     public static void validate(EvaluatorConfigDTO source) {
         EvaluatorConfigDTO config = normalize(source);
-        boolean anyEvaluatorSourceSelected = Boolean.TRUE.equals(config.getIncludeManager())
-                || Boolean.TRUE.equals(config.getIncludeSelf())
-                || Boolean.TRUE.equals(config.getIncludeSubordinates())
+        boolean anyEvaluatorSourceSelected = config.getIncludeManager()
+                || config.getIncludeSelf()
+                || config.getIncludeSubordinates()
                 || isPeerSelectionEnabled(config);
         if (!anyEvaluatorSourceSelected) {
             throw new BusinessValidationException("Choose at least one evaluator role.");
@@ -99,7 +99,7 @@ public final class FeedbackEvaluatorConfigNormalizer {
             }
         }
 
-        if (Boolean.TRUE.equals(config.getIncludeSubordinates())) {
+        if (config.getIncludeSubordinates()) {
             int subordinateMin = requestedSubordinateMinCount(config);
             int subordinateMax = requestedSubordinateMaxCount(config);
             if (subordinateMin > subordinateMax) {
@@ -110,23 +110,21 @@ public final class FeedbackEvaluatorConfigNormalizer {
 
     public static boolean isPeerSelectionEnabled(EvaluatorConfigDTO source) {
         EvaluatorConfigDTO config = normalize(source);
-        return Boolean.TRUE.equals(config.getIncludePeers())
+        return config.getIncludePeers()
                 && (isTeamPeerSelectionEnabled(config)
                 || isDepartmentPeerSelectionEnabled(config)
-                || Boolean.TRUE.equals(config.getIncludeProjectPeers())
-                || Boolean.TRUE.equals(config.getIncludeCrossTeamPeers()));
+                || config.getIncludeProjectPeers()
+                || config.getIncludeCrossTeamPeers());
     }
 
     public static boolean isTeamPeerSelectionEnabled(EvaluatorConfigDTO source) {
         EvaluatorConfigDTO config = normalize(source);
-        return Boolean.TRUE.equals(config.getIncludePeers())
-                && Boolean.TRUE.equals(config.getIncludeTeamPeers());
+        return config.getIncludePeers() && config.getIncludeTeamPeers();
     }
 
     public static boolean isDepartmentPeerSelectionEnabled(EvaluatorConfigDTO source) {
         EvaluatorConfigDTO config = normalize(source);
-        return Boolean.TRUE.equals(config.getIncludePeers())
-                && Boolean.TRUE.equals(config.getIncludeDepartmentPeers());
+        return config.getIncludePeers() && config.getIncludeDepartmentPeers();
     }
 
     public static int requestedPeerMinCount(EvaluatorConfigDTO source) {

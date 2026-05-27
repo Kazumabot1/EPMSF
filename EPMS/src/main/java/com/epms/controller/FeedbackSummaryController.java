@@ -115,12 +115,29 @@ public class FeedbackSummaryController {
     private void ensureManagerOrAbove() {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
-                .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("MANAGER") || role.equals("HR") || role.equals("ADMIN")
-                        || role.equals("ROLE_MANAGER") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+                .map(this::normalizeRoleName)
+                .anyMatch(role -> role.equals("MANAGER")
+                        || role.equals("HR")
+                        || role.equals("ADMIN")
+                        || role.equals("DEPARTMENT_HEAD")
+                        || role.equals("DEPARTMENTHEAD")
+                        || role.equals("DEPT_HEAD")
+                        || role.equals("HEAD_OF_DEPARTMENT"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only Manager/HR/Admin can access team feedback summaries.");
+            throw new UnauthorizedActionException("Only Manager, Department Head, HR, or Admin can access feedback summaries.");
         }
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
     }
 
     private void ensureHrOrAdmin() {

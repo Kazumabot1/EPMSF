@@ -120,7 +120,12 @@ export interface FeedbackMyResult {
 
 export interface FeedbackTeamSummary {
   managerUserId: number;
+  ownerUserId?: number;
+  viewScope?: 'MANAGER_DIRECT_REPORTS' | 'DEPARTMENT' | string;
+  departmentId?: number | null;
+  departmentName?: string | null;
   totalDirectReports: number;
+  totalDepartmentEmployees?: number;
   totalClosedResults: number;
   items: FeedbackResultItem[];
 }
