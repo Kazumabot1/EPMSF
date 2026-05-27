@@ -44,6 +44,7 @@ import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/Depart
 import AdminDashboard from './pages/admin/AdminDashboard';
 
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
+import SelfAssessmentFormRecordsPage from './pages/hr/SelfAssessmentFormRecordsPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
 import ReportingDashboardPage from './pages/reports/ReportingDashboardPage';
