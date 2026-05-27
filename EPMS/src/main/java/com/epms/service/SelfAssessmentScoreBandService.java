@@ -39,14 +39,13 @@ public class SelfAssessmentScoreBandService {
 
     @Transactional(readOnly = true)
     public ScoreTableResponse getTable() {
-        ensureDefaultsReadonlySafe();
         LocalDateTime now = LocalDateTime.now();
         int activeFormCount = assessmentFormRepository
                 .findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(now, now)
                 .size();
 
         return ScoreTableResponse.builder()
-                .bands(scoreBandRepository.findAllByOrderBySortOrderAsc().stream().map(this::toResponse).toList())
+                .bands(getReadonlyBands().stream().map(this::toResponse).toList())
                 .audits(getAudit())
                 .activeFormExists(activeFormCount > 0)
                 .activeFormCount(activeFormCount)
@@ -63,9 +62,7 @@ public class SelfAssessmentScoreBandService {
 
     @Transactional(readOnly = true)
     public List<EmployeeAssessmentDtos.AssessmentScoreBandResponse> getActiveBandsForAssessment() {
-        ensureDefaultsReadonlySafe();
-
-        return scoreBandRepository.findAllByOrderBySortOrderAsc()
+        return getReadonlyBands()
                 .stream()
                 .map(band -> EmployeeAssessmentDtos.AssessmentScoreBandResponse.builder()
                         .id(band.getId())
@@ -297,10 +294,13 @@ public class SelfAssessmentScoreBandService {
         }
     }
 
-    private void ensureDefaultsReadonlySafe() {
-        if (scoreBandRepository.count() < REQUIRED_ROW_COUNT) {
-            ensureDefaults();
+    private List<SelfAssessmentScoreBand> getReadonlyBands() {
+        List<SelfAssessmentScoreBand> existing = scoreBandRepository.findAllByOrderBySortOrderAsc();
+        if (existing.size() >= REQUIRED_ROW_COUNT) {
+            return existing;
         }
+
+        return defaultBands();
     }
 
     private void ensureDefaults() {
@@ -309,7 +309,10 @@ public class SelfAssessmentScoreBandService {
         }
 
         scoreBandRepository.deleteAll();
+        scoreBandRepository.saveAll(defaultBands());
+    }
 
+    private List<SelfAssessmentScoreBand> defaultBands() {
         List<SelfAssessmentScoreBand> defaults = new ArrayList<>();
 
         defaults.add(defaultBand(86, 100, "Outstanding",
@@ -323,7 +326,7 @@ public class SelfAssessmentScoreBandService {
         defaults.add(defaultBand(0, 39, "Unsatisfactory",
                 "Performance does not meet the minimum requirement of the job.", 5));
 
-        scoreBandRepository.saveAll(defaults);
+        return defaults;
     }
 
     private SelfAssessmentScoreBand defaultBand(

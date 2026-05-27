@@ -151,6 +151,18 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
           icon: 'bi-ui-checks-grid',
           permissionField: 'selfAssessmentInput',
         },
+        {
+          label: 'Review Form',
+          path: '/hr/assessment-review-forms',
+          icon: 'bi-clipboard-check',
+          permissionField: 'selfAssessmentView',
+        },
+        {
+          label: 'Form Record',
+          path: '/hr/assessment-form-records',
+          icon: 'bi-folder2-open',
+          permissionField: 'selfAssessmentView',
+        },
       ],
     },
     {

@@ -153,6 +153,7 @@ const roleLabel =
         children: [
           { to: '/hr/assessment-scores', label: 'Scores', icon: 'bi bi-clipboard-data', end: true },
           { to: '/hr/assessment-forms', label: 'Form Create', icon: 'bi bi-ui-checks-grid', end: true },
+          { to: '/hr/assessment-form-records', label: 'Form Record', icon: 'bi bi-folder2-open', end: true },
         ],
       },
       {

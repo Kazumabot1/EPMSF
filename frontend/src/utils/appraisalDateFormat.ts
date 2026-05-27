@@ -8,7 +8,48 @@ const DISPLAY_DATE_FORMATTER = new Intl.DateTimeFormat('en-GB', {
 
 const ISO_DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})/;
 const HAS_TIME_PART = /[T\s]\d{1,2}:\d{2}/;
-const DISPLAY_DATE_PATTERN = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+const DISPLAY_DATE_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+const LONG_DATE_PATTERN = /^(\d{1,2})\s+([A-Za-z]+),?\s+(\d{4})$/;
+
+const MONTH_INDEX_BY_NAME: Record<string, number> = {
+  january: 1,
+  jan: 1,
+  february: 2,
+  feb: 2,
+  march: 3,
+  mar: 3,
+  april: 4,
+  apr: 4,
+  may: 5,
+  june: 6,
+  jun: 6,
+  july: 7,
+  jul: 7,
+  august: 8,
+  aug: 8,
+  september: 9,
+  sep: 9,
+  sept: 9,
+  october: 10,
+  oct: 10,
+  november: 11,
+  nov: 11,
+  december: 12,
+  dec: 12,
+};
+
+const toValidIsoDate = (year: number, month: number, day: number): string | null => {
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() + 1 !== month ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+};
 
 export const formatDisplayDate = (value?: string | null): string => {
   if (!value) return '-';
@@ -54,21 +95,27 @@ export const parseDisplayDateToIso = (value?: string | null): string | null => {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
 
-  const match = DISPLAY_DATE_PATTERN.exec(raw);
-  if (!match) return null;
-
-  const [, day, month, year] = match;
-  const iso = `${year}-${month}-${day}`;
-  const parsed = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  if (
-    parsed.getFullYear() !== Number(year) ||
-    parsed.getMonth() + 1 !== Number(month) ||
-    parsed.getDate() !== Number(day)
-  ) {
-    return null;
+  const slashMatch = DISPLAY_DATE_PATTERN.exec(raw);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return toValidIsoDate(Number(year), Number(month), Number(day));
   }
-  return iso;
+
+  const longMatch = LONG_DATE_PATTERN.exec(raw);
+  if (longMatch) {
+    const [, day, monthName, year] = longMatch;
+    const month = MONTH_INDEX_BY_NAME[monthName.toLowerCase()];
+    if (!month) return null;
+    return toValidIsoDate(Number(year), month, Number(day));
+  }
+
+  const isoMatch = raw.match(ISO_DATE_PREFIX);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return toValidIsoDate(Number(year), Number(month), Number(day));
+  }
+
+  return null;
 };
 
 export const isValidDisplayDateText = (value?: string | null): boolean => {

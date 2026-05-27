@@ -429,10 +429,26 @@ async managerDecline(
     return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
   },
 
-  async hrApprove(id: number, comment?: string): Promise<EmployeeAssessment> {
-    const response = await api.post(`/employee-assessments/${id}/hr-approve`, {
-      comment: comment ?? null,
-    });
+  async hrApprove(
+    id: number,
+    payload?: {
+      comment?: string | null;
+      signatureId?: number | null;
+      signatureImageData?: string | null;
+      signatureImageType?: string | null;
+      signatureName?: string | null;
+    } | string,
+  ): Promise<EmployeeAssessment> {
+    const body = typeof payload === 'string'
+      ? { comment: payload }
+      : {
+          comment: payload?.comment ?? null,
+          signatureId: payload?.signatureId ?? null,
+          signatureImageData: payload?.signatureImageData ?? null,
+          signatureImageType: payload?.signatureImageType ?? null,
+          signatureName: payload?.signatureName ?? null,
+        };
+    const response = await api.post(`/employee-assessments/${id}/hr-approve`, body);
     return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
   },
 
@@ -462,5 +478,46 @@ async hrDecline(id: number, reason: string, comment?: string): Promise<EmployeeA
 
   async scoreTable(): Promise<AssessmentScoreRow[]> {
     return this.getScoreTable();
+  },
+
+  async exportSelfAssessmentPdf(assessmentId: number): Promise<Blob> {
+    try {
+      const response = await api.get<ArrayBuffer>(`/employee-assessments/reports/${assessmentId}/pdf`, {
+        responseType: 'arraybuffer',
+        headers: { Accept: 'application/pdf' },
+      });
+      const bytes = new Uint8Array(response.data);
+      const pdfHeader = new TextDecoder('utf-8').decode(bytes.slice(0, 4));
+      if (pdfHeader !== '%PDF') {
+        const text = new TextDecoder('utf-8').decode(bytes);
+        try {
+          const parsed = JSON.parse(text) as { message?: string; error?: string };
+          throw new Error(parsed.message || parsed.error || 'Self-assessment PDF could not be exported.');
+        } catch (parseError) {
+          if (parseError instanceof SyntaxError) {
+            throw new Error(text || 'Self-assessment PDF could not be exported.');
+          }
+          throw parseError;
+        }
+      }
+      return new Blob([response.data], { type: 'application/pdf' });
+    } catch (error) {
+      const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+      if (responseData instanceof ArrayBuffer) {
+        const text = new TextDecoder('utf-8').decode(new Uint8Array(responseData));
+        if (text) {
+          try {
+            const parsed = JSON.parse(text) as { message?: string; error?: string };
+            throw new Error(parsed.message || parsed.error || text);
+          } catch (parseError) {
+            if (parseError instanceof SyntaxError) {
+              throw new Error(text);
+            }
+            throw parseError;
+          }
+        }
+      }
+      throw error;
+    }
   },
 };

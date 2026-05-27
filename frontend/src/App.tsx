@@ -43,6 +43,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
+import SelfAssessmentFormRecordsPage from './pages/hr/SelfAssessmentFormRecordsPage';
 import ReportingDashboardPage from './pages/reports/ReportingDashboardPage';
 
 import PositionCreate from './pages/position/Create';
@@ -313,6 +314,8 @@ function App() {
               <Route path="/hr/reports/recommendations" element={<ReportingDashboardPage reportType="recommendations" />} />
               <Route path="/hr/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/hr/assessment-forms" element={<AssessmentFormBuilderPage />} />
+              <Route path="/hr/assessment-review-forms" element={<SelfAssessmentFormRecordsPage pageMode="review" />} />
+              <Route path="/hr/assessment-form-records" element={<SelfAssessmentFormRecordsPage pageMode="records" />} />
               <Route path="/hr/feedback/dashboard" element={<Navigate to="/hr/feedback/questions" replace />} />
               <Route path="/hr/feedback/*" element={<FeedbackLayoutPage />} />
               {appraisalRoutes}
