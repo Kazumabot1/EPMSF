@@ -45,6 +45,20 @@
             <version>5.2.5</version>
         </dependency>
 
+        <!-- JasperReports: HR appraisal PDF report generation -->
+        <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports</artifactId>
+            <version>6.21.3</version>
+        </dependency>
+        <!-- Explicit PDF engine used by JasperReports PDF export.
+             Keeping this direct dependency avoids runtime 500 errors when Maven does not pull it transitively. -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.32</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>

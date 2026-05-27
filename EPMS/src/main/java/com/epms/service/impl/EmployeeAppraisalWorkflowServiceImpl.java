@@ -95,7 +95,6 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         form.setEmployeeCodeSnapshot(employeeUser != null ? employeeUser.getEmployeeCode() : null);
         form.setDepartmentNameSnapshot(department.getDepartmentName());
         form.setPositionSnapshot(employee.getPosition() != null ? employee.getPosition().getPositionTitle() : null);
-        form.setAssessmentDate(cycle.getStartDate());
         form.setStatus(EmployeeAppraisalStatus.PM_DRAFT);
         form.setVisibleToEmployee(false);
         form.setLocked(false);
@@ -132,7 +131,10 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
 
         User managerUser = getUser(pmUserId);
         form.setProjectManager(managerUser);
-        form.setAssessmentDate(form.getCycle() != null ? form.getCycle().getStartDate() : form.getAssessmentDate());
+        if (request != null) {
+            form.setAssessmentDate(request.getAssessmentDate());
+            form.setEffectiveDate(request.getEffectiveDate());
+        }
 
         if (request != null && request.getRatings() != null) {
             savePmDraftRatings(form, request.getRatings());
@@ -198,7 +200,8 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         );
 
         form.setProjectManager(managerUser);
-        form.setAssessmentDate(form.getCycle() != null ? form.getCycle().getStartDate() : form.getAssessmentDate());
+        form.setAssessmentDate(request.getAssessmentDate());
+        form.setEffectiveDate(request.getEffectiveDate());
 
         savePmRatings(form, request.getRatings());
         recalculateScore(form);
@@ -1117,7 +1120,15 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         review.setSignatureImageData(signatureImageData);
         review.setSignatureImageType(signatureImageType);
         review.setDecision(decision);
-        review.setSubmittedAt(submitted ? new Date() : null);
+
+        Date actionTime = new Date();
+        // Keep submitted_at non-null even for draft rows so existing local databases
+        // with the old NOT NULL constraint do not fail with a 500 during auto-save.
+        // The decision column remains the source of truth: DRAFT = saved draft,
+        // APPROVED/SUBMITTED = final stage submission.
+        if (submitted || review.getSubmittedAt() == null) {
+            review.setSubmittedAt(actionTime);
+        }
 
         reviewRepository.save(review);
     }

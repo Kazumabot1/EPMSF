@@ -371,6 +371,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
           { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
+          // { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
+          // { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
           { to: '/hr/feedback/audit', label: 'Audit Log', icon: 'bi bi-shield-check' },
@@ -807,6 +809,13 @@ if (isHr) return hrNavItems;
 if (isDepartmentHead) return departmentHeadNavItems;
 if (isManager) return managerNavItems;
 if (isEmployee) return employeeNavItems;
+  if (variant === 'admin') return adminNavItems;
+  if (variant === 'hr') return hrNavItems;
+  if (isAdmin) return adminNavItems;
+  if (isHr) return hrNavItems;
+  if (isDepartmentHead) return departmentHeadNavItems;
+  if (isExecutive) return executiveNavItems;
+  if (isEmployee) return employeeNavItems;
 
     return hrNavItems;
   }, [
@@ -819,6 +828,7 @@ if (isEmployee) return employeeNavItems;
     positionPermissions,
   ]);
 
+}, [variant, isAdmin, isHr, isDepartmentHead, isExecutive, isEmployee, canCreatePip]);
   const loadUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/notifications/unread-count');
@@ -912,6 +922,51 @@ if (isEmployee) return employeeNavItems;
     });
   };
 
+  const renderSubmenuItem = (child: NavItem, depth = 0) => {
+    const childExpanded = expanded.has(child.to);
+    const childActive = child.end
+        ? location.pathname === child.to
+        : location.pathname === child.to || location.pathname.startsWith(`${child.to}/`) || hasActiveChild(child);
+
+    if (child.children?.length) {
+      return (
+          <div key={child.to} className="hr-submenu-group">
+            <button
+                type="button"
+                className={`hr-submenu-link hr-submenu-toggle ${childActive ? 'active' : ''}`}
+                style={{ marginLeft: depth * 12 }}
+                onClick={() => toggleParent(child)}
+            >
+              <i className={child.icon} />
+              <span>{child.label}</span>
+              <i className={`bi ${childExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} hr-submenu-caret`} />
+            </button>
+            {childExpanded && (
+                <div className="hr-submenu hr-submenu-nested">
+                  {child.children.map((grandchild) => renderSubmenuItem(grandchild, depth + 1))}
+                </div>
+            )}
+          </div>
+      );
+    }
+
+    return (
+        <NavLink
+            key={child.to}
+            to={child.to}
+            end={child.end}
+            className={({ isActive }) =>
+                `hr-submenu-link ${isActive ? 'active' : ''}`
+            }
+            style={{ marginLeft: depth * 12 }}
+        >
+          <i className={child.icon} />
+          <span>{child.label}</span>
+          {child.to.includes('notifications') && notificationBadge}
+        </NavLink>
+    );
+  };
+
   return (
     <aside className={`hr-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="hr-sidebar-top">
@@ -994,6 +1049,15 @@ className={({ isActive }) => `hr-submenu-link ${isActive ? 'active' : ''}`}
           );
         })}
       </nav>
+                  {!collapsed && isExpanded && (
+                      <div className="hr-submenu">
+                        {item.children.map((child) => renderSubmenuItem(child))}
+                      </div>
+                  )}
+                </div>
+            );
+          })}
+        </nav>
 
              <div className="hr-sidebar-footer">
                <button type="button" className="hr-sidebar-collapse" onClick={onToggle}>

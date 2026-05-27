@@ -1,6 +1,7 @@
 package com.epms.repository;
 
 import com.epms.entity.DepartmentKpiCycle;
+import com.epms.entity.enums.KpiTemplateCycleStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +13,6 @@ public interface DepartmentKpiCycleRepository extends JpaRepository<DepartmentKp
     Optional<DepartmentKpiCycle> findDetailById(Integer id);
 
     List<DepartmentKpiCycle> findAllByOrderByCreatedAtDesc();
+
+    List<DepartmentKpiCycle> findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus status);
 }

@@ -63,7 +63,7 @@ public class AuditLog {
     @Column(columnDefinition = "TEXT")
     private String newValue;
 
-    @Column(length = 150)
+    @Column(length = 500)
     private String reason;
 
     @Temporal(TemporalType.TIMESTAMP)

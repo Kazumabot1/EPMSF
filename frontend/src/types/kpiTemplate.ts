@@ -4,6 +4,8 @@ export interface KpiTemplatePositionSummary {
   id: number;
   positionId: number;
   positionTitle: string;
+  durationMonths: number;
+  durationLabel: string;
 }
 
 export interface KpiTemplateItem {
@@ -47,8 +49,9 @@ export interface KpiTemplateResponse {
 export interface KpiTemplateRequest {
   title: string;
   status: KpiFormStatus;
-  startDate?: string | null;
-  endDate?: string | null;
+  startDate?: null;
+  endDate?: null;
+  positionDurationMonths: number;
   positionIds: number[];
   items: KpiTemplateItem[];
   removedItemReasons?: Record<number, string>;

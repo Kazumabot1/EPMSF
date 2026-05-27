@@ -3,7 +3,9 @@ package com.epms.service.impl;
 import com.epms.dto.*;
 import com.epms.entity.*;
 import com.epms.entity.enums.DepartmentKpiResultStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiGraceExtension;
 import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.*;
@@ -17,8 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,7 +30,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    private static final Set<Integer> ALLOWED_DURATION_YEARS = Set.of(1, 2, 3, 4, 5);
     private static final String TYPE_DEPARTMENT_KPI_FINALIZED = "DEPARTMENT_KPI_FINALIZED";
+    private static final String TYPE_DEPARTMENT_KPI_FINALIZATION_APPROVAL = "DEPARTMENT_KPI_FINALIZATION_APPROVAL";
 
     private final DepartmentKpiTemplateRepository templateRepository;
     private final DepartmentKpiCycleRepository cycleRepository;
@@ -39,6 +45,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     private final KpiItemRepository kpiItemRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -47,8 +54,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         User user = currentUser();
         DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
                 .title(request.getTitle().trim())
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
+                .durationMonths(request.getDurationMonths())
                 .status(request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus())
                 .createdByUser(user)
                 .build();
@@ -65,8 +71,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         DepartmentKpiTemplate template = templateRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI template not found."));
         template.setTitle(request.getTitle().trim());
-        template.setStartDate(request.getStartDate());
-        template.setEndDate(request.getEndDate());
+        template.setDurationMonths(request.getDurationMonths());
         template.setStatus(request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus());
         template.setUpdatedByUser(currentUser());
         template.getRows().clear();
@@ -106,11 +111,13 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     @Transactional
     public DepartmentKpiCycleResponseDto createCycle(DepartmentKpiCycleRequestDto request) {
         validateCycleRequest(request);
+        Integer durationYears = normalizedDurationYears(request);
         DepartmentKpiCycle cycle = DepartmentKpiCycle.builder()
                 .cycleName(request.getCycleName().trim())
                 .startDate(request.getStartDate())
-                .durationMonths(request.getDurationMonths())
-                .endDate(request.getStartDate().plusMonths(request.getDurationMonths()).minusDays(1))
+                .durationMonths(durationYears * 12)
+                .durationYears(durationYears)
+                .endDate(calculateEndDate(request.getStartDate(), durationYears))
                 .status(KpiTemplateCycleStatus.DRAFT)
                 .createdByUser(currentUser())
                 .build();
@@ -125,10 +132,18 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         validateCycleRequest(request);
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        ensureCycleEditable(cycle);
+        String editReason = normalizeEditReason(request.getEditReason());
+        if (editReason == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
+        }
+        Integer durationYears = normalizedDurationYears(request);
+        cycle.setLastEditReason(editReason);
         cycle.setCycleName(request.getCycleName().trim());
         cycle.setStartDate(request.getStartDate());
-        cycle.setDurationMonths(request.getDurationMonths());
-        cycle.setEndDate(request.getStartDate().plusMonths(request.getDurationMonths()).minusDays(1));
+        cycle.setDurationMonths(durationYears * 12);
+        cycle.setDurationYears(durationYears);
+        cycle.setEndDate(calculateEndDate(request.getStartDate(), durationYears));
         cycle.setUpdatedByUser(currentUser());
         cycle.getCycleTemplates().clear();
         cycleRepository.flush();
@@ -152,17 +167,94 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     @Override
     @Transactional
-    public DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, boolean active) {
+    public DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, DepartmentKpiCycleStatusRequestDTO request) {
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        boolean active = Boolean.TRUE.equals(request.getActive());
         if (active) {
+            if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+                return getCycle(id);
+            }
+            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
+            }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+            cycle.setClosingRequestedAt(null);
+            cycle.setGraceEndsAt(null);
+            cycle.setClosedAt(null);
             DepartmentKpiCyclePeriod period = ensureLatestPeriod(cycle);
             createResultsForCyclePeriod(cycle, period);
         } else {
+            if (cycle.getStatus() != KpiTemplateCycleStatus.ACTIVE) {
+                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
+                    return getCycle(id);
+                }
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only active cycles can be deactivated.");
+            }
+            if (isBeforeOfficialEndDate(cycle)) {
+                requestEarlyClose(cycle, request);
+                cycleRepository.saveAndFlush(cycle);
+                return getCycle(id);
+            }
+            LocalDateTime now = LocalDateTime.now(clock);
             cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
+            cycle.setClosingRequestedAt(now);
+            cycle.setGraceEndsAt(null);
+            cycle.setClosedAt(now);
         }
         cycle.setUpdatedByUser(currentUser());
+        cycleRepository.saveAndFlush(cycle);
+        return getCycle(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepartmentKpiCycleResponseDto> listPendingEarlyCloseRequests() {
+        return cycleRepository
+                .findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus.PENDING_APPROVAL)
+                .stream()
+                .map(this::toCycleDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiCycleResponseDto approveEarlyClose(Integer id, String reviewReason) {
+        DepartmentKpiCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        LocalDateTime now = LocalDateTime.now(clock);
+        KpiGraceExtension extension = cycle.getGraceExtension();
+        if (extension == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
+        }
+        cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
+        cycle.setClosingRequestedAt(now);
+        cycle.setGraceEndsAt(extension.addTo(now));
+        cycle.setClosedAt(null);
+        cycle.setEarlyCloseReviewedAt(now);
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        cycle.setEarlyCloseReviewReason(normalizeEditReason(reviewReason));
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.saveAndFlush(cycle);
+        return getCycle(id);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiCycleResponseDto rejectEarlyClose(Integer id, String reviewReason) {
+        DepartmentKpiCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+        cycle.setEarlyCloseReviewedAt(LocalDateTime.now(clock));
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        cycle.setEarlyCloseReviewReason(normalizeEditReason(reviewReason));
+        cycle.setClosingRequestedAt(null);
+        cycle.setGraceEndsAt(null);
+        cycle.setClosedAt(null);
+        cycle.setUpdatedByUser(reviewer);
         cycleRepository.saveAndFlush(cycle);
         return getCycle(id);
     }
@@ -192,6 +284,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
         if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Scores cannot be changed after finalization.");
+        }
+        if (result.getStatus() == DepartmentKpiResultStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Scores cannot be changed while CEO approval is pending.");
         }
         Map<Integer, DepartmentKpiScore> byRow = result.getScores().stream()
                 .collect(Collectors.toMap(s -> s.getTemplateRow().getId(), s -> s));
@@ -241,33 +336,45 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     @Override
     @Transactional
-    public DepartmentKpiResultDto finalizeResult(Integer resultId) {
+    public DepartmentKpiResultDto requestFinalization(Integer resultId, DepartmentKpiFinalizationRequestDto request) {
         DepartmentKpiResult result = resultRepository.findDetailById(resultId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
-        finalizeOne(result, LocalDateTime.now());
-        resultRepository.saveAndFlush(result);
-        notifyDepartmentHeads(result);
-        return toResultDto(result);
+        if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Department KPI result is already finalized.");
+        }
+        if (result.getStatus() == DepartmentKpiResultStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Department KPI finalization is already pending CEO approval.");
+        }
+        String reason = request == null || request.getReason() == null ? "" : request.getReason().trim();
+        if (reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Finalization reason is required.");
+        }
+        ensureResultComplete(result);
+        result.calculateTotals();
+        User requester = currentUser();
+        result.setStatus(DepartmentKpiResultStatus.PENDING_APPROVAL);
+        result.setFinalizationRequestReason(reason);
+        result.setFinalizationRequestedAt(LocalDateTime.now(clock));
+        result.setFinalizationRequestedByUser(requester);
+        result.setFinalizationReviewDecision(null);
+        result.setFinalizationReviewReason(null);
+        result.setFinalizationReviewedAt(null);
+        result.setFinalizationReviewedByUser(null);
+        DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
+        notifyExecutivesOfFinalizationRequest(saved);
+        return toResultDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiResultDto finalizeResult(Integer resultId) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Submit Department KPI finalization for CEO approval.");
     }
 
     @Override
     @Transactional
     public int finalizeTemplate(Integer templateId, Integer cyclePeriodId) {
-        List<DepartmentKpiResult> results = resultRepository.findByTemplateAndPeriod(templateId, cyclePeriodId);
-        if (results.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No Department KPI results found for this template.");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        int count = 0;
-        for (DepartmentKpiResult result : results) {
-            if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED) continue;
-            finalizeOne(result, now);
-            resultRepository.save(result);
-            notifyDepartmentHeads(result);
-            count++;
-        }
-        resultRepository.flush();
-        return count;
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bulk Department KPI finalization is not available. Submit each result for CEO approval.");
     }
 
     @Override
@@ -283,6 +390,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         return resultRepository.findByStatusInOrderByAssignedAtDesc(List.of(
                 DepartmentKpiResultStatus.ASSIGNED,
                 DepartmentKpiResultStatus.IN_PROGRESS,
+                DepartmentKpiResultStatus.PENDING_APPROVAL,
                 DepartmentKpiResultStatus.CLOSED
         )).stream().map(this::toResultDto).toList();
     }
@@ -298,18 +406,67 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .stream().map(this::toResultDto).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepartmentKpiResultDto> listPendingFinalizationRequests() {
+        return resultRepository.findByStatusOrderByFinalizationRequestedAtAsc(DepartmentKpiResultStatus.PENDING_APPROVAL)
+                .stream().map(this::toResultDto).toList();
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiResultDto approveFinalization(Integer resultId, String reviewReason) {
+        DepartmentKpiResult result = requirePendingFinalization(resultId);
+        result.setFinalizationReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        result.setFinalizationReviewReason(cleanOptionalText(reviewReason));
+        result.setFinalizationReviewedAt(LocalDateTime.now(clock));
+        result.setFinalizationReviewedByUser(currentUser());
+        finalizeOne(result, LocalDateTime.now(clock));
+        DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
+        notifyDepartmentHeads(saved);
+        notifyFinalizationRequester(saved, true);
+        return toResultDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public DepartmentKpiResultDto rejectFinalization(Integer resultId, String reviewReason) {
+        DepartmentKpiResult result = requirePendingFinalization(resultId);
+        result.setStatus(DepartmentKpiResultStatus.IN_PROGRESS);
+        result.setFinalizationReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        result.setFinalizationReviewReason(cleanOptionalText(reviewReason));
+        result.setFinalizationReviewedAt(LocalDateTime.now(clock));
+        result.setFinalizationReviewedByUser(currentUser());
+        DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
+        notifyFinalizationRequester(saved, false);
+        return toResultDto(saved);
+    }
+
     private void finalizeOne(DepartmentKpiResult result, LocalDateTime now) {
         if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Department KPI result is already closed.");
         }
-        if (result.getScores() == null || result.getScores().isEmpty()
-                || result.getScores().stream().anyMatch(s -> s.getScore() == null)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Complete all KPI rows before finalizing.");
-        }
+        ensureResultComplete(result);
         result.calculateTotals();
         result.setStatus(DepartmentKpiResultStatus.FINALIZED);
         result.setFinalizedAt(now);
         result.setFinalizedByUser(currentUser());
+    }
+
+    private void ensureResultComplete(DepartmentKpiResult result) {
+        if (result.getScores() == null || result.getScores().isEmpty()
+                || result.getScores().stream().anyMatch(s -> s.getScore() == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Complete all KPI rows before finalizing.");
+        }
+    }
+
+    private DepartmentKpiResult requirePendingFinalization(Integer resultId) {
+        DepartmentKpiResult result = resultRepository.findDetailById(resultId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
+        if (result.getStatus() != DepartmentKpiResultStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending Department KPI finalization request exists for this result.");
+        }
+        return result;
     }
 
     private void validateWeightScoreWithinWeight(DepartmentKpiResult result, DepartmentKpiScore score) {
@@ -376,9 +533,70 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                         .cycle(cycle)
                         .periodNumber(1)
                         .startDate(cycle.getStartDate())
-                        .endDate(cycle.getStartDate().plusMonths(cycle.getDurationMonths()).minusDays(1))
+                        .endDate(calculateEndDate(cycle.getStartDate(), responseDurationYears(cycle)))
                         .status(KpiTemplateCyclePeriodStatus.OPEN)
                         .build()));
+    }
+
+    private DepartmentKpiCycle requirePendingApproval(Integer id) {
+        DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        if (cycle.getStatus() != KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending Department KPI early close request exists for this cycle.");
+        }
+        return cycle;
+    }
+
+    private void requestEarlyClose(DepartmentKpiCycle cycle, DepartmentKpiCycleStatusRequestDTO request) {
+        String reason = normalizeEditReason(request.getReason());
+        if (reason == null || reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required to request early cycle closure.");
+        }
+        if (request.getGraceExtension() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is required.");
+        }
+        User requester = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        cycle.setEarlyCloseReason(reason);
+        cycle.setGraceExtension(request.getGraceExtension());
+        cycle.setEarlyCloseRequestedAt(LocalDateTime.now(clock));
+        cycle.setEarlyCloseRequestedByUser(requester);
+        cycle.setEarlyCloseReviewedAt(null);
+        cycle.setEarlyCloseReviewedByUser(null);
+        cycle.setEarlyCloseReviewDecision(null);
+        cycle.setEarlyCloseReviewReason(null);
+        cycle.setUpdatedByUser(requester);
+    }
+
+    private boolean isBeforeOfficialEndDate(DepartmentKpiCycle cycle) {
+        LocalDate officialEnd = cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .map(DepartmentKpiCyclePeriod::getEndDate)
+                .orElse(cycle.getEndDate());
+        return officialEnd != null && LocalDate.now(clock).isBefore(officialEnd);
+    }
+
+    private void ensureCycleEditable(DepartmentKpiCycle cycle) {
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cycles pending CEO approval cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getEarlyCloseReviewDecision() == KpiEarlyCloseReviewDecision.APPROVED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "CEO approved closure; this cycle can no longer be edited."
+            );
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getGraceEndsAt() != null
+                && !cycle.getGraceEndsAt().isAfter(LocalDateTime.now(clock))) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Grace period has ended; this cycle can no longer be edited."
+            );
+        }
     }
 
     private void validateTemplateRequest(DepartmentKpiTemplateRequestDto request) {
@@ -388,8 +606,8 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (request.getDepartmentIds() == null || request.getDepartmentIds().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one department.");
         }
-        if (request.getStartDate() != null && request.getEndDate() != null && request.getEndDate().isBefore(request.getStartDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date cannot be before start date.");
+        if (request.getDurationMonths() == null || !ALLOWED_DURATION_MONTHS.contains(request.getDurationMonths())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Template duration must be between 3 months and 1 year.");
         }
         validateRows(request.getItems());
         KpiFormStatus status = request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus();
@@ -426,8 +644,15 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (request.getCycleName() == null || request.getCycleName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cycle name is required.");
         }
-        if (request.getStartDate() == null || request.getDurationMonths() == null || !ALLOWED_DURATION_MONTHS.contains(request.getDurationMonths())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duration must be between 3 and 12 months.");
+        if (request.getStartDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date is required.");
+        }
+        if (request.getStartDate().isBefore(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be in the past.");
+        }
+        Integer durationYears = normalizedDurationYears(request);
+        if (!ALLOWED_DURATION_YEARS.contains(durationYears)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duration must be between 1 and 5 years.");
         }
         if (request.getTemplateIds() == null || request.getTemplateIds().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one Department KPI template.");
@@ -460,8 +685,46 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         }
     }
 
+    private void assertTemplatesNotUsedByOtherActiveCycles(Integer excludeCycleId, List<Integer> templateIds) {
+        if (templateIds == null || templateIds.isEmpty()) {
+            return;
+        }
+        List<DepartmentKpiCycleTemplate> conflicts = cycleTemplateRepository.findConflictingLinks(
+                KpiTemplateCycleStatus.ACTIVE,
+                excludeCycleId,
+                templateIds
+        );
+        if (conflicts == null || conflicts.isEmpty()) {
+            return;
+        }
+        DepartmentKpiCycleTemplate conflict = conflicts.get(0);
+        String templateTitle = conflict.getTemplate().getTitle();
+        String cycleName = conflict.getCycle().getCycleName();
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Department KPI template \"" + templateTitle + "\" is already used by the active cycle \"" + cycleName + "\"."
+        );
+    }
+
+    private String normalizeEditReason(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
+    }
+
+    private String cleanOptionalText(String value) {
+        return normalizeEditReason(value);
+    }
+
     private void applyCycleTemplates(DepartmentKpiCycle cycle, List<Integer> templateIds) {
-        for (Integer id : templateIds.stream().distinct().toList()) {
+        List<Integer> distinctIds = templateIds.stream().distinct().toList();
+        assertTemplatesNotUsedByOtherActiveCycles(cycle.getId(), distinctIds);
+        for (Integer id : distinctIds) {
             DepartmentKpiTemplate template = templateRepository.findById(id)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Department KPI template not found: " + id));
             if (template.getStatus() != KpiFormStatus.ACTIVE && template.getStatus() != KpiFormStatus.FINALIZED) {
@@ -507,6 +770,8 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .title(t.getTitle())
                 .startDate(t.getStartDate())
                 .endDate(t.getEndDate())
+                .durationMonths(t.getDurationMonths())
+                .durationLabel(durationMonthLabel(t.getDurationMonths()))
                 .status(t.getStatus())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
@@ -523,18 +788,33 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .filter(link -> link.getTemplate() != null)
                 .map(link -> DepartmentKpiCycleResponseDto.TemplateSummary.builder().id(link.getTemplate().getId()).title(link.getTemplate().getTitle()).build())
                 .toList();
+        Integer durationYears = responseDurationYears(c);
         return DepartmentKpiCycleResponseDto.builder()
                 .id(c.getId())
                 .cycleName(c.getCycleName())
                 .startDate(c.getStartDate())
                 .endDate(c.getEndDate())
                 .durationMonths(c.getDurationMonths())
-                .durationLabel(c.getDurationMonths() == 12 ? "1 year" : c.getDurationMonths() + " months")
+                .durationYears(durationYears)
+                .durationLabel(durationYearLabel(durationYears))
                 .status(c.getStatus())
                 .currentPeriodId(period == null ? null : period.getId())
                 .currentPeriodNumber(period == null ? null : period.getPeriodNumber())
                 .currentPeriodStartDate(period == null ? null : period.getStartDate())
                 .currentPeriodEndDate(period == null ? null : period.getEndDate())
+                .closingRequestedAt(c.getClosingRequestedAt())
+                .graceEndsAt(c.getGraceEndsAt())
+                .closedAt(c.getClosedAt())
+                .earlyCloseReason(c.getEarlyCloseReason())
+                .graceExtension(c.getGraceExtension())
+                .earlyCloseRequestedAt(c.getEarlyCloseRequestedAt())
+                .earlyCloseRequestedByUserId(c.getEarlyCloseRequestedByUser() == null ? null : c.getEarlyCloseRequestedByUser().getId())
+                .earlyCloseRequestedByName(c.getEarlyCloseRequestedByUser() == null ? null : displayUser(c.getEarlyCloseRequestedByUser()))
+                .earlyCloseReviewedAt(c.getEarlyCloseReviewedAt())
+                .earlyCloseReviewedByUserId(c.getEarlyCloseReviewedByUser() == null ? null : c.getEarlyCloseReviewedByUser().getId())
+                .earlyCloseReviewedByName(c.getEarlyCloseReviewedByUser() == null ? null : displayUser(c.getEarlyCloseReviewedByUser()))
+                .earlyCloseReviewDecision(c.getEarlyCloseReviewDecision())
+                .earlyCloseReviewReason(c.getEarlyCloseReviewReason())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .templates(templates)
@@ -555,6 +835,15 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 .finalizedAt(r.getFinalizedAt())
                 .periodStartDate(r.getCyclePeriod() != null ? r.getCyclePeriod().getStartDate() : r.getTemplate().getStartDate())
                 .periodEndDate(r.getCyclePeriod() != null ? r.getCyclePeriod().getEndDate() : r.getTemplate().getEndDate())
+                .finalizationRequestReason(r.getFinalizationRequestReason())
+                .finalizationRequestedAt(r.getFinalizationRequestedAt())
+                .finalizationRequestedByUserId(r.getFinalizationRequestedByUser() == null ? null : r.getFinalizationRequestedByUser().getId())
+                .finalizationRequestedByName(r.getFinalizationRequestedByUser() == null ? null : displayUser(r.getFinalizationRequestedByUser()))
+                .finalizationReviewDecision(r.getFinalizationReviewDecision())
+                .finalizationReviewReason(r.getFinalizationReviewReason())
+                .finalizationReviewedAt(r.getFinalizationReviewedAt())
+                .finalizationReviewedByUserId(r.getFinalizationReviewedByUser() == null ? null : r.getFinalizationReviewedByUser().getId())
+                .finalizationReviewedByName(r.getFinalizationReviewedByUser() == null ? null : displayUser(r.getFinalizationReviewedByUser()))
                 .lines(r.getScores().stream()
                         .sorted(Comparator.comparing(s -> s.getTemplateRow().getSortOrder() == null ? 0 : s.getTemplateRow().getSortOrder()))
                         .map(s -> DepartmentKpiResultDto.Line.builder()
@@ -600,6 +889,71 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                     result.getId()
             );
         }
+    }
+
+    private void notifyExecutivesOfFinalizationRequest(DepartmentKpiResult result) {
+        for (User executive : userRepository.findActiveUsersByNormalizedRoleNames(List.of("CEO", "EXECUTIVE"))) {
+            notificationService.send(
+                    executive.getId(),
+                    "Department KPI finalization approval needed",
+                    "HR requested final approval for Department KPI \"" + result.getTemplate().getTitle() + "\" for "
+                            + result.getDepartment().getDepartmentName() + ".",
+                    TYPE_DEPARTMENT_KPI_FINALIZATION_APPROVAL,
+                    result.getId()
+            );
+        }
+    }
+
+    private void notifyFinalizationRequester(DepartmentKpiResult result, boolean approved) {
+        User requester = result.getFinalizationRequestedByUser();
+        if (requester == null || requester.getId() == null) {
+            return;
+        }
+        notificationService.send(
+                requester.getId(),
+                approved ? "Department KPI finalization approved" : "Department KPI finalization rejected",
+                approved
+                        ? "CEO approved Department KPI finalization for " + result.getDepartment().getDepartmentName() + "."
+                        : "CEO rejected Department KPI finalization for " + result.getDepartment().getDepartmentName() + ". You can continue scoring.",
+                TYPE_DEPARTMENT_KPI_FINALIZATION_APPROVAL,
+                result.getId()
+        );
+    }
+
+    private Integer normalizedDurationYears(DepartmentKpiCycleRequestDto request) {
+        if (request.getDurationYears() != null) {
+            return request.getDurationYears();
+        }
+        if (request.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(request.getDurationMonths() / 12.0)));
+        }
+        return null;
+    }
+
+    private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
+        if (startDate.getMonth() == Month.FEBRUARY && startDate.getDayOfMonth() == 29
+                && !startDate.plusYears(durationYears).isLeapYear()) {
+            return startDate.plusYears(durationYears);
+        }
+        return startDate.plusYears(durationYears).minusDays(1);
+    }
+
+    private Integer responseDurationYears(DepartmentKpiCycle cycle) {
+        if (cycle.getDurationYears() != null && ALLOWED_DURATION_YEARS.contains(cycle.getDurationYears())) {
+            return cycle.getDurationYears();
+        }
+        if (cycle.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(cycle.getDurationMonths() / 12.0)));
+        }
+        return 1;
+    }
+
+    private String durationYearLabel(Integer years) {
+        return years == null || years == 1 ? "1 year" : years + " years";
+    }
+
+    private String durationMonthLabel(Integer months) {
+        return months == null || months == 12 ? "1 year" : months + " months";
     }
 
     private User currentUser() {

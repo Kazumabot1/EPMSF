@@ -65,10 +65,10 @@ import java.util.stream.Collectors;
 public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
     private static final String DEFAULT_CAMPAIGN_TYPE = "360 Feedback";
-    private static final Set<String> TARGET_LEVEL_CODES = Set.of("L05", "L06", "L07");
+    private static final Set<String> TARGET_LEVEL_CODES = Set.of("L04", "L05", "L06", "L07");
     private static final Set<String> TARGET_EXCLUDED_ROLES = Set.of(
             "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN",
-            "CEO", "EXECUTIVE", "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT"
+            "CEO", "EXECUTIVE"
     );
 
     private static final List<FeedbackCampaignStatus> OVERLAP_BLOCKING_STATUSES = List.of(
@@ -836,6 +836,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         addAssignmentCheck(requests, assignments, checks, blocking, warnings);
         addQuestionReviewCheck(campaign, assignments, checks, blocking, warnings);
         addScoringConfigCheck(campaign, assignments, checks, blocking, warnings);
+        addPrivacyPolicyCheck(campaign, checks, warnings);
         addSubmissionWindowCheck(campaign, checks, blocking, warnings);
 
         int totalAssignments = assignments.size();
@@ -1030,16 +1031,16 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             }
             questionReviewService.validateCampaignQuestionSelectionReady(campaign.getId());
             long emptyGroups = review.getGroups() == null ? 0 : review.getGroups().stream()
-                                                                .filter(group -> group.getIncludedQuestionCount() == null || group.getIncludedQuestionCount() <= 0)
-                                                                .count();
+                    .filter(group -> group.getIncludedQuestionCount() == null || group.getIncludedQuestionCount() <= 0)
+                    .count();
             if (emptyGroups > 0) {
                 blocking.add("Every evaluator group must keep at least one included question.");
                 checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "BLOCKED", emptyGroups + " evaluator group(s) have no included questions."));
                 return;
             }
             long noScoredGroups = review.getGroups() == null ? 0 : review.getGroups().stream()
-                                                                   .filter(group -> group.getIncludedScoredQuestionCount() == null || group.getIncludedScoredQuestionCount() <= 0)
-                                                                   .count();
+                    .filter(group -> group.getIncludedScoredQuestionCount() == null || group.getIncludedScoredQuestionCount() <= 0)
+                    .count();
             if (noScoredGroups > 0) {
                 warnings.add(noScoredGroups + " question group(s) have no scored questions.");
                 checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "WARNING", review.getIncludedQuestionCount() + " questions saved; " + noScoredGroups + " group(s) are non-scored only."));
@@ -1089,6 +1090,42 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             return;
         }
         checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "PASS", "Relationship weights total 100% and are ready for scoring."));
+    }
+
+    private void addPrivacyPolicyCheck(
+            FeedbackCampaign campaign,
+            List<FeedbackCampaignActivationReadinessResponse.FeedbackCampaignActivationCheck> checks,
+            List<String> warnings
+    ) {
+        List<String> anonymousRoles = new ArrayList<>();
+        if (Boolean.TRUE.equals(campaign.getManagerFeedbackAnonymous())) anonymousRoles.add("manager");
+        if (!Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) anonymousRoles.add("peer");
+        if (!Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) anonymousRoles.add("direct report");
+        if (Boolean.TRUE.equals(campaign.getSelfFeedbackAnonymous())) anonymousRoles.add("self");
+
+        List<String> privacyWarnings = new ArrayList<>();
+        if (Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) {
+            privacyWarnings.add("Peer feedback is not anonymous. Confirm this policy before launching.");
+        }
+        if (Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) {
+            privacyWarnings.add("Direct report feedback is not anonymous. Confirm this policy before launching.");
+        }
+
+        if (!privacyWarnings.isEmpty()) {
+            warnings.addAll(privacyWarnings);
+            checks.add(readinessCheck(
+                    "PRIVACY_POLICY",
+                    "Privacy settings",
+                    "WARNING",
+                    String.join(" ", privacyWarnings)
+            ));
+            return;
+        }
+
+        String message = anonymousRoles.isEmpty()
+                ? "No anonymous feedback roles are enabled."
+                : "Anonymous feedback enabled for " + String.join(", ", anonymousRoles) + " feedback.";
+        checks.add(readinessCheck("PRIVACY_POLICY", "Privacy settings", "PASS", message));
     }
 
     private void addSubmissionWindowCheck(
@@ -1522,11 +1559,12 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             blockReasons.add("This employee is not available for this campaign.");
         }
         String normalizedLevelCode = normalizeLevelCode(level == null ? null : level.getLevelCode());
-        if (normalizedLevelCode == null || !TARGET_LEVEL_CODES.contains(normalizedLevelCode)) {
+        boolean departmentHeadTarget = user != null && hasDepartmentHeadRole(user);
+        if ((normalizedLevelCode == null || !TARGET_LEVEL_CODES.contains(normalizedLevelCode)) && !departmentHeadTarget) {
             blockReasons.add("This employee is outside the selected campaign audience.");
         }
         if (user != null && hasTargetExcludedRole(user)) {
-            blockReasons.add("Department heads, HR, Admin, and CEO users can give feedback when assigned, but they are not included as feedback recipients.");
+            blockReasons.add("HR, Admin, and Executive users can give feedback when assigned, but they are not included as feedback recipients.");
         }
         if (excludedTargetUserId != null && user != null && user.getId() != null
                 && Objects.equals(user.getId().longValue(), excludedTargetUserId)) {
@@ -1603,6 +1641,18 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
                 .map(this::normalizeRoleNameForPolicy)
                 .anyMatch(TARGET_EXCLUDED_ROLES::contains);
+    }
+
+    private boolean hasDepartmentHeadRole(User user) {
+        if (user == null || user.getId() == null) {
+            return false;
+        }
+        return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
+                .map(this::normalizeRoleNameForPolicy)
+                .anyMatch(role -> role.equals("DEPARTMENT_HEAD")
+                        || role.equals("DEPARTMENTHEAD")
+                        || role.equals("DEPT_HEAD")
+                        || role.equals("HEAD_OF_DEPARTMENT"));
     }
 
     private String normalizeRoleNameForPolicy(String role) {

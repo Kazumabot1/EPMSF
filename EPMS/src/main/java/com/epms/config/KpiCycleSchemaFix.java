@@ -34,7 +34,14 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             if (!product.contains("mysql") && !product.contains("mariadb")) {
                 return;
             }
+            alignEarlyCloseColumns(conn);
+            alignDepartmentKpiEarlyCloseColumns(conn);
+            alignCycleDurationColumns(conn);
+            alignDepartmentKpiDurationColumns(conn);
+            alignCyclePeriodTemplateColumn(conn);
             alignCycleStatusEnum(conn);
+            alignDepartmentKpiCycleStatusEnum(conn);
+            alignDepartmentKpiResultFinalizationApproval(conn);
             alignEmployeeKpiStatusEnum(conn);
         } catch (SQLException e) {
             log.warn("KPI cycle schema fix skipped: {}", e.getMessage());
@@ -46,15 +53,156 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             return;
         }
         String columnType = columnType(conn, "kpi_template_cycle", "status");
-        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'closing'")) {
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
             return;
         }
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(
                     "ALTER TABLE kpi_template_cycle "
-                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','CLOSING','DEACTIVATED') NOT NULL"
+                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
             );
-            log.info("Aligned kpi_template_cycle.status enum with CLOSING status.");
+            log.info("Aligned kpi_template_cycle.status enum with early close approval status.");
+        }
+    }
+
+    private void alignEarlyCloseColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle")) {
+            return;
+        }
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "grace_extension", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_requested_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_requested_by", "INT NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_reviewed_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_reviewed_by", "INT NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_review_decision", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "kpi_template_cycle", "early_close_review_reason", "VARCHAR(1000) NULL");
+    }
+
+    private void alignDepartmentKpiEarlyCloseColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_cycle")) {
+            return;
+        }
+        addColumnIfMissing(conn, "department_kpi_cycle", "closing_requested_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "grace_ends_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "closed_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "grace_extension", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_requested_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_requested_by", "INT NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_reviewed_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_reviewed_by", "INT NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_review_decision", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "department_kpi_cycle", "early_close_review_reason", "VARCHAR(1000) NULL");
+    }
+
+    private void alignCycleDurationColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle")) {
+            return;
+        }
+        if (!columnExists(conn, "kpi_template_cycle", "duration_years")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE kpi_template_cycle ADD COLUMN duration_years INT NOT NULL DEFAULT 1");
+                stmt.executeUpdate(
+                        "UPDATE kpi_template_cycle "
+                                + "SET duration_years = GREATEST(1, LEAST(5, CEIL(COALESCE(duration_months, 12) / 12)))"
+                );
+                log.info("Added kpi_template_cycle.duration_years column.");
+            }
+        }
+    }
+
+    private void alignDepartmentKpiDurationColumns(Connection conn) throws SQLException {
+        if (tableExists(conn, "department_kpi_template")
+                && !columnExists(conn, "department_kpi_template", "duration_months")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE department_kpi_template ADD COLUMN duration_months INT NOT NULL DEFAULT 3");
+                log.info("Added department_kpi_template.duration_months column.");
+            }
+        }
+        if (tableExists(conn, "department_kpi_cycle")
+                && !columnExists(conn, "department_kpi_cycle", "duration_years")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE department_kpi_cycle ADD COLUMN duration_years INT NOT NULL DEFAULT 1");
+                stmt.executeUpdate(
+                        "UPDATE department_kpi_cycle "
+                                + "SET duration_years = GREATEST(1, LEAST(5, CEIL(COALESCE(duration_months, 12) / 12)))"
+                );
+                log.info("Added department_kpi_cycle.duration_years column.");
+            }
+        }
+    }
+
+    private void alignCyclePeriodTemplateColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle_period")) {
+            return;
+        }
+        if (!columnExists(conn, "kpi_template_cycle_period", "kpi_form_id")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("ALTER TABLE kpi_template_cycle_period ADD COLUMN kpi_form_id INT NULL");
+                log.info("Added kpi_template_cycle_period.kpi_form_id column.");
+            }
+        }
+    }
+
+    private void alignDepartmentKpiCycleStatusEnum(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_cycle") || !columnExists(conn, "department_kpi_cycle", "status")) {
+            return;
+        }
+        String columnType = columnType(conn, "department_kpi_cycle", "status");
+        if (columnType == null || !columnType.toLowerCase(Locale.ROOT).contains("enum")) {
+            return;
+        }
+        if (columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "ALTER TABLE department_kpi_cycle "
+                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
+            );
+            log.info("Aligned department_kpi_cycle.status enum with early close approval status.");
+        }
+    }
+
+    private void alignDepartmentKpiResultFinalizationApproval(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_result")) {
+            return;
+        }
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_request_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_requested_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_requested_by_user_id", "INT NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_review_decision", "VARCHAR(30) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_review_reason", "VARCHAR(1000) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_reviewed_at", "DATETIME(6) NULL");
+        addColumnIfMissing(conn, "department_kpi_result", "finalization_reviewed_by_user_id", "INT NULL");
+
+        if (!columnExists(conn, "department_kpi_result", "status")) {
+            return;
+        }
+        String columnType = columnType(conn, "department_kpi_result", "status");
+        if (columnType == null || !columnType.toLowerCase(Locale.ROOT).contains("enum")) {
+            return;
+        }
+        if (columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "ALTER TABLE department_kpi_result "
+                            + "MODIFY COLUMN status ENUM('ASSIGNED','IN_PROGRESS','PENDING_APPROVAL','FINALIZED','CLOSED') NOT NULL"
+            );
+            log.info("Aligned department_kpi_result.status enum with finalization approval status.");
+        }
+    }
+
+    private void addColumnIfMissing(Connection conn, String tableName, String columnName, String definition) throws SQLException {
+        if (columnExists(conn, tableName, columnName)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
+            log.info("Added {}.{} column.", tableName, columnName);
         }
     }
 

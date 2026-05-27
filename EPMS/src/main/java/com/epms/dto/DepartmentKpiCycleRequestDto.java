@@ -18,9 +18,12 @@ public class DepartmentKpiCycleRequestDto {
     private String cycleName;
     @NotNull
     private LocalDate startDate;
-    @NotNull
+    private Integer durationYears;
     private Integer durationMonths;
     @NotEmpty
     @Builder.Default
     private List<Integer> templateIds = new ArrayList<>();
+
+    /** Required when updating a cycle; ignored on create. */
+    private String editReason;
 }

@@ -12,6 +12,7 @@ import com.epms.repository.UserRepository;
 import com.epms.service.AppraisalTemplateService;
 import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -34,6 +36,7 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public AppraisalTemplateResponse createTemplate(AppraisalTemplateRequest request, Integer createdByUserId) {
@@ -71,24 +74,21 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
     @Override
     public AppraisalTemplateResponse updateDraftTemplate(Integer templateId, AppraisalTemplateRequest request, Integer updatedByUserId) {
         validateTemplateRequest(request);
-        AppraisalFormTemplate template = getTemplateEntity(templateId);
-        ensureTemplateEditable(template);
-        String auditBefore = templateAuditSummary(template);
-        template.setTemplateName(request.getTemplateName().trim());
-        template.setDescription(request.getDescription());
-        template.setAppraiseeSignatureId(request.getAppraiseeSignatureId());
-        template.setAppraiserSignatureId(request.getAppraiserSignatureId());
-        template.setHrSignatureId(request.getHrSignatureId());
-        template.setSignatureDateFormat(normalizeSignatureDateFormat(request.getSignatureDateFormat()));
-        template.setFormType(request.getFormType() != null ? request.getFormType() : template.getFormType());
-        template.setTargetAllDepartments(request.getTargetAllDepartments() == null || Boolean.TRUE.equals(request.getTargetAllDepartments()));
+        dropLegacyTemplateUniqueIndexesIfPresent();
 
-        replaceDepartments(template, request);
-        replaceSections(template, request.getSections());
-        replaceScoreBands(template, request.getScoreBands());
+        AppraisalFormTemplate sourceTemplate = getTemplateEntity(templateId);
+        ensureTemplateEditable(sourceTemplate);
+        String auditBefore = templateAuditSummary(sourceTemplate);
+        List<AuditChangeParts> auditChanges = buildTemplateRequestAuditChanges(sourceTemplate, request);
 
-        AppraisalFormTemplate saved = templateRepository.save(template);
-        auditTemplateUpdate(saved, updatedByUserId, auditBefore);
+        // HR template edits must never mutate the template structure that old appraisal
+        // cycles/forms already reference.  Save the edited form as a fresh master
+        // template record, then hide the previous master from the reusable template list.
+        AppraisalFormTemplate replacement = buildReplacementTemplate(sourceTemplate, request, updatedByUserId);
+        AppraisalFormTemplate saved = templateRepository.saveAndFlush(replacement);
+
+        hidePreviousTemplateFromMasterList(sourceTemplate);
+        auditTemplateUpdateSafely(saved, updatedByUserId, auditBefore, auditChanges, request.getEditReason());
         return mapTemplate(saved, true);
     }
 
@@ -136,38 +136,523 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
     }
 
 
-    private void auditTemplateUpdate(AppraisalFormTemplate template, Integer updatedByUserId, String auditBefore) {
-        auditLogService.log(
-                updatedByUserId,
-                "UPDATE",
-                "APPRAISAL_TEMPLATE",
-                template.getId(),
-                "Template Form",
-                compactAuditSummary(auditBefore),
-                compactAuditSummary(templateAuditSummary(template)),
-                "HR edited appraisal template form"
-        );
+    private List<AuditChangeParts> buildTemplateRequestAuditChanges(AppraisalFormTemplate sourceTemplate, AppraisalTemplateRequest request) {
+        List<AuditChangeParts> changes = new ArrayList<>();
+        if (sourceTemplate == null || request == null) {
+            return changes;
+        }
+
+        String oldName = safeAuditText(sourceTemplate.getTemplateName());
+        String newName = safeAuditText(request.getTemplateName());
+        if (!Objects.equals(oldName, newName)) {
+            changes.add(new AuditChangeParts("Template Name", auditState(oldName, newName), oldName, newName));
+        }
+
+        String oldDescription = safeAuditText(sourceTemplate.getDescription());
+        String newDescription = safeAuditText(request.getDescription());
+        if (!Objects.equals(oldDescription, newDescription)) {
+            changes.add(new AuditChangeParts("Description", auditState(oldDescription, newDescription), oldDescription, newDescription));
+        }
+
+        List<AppraisalSection> oldSections = activeSortedSections(sourceTemplate);
+        Map<Integer, AppraisalSection> oldSectionsById = new LinkedHashMap<>();
+        for (AppraisalSection section : oldSections) {
+            if (section.getId() != null) {
+                oldSectionsById.put(section.getId(), section);
+            }
+        }
+
+        List<AppraisalSectionRequest> requestedSections = request.getSections() == null ? List.of() : request.getSections();
+        Set<Integer> requestedSectionIds = new LinkedHashSet<>();
+        for (int sectionIndex = 0; sectionIndex < requestedSections.size(); sectionIndex++) {
+            AppraisalSectionRequest sectionRequest = requestedSections.get(sectionIndex);
+            int sectionNo = sectionIndex + 1;
+            AppraisalSection oldSection = sectionRequest.getId() == null ? null : oldSectionsById.get(sectionRequest.getId());
+            if (oldSection != null && oldSection.getId() != null) {
+                requestedSectionIds.add(oldSection.getId());
+            }
+
+            String newSectionName = safeAuditText(sectionRequest.getSectionName());
+            if (oldSection == null) {
+                changes.add(new AuditChangeParts("Section " + sectionNo, "added", "", formatSectionRequestSnapshot(sectionRequest)));
+                List<AppraisalCriterionRequest> criteriaRequests = sectionRequest.getCriteria() == null ? List.of() : sectionRequest.getCriteria();
+                for (int criteriaIndex = 0; criteriaIndex < criteriaRequests.size(); criteriaIndex++) {
+                    changes.add(new AuditChangeParts(
+                            "Criteria " + sectionNo + "." + (criteriaIndex + 1),
+                            "added",
+                            "",
+                            safeAuditText(criteriaRequests.get(criteriaIndex).getCriteriaText())
+                    ));
+                }
+                continue;
+            }
+
+            String oldSectionName = safeAuditText(oldSection.getSectionName());
+            if (!Objects.equals(oldSectionName, newSectionName)) {
+                changes.add(new AuditChangeParts("Section " + sectionNo, "changed", oldSectionName, newSectionName));
+            }
+
+            addCriteriaRequestAuditChanges(changes, oldSection, sectionRequest, sectionNo);
+        }
+
+        for (int oldIndex = 0; oldIndex < oldSections.size(); oldIndex++) {
+            AppraisalSection oldSection = oldSections.get(oldIndex);
+            if (oldSection.getId() != null && requestedSectionIds.contains(oldSection.getId())) {
+                continue;
+            }
+            int sectionNo = oldIndex + 1;
+            List<String> oldCriteria = activeSortedCriteria(oldSection).stream()
+                    .map(criteria -> safeAuditText(criteria.getCriteriaText()))
+                    .toList();
+            changes.add(new AuditChangeParts(
+                    "Section " + sectionNo,
+                    "removed",
+                    formatSectionSnapshot(new AuditSectionSnapshot(safeAuditText(oldSection.getSectionName()), oldCriteria)),
+                    ""
+            ));
+            for (int criteriaIndex = 0; criteriaIndex < oldCriteria.size(); criteriaIndex++) {
+                changes.add(new AuditChangeParts(
+                        "Criteria " + sectionNo + "." + (criteriaIndex + 1),
+                        "removed",
+                        oldCriteria.get(criteriaIndex),
+                        ""
+                ));
+            }
+        }
+
+        addScoreBandRequestAuditChanges(changes, sourceTemplate, request);
+        return changes;
+    }
+
+    private void addCriteriaRequestAuditChanges(List<AuditChangeParts> changes, AppraisalSection oldSection, AppraisalSectionRequest sectionRequest, int sectionNo) {
+        List<AppraisalFormCriteria> oldCriteria = activeSortedCriteria(oldSection);
+        Map<Integer, AppraisalFormCriteria> oldCriteriaById = new LinkedHashMap<>();
+        for (AppraisalFormCriteria criteria : oldCriteria) {
+            if (criteria.getId() != null) {
+                oldCriteriaById.put(criteria.getId(), criteria);
+            }
+        }
+
+        List<AppraisalCriterionRequest> criteriaRequests = sectionRequest.getCriteria() == null ? List.of() : sectionRequest.getCriteria();
+        Set<Integer> requestedCriteriaIds = new LinkedHashSet<>();
+        for (int criteriaIndex = 0; criteriaIndex < criteriaRequests.size(); criteriaIndex++) {
+            AppraisalCriterionRequest criteriaRequest = criteriaRequests.get(criteriaIndex);
+            int criteriaNo = criteriaIndex + 1;
+            AppraisalFormCriteria oldCriterion = criteriaRequest.getId() == null ? null : oldCriteriaById.get(criteriaRequest.getId());
+            String newCriteriaText = safeAuditText(criteriaRequest.getCriteriaText());
+            if (oldCriterion == null) {
+                changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + criteriaNo, "added", "", newCriteriaText));
+                continue;
+            }
+            if (oldCriterion.getId() != null) {
+                requestedCriteriaIds.add(oldCriterion.getId());
+            }
+            String oldCriteriaText = safeAuditText(oldCriterion.getCriteriaText());
+            if (!Objects.equals(oldCriteriaText, newCriteriaText)) {
+                changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + criteriaNo, "changed", oldCriteriaText, newCriteriaText));
+            }
+        }
+
+        for (int oldIndex = 0; oldIndex < oldCriteria.size(); oldIndex++) {
+            AppraisalFormCriteria oldCriterion = oldCriteria.get(oldIndex);
+            if (oldCriterion.getId() != null && requestedCriteriaIds.contains(oldCriterion.getId())) {
+                continue;
+            }
+            changes.add(new AuditChangeParts(
+                    "Criteria " + sectionNo + "." + (oldIndex + 1),
+                    "removed",
+                    safeAuditText(oldCriterion.getCriteriaText()),
+                    ""
+            ));
+        }
+    }
+
+    private void addScoreBandRequestAuditChanges(List<AuditChangeParts> changes, AppraisalFormTemplate sourceTemplate, AppraisalTemplateRequest request) {
+        List<AppraisalTemplateScoreBand> oldBands = activeSortedScoreBands(sourceTemplate);
+        Map<Integer, AppraisalTemplateScoreBand> oldBandsById = new LinkedHashMap<>();
+        for (AppraisalTemplateScoreBand band : oldBands) {
+            if (band.getId() != null) {
+                oldBandsById.put(band.getId(), band);
+            }
+        }
+
+        List<AppraisalScoreBandRequest> requestedBands = normalizeScoreBandRequests((request.getScoreBands() == null || request.getScoreBands().isEmpty())
+                ? defaultScoreBands()
+                : request.getScoreBands());
+        Set<Integer> requestedBandIds = new LinkedHashSet<>();
+        for (int index = 0; index < requestedBands.size(); index++) {
+            AppraisalScoreBandRequest bandRequest = requestedBands.get(index);
+            AppraisalTemplateScoreBand oldBand = bandRequest.getId() == null ? null : oldBandsById.get(bandRequest.getId());
+            String newValue = scoreBandAuditText(bandRequest);
+            if (oldBand == null) {
+                changes.add(new AuditChangeParts("Score Range " + (index + 1), "added", "", newValue));
+                continue;
+            }
+            if (oldBand.getId() != null) {
+                requestedBandIds.add(oldBand.getId());
+            }
+            String oldValue = scoreBandAuditText(oldBand);
+            if (!Objects.equals(oldValue, newValue)) {
+                changes.add(new AuditChangeParts("Score Range " + (index + 1), "changed", oldValue, newValue));
+            }
+        }
+
+        for (int oldIndex = 0; oldIndex < oldBands.size(); oldIndex++) {
+            AppraisalTemplateScoreBand oldBand = oldBands.get(oldIndex);
+            if (oldBand.getId() != null && requestedBandIds.contains(oldBand.getId())) {
+                continue;
+            }
+            changes.add(new AuditChangeParts("Score Range " + (oldIndex + 1), "removed", scoreBandAuditText(oldBand), ""));
+        }
+    }
+
+    private List<AppraisalSection> activeSortedSections(AppraisalFormTemplate template) {
+        if (template == null || template.getSections() == null) {
+            return List.of();
+        }
+        return template.getSections().stream()
+                .filter(section -> section.getActive() == null || Boolean.TRUE.equals(section.getActive()))
+                .sorted(Comparator.comparing(AppraisalSection::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .toList();
+    }
+
+    private List<AppraisalFormCriteria> activeSortedCriteria(AppraisalSection section) {
+        if (section == null || section.getCriteria() == null) {
+            return List.of();
+        }
+        return section.getCriteria().stream()
+                .filter(criteria -> criteria.getActive() == null || Boolean.TRUE.equals(criteria.getActive()))
+                .sorted(Comparator.comparing(AppraisalFormCriteria::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .toList();
+    }
+
+    private List<AppraisalTemplateScoreBand> activeSortedScoreBands(AppraisalFormTemplate template) {
+        if (template == null || template.getScoreBands() == null) {
+            return List.of();
+        }
+        return template.getScoreBands().stream()
+                .filter(band -> band.getActive() == null || Boolean.TRUE.equals(band.getActive()))
+                .sorted(Comparator.comparing(AppraisalTemplateScoreBand::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .toList();
+    }
+
+    private String formatSectionRequestSnapshot(AppraisalSectionRequest sectionRequest) {
+        if (sectionRequest == null) {
+            return "";
+        }
+        List<String> criteria = sectionRequest.getCriteria() == null
+                ? List.of()
+                : sectionRequest.getCriteria().stream()
+                .map(criteriaRequest -> safeAuditText(criteriaRequest.getCriteriaText()))
+                .toList();
+        return formatSectionSnapshot(new AuditSectionSnapshot(safeAuditText(sectionRequest.getSectionName()), criteria));
+    }
+
+    private String scoreBandAuditText(AppraisalScoreBandRequest band) {
+        if (band == null) {
+            return "";
+        }
+        return safeAuditText(band.getLabel()) + " " + band.getMinScore() + "-" + band.getMaxScore();
+    }
+
+    private String scoreBandAuditText(AppraisalTemplateScoreBand band) {
+        if (band == null) {
+            return "";
+        }
+        return safeAuditText(band.getLabel()) + " " + band.getMinScore() + "-" + band.getMaxScore();
+    }
+
+
+    private void auditTemplateUpdateSafely(AppraisalFormTemplate template, Integer updatedByUserId, String auditBefore, List<AuditChangeParts> requestChanges, String editReason) {
+        try {
+            String auditAfter = templateAuditSummary(template);
+            List<AuditChangeParts> changes = requestChanges != null ? new ArrayList<>(requestChanges) : buildAuditChangeParts(auditBefore, auditAfter);
+            if (changes.isEmpty()) {
+                changes = List.of(new AuditChangeParts("Updated", "changed", "", ""));
+            }
+            String auditBatchId = Long.toString(System.nanoTime(), 36);
+            for (AuditChangeParts parts : changes) {
+                auditLogService.log(
+                        updatedByUserId,
+                        "UPDATE",
+                        "APPRAISAL_TEMPLATE",
+                        template.getId(),
+                        compactAuditSummary(withAuditBatch(parts.field(), auditBatchId)),
+                        compactAuditSummary(parts.oldValue()),
+                        compactAuditSummary(encodedAuditNewValue(parts)),
+                        normalizeEditReason(editReason)
+                );
+            }
+        } catch (Exception ignored) {
+            // Audit records are useful for HR tracking, but they must never block the actual edit save.
+        }
+    }
+
+    private String withAuditBatch(String value, String auditBatchId) {
+        String base = value == null || value.isBlank() ? "Updated" : value;
+        if (auditBatchId == null || auditBatchId.isBlank()) {
+            return base;
+        }
+        return base + " @@auditBatch=" + auditBatchId;
+    }
+
+    private String encodedAuditNewValue(AuditChangeParts parts) {
+        if (parts == null) {
+            return "changed";
+        }
+        String state = parts.state() == null || parts.state().isBlank() ? "changed" : parts.state().trim().toLowerCase();
+        String newValue = parts.newValue() == null ? "" : parts.newValue().trim();
+        return newValue.isBlank() ? state : state + "::" + newValue;
+    }
+
+    private String normalizeEditReason(String value) {
+        if (value == null || value.isBlank()) {
+            return "No reason provided";
+        }
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        return normalized.length() <= 450 ? normalized : normalized.substring(0, 447) + "...";
     }
 
     private String compactAuditSummary(String value) {
         if (value == null) {
-            return "-";
+            return "";
         }
         String normalized = value.replaceAll("\\s+", " ").trim();
         return normalized.length() <= 240 ? normalized : normalized.substring(0, 237) + "...";
+    }
+
+    private List<AuditChangeParts> buildAuditChangeParts(String beforeSummary, String afterSummary) {
+        Map<String, String> before = parseAuditSummary(beforeSummary);
+        Map<String, String> after = parseAuditSummary(afterSummary);
+        List<AuditChangeParts> changes = new ArrayList<>();
+
+        addScalarAuditChange(changes, before, after, "Name", "Template Name");
+        addScalarAuditChange(changes, before, after, "Description", "Description");
+        addScalarAuditChange(changes, before, after, "Departments", "Departments");
+        addEvaluationAuditChanges(changes, before.get("evaluation details"), after.get("evaluation details"));
+        addScoreRangeAuditChanges(changes, before.get("score ranges"), after.get("score ranges"));
+        addScalarAuditChange(changes, before, after, "Status", "Status");
+
+        return changes;
+    }
+
+    private void addScalarAuditChange(List<AuditChangeParts> changes, Map<String, String> before, Map<String, String> after, String auditKey, String label) {
+        String oldValue = before.getOrDefault(auditKey.toLowerCase(), "");
+        String newValue = after.getOrDefault(auditKey.toLowerCase(), "");
+        if (!Objects.equals(oldValue, newValue)) {
+            changes.add(new AuditChangeParts(label, auditState(oldValue, newValue), oldValue, newValue));
+        }
+    }
+
+    private String auditState(String oldValue, String newValue) {
+        boolean oldBlank = oldValue == null || oldValue.isBlank() || "-".equals(oldValue.trim());
+        boolean newBlank = newValue == null || newValue.isBlank() || "-".equals(newValue.trim());
+        if (!oldBlank && newBlank) return "removed";
+        if (oldBlank && !newBlank) return "added";
+        return "changed";
+    }
+
+    private void addEvaluationAuditChanges(List<AuditChangeParts> changes, String beforeValue, String afterValue) {
+        if (Objects.equals(beforeValue, afterValue)) {
+            return;
+        }
+        List<AuditSectionSnapshot> beforeSections = parseEvaluationSnapshot(beforeValue);
+        List<AuditSectionSnapshot> afterSections = parseEvaluationSnapshot(afterValue);
+        if (beforeSections.isEmpty() && afterSections.isEmpty()) {
+            changes.add(new AuditChangeParts("Evaluation Details", "changed", "", ""));
+            return;
+        }
+
+        int maxSections = Math.max(beforeSections.size(), afterSections.size());
+        for (int sectionIndex = 0; sectionIndex < maxSections; sectionIndex++) {
+            int sectionNo = sectionIndex + 1;
+            AuditSectionSnapshot beforeSection = sectionIndex < beforeSections.size() ? beforeSections.get(sectionIndex) : null;
+            AuditSectionSnapshot afterSection = sectionIndex < afterSections.size() ? afterSections.get(sectionIndex) : null;
+            if (beforeSection != null && afterSection == null) {
+                changes.add(new AuditChangeParts("Section " + sectionNo, "removed", formatSectionSnapshot(beforeSection), ""));
+                for (int criteriaIndex = 0; criteriaIndex < beforeSection.criteria.size(); criteriaIndex++) {
+                    changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + (criteriaIndex + 1), "removed", beforeSection.criteria.get(criteriaIndex), ""));
+                }
+                continue;
+            }
+            if (beforeSection == null && afterSection != null) {
+                changes.add(new AuditChangeParts("Section " + sectionNo, "added", "", formatSectionSnapshot(afterSection)));
+                for (int criteriaIndex = 0; criteriaIndex < afterSection.criteria.size(); criteriaIndex++) {
+                    changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + (criteriaIndex + 1), "added", "", afterSection.criteria.get(criteriaIndex)));
+                }
+                continue;
+            }
+            if (!Objects.equals(beforeSection == null ? null : beforeSection.name, afterSection == null ? null : afterSection.name)) {
+                changes.add(new AuditChangeParts("Section " + sectionNo, "changed", beforeSection == null ? "" : beforeSection.name, afterSection == null ? "" : afterSection.name));
+            }
+
+            List<String> beforeCriteria = beforeSection == null ? List.of() : beforeSection.criteria;
+            List<String> afterCriteria = afterSection == null ? List.of() : afterSection.criteria;
+            int maxCriteria = Math.max(beforeCriteria.size(), afterCriteria.size());
+            for (int criteriaIndex = 0; criteriaIndex < maxCriteria; criteriaIndex++) {
+                int criteriaNo = criteriaIndex + 1;
+                String oldCriteria = criteriaIndex < beforeCriteria.size() ? beforeCriteria.get(criteriaIndex) : null;
+                String newCriteria = criteriaIndex < afterCriteria.size() ? afterCriteria.get(criteriaIndex) : null;
+                if (oldCriteria != null && newCriteria == null) {
+                    changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + criteriaNo, "removed", oldCriteria, ""));
+                } else if (oldCriteria == null && newCriteria != null) {
+                    changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + criteriaNo, "added", "", newCriteria));
+                } else if (!Objects.equals(oldCriteria, newCriteria)) {
+                    changes.add(new AuditChangeParts("Criteria " + sectionNo + "." + criteriaNo, "changed", oldCriteria == null ? "" : oldCriteria, newCriteria == null ? "" : newCriteria));
+                }
+            }
+        }
+    }
+
+    private String formatSectionSnapshot(AuditSectionSnapshot section) {
+        if (section == null) {
+            return "";
+        }
+        String criteriaText = section.criteria == null || section.criteria.isEmpty()
+                ? "-"
+                : String.join(" / ", section.criteria);
+        return section.name + "[" + criteriaText + "]";
+    }
+
+    private void addScoreRangeAuditChanges(List<AuditChangeParts> changes, String beforeValue, String afterValue) {
+        if (Objects.equals(beforeValue, afterValue)) {
+            return;
+        }
+        List<String> beforeRanges = parseScoreRangeSnapshot(beforeValue);
+        List<String> afterRanges = parseScoreRangeSnapshot(afterValue);
+        if (beforeRanges.isEmpty() && afterRanges.isEmpty()) {
+            changes.add(new AuditChangeParts("Score Ranges", "changed", "", ""));
+            return;
+        }
+        int maxRanges = Math.max(beforeRanges.size(), afterRanges.size());
+        for (int index = 0; index < maxRanges; index++) {
+            String oldRange = index < beforeRanges.size() ? beforeRanges.get(index) : null;
+            String newRange = index < afterRanges.size() ? afterRanges.get(index) : null;
+            if (oldRange != null && newRange == null) {
+                changes.add(new AuditChangeParts("Score Range " + (index + 1), "removed", oldRange, ""));
+            } else if (oldRange == null && newRange != null) {
+                changes.add(new AuditChangeParts("Score Range " + (index + 1), "added", "", newRange));
+            } else if (!Objects.equals(oldRange, newRange)) {
+                changes.add(new AuditChangeParts("Score Range " + (index + 1), "changed", oldRange == null ? "" : oldRange, newRange == null ? "" : newRange));
+            }
+        }
+    }
+
+    private record AuditChangeParts(String field, String state, String oldValue, String newValue) {}
+
+    private List<AuditSectionSnapshot> parseEvaluationSnapshot(String value) {
+        List<AuditSectionSnapshot> sections = new ArrayList<>();
+        if (value == null || value.isBlank() || "-".equals(value.trim())) {
+            return sections;
+        }
+        for (String sectionPart : value.split("\\s*;\\s*")) {
+            String trimmed = sectionPart.trim();
+            if (trimmed.isBlank()) {
+                continue;
+            }
+            int open = trimmed.indexOf('[');
+            int close = trimmed.lastIndexOf(']');
+            String name = open >= 0 ? trimmed.substring(0, open).trim() : trimmed;
+            String criteriaValue = open >= 0 && close > open ? trimmed.substring(open + 1, close).trim() : "";
+            List<String> criteria = new ArrayList<>();
+            if (!criteriaValue.isBlank() && !"-".equals(criteriaValue)) {
+                for (String criteriaText : criteriaValue.split("\\s*/\\s*")) {
+                    String normalized = criteriaText.trim();
+                    if (!normalized.isBlank()) {
+                        criteria.add(normalized);
+                    }
+                }
+            }
+            sections.add(new AuditSectionSnapshot(name, criteria));
+        }
+        return sections;
+    }
+
+    private void addScoreRangeChanges(List<String> changedLabels, String beforeValue, String afterValue) {
+        if (Objects.equals(beforeValue, afterValue)) {
+            return;
+        }
+        List<String> beforeRanges = parseScoreRangeSnapshot(beforeValue);
+        List<String> afterRanges = parseScoreRangeSnapshot(afterValue);
+        if (beforeRanges.isEmpty() && afterRanges.isEmpty()) {
+            changedLabels.add("Score Ranges: changed");
+            return;
+        }
+        int maxRanges = Math.max(beforeRanges.size(), afterRanges.size());
+        for (int index = 0; index < maxRanges; index++) {
+            String oldRange = index < beforeRanges.size() ? beforeRanges.get(index) : null;
+            String newRange = index < afterRanges.size() ? afterRanges.get(index) : null;
+            if (oldRange != null && newRange == null) {
+                changedLabels.add("Score Range " + (index + 1) + ": removed");
+            } else if (oldRange == null && newRange != null) {
+                changedLabels.add("Score Range " + (index + 1) + ": added");
+            } else if (!Objects.equals(oldRange, newRange)) {
+                changedLabels.add("Score Range " + (index + 1) + ": changed");
+            }
+        }
+    }
+
+    private List<String> parseScoreRangeSnapshot(String value) {
+        List<String> ranges = new ArrayList<>();
+        if (value == null || value.isBlank() || "-".equals(value.trim())) {
+            return ranges;
+        }
+        for (String range : value.split("\\s*;\\s*")) {
+            String normalized = range.trim();
+            if (!normalized.isBlank()) {
+                ranges.add(normalized);
+            }
+        }
+        return ranges;
+    }
+
+    private static class AuditSectionSnapshot {
+        private final String name;
+        private final List<String> criteria;
+
+        private AuditSectionSnapshot(String name, List<String> criteria) {
+            this.name = name;
+            this.criteria = criteria;
+        }
+    }
+
+    private Map<String, String> parseAuditSummary(String summary) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (summary == null || summary.isBlank()) {
+            return values;
+        }
+        for (String part : summary.split("\\|")) {
+            int idx = part.indexOf(':');
+            if (idx < 0) {
+                continue;
+            }
+            String key = part.substring(0, idx).trim().toLowerCase();
+            String value = part.substring(idx + 1).trim();
+            if (!key.isBlank()) {
+                values.put(key, value);
+            }
+        }
+        return values;
     }
 
     private String templateAuditSummary(AppraisalFormTemplate template) {
         if (template == null) {
             return "-";
         }
-        int sectionCount = template.getSections() == null ? 0 : template.getSections().size();
+        int sectionCount = template.getSections() == null
+                ? 0
+                : (int) template.getSections().stream()
+                .filter(section -> section.getActive() == null || Boolean.TRUE.equals(section.getActive()))
+                .count();
         int criteriaCount = template.getSections() == null
                 ? 0
                 : template.getSections().stream()
-                .mapToInt(section -> section.getCriteria() == null ? 0 : section.getCriteria().size())
+                .filter(section -> section.getActive() == null || Boolean.TRUE.equals(section.getActive()))
+                .mapToInt(section -> section.getCriteria() == null ? 0 : (int) section.getCriteria().stream()
+                        .filter(criteria -> criteria.getActive() == null || Boolean.TRUE.equals(criteria.getActive()))
+                        .count())
                 .sum();
-        int scoreBandCount = template.getScoreBands() == null ? 0 : template.getScoreBands().size();
+        String scoreRanges = templateScoreRangeSummary(template);
         String departments = Boolean.TRUE.equals(template.getTargetAllDepartments())
                 ? "All Departments"
                 : template.getTargetDepartments().stream()
@@ -183,8 +668,49 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
                 + " | Departments: " + departments
                 + " | Sections: " + sectionCount
                 + " | Criteria: " + criteriaCount
-                + " | Score Ranges: " + scoreBandCount
+                + " | Evaluation Details: " + templateEvaluationSummary(template)
+                + " | Score Ranges: " + scoreRanges
                 + " | Status: " + template.getStatus();
+    }
+
+    private String templateEvaluationSummary(AppraisalFormTemplate template) {
+        if (template.getSections() == null || template.getSections().isEmpty()) {
+            return "-";
+        }
+        return template.getSections().stream()
+                .filter(section -> section.getActive() == null || Boolean.TRUE.equals(section.getActive()))
+                .sorted(Comparator.comparing(AppraisalSection::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .map(section -> safeAuditText(section.getSectionName()) + "[" + criteriaSummary(section) + "]")
+                .collect(java.util.stream.Collectors.joining(" ; "));
+    }
+
+    private String criteriaSummary(AppraisalSection section) {
+        if (section.getCriteria() == null || section.getCriteria().isEmpty()) {
+            return "-";
+        }
+        return section.getCriteria().stream()
+                .filter(criteria -> criteria.getActive() == null || Boolean.TRUE.equals(criteria.getActive()))
+                .sorted(Comparator.comparing(AppraisalFormCriteria::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .map(criteria -> safeAuditText(criteria.getCriteriaText()))
+                .collect(java.util.stream.Collectors.joining(" / "));
+    }
+
+    private String templateScoreRangeSummary(AppraisalFormTemplate template) {
+        if (template.getScoreBands() == null || template.getScoreBands().isEmpty()) {
+            return "-";
+        }
+        return template.getScoreBands().stream()
+                .filter(band -> band.getActive() == null || Boolean.TRUE.equals(band.getActive()))
+                .sorted(Comparator.comparing(AppraisalTemplateScoreBand::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .map(band -> safeAuditText(band.getLabel()) + " " + band.getMinScore() + "-" + band.getMaxScore())
+                .collect(java.util.stream.Collectors.joining(" ; "));
+    }
+
+    private String safeAuditText(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        return value.replace("|", "/").replaceAll("\\s+", " " ).trim();
     }
 
     private void ensureUniqueTemplateNameForCreate(String templateName) {
@@ -194,6 +720,66 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
         }
     }
 
+
+    private AppraisalFormTemplate buildReplacementTemplate(AppraisalFormTemplate sourceTemplate, AppraisalTemplateRequest request, Integer updatedByUserId) {
+        AppraisalFormTemplate replacement = new AppraisalFormTemplate();
+        replacement.setTemplateName(request.getTemplateName().trim());
+        replacement.setDescription(request.getDescription());
+        replacement.setAppraiseeSignatureId(request.getAppraiseeSignatureId());
+        replacement.setAppraiserSignatureId(request.getAppraiserSignatureId());
+        replacement.setHrSignatureId(request.getHrSignatureId());
+        replacement.setSignatureDateFormat(normalizeSignatureDateFormat(request.getSignatureDateFormat()));
+        replacement.setFormType(request.getFormType() != null ? request.getFormType() : sourceTemplate.getFormType());
+        replacement.setTargetAllDepartments(request.getTargetAllDepartments() == null || Boolean.TRUE.equals(request.getTargetAllDepartments()));
+        replacement.setStatus(sourceTemplate.getStatus() == null ? AppraisalTemplateStatus.DRAFT : sourceTemplate.getStatus());
+        replacement.setVersionNo(1);
+        replacement.setCycleSpecificCopy(false);
+
+        User editor = null;
+        if (updatedByUserId != null) {
+            editor = userRepository.findById(updatedByUserId).orElse(null);
+        }
+        replacement.setCreatedByUser(editor != null ? editor : sourceTemplate.getCreatedByUser());
+
+        applyDepartments(replacement, request);
+        applySections(replacement, request.getSections());
+        applyScoreBands(replacement, request.getScoreBands());
+        return replacement;
+    }
+
+    private void hidePreviousTemplateFromMasterList(AppraisalFormTemplate previousTemplate) {
+        if (previousTemplate == null || previousTemplate.getId() == null || Boolean.TRUE.equals(previousTemplate.getCycleSpecificCopy())) {
+            return;
+        }
+        previousTemplate.setCycleSpecificCopy(true);
+        templateRepository.saveAndFlush(previousTemplate);
+    }
+
+    private void dropLegacyTemplateUniqueIndexesIfPresent() {
+        try {
+            List<String> uniqueIndexes = jdbcTemplate.queryForList(
+                    """
+                    SELECT INDEX_NAME
+                    FROM INFORMATION_SCHEMA.STATISTICS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'appraisal_form_template'
+                      AND NON_UNIQUE = 0
+                      AND INDEX_NAME <> 'PRIMARY'
+                    GROUP BY INDEX_NAME
+                    """,
+                    String.class
+            );
+            for (String indexName : uniqueIndexes) {
+                try {
+                    jdbcTemplate.execute("ALTER TABLE appraisal_form_template DROP INDEX `" + indexName.replace("`", "``") + "`");
+                } catch (Exception ignored) {
+                    // Already removed or insufficient permissions. Edit flow should continue.
+                }
+            }
+        } catch (Exception ignored) {
+            // Non-MySQL database or missing metadata privileges.
+        }
+    }
 
     private AppraisalFormTemplate getTemplateEntity(Integer templateId) {
         return templateRepository.findById(templateId)
@@ -339,7 +925,11 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
                     .forEach(requestedExistingSectionIds::add);
         }
 
-        template.getSections().removeIf(section -> section.getId() != null && !requestedExistingSectionIds.contains(section.getId()));
+        template.getSections().forEach(section -> {
+            if (section.getId() != null && !requestedExistingSectionIds.contains(section.getId())) {
+                section.setActive(false);
+            }
+        });
 
         int sectionIndex = 0;
         for (AppraisalSectionRequest sectionRequest : sectionRequests == null ? List.<AppraisalSectionRequest>of() : sectionRequests) {
@@ -379,7 +969,11 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
                     .forEach(requestedExistingCriteriaIds::add);
         }
 
-        section.getCriteria().removeIf(criteria -> criteria.getId() != null && !requestedExistingCriteriaIds.contains(criteria.getId()));
+        section.getCriteria().forEach(criteria -> {
+            if (criteria.getId() != null && !requestedExistingCriteriaIds.contains(criteria.getId())) {
+                criteria.setActive(false);
+            }
+        });
 
         int criteriaIndex = 0;
         for (AppraisalCriterionRequest criterionRequest : criteriaRequests == null ? List.<AppraisalCriterionRequest>of() : criteriaRequests) {
@@ -461,7 +1055,11 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
                 .filter(existingBandsById::containsKey)
                 .forEach(requestedExistingBandIds::add);
 
-        template.getScoreBands().removeIf(band -> band.getId() != null && !requestedExistingBandIds.contains(band.getId()));
+        template.getScoreBands().forEach(band -> {
+            if (band.getId() != null && !requestedExistingBandIds.contains(band.getId())) {
+                band.setActive(false);
+            }
+        });
 
         int index = 0;
         for (AppraisalScoreBandRequest bandRequest : bands) {
@@ -526,6 +1124,7 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
                 sections = sectionRepository.findByTemplateIdWithCriteria(template.getId());
             }
             response.setSections(sections.stream()
+                    .filter(section -> section.getActive() == null || Boolean.TRUE.equals(section.getActive()))
                     .sorted(Comparator.comparing(AppraisalSection::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
                     .map(this::mapSection)
                     .toList());
@@ -546,6 +1145,7 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
                     .toList());
         } else {
             response.setScoreBands(deduplicateTemplateScoreBands(bands).stream()
+                    .filter(band -> band.getActive() == null || Boolean.TRUE.equals(band.getActive()))
                     .sorted(Comparator.comparing(AppraisalTemplateScoreBand::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
                     .map(band -> new AppraisalScoreBandResponse(
                             band.getId(),
@@ -616,6 +1216,7 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
         response.setSortOrder(section.getSortOrder());
         response.setActive(section.getActive());
         response.setCriteria(section.getCriteria().stream()
+                .filter(criteria -> criteria.getActive() == null || Boolean.TRUE.equals(criteria.getActive()))
                 .sorted(Comparator.comparing(AppraisalFormCriteria::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
                 .map(criteria -> new AppraisalCriterionResponse(
                         criteria.getId(),

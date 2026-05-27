@@ -33,6 +33,7 @@ export function kpiStatusBadgeClass(status: string): string {
 }
 
 export type KpiTemplateDurationMonths = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type KpiCycleDurationYears = 1 | 2 | 3 | 4 | 5;
 
 export const KPI_TEMPLATE_DURATION_OPTIONS: Array<{ value: KpiTemplateDurationMonths; label: string }> = [
   { value: 3, label: '3 months' },
@@ -48,6 +49,15 @@ export const KPI_TEMPLATE_DURATION_OPTIONS: Array<{ value: KpiTemplateDurationMo
 ];
 
 export const DEFAULT_KPI_TEMPLATE_DURATION_MONTHS: KpiTemplateDurationMonths = 12;
+export const DEFAULT_KPI_CYCLE_DURATION_YEARS: KpiCycleDurationYears = 1;
+
+export const KPI_CYCLE_DURATION_OPTIONS: Array<{ value: KpiCycleDurationYears; label: string }> = [
+  { value: 1, label: '1 year' },
+  { value: 2, label: '2 years' },
+  { value: 3, label: '3 years' },
+  { value: 4, label: '4 years' },
+  { value: 5, label: '5 years' },
+];
 
 const toDateInputValue = (value: Date): string => {
   const year = value.getFullYear();
@@ -55,6 +65,8 @@ const toDateInputValue = (value: Date): string => {
   const day = `${value.getDate()}`.padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+export const todayDateInputValue = (): string => toDateInputValue(new Date());
 
 export function calculateKpiTemplateEndDate(startDate: string, durationMonths: KpiTemplateDurationMonths): string {
   if (!startDate) return '';
@@ -64,6 +76,26 @@ export function calculateKpiTemplateEndDate(startDate: string, durationMonths: K
   end.setMonth(end.getMonth() + durationMonths);
   end.setDate(end.getDate() - 1);
   return toDateInputValue(end);
+}
+
+export function calculateKpiCycleEndDate(startDate: string, durationYears: KpiCycleDurationYears): string {
+  if (!startDate) return '';
+  const start = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return '';
+  const end = new Date(start);
+  end.setFullYear(end.getFullYear() + durationYears);
+  if (start.getMonth() === 1 && start.getDate() === 29 && end.getMonth() === 1 && end.getDate() === 28) {
+    return toDateInputValue(end);
+  }
+  end.setDate(end.getDate() - 1);
+  return toDateInputValue(end);
+}
+
+export function inferKpiCycleDurationYears(startDate: string, endDate: string): KpiCycleDurationYears {
+  const matched = KPI_CYCLE_DURATION_OPTIONS.find(
+    (option) => calculateKpiCycleEndDate(startDate, option.value) === endDate,
+  );
+  return matched?.value ?? DEFAULT_KPI_CYCLE_DURATION_YEARS;
 }
 
 export function inferKpiTemplateDurationMonths(startDate: string, endDate: string): KpiTemplateDurationMonths {
@@ -122,13 +154,77 @@ export function countPositionsWithoutKpiTemplate(
   return positions.filter((position) => !assigned.has(position.id)).length;
 }
 
-/** KPI forms saved via "Use Form" (draft) — selectable in template cycles. */
+/** KPI template cycles that still hold form assignments (not draft/inactive). */
+export const RUNNING_KPI_CYCLE_STATUSES = ['ACTIVE', 'CLOSING', 'PENDING_APPROVAL'] as const;
+
+export type CycleWithLinkedForms = {
+  id: number;
+  status: string;
+  kpiForms: { id: number }[];
+};
+
+export type CycleWithLinkedTemplates = {
+  id: number;
+  status: string;
+  templates: { id: number }[];
+};
+
+export function collectFormIdsInRunningKpiCycles(
+  cycles: CycleWithLinkedForms[],
+  excludeCycleId?: number,
+): Set<number> {
+  const running = new Set<string>(RUNNING_KPI_CYCLE_STATUSES);
+  const ids = new Set<number>();
+  for (const cycle of cycles) {
+    if (!running.has(cycle.status)) continue;
+    if (excludeCycleId != null && cycle.id === excludeCycleId) continue;
+    for (const form of cycle.kpiForms) {
+      ids.add(form.id);
+    }
+  }
+  return ids;
+}
+
+export function collectTemplateIdsInActiveDepartmentCycles(
+  cycles: CycleWithLinkedTemplates[],
+  excludeCycleId?: number,
+): Set<number> {
+  const ids = new Set<number>();
+  for (const cycle of cycles) {
+    if (cycle.status !== 'ACTIVE') continue;
+    if (excludeCycleId != null && cycle.id === excludeCycleId) continue;
+    for (const template of cycle.templates) {
+      ids.add(template.id);
+    }
+  }
+  return ids;
+}
+
+/** KPI forms saved via "Use Form" — selectable when active, not on another running cycle, or already on this cycle. */
 export function filterKpiFormsForCycleSelection<T extends { id: number; status: string }>(
   templates: T[],
   selectedFormIds: number[] = [],
+  unavailableFormIds: Set<number> = new Set(),
 ): T[] {
   const selected = new Set(selectedFormIds);
-  return templates.filter((template) => template.status === 'ACTIVE' || selected.has(template.id));
+  return templates.filter(
+    (template) =>
+      (template.status === 'ACTIVE' && !unavailableFormIds.has(template.id)) || selected.has(template.id),
+  );
+}
+
+export function filterDepartmentTemplatesForCycleSelection<T extends { id: number; status: string }>(
+  templates: T[],
+  selectedTemplateIds: number[] = [],
+  unavailableTemplateIds: Set<number> = new Set(),
+): T[] {
+  const selected = new Set(selectedTemplateIds);
+  return templates.filter(
+    (template) =>
+      ((template.status === 'ACTIVE' || template.status === 'FINALIZED') &&
+        !unavailableTemplateIds.has(template.id)) ||
+      selected.has(template.id),
+  );
 }
 
 export function formatTemplatePositionLabels(
@@ -150,7 +246,11 @@ export function formatKpiFormCycleOptionLabel(template: {
   positions?: Array<{ positionTitle?: string | null }>;
 }): string {
   const positions = (template.positions ?? [])
-    .map((link) => link.positionTitle?.trim())
+    .map((link) => {
+      const title = link.positionTitle?.trim();
+      const duration = 'durationLabel' in link && typeof link.durationLabel === 'string' ? link.durationLabel : null;
+      return title && duration ? `${title} - ${duration}` : title;
+    })
     .filter((name): name is string => Boolean(name))
     .join(', ');
   const positionSuffix = positions ? ` — ${positions}` : '';

@@ -283,6 +283,8 @@ public class SecurityConfig {
                                 "/api/hr/appraisal/cycles/**",
                                 "/api/appraisal/cycles",
                                 "/api/appraisal/cycles/**",
+                                "/api/hr/appraisal/cycles",
+                                "/api/hr/appraisal/cycles/**",
                                 "/api/hr/appraisal/score-bands",
                                 "/api/hr/appraisal/score-bands/**",
                                 "/api/appraisal/workflow",
@@ -367,6 +369,9 @@ public class SecurityConfig {
                         )
 
                         .requestMatchers(
+                                "/api/hr/kpi-templates/**",
+                                "/api/hr/kpi-template-cycles",
+                                "/api/hr/kpi-template-cycles/**",
                                 "/api/hr/department-kpi-templates",
                                 "/api/hr/department-kpi-templates/**",
                                 "/api/hr/department-kpi-cycles",
@@ -524,6 +529,17 @@ public class SecurityConfig {
                                         "assessmentScoresView"
                                 )
                         )
+
+                        .requestMatchers(
+                                "/api/appraisal/workflow",
+                                "/api/appraisal/workflow/**",
+                                "/api/pip",
+                                "/api/pip/**",
+                                "/api/pips",
+                                "/api/pips/**",
+                                "/api/v1/feedback",
+                                "/api/v1/feedback/**"
+                        ).authenticated()
 
                         .anyRequest().authenticated()
                 )

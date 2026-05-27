@@ -1,5 +1,8 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { appraisalCycleService, appraisalWorkflowService } from '../../services/appraisalService';
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  appraisalCycleService,
+  appraisalWorkflowService,
+} from "../../services/appraisalService";
 import type {
   AppraisalCycleResponse,
   AppraisalEmployeeOptionResponse,
@@ -7,12 +10,15 @@ import type {
   AppraisalTemplateResponse,
   EmployeeAppraisalFormResponse,
   PmAppraisalSubmitRequest,
-} from '../../types/appraisal';
-import AppraisalFormView from '../../components/appraisal/AppraisalFormView';
-import AppraisalRatingDots from '../../components/appraisal/AppraisalRatingDots';
-import AppraisalPopup, { type AppraisalPopupType } from '../../components/appraisal/AppraisalPopup';
-import { formatDisplayDate } from '../../utils/appraisalDateFormat';
-import './appraisal.css';
+} from "../../types/appraisal";
+import AppraisalFormView from "../../components/appraisal/AppraisalFormView";
+import AppraisalRatingDots from "../../components/appraisal/AppraisalRatingDots";
+import AppraisalPopup, {
+  type AppraisalPopupType,
+} from "../../components/appraisal/AppraisalPopup";
+import { formatDisplayDate } from "../../utils/appraisalDateFormat";
+import { getAppraisalScoreBandToneClass } from "../../utils/appraisalScoreBandTone";
+import "./appraisal.css";
 
 type PopupState = {
   type: AppraisalPopupType;
@@ -21,57 +27,107 @@ type PopupState = {
 };
 
 const DEFAULT_SCORE_BANDS: AppraisalScoreBandResponse[] = [
-  { id: 0, minScore: 86, maxScore: 100, label: 'Outstanding', description: 'Performance exceptional and far exceeds expectations.', sortOrder: 1, active: true },
-  { id: 0, minScore: 71, maxScore: 85, label: 'Exceeds Requirements', description: 'Performance is consistent and clearly meets essential requirements.', sortOrder: 2, active: true },
-  { id: 0, minScore: 60, maxScore: 70, label: 'Meet Requirement', description: 'Performance is satisfactory and meets requirements of the job.', sortOrder: 3, active: true },
-  { id: 0, minScore: 40, maxScore: 59, label: 'Need Improvement', description: 'Performance is inconsistent. Supervision and training are needed.', sortOrder: 4, active: true },
-  { id: 0, minScore: 0, maxScore: 39, label: 'Unsatisfactory', description: 'Performance does not meet the minimum requirement of the job.', sortOrder: 5, active: true },
+  {
+    id: 0,
+    minScore: 86,
+    maxScore: 100,
+    label: "Outstanding",
+    description: "Performance exceptional and far exceeds expectations.",
+    sortOrder: 1,
+    active: true,
+  },
+  {
+    id: 0,
+    minScore: 71,
+    maxScore: 85,
+    label: "Exceeds Requirements",
+    description:
+      "Performance is consistent and clearly meets essential requirements.",
+    sortOrder: 2,
+    active: true,
+  },
+  {
+    id: 0,
+    minScore: 60,
+    maxScore: 70,
+    label: "Meet Requirement",
+    description:
+      "Performance is satisfactory and meets requirements of the job.",
+    sortOrder: 3,
+    active: true,
+  },
+  {
+    id: 0,
+    minScore: 40,
+    maxScore: 59,
+    label: "Need Improvement",
+    description:
+      "Performance is inconsistent. Supervision and training are needed.",
+    sortOrder: 4,
+    active: true,
+  },
+  {
+    id: 0,
+    minScore: 0,
+    maxScore: 39,
+    label: "Unsatisfactory",
+    description:
+      "Performance does not meet the minimum requirement of the job.",
+    sortOrder: 5,
+    active: true,
+  },
 ];
 
 const EmployeePerformanceReviewPage = () => {
   const [cycles, setCycles] = useState<AppraisalCycleResponse[]>([]);
-  const [employees, setEmployees] = useState<AppraisalEmployeeOptionResponse[]>([]);
-  const [reviewedEmployeeIds, setReviewedEmployeeIds] = useState<Set<number>>(() => new Set());
+  const [employees, setEmployees] = useState<AppraisalEmployeeOptionResponse[]>(
+    [],
+  );
+  const [reviewedEmployeeIds, setReviewedEmployeeIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [selectedCycleId, setSelectedCycleId] = useState<number>(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number>(0);
-  const [selectedCycleTemplate, setSelectedCycleTemplate] = useState<AppraisalTemplateResponse | null>(null);
+  const [selectedCycleTemplate, setSelectedCycleTemplate] =
+    useState<AppraisalTemplateResponse | null>(null);
   const [form, setForm] = useState<EmployeeAppraisalFormResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [popup, setPopup] = useState<PopupState | null>(null);
-  const [departmentFilter, setDepartmentFilter] = useState('');
 
-  const selectedCycle = useMemo(() => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null, [cycles, selectedCycleId]);
-  const selectedCycleLocked = Boolean(selectedCycle?.locked || selectedCycle?.status === 'LOCKED' || isCycleEndDateToday(selectedCycle?.endDate));
+  const selectedCycle = useMemo(
+    () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
+    [cycles, selectedCycleId],
+  );
+  const selectedCycleLocked = Boolean(
+    selectedCycle?.locked ||
+    selectedCycle?.status === "LOCKED" ||
+    isCycleEndDateToday(selectedCycle?.endDate),
+  );
   const availableEmployees = useMemo(
-    () => employees.filter((employee) => !reviewedEmployeeIds.has(employee.employeeId)),
+    () =>
+      employees.filter(
+        (employee) => !reviewedEmployeeIds.has(employee.employeeId),
+      ),
     [employees, reviewedEmployeeIds],
   );
   const selectedEmployee = useMemo(
-    () => employees.find((employee) => employee.employeeId === selectedEmployeeId) ?? null,
+    () =>
+      employees.find(
+        (employee) => employee.employeeId === selectedEmployeeId,
+      ) ?? null,
     [employees, selectedEmployeeId],
   );
 
-  const departmentOptions = useMemo(() => {
-    const options = new Map<number, string>();
-    cycles.forEach((cycle) => {
-      cycle.departmentIds?.forEach((departmentId, index) => {
-        options.set(departmentId, cycle.departmentNames?.[index] || `Department #${departmentId}`);
-      });
-    });
-    return Array.from(options.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [cycles]);
-
-  const filteredCycles = useMemo(() => {
-    const selectedDepartmentId = departmentFilter ? Number(departmentFilter) : null;
-    return cycles.filter((cycle) => selectedDepartmentId === null || cycle.departmentIds?.includes(selectedDepartmentId));
-  }, [cycles, departmentFilter]);
-
-  const clearCycleFilters = () => {
-    setDepartmentFilter('');
-  };
+  const sortedCycles = useMemo(
+    () =>
+      [...cycles].sort(
+        (left, right) => cycleReceivedTime(right) - cycleReceivedTime(left),
+      ),
+    [cycles],
+  );
 
   const closeReviewModal = () => {
     setSelectedCycleId(0);
@@ -89,7 +145,11 @@ const EmployeePerformanceReviewPage = () => {
         const reviewCycles = await appraisalCycleService.getActiveForPm();
         setCycles(reviewCycles.filter(shouldShowCycleToManager));
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Appraisal cycles could not be loaded.');
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Appraisal cycles could not be loaded.",
+        );
       } finally {
         setLoading(false);
       }
@@ -103,13 +163,20 @@ const EmployeePerformanceReviewPage = () => {
     setSelectedEmployeeId(0);
     setForm(null);
     try {
-      const employeeList = await appraisalWorkflowService.getPmEligibleEmployees(cycleId);
+      const employeeList =
+        await appraisalWorkflowService.getPmEligibleEmployees(cycleId);
       setEmployees(employeeList);
       if (employeeList.length === 0) {
-        setMessage('No eligible employee-level team members remain for this cycle. Submitted employees are removed from the review list.');
+        setMessage(
+          "No eligible employee-level team members remain for this cycle. Submitted employees are removed from the review list.",
+        );
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Eligible employee list could not be loaded.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Eligible employee list could not be loaded.",
+      );
     } finally {
       setLoadingEmployees(false);
     }
@@ -119,34 +186,50 @@ const EmployeePerformanceReviewPage = () => {
     setLoadingTemplate(true);
     setSelectedCycleTemplate(null);
     try {
-      const template = await appraisalWorkflowService.getPmCycleTemplate(cycleId);
+      const template =
+        await appraisalWorkflowService.getPmCycleTemplate(cycleId);
       setSelectedCycleTemplate(template);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Appraisal cycle form template could not be loaded.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Appraisal cycle form template could not be loaded.",
+      );
     } finally {
       setLoadingTemplate(false);
     }
   };
 
   const openCycle = (cycle: AppraisalCycleResponse) => {
-    setSelectedCycleId(cycle.id);
     setReviewedEmployeeIds(new Set());
     setSelectedEmployeeId(0);
     setSelectedCycleTemplate(null);
     setForm(null);
-    setMessage('');
-    if (cycle.locked || cycle.status === 'LOCKED' || isCycleEndDateToday(cycle.endDate)) {
-      setEmployees([]);
-      setMessage('This appraisal cycle is locked by HR. You can see the record but cannot open or submit the form.');
+    setEmployees([]);
+    setMessage("");
+    if (
+      cycle.locked ||
+      cycle.status === "LOCKED" ||
+      isCycleEndDateToday(cycle.endDate)
+    ) {
+      setSelectedCycleId(0);
+      setPopup({
+        type: "info",
+        title: "Appraisal Cycle Locked",
+        message:
+          "This appraisal cycle is already locked. The form cannot be opened or submitted.",
+      });
       return;
     }
+    setSelectedCycleId(cycle.id);
     void loadEmployeesForCycle(cycle.id);
     void loadTemplateForCycle(cycle.id);
   };
 
   const refreshEligibleEmployees = async () => {
     if (!selectedCycleId || selectedCycleLocked) return;
-    const employeeList = await appraisalWorkflowService.getPmEligibleEmployees(selectedCycleId);
+    const employeeList =
+      await appraisalWorkflowService.getPmEligibleEmployees(selectedCycleId);
     setEmployees(employeeList);
   };
 
@@ -155,14 +238,21 @@ const EmployeePerformanceReviewPage = () => {
     setSelectedEmployeeId(employeeId);
     setForm(null);
     setLoading(true);
-    setMessage('');
+    setMessage("");
     try {
-      const draft = await appraisalWorkflowService.createPmDraft(selectedCycleId, employeeId);
+      const draft = await appraisalWorkflowService.createPmDraft(
+        selectedCycleId,
+        employeeId,
+      );
       setForm(draft);
       setSelectedEmployeeId(draft.employeeId);
     } catch (error) {
       setForm(null);
-      setMessage(error instanceof Error ? error.message : 'Unable to open appraisal cycle form.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to open appraisal cycle form.",
+      );
     } finally {
       setLoading(false);
     }
@@ -173,35 +263,30 @@ const EmployeePerformanceReviewPage = () => {
     setLoading(true);
     try {
       await appraisalWorkflowService.submitPmReview(form.id, payload);
-      setReviewedEmployeeIds((previous) => new Set(previous).add(form.employeeId));
+      setReviewedEmployeeIds((previous) =>
+        new Set(previous).add(form.employeeId),
+      );
       setForm(null);
       setSelectedEmployeeId(0);
-      await refreshEligibleEmployees();
-      setMessage('');
+        await refreshEligibleEmployees();
+      setMessage("");
       setPopup({
-        type: 'success',
-        title: 'Submitted Successfully',
-        message: 'Manager review submitted to Dept Head. Choose the next employee name in the same appraisal form box.',
+        type: "success",
+        title: "Submitted Successfully",
+        message:
+          "Manager review submitted to Dept Head. Choose the next employee name in the same appraisal form box.",
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Submit failed.';
+      const errorMessage =
+        error instanceof Error ? error.message : "Submit failed.";
       setMessage(errorMessage);
-      setPopup({ type: 'error', title: 'Submit Failed', message: errorMessage });
+      setPopup({
+        type: "error",
+        title: "Submit Failed",
+        message: errorMessage,
+      });
     } finally {
       setLoading(false);
-    }
-  };
-
-
-  const savePmDraft = async (payload: PmAppraisalSubmitRequest) => {
-    if (!form) return;
-    const formId = form.id;
-    try {
-      const updated = await appraisalWorkflowService.savePmDraft(formId, payload);
-      setForm((current) => (current?.id === formId ? updated : current));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Auto-save failed.');
-      throw error;
     }
   };
 
@@ -209,18 +294,22 @@ const EmployeePerformanceReviewPage = () => {
     <label className="appraisal-field appraisal-employee-picker-field">
       <span>Employee Name</span>
       <select
-        value={selectedEmployeeId}
+        value={selectedEmployeeId || ""}
         onChange={(event) => void openEmployeeForm(Number(event.target.value))}
         disabled={loading || loadingEmployees || selectedCycleLocked}
       >
-        <option value={0}>{loadingEmployees ? 'Loading employee-level team members...' : 'Select employee name'}</option>
+        <option value="">
+          {loadingEmployees
+            ? "Loading employee-level team members..."
+            : "Select employee name"}
+        </option>
         {availableEmployees.map((employee) => (
           <option key={employee.employeeId} value={employee.employeeId}>
             {formatEmployeeNameOption(employee)}
           </option>
         ))}
       </select>
-      <small>Only employee-level members from your assigned team can be selected.</small>
+      <small>Choose an employee-level member from your assigned team.</small>
     </label>
   );
 
@@ -233,16 +322,21 @@ const EmployeePerformanceReviewPage = () => {
           <div>
             <p className="appraisal-dashboard-kicker">Team Appraisals</p>
             <h1>Employee Performance Review</h1>
-            <p>Click an HR appraisal cycle to open the same appraisal cycle form style, then select the employee name inside the form.</p>
+            <p>
+              Click an HR appraisal cycle to open the same appraisal cycle form
+              style, then select the employee name inside the form.
+            </p>
           </div>
           <div className="appraisal-hero-stat-card">
-            <strong>{filteredCycles.length}</strong>
+            <strong>{sortedCycles.length}</strong>
             <span>Cycle Records</span>
           </div>
         </div>
       </div>
 
-      {message && <div className="appraisal-card appraisal-message-card">{message}</div>}
+      {message && (
+        <div className="appraisal-card appraisal-message-card">{message}</div>
+      )}
 
       <div className="appraisal-card">
         <div className="appraisal-form-block-header">
@@ -252,28 +346,11 @@ const EmployeePerformanceReviewPage = () => {
           {loading && <span className="appraisal-muted">Loading...</span>}
         </div>
 
-        <div className="appraisal-filter-bar">
-          <label className="appraisal-filter-field">
-            <span>Department</span>
-            <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
-              <option value="">All Departments</option>
-              {departmentOptions.map(([departmentId, departmentName]) => (
-                <option key={departmentId} value={departmentId}>{departmentName}</option>
-              ))}
-            </select>
-          </label>
-          <div className="appraisal-filter-actions">
-            <button className="appraisal-button ghost" type="button" onClick={clearCycleFilters}>Clear Filters</button>
-            <span className="appraisal-filter-result">Showing {filteredCycles.length} of {cycles.length}</span>
-          </div>
-        </div>
-
         <div className="appraisal-template-table-wrap">
           <table className="appraisal-template-table appraisal-cycle-record-table appraisal-modern-record-table">
             <thead>
               <tr>
                 <th>Appraisal Name</th>
-                <th>Department</th>
                 <th>Manager Deadline</th>
                 <th>Cycle Type</th>
                 <th>Cycle Year</th>
@@ -283,27 +360,43 @@ const EmployeePerformanceReviewPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredCycles.length === 0 && !loading ? (
+              {sortedCycles.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={8}><div className="appraisal-empty">{cycles.length === 0 ? 'No appraisal cycle records found.' : 'No appraisal cycles match the selected department.'}</div></td>
+                  <td colSpan={7}>
+                    <div className="appraisal-empty">
+                      No appraisal cycle records found.
+                    </div>
+                  </td>
                 </tr>
-              ) : filteredCycles.map((cycle) => (
-                <tr
-                  key={cycle.id}
-                  className={`appraisal-clickable-row ${selectedCycleId === cycle.id ? 'appraisal-selected-row' : ''}`}
-                  onClick={() => openCycle(cycle)}
-                  title="Open appraisal form"
-                >
-                  <td><strong>{cycle.cycleName}</strong></td>
-                  <td>{cycle.departmentNames?.join(', ') || '-'}</td>
-                  <td>{formatDate(cycle.managerSubmissionDeadline || cycle.submissionDeadline)}</td>
-                  <td>{cycle.cycleType}</td>
-                  <td>{cycle.cycleYear}</td>
-                  <td>{formatDate(cycle.startDate)}</td>
-                  <td>{formatDate(cycle.endDate)}</td>
-                  <td><span className={statusClass(displayCycleStatus(cycle))}>{displayCycleStatus(cycle)}</span></td>
-                </tr>
-              ))}
+              ) : (
+                sortedCycles.map((cycle) => (
+                  <tr
+                    key={cycle.id}
+                    className={`appraisal-clickable-row ${selectedCycleId === cycle.id ? "appraisal-selected-row" : ""}`}
+                    onClick={() => openCycle(cycle)}
+                    title="Open appraisal form"
+                  >
+                    <td>
+                      <strong>{cycle.cycleName}</strong>
+                    </td>
+                    <td>
+                      {formatDate(
+                        cycle.managerSubmissionDeadline ||
+                          cycle.submissionDeadline,
+                      )}
+                    </td>
+                    <td>{cycle.cycleType}</td>
+                    <td>{cycle.cycleYear}</td>
+                    <td>{formatDate(cycle.startDate)}</td>
+                    <td>{formatDate(cycle.endDate)}</td>
+                    <td>
+                      <span className={statusClass(displayCycleStatus(cycle))}>
+                        {displayCycleStatus(cycle)}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -320,9 +413,18 @@ const EmployeePerformanceReviewPage = () => {
           >
             <div className="appraisal-modal-header">
               <div>
-                <h2 id="manager-review-modal-title">{form ? `${form.cycleName} - ${form.employeeName}` : selectedCycle.cycleName}</h2>
+                <h2 id="manager-review-modal-title">
+                  {form
+                    ? `${form.cycleName} - ${form.employeeName}`
+                    : selectedCycle.cycleName}
+                </h2>
               </div>
-              <button className="appraisal-modal-close" type="button" onClick={closeReviewModal} aria-label="Close manager review form">
+              <button
+                className="appraisal-modal-close"
+                type="button"
+                onClick={closeReviewModal}
+                aria-label="Close manager review form"
+              >
                 <i className="bi bi-x-lg" />
               </button>
             </div>
@@ -333,8 +435,8 @@ const EmployeePerformanceReviewPage = () => {
                   mode="pm"
                   busy={loading}
                   onPmSubmit={submitPm}
-                  onPmDraftSave={savePmDraft}
                   employeeNameField={employeeNameField}
+                  departmentNameOverride={selectedEmployee?.departmentName ?? null}
                 />
               ) : (
                 <CycleEmployeeFormShell
@@ -347,7 +449,13 @@ const EmployeePerformanceReviewPage = () => {
               )}
             </div>
             <div className="appraisal-modal-footer">
-              <button className="appraisal-button secondary" type="button" onClick={closeReviewModal}>Close</button>
+              <button
+                className="appraisal-button secondary"
+                type="button"
+                onClick={closeReviewModal}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -374,7 +482,13 @@ interface CycleEmployeeFormShellProps {
   loading: boolean;
 }
 
-const CycleEmployeeFormShell = ({ cycle, template, employeeNameField, selectedEmployee, loading }: CycleEmployeeFormShellProps) => {
+const CycleEmployeeFormShell = ({
+  cycle,
+  template,
+  employeeNameField,
+  selectedEmployee,
+  loading,
+}: CycleEmployeeFormShellProps) => {
   let globalNo = 0;
   const scoreBands = activeScoreBands(template?.scoreBands);
 
@@ -386,29 +500,61 @@ const CycleEmployeeFormShell = ({ cycle, template, employeeNameField, selectedEm
       </div>
 
       <div className="appraisal-template-summary-card appraisal-cycle-summary-card compact-summary">
-        <div><strong>Appraisal Name</strong><span>{cycle.cycleName}</span></div>
-        <div><strong>Cycle Type</strong><span>{cycle.cycleType || '-'}</span></div>
-        <div><strong>Cycle Year</strong><span>{cycle.cycleYear}</span></div>
-        <div><strong>Status</strong><span>{cycle.status}</span></div>
+        <div>
+          <strong>Appraisal Name</strong>
+          <span>{cycle.cycleName}</span>
+        </div>
+        <div>
+          <strong>Cycle Type</strong>
+          <span>{cycle.cycleType || "-"}</span>
+        </div>
+        <div>
+          <strong>Cycle Year</strong>
+          <span>{cycle.cycleYear}</span>
+        </div>
+        <div>
+          <strong>Status</strong>
+          <span>{cycle.status}</span>
+        </div>
       </div>
 
       <div className="appraisal-form-block">
         <h3>Employee Information</h3>
         <div className="appraisal-inline-grid three appraisal-cycle-employee-grid">
           {employeeNameField}
-          <ShellInfoField label="Employee ID" value={selectedEmployee?.employeeCode || '-'} />
-          <ShellInfoField label="Current Position" value={selectedEmployee?.positionName || '-'} />
-          <ShellInfoField label="Department" value={selectedEmployee?.departmentName || cycle.departmentNames?.join(', ') || '-'} />
-          <ShellInfoField label="Assessment Date" value={formatDate(cycle.startDate)} />
-          <ShellInfoField label="Effective Date" value="-" />
-          <ShellInfoField label="Manager Deadline" value={formatDate(cycle.managerSubmissionDeadline || cycle.submissionDeadline)} />
+          <ShellInfoField
+            label="Employee ID"
+            value={selectedEmployee?.employeeCode || "-"}
+          />
+          <ShellInfoField
+            label="Current Position"
+            value={selectedEmployee?.positionName || "-"}
+          />
+          <ShellInfoField
+            label="Department"
+            value={selectedEmployee?.departmentName || "-"}
+          />
+          <ShellInfoField label="Assessment Date" value="" />
+          <ShellInfoField label="Effective Date" value="" />
+          <ShellInfoField
+            label="Manager Deadline"
+            value={formatDate(
+              cycle.managerSubmissionDeadline || cycle.submissionDeadline,
+            )}
+          />
         </div>
       </div>
 
       <div className="appraisal-form-block">
         <h3>Evaluations</h3>
-        {loading && !template ? <div className="appraisal-empty">Loading appraisal cycle form...</div> : null}
-        {!loading && !template ? <div className="appraisal-empty">Selected appraisal cycle form template could not be loaded.</div> : null}
+        {loading && !template ? (
+          <div className="appraisal-empty">Loading appraisal cycle form...</div>
+        ) : null}
+        {!loading && !template ? (
+          <div className="appraisal-empty">
+            Selected appraisal cycle form template could not be loaded.
+          </div>
+        ) : null}
         {template?.sections.map((section) => (
           <div className="appraisal-section-card" key={section.id}>
             <div className="appraisal-section-header">
@@ -419,7 +565,13 @@ const CycleEmployeeFormShell = ({ cycle, template, employeeNameField, selectedEm
             </div>
             <div className="appraisal-template-table-wrap">
               <table className="appraisal-template-table">
-                <thead><tr><th>#</th><th>Criteria</th><th>Rating 1-5</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Criteria</th>
+                    <th>Rating 1-5</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {section.criteria.map((criteria) => {
                     globalNo += 1;
@@ -427,7 +579,13 @@ const CycleEmployeeFormShell = ({ cycle, template, employeeNameField, selectedEm
                       <tr key={criteria.id}>
                         <td className="appraisal-center-cell">{globalNo}</td>
                         <td>{criteria.criteriaText}</td>
-                        <td><AppraisalRatingDots value={null} max={criteria.maxRating || 5} disabled /></td>
+                        <td>
+                          <AppraisalRatingDots
+                            value={null}
+                            max={criteria.maxRating || 5}
+                            disabled
+                          />
+                        </td>
                       </tr>
                     );
                   })}
@@ -443,14 +601,30 @@ const CycleEmployeeFormShell = ({ cycle, template, employeeNameField, selectedEm
         <div className="appraisal-score-formula-card in-block">
           <div className="appraisal-total-points-strip">
             <strong>Total Points</strong>
-            <span>Actual total points are shown and calculated after Manager gives ratings.</span>
+            <span>
+              Actual total points are shown and calculated after Manager gives
+              ratings.
+            </span>
           </div>
           <table className="appraisal-score-formula-table">
-            <thead><tr><th>Analysis</th><th>Formula</th><th>Score</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Analysis</th>
+                <th>Formula</th>
+                <th>Score</th>
+              </tr>
+            </thead>
             <tbody>
               <tr>
-                <td><strong>Total Points</strong></td>
-                <td><div className="formula-main">Total Point</div><div className="formula-divider" /><div>Number of Questions Answered × 5</div><div className="formula-multiply">× 100</div></td>
+                <td>
+                  <strong>Total Points</strong>
+                </td>
+                <td>
+                  <div className="formula-main">Total Point</div>
+                  <div className="formula-divider" />
+                  <div>Number of Questions Answered × 5</div>
+                  <div className="formula-multiply">× 100</div>
+                </td>
                 <td>Auto calculated from Manager ratings</td>
               </tr>
             </tbody>
@@ -465,7 +639,9 @@ const CycleEmployeeFormShell = ({ cycle, template, employeeNameField, selectedEm
 
       <div className="appraisal-form-block">
         <h3>Other Remarks</h3>
-        <div className="appraisal-other-remarks-preview"><span>Appraiser's Comment for Discussion</span></div>
+        <div className="appraisal-other-remarks-preview">
+          <span>Appraiser's Comment for Discussion</span>
+        </div>
       </div>
 
       <ShellSignatureSection />
@@ -491,7 +667,13 @@ const ShellSignatureSlot = ({ label }: { label: string }) => (
   </div>
 );
 
-const ShellInfoField = ({ label, value }: { label: string; value: string | number }) => (
+const ShellInfoField = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) => (
   <label className="appraisal-field">
     <span>{label}</span>
     <input value={String(value)} readOnly disabled />
@@ -506,10 +688,14 @@ const ScoreGuide = ({ bands }: { bands: AppraisalScoreBandResponse[] }) => (
       <span>Description</span>
     </div>
     {bands.map((band, index) => (
-      <div className="appraisal-score-band-row" key={`${band.label}-${index}`}>
-        <div className="appraisal-score-range-inputs"><strong>{String(band.minScore).padStart(2, '0')}-{band.maxScore}</strong></div>
+      <div className={`appraisal-score-band-row ${getAppraisalScoreBandToneClass(band.label)}`.trim()} key={`${band.label}-${index}`}>
+        <div className="appraisal-score-range-inputs">
+          <strong>
+            {String(band.minScore).padStart(2, "0")}-{band.maxScore}
+          </strong>
+        </div>
         <strong>{band.label}</strong>
-        <span className="appraisal-muted">{band.description || '-'}</span>
+        <span className="appraisal-muted appraisal-score-band-description">{band.description || "-"}</span>
       </div>
     ))}
   </div>
@@ -522,12 +708,23 @@ const activeScoreBands = (bands?: AppraisalScoreBandResponse[] | null) => {
     .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
 };
 
+const cycleReceivedTime = (cycle: AppraisalCycleResponse) =>
+  toDateTime(
+    cycle.activatedAt || cycle.createdAt || cycle.startDate || cycle.endDate,
+  );
 
-const startOfLocalDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
+const toDateTime = (value?: string | null) => {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const startOfLocalDay = (value: Date) =>
+  new Date(value.getFullYear(), value.getMonth(), value.getDate());
 
 const toLocalDateOnly = (value?: string | null) => {
   if (!value) return null;
-  const [year, month, day] = value.split('-').map(Number);
+  const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return startOfLocalDay(new Date(value));
   return new Date(year, month - 1, day);
 };
@@ -544,24 +741,29 @@ const shouldShowCycleToManager = (cycle: AppraisalCycleResponse) => {
   return endDate.getTime() >= startOfLocalDay(new Date()).getTime();
 };
 
-const displayCycleStatus = (cycle: AppraisalCycleResponse) => (
-  cycle.locked || cycle.status === 'LOCKED' || isCycleEndDateToday(cycle.endDate) ? 'LOCKED' : cycle.status
-);
+const displayCycleStatus = (cycle: AppraisalCycleResponse) =>
+  cycle.locked ||
+  cycle.status === "LOCKED" ||
+  isCycleEndDateToday(cycle.endDate)
+    ? "LOCKED"
+    : cycle.status;
 
-const formatEmployeeNameOption = (employee: AppraisalEmployeeOptionResponse) => {
-  const code = employee.employeeCode ? ` (${employee.employeeCode})` : '';
-  const position = employee.positionName ? ` - ${employee.positionName}` : '';
+const formatEmployeeNameOption = (
+  employee: AppraisalEmployeeOptionResponse,
+) => {
+  const code = employee.employeeCode ? ` (${employee.employeeCode})` : "";
+  const position = employee.positionName ? ` - ${employee.positionName}` : "";
   return `${employee.employeeName}${code}${position}`;
 };
 
 const formatDate = formatDisplayDate;
 
 const statusClass = (status?: string | null) => {
-  const normalized = status ?? '';
-  if (normalized === 'ACTIVE') return 'appraisal-status green';
-  if (normalized === 'LOCKED') return 'appraisal-status gray';
-  if (normalized === 'COMPLETED') return 'appraisal-status green';
-  return 'appraisal-status amber';
+  const normalized = status ?? "";
+  if (normalized === "ACTIVE") return "appraisal-status green";
+  if (normalized === "LOCKED") return "appraisal-status gray";
+  if (normalized === "COMPLETED") return "appraisal-status green";
+  return "appraisal-status amber";
 };
 
 export default EmployeePerformanceReviewPage;

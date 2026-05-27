@@ -17,6 +17,8 @@ public class DepartmentKpiTemplateResponseDto {
     private String title;
     private LocalDate startDate;
     private LocalDate endDate;
+    private Integer durationMonths;
+    private String durationLabel;
     private KpiFormStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

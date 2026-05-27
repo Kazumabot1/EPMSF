@@ -12038,3 +12038,157 @@
     color: #0f172a;
     font-weight: 800;
 }
+
+/* Patch 6 — launch readiness progress and action guidance */
+.hfda-readiness-progress {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.hfda-progress-ring {
+    display: grid;
+    place-items: center;
+    width: 78px;
+    height: 78px;
+    flex: 0 0 78px;
+    border-radius: 999px;
+    border: 8px solid #e2e8f0;
+    background: #f8fafc;
+    text-align: center;
+}
+
+.hfda-progress-ring strong {
+    display: block;
+    color: #0f172a;
+    font-size: 1.1rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.hfda-progress-ring span {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.hfda-progress-copy strong {
+    display: block;
+    color: #0f172a;
+    font-weight: 900;
+}
+
+.hfda-progress-copy p {
+    margin: 4px 0 0;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+.hfda-action-panel {
+    display: grid;
+    gap: 12px;
+    padding: 16px 18px;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.hfda-action-panel > div:first-child strong {
+    display: block;
+    margin-top: 4px;
+    color: #0f172a;
+    font-weight: 900;
+}
+
+.hfda-action-list {
+    display: grid;
+    gap: 8px;
+}
+
+.hfda-action-chip {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 14px;
+    background: #fff;
+    color: #334155;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.hfda-action-chip:hover {
+    transform: translateY(-1px);
+    border-color: rgba(59, 130, 246, 0.28);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.hfda-action-chip i {
+    font-size: 1rem;
+}
+
+.hfda-action-chip.ready i { color: #0f766e; }
+.hfda-action-chip.warning i { color: #b45309; }
+.hfda-action-chip.blocked i { color: #dc2626; }
+
+.hfda-action-chip span {
+    color: #0f172a;
+    font-weight: 850;
+}
+
+.hfda-action-chip em {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.72rem;
+    font-style: normal;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.hfda-inline-fix {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 9px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font-size: 0.82rem;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.hfda-inline-fix:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+    .hfda-readiness-progress {
+        align-items: flex-start;
+    }
+
+    .hfda-action-chip {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .hfda-action-chip em {
+        grid-column: 2;
+        justify-self: start;
+    }
+}

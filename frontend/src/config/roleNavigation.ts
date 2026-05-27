@@ -14,6 +14,7 @@ export interface NavItem {
   icon: string;
   end?: boolean;
   permissionField?: keyof PositionPermission;
+  requiresMyTeam?: boolean;
   children?: NavItem[];
 }
 
@@ -68,6 +69,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Employee: [
     { label: 'My Dashboard', path: '/employee/dashboard', icon: 'bi-columns-gap', end: true },
     { label: 'My KPIs', path: '/employee/kpis', icon: 'bi-bullseye' },
+    { label: 'My Team', path: '/employee/my-team', icon: 'bi-people-fill', requiresMyTeam: true },
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
     { label: '360 Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
@@ -158,9 +160,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/hr/appraisal',
       icon: 'bi-clipboard-check',
       children: [
-        { label: 'Template Form Create', path: '/hr/appraisal/template-create', icon: 'bi-file-earmark-plus' },
         { label: 'Template Form Records', path: '/hr/appraisal/template-records', icon: 'bi-folder2-open' },
-        { label: 'Create Appraisal', path: '/hr/appraisal/create', icon: 'bi-calendar-plus' },
         { label: 'Appraisal Create Records', path: '/hr/appraisal/create-records', icon: 'bi-journal-check' },
         { label: 'Cycle Records', path: '/hr/appraisal/cycles', icon: 'bi-arrow-repeat' },
         { label: 'Manager + Dept Review Check', path: '/hr/appraisal/review-check', icon: 'bi-shield-check' },
@@ -238,11 +238,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     {
-      label: 'View Self-assessment Form',
-      path: '/department-head/self-assessment-forms',
-      icon: 'bi bi-eye',
-    },
-    {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',
       icon: 'bi-chat-dots',
@@ -305,6 +300,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
+    { label: 'My Team', path: '/manager/my-team', icon: 'bi-people-fill', requiresMyTeam: true },
     {
       label: 'Assessment Review',
       path: '/manager/assessment-review',
@@ -362,12 +358,20 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       children: managerReportsChildren,
     },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
-    { label: 'My Self-Assessment', path: '/manager/self-assessment', icon: 'bi-pencil-square' },
   ],
 
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    {
+      label: 'Approval',
+      path: '/executive/approval/kpi',
+      icon: 'bi-shield-check',
+      children: [
+        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
+        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check', end: true },
+      ],
+    },
     {
       label: 'Reports',
       path: '/executive/reports',

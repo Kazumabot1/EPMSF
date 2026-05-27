@@ -12,6 +12,7 @@ import { signatureService } from '../../services/signatureService';
 import type { Signature } from '../../types/signature';
 import AppraisalRatingDots from './AppraisalRatingDots';
 import { formatDisplayDate } from '../../utils/appraisalDateFormat';
+import { getAppraisalScoreBandToneClass } from '../../utils/appraisalScoreBandTone';
 import '../../pages/appraisal/appraisal.css';
 
 type AppraisalFormMode = 'pm' | 'dept-head' | 'hr' | 'employee' | 'readonly';
@@ -25,10 +26,12 @@ interface AppraisalFormViewProps {
   onReviewSubmit?: (payload: AppraisalReviewSubmitRequest) => Promise<void> | void;
   onReviewDraftSave?: (payload: AppraisalReviewSubmitRequest) => Promise<void> | void;
   employeeNameField?: ReactNode;
+  departmentNameOverride?: string | null;
 }
 
 interface AutoSaveSnapshot {
   key: string;
+  dirty: boolean;
   canSavePm: boolean;
   canSaveReview: boolean;
   pmPayload: PmAppraisalSubmitRequest;
@@ -88,6 +91,8 @@ const buildAutoSaveKey = (
   signatureImageData: string | null,
   signatureImageType: string | null,
   selectedSignatureId: number,
+  assessmentDateText: string,
+  effectiveDateText: string,
 ) => JSON.stringify({
   formId,
   mode,
@@ -96,9 +101,14 @@ const buildAutoSaveKey = (
   signatureImageData,
   signatureImageType,
   selectedSignatureId,
+  assessmentDateText,
+  effectiveDateText,
 });
 
 const formatDate = formatDisplayDate;
+
+const resolveAssessmentDateValue = (form: EmployeeAppraisalFormResponse, pmReview?: AppraisalReviewResponse) =>
+  form.assessmentDate || pmReview?.submittedAt || form.pmSubmittedAt || null;
 
 const activeScoreBands = (bands?: AppraisalScoreBandResponse[] | null) => {
   const source = bands && bands.length ? bands : DEFAULT_SCORE_BANDS;
@@ -123,9 +133,12 @@ const AppraisalFormView = ({
   onReviewSubmit,
   onReviewDraftSave,
   employeeNameField,
+  departmentNameOverride,
 }: AppraisalFormViewProps) => {
   const [ratings, setRatings] = useState<Record<number, number>>({});
   const [comment, setComment] = useState('');
+  const [assessmentDateText, setAssessmentDateText] = useState('');
+  const [effectiveDateText, setEffectiveDateText] = useState('');
   const [signatureImageData, setSignatureImageData] = useState<string | null>(null);
   const [signatureImageType, setSignatureImageType] = useState<string | null>(null);
   const [selectedSignatureId, setSelectedSignatureId] = useState<number>(0);
@@ -140,6 +153,7 @@ const AppraisalFormView = ({
   const autoSaveSnapshotRef = useRef<AutoSaveSnapshot | null>(null);
   const autoSaveInFlightRef = useRef(false);
   const queuedAutoSaveRef = useRef<AutoSaveSnapshot | null>(null);
+  const draftDirtyRef = useRef(false);
 
   const pmReview = useMemo(() => findReview(form.reviews ?? [], 'PM'), [form.reviews]);
   const deptHeadReview = useMemo(() => findReview(form.reviews ?? [], 'DEPT_HEAD'), [form.reviews]);
@@ -147,6 +161,7 @@ const AppraisalFormView = ({
 
   useEffect(() => {
     autoSaveReadyRef.current = false;
+    draftDirtyRef.current = false;
     if (autoSaveTimerRef.current !== null) {
       window.clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
@@ -164,9 +179,13 @@ const AppraisalFormView = ({
     const nextComment = currentStageReview?.comment ?? '';
     const nextSignatureImageData = currentStageReview?.signatureImageData ?? null;
     const nextSignatureImageType = currentStageReview?.signatureImageType ?? null;
+    const nextAssessmentDateText = '';
+    const nextEffectiveDateText = '';
 
     setRatings(nextRatings);
     setComment(nextComment);
+    setAssessmentDateText(nextAssessmentDateText);
+    setEffectiveDateText(nextEffectiveDateText);
     setSignatureImageData(nextSignatureImageData);
     setSignatureImageType(nextSignatureImageType);
     setSelectedSignatureId(0);
@@ -180,6 +199,8 @@ const AppraisalFormView = ({
       nextSignatureImageData,
       nextSignatureImageType,
       0,
+      nextAssessmentDateText,
+      nextEffectiveDateText,
     );
 
     const readyTimer = window.setTimeout(() => {
@@ -247,12 +268,19 @@ const AppraisalFormView = ({
   const canSubmitPm = mode === 'pm' && !isLocked && missingRatingCount === 0 && hasRemark && hasSignature;
   const canSubmitReview = (mode === 'dept-head' || mode === 'hr') && !isLocked && hasRemark && hasSignature;
 
+  const markDraftDirty = () => {
+    draftDirtyRef.current = true;
+  };
+
   const handleSignatureSelect = (signatureId: number) => {
+    markDraftDirty();
     const signature = signatures.find((item) => item.id === signatureId);
     setSelectedSignatureId(signature?.id ?? 0);
     setSignatureImageData(signature?.imageData ?? null);
     setSignatureImageType(signature?.imageType ?? null);
   };
+
+  const resolvedAssessmentDate = useMemo(() => resolveAssessmentDateValue(form, pmReview), [form, pmReview]);
 
   const liveScore = useMemo<ScoreSnapshot>(() => {
     const answeredCriteria = allCriteria.filter((criteria) => Boolean(ratings[criteria.id]));
@@ -281,6 +309,8 @@ const AppraisalFormView = ({
   }, [allCriteria, form.answeredCriteriaCount, form.performanceLabel, form.scorePercent, form.totalPoints, mode, ratings, scoreBands]);
 
   const buildPmPayload = (includeAllRatings: boolean): PmAppraisalSubmitRequest => ({
+    assessmentDate: null,
+    effectiveDate: null,
     ratings: (includeAllRatings ? allCriteria : allCriteria.filter((criteria) => Boolean(ratings[criteria.id]))).map<AppraisalRatingInput>((criteria) => ({
       criteriaId: criteria.id,
       ratingValue: ratings[criteria.id] ?? 0,
@@ -302,7 +332,7 @@ const AppraisalFormView = ({
   });
 
   const runAutoSaveSnapshot = useCallback((snapshot: AutoSaveSnapshot | null, force = false) => {
-    if (!snapshot || (!snapshot.canSavePm && !snapshot.canSaveReview)) {
+    if (!snapshot || !snapshot.dirty || (!snapshot.canSavePm && !snapshot.canSaveReview)) {
       return;
     }
 
@@ -325,7 +355,11 @@ const AppraisalFormView = ({
         : Promise.resolve();
 
     savePromise
+      .then(() => {
+        draftDirtyRef.current = false;
+      })
       .catch(() => {
+        draftDirtyRef.current = true;
         lastAutoSaveKeyRef.current = '';
       })
       .finally(() => {
@@ -333,6 +367,7 @@ const AppraisalFormView = ({
         const queuedSnapshot = queuedAutoSaveRef.current;
         queuedAutoSaveRef.current = null;
         if (queuedSnapshot && queuedSnapshot.key !== lastAutoSaveKeyRef.current) {
+          draftDirtyRef.current = true;
           runAutoSaveSnapshot(queuedSnapshot, true);
         }
       });
@@ -347,7 +382,10 @@ const AppraisalFormView = ({
       signatureImageData,
       signatureImageType,
       selectedSignatureId,
+      assessmentDateText,
+      effectiveDateText,
     ),
+    dirty: draftDirtyRef.current,
     canSavePm: mode === 'pm' && !isLocked && !busy && Boolean(onPmDraftSave),
     canSaveReview: (mode === 'dept-head' || mode === 'hr') && !isLocked && !busy && Boolean(onReviewDraftSave),
     pmPayload: buildPmPayload(false),
@@ -360,7 +398,7 @@ const AppraisalFormView = ({
   useEffect(() => {
     const snapshot = autoSaveSnapshotRef.current;
 
-    if (!snapshot || (!snapshot.canSavePm && !snapshot.canSaveReview) || !autoSaveReadyRef.current) {
+    if (!snapshot || !snapshot.dirty || (!snapshot.canSavePm && !snapshot.canSaveReview) || !autoSaveReadyRef.current) {
       return;
     }
 
@@ -383,7 +421,7 @@ const AppraisalFormView = ({
         autoSaveTimerRef.current = null;
       }
     };
-  }, [autoSaveSnapshot.key, autoSaveSnapshot.canSavePm, autoSaveSnapshot.canSaveReview, runAutoSaveSnapshot]);
+  }, [autoSaveSnapshot.key, autoSaveSnapshot.dirty, autoSaveSnapshot.canSavePm, autoSaveSnapshot.canSaveReview, runAutoSaveSnapshot]);
 
   useEffect(() => () => {
     if (autoSaveTimerRef.current !== null) {
@@ -405,13 +443,25 @@ const AppraisalFormView = ({
     if (!onPmSubmit) return;
 
     clearPendingAutoSave();
-    await onPmSubmit(buildPmPayload(true));
+    draftDirtyRef.current = false;
+    try {
+      await onPmSubmit(buildPmPayload(true));
+    } catch (error) {
+      draftDirtyRef.current = true;
+      throw error;
+    }
   };
 
   const submitReview = async () => {
     if (!onReviewSubmit) return;
     clearPendingAutoSave();
-    await onReviewSubmit(buildReviewPayload());
+    draftDirtyRef.current = false;
+    try {
+      await onReviewSubmit(buildReviewPayload());
+    } catch (error) {
+      draftDirtyRef.current = true;
+      throw error;
+    }
   };
 
   const currentSignatureSrc = signatureImageData && signatureImageType
@@ -420,6 +470,9 @@ const AppraisalFormView = ({
       : `data:${signatureImageType};base64,${signatureImageData}`
     : null;
   const currentSignatureDateText = formatDate(new Date().toISOString());
+  const displayDepartmentName = mode === 'pm'
+    ? departmentNameOverride || form.departmentName || '-'
+    : form.departmentName || '-';
   const remarkBlockTitle = getRemarkBlockTitle(mode);
   const remarkLabel = getRemarkLabel(mode);
   const remarkPlaceholder = getRemarkPlaceholder(mode);
@@ -446,9 +499,17 @@ const AppraisalFormView = ({
           {employeeNameField ?? <InfoField label="Employee Name" value={form.employeeName} />}
           <InfoField label="Employee ID" value={form.employeeCode || '-'} />
           <InfoField label="Current Position" value={form.positionName || '-'} />
-          <InfoField label="Department" value={form.departmentName} />
-          <InfoField label="Assessment Date" value={formatDate(form.cycleStartDate || form.assessmentDate)} />
-          <InfoField label="Effective Date" value={formatDate(form.effectiveDate)} />
+          <InfoField label="Department" value={displayDepartmentName} />
+          {mode === 'pm' ? (
+            <InfoField label="Assessment Date" value="" />
+          ) : (
+            <InfoField label="Assessment Date" value={formatDate(resolvedAssessmentDate)} />
+          )}
+          {mode === 'pm' ? (
+            <InfoField label="Effective Date" value="" />
+          ) : (
+            <InfoField label="Effective Date" value={formatDate(form.effectiveDate)} />
+          )}
           {mode === 'pm' && <InfoField label="Manager Deadline" value={formatDate(form.cycleManagerSubmissionDeadline || form.cycleSubmissionDeadline)} />}
           {mode === 'dept-head' && <InfoField label="Dept Head Deadline" value={formatDate(form.cycleDeptHeadSubmissionDeadline || form.cycleSubmissionDeadline)} />}
         </div>
@@ -486,7 +547,10 @@ const AppraisalFormView = ({
                             value={ratings[criteria.id] ?? criteria.ratingValue ?? null}
                             max={criteria.maxRating || 5}
                             disabled={mode !== 'pm' || isLocked}
-                            onChange={(value) => setRatings((previous) => ({ ...previous, [criteria.id]: value }))}
+                            onChange={(value) => {
+                              markDraftDirty();
+                              setRatings((previous) => ({ ...previous, [criteria.id]: value }));
+                            }}
                           />
                         </td>
                       </tr>
@@ -528,7 +592,7 @@ const AppraisalFormView = ({
               <tr>
                 <td><strong>Current Result</strong></td>
                 <td>{liveScore.totalPoints} / {liveScore.maxPossible || 0} × 100</td>
-                <td>{liveScore.performanceLabel}</td>
+                <td className={`appraisal-current-result-cell ${getAppraisalScoreBandToneClass(liveScore.performanceLabel)}`.trim()}>{liveScore.performanceLabel}</td>
               </tr>
             </tbody>
           </table>
@@ -561,7 +625,10 @@ const AppraisalFormView = ({
             <textarea
               rows={4}
               value={comment}
-              onChange={(event) => setComment(event.target.value)}
+              onChange={(event) => {
+                markDraftDirty();
+                setComment(event.target.value);
+              }}
               placeholder={remarkPlaceholder}
             />
           </label>
@@ -683,10 +750,10 @@ const ScoreGuide = ({ bands }: { bands: AppraisalScoreBandResponse[] }) => (
       <span>Description</span>
     </div>
     {bands.map((band, index) => (
-      <div className="appraisal-score-band-row" key={`${band.label}-${index}`}>
+      <div className={`appraisal-score-band-row ${getAppraisalScoreBandToneClass(band.label)}`.trim()} key={`${band.label}-${index}`}>
         <div className="appraisal-score-range-inputs"><strong>{String(band.minScore).padStart(2, '0')}-{band.maxScore}</strong></div>
         <strong>{band.label}</strong>
-        <span className="appraisal-muted">{band.description || '-'}</span>
+        <span className="appraisal-muted appraisal-score-band-description">{band.description || '-'}</span>
       </div>
     ))}
   </div>

@@ -3,6 +3,7 @@ import { extractApiErrorMessage } from './apiError';
 import type {
   DepartmentKpiCycle,
   DepartmentKpiCycleRequest,
+  DepartmentKpiCycleStatusRequest,
   DepartmentKpiResult,
   DepartmentKpiTemplate,
   DepartmentKpiTemplateRequest,
@@ -88,12 +89,72 @@ export const departmentKpiCycleService = {
       throw new Error(extractApiErrorMessage(error, 'Failed to update Department KPI cycle.'));
     }
   },
-  async updateStatus(id: number, active: boolean): Promise<DepartmentKpiCycle> {
+  async updateStatus(id: number, activeOrPayload: boolean | DepartmentKpiCycleStatusRequest): Promise<DepartmentKpiCycle> {
     try {
-      const response = await api.patch<DepartmentKpiCycle>(`${CYCLE_BASE}/${id}/status`, { active });
+      const payload = typeof activeOrPayload === 'boolean' ? { active: activeOrPayload } : activeOrPayload;
+      const response = await api.patch<DepartmentKpiCycle>(`${CYCLE_BASE}/${id}/status`, payload);
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to update Department KPI cycle status.'));
+    }
+  },
+};
+
+export const departmentKpiApprovalService = {
+  async listPendingApprovals(): Promise<DepartmentKpiCycle[]> {
+    try {
+      const response = await api.get<DepartmentKpiCycle[]>('/executive/department-kpi-approvals');
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load Department KPI approval requests.'));
+    }
+  },
+  async approveEarlyClose(id: number, reviewReason?: string): Promise<DepartmentKpiCycle> {
+    try {
+      const response = await api.post<DepartmentKpiCycle>(`/executive/department-kpi-approvals/${id}/approve`, {
+        reviewReason,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to approve Department KPI close request.'));
+    }
+  },
+  async rejectEarlyClose(id: number, reviewReason?: string): Promise<DepartmentKpiCycle> {
+    try {
+      const response = await api.post<DepartmentKpiCycle>(`/executive/department-kpi-approvals/${id}/reject`, {
+        reviewReason,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to reject Department KPI close request.'));
+    }
+  },
+  async listPendingFinalizationRequests(): Promise<DepartmentKpiResult[]> {
+    try {
+      const response = await api.get<DepartmentKpiResult[]>('/executive/department-kpi-approvals/finalization-requests');
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to load Department KPI finalization requests.'));
+    }
+  },
+  async approveFinalization(resultId: number, reviewReason?: string): Promise<DepartmentKpiResult> {
+    try {
+      const response = await api.post<DepartmentKpiResult>(`/executive/department-kpi-approvals/finalization-requests/${resultId}/approve`, {
+        reviewReason,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to approve Department KPI finalization request.'));
+    }
+  },
+  async rejectFinalization(resultId: number, reviewReason?: string): Promise<DepartmentKpiResult> {
+    try {
+      const response = await api.post<DepartmentKpiResult>(`/executive/department-kpi-approvals/finalization-requests/${resultId}/reject`, {
+        reviewReason,
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to reject Department KPI finalization request.'));
     }
   },
 };
@@ -123,6 +184,14 @@ export const departmentKpiWorkflowService = {
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to save Department KPI scores.'));
+    }
+  },
+  async requestFinalization(resultId: number, reason: string): Promise<DepartmentKpiResult> {
+    try {
+      const response = await api.post<DepartmentKpiResult>(`${WORKFLOW_BASE}/results/${resultId}/finalization-request`, { reason });
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to submit Department KPI finalization request.'));
     }
   },
   async finalizeResult(resultId: number): Promise<DepartmentKpiResult> {

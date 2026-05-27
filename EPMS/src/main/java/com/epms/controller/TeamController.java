@@ -211,6 +211,23 @@ public class TeamController {
         );
     }
 
+    @GetMapping("/my-department/{teamId}")
+    @PreAuthorize(
+            "hasRole('DEPARTMENT_HEAD') or hasRole('DEPARTMENTHEAD') " +
+                    "or hasAuthority('ROLE_DEPARTMENT_HEAD') or hasAuthority('ROLE_DEPARTMENTHEAD') " +
+                    "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD'"
+    )
+    public ResponseEntity<GenericApiResponse<TeamResponseDto>> getMyDepartmentTeamById(
+            @PathVariable Integer teamId
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success(
+                        "Team fetched successfully",
+                        teamService.getMyDepartmentTeamById(teamId)
+                )
+        );
+    }
+
     @GetMapping("/my-department/candidates/users")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<GenericApiResponse<List<CandidateResponseDto>>> getMyDepartmentCandidateUsers() {

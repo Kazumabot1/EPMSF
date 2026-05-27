@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -41,5 +42,38 @@ public class EmployeeKpiFormEvaluator {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof EmployeeKpiFormEvaluator other)) {
+            return false;
+        }
+        if (id != null && other.id != null) {
+            return Objects.equals(id, other.id);
+        }
+        Integer evaluatorId = evaluatorUserId();
+        Integer otherEvaluatorId = other.evaluatorUserId();
+        if (evaluatorId == null || otherEvaluatorId == null) {
+            return false;
+        }
+        return Objects.equals(employeeKpiFormId(), other.employeeKpiFormId())
+                && Objects.equals(evaluatorId, otherEvaluatorId);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
+    private Integer employeeKpiFormId() {
+        return employeeKpiForm == null ? null : employeeKpiForm.getId();
+    }
+
+    private Integer evaluatorUserId() {
+        return evaluatorUser == null ? null : evaluatorUser.getId();
     }
 }

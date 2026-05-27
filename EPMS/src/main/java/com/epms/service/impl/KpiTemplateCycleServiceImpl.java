@@ -2,12 +2,16 @@ package com.epms.service.impl;
 
 import com.epms.dto.KpiTemplateCycleRequestDTO;
 import com.epms.dto.KpiTemplateCycleResponseDTO;
+import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.entity.KpiForm;
 import com.epms.entity.KpiTemplateCycle;
 import com.epms.entity.KpiTemplateCycleForm;
 import com.epms.entity.KpiTemplateCyclePeriod;
 import com.epms.entity.User;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiGraceExtension;
+import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.KpiFormRepository;
 import com.epms.repository.KpiTemplateCycleFormRepository;
@@ -23,7 +27,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Month;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +41,13 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
-    private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    private static final Set<Integer> ALLOWED_DURATION_YEARS = Set.of(1, 2, 3, 4, 5);
+
+    private static final Set<KpiTemplateCycleStatus> RUNNING_CYCLE_STATUSES = EnumSet.of(
+            KpiTemplateCycleStatus.ACTIVE,
+            KpiTemplateCycleStatus.CLOSING,
+            KpiTemplateCycleStatus.PENDING_APPROVAL
+    );
 
     private final KpiTemplateCycleRepository cycleRepository;
     private final KpiTemplateCycleFormRepository cycleFormRepository;
@@ -41,19 +55,22 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
+    private final Clock clock;
 
     @Override
     @Transactional
     public KpiTemplateCycleResponseDTO create(KpiTemplateCycleRequestDTO dto) {
         validateRequest(dto);
         User author = currentUser();
-        LocalDate endDate = calculateEndDate(dto.getStartDate(), dto.getDurationMonths());
+        Integer durationYears = normalizedDurationYears(dto);
+        LocalDate endDate = calculateEndDate(dto.getStartDate(), durationYears);
 
         KpiTemplateCycle cycle = KpiTemplateCycle.builder()
                 .cycleName(dto.getCycleName().trim())
                 .startDate(dto.getStartDate())
                 .endDate(endDate)
-                .durationMonths(dto.getDurationMonths())
+                .durationMonths(durationYears * 12)
+                .durationYears(durationYears)
                 .status(KpiTemplateCycleStatus.DRAFT)
                 .createdByUser(author)
                 .build();
@@ -71,10 +88,19 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
 
+        ensureCycleEditable(cycle);
+        String editReason = normalizeText(dto.getEditReason(), 1000);
+        if (editReason == null || editReason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
+        }
+        cycle.setLastEditReason(editReason);
+
         cycle.setCycleName(dto.getCycleName().trim());
         cycle.setStartDate(dto.getStartDate());
-        cycle.setDurationMonths(dto.getDurationMonths());
-        cycle.setEndDate(calculateEndDate(dto.getStartDate(), dto.getDurationMonths()));
+        Integer durationYears = normalizedDurationYears(dto);
+        cycle.setDurationYears(durationYears);
+        cycle.setDurationMonths(durationYears * 12);
+        cycle.setEndDate(calculateEndDate(dto.getStartDate(), durationYears));
         cycle.setUpdatedByUser(currentUser());
 
         cycle.getCycleForms().clear();
@@ -104,16 +130,18 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
     @Override
     @Transactional
-    public KpiTemplateCycleResponseDTO updateStatus(Integer id, boolean active) {
+    public KpiTemplateCycleResponseDTO updateStatus(Integer id, KpiTemplateCycleStatusRequestDTO request) {
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
+        boolean active = Boolean.TRUE.equals(request.getActive());
 
         if (active) {
             if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
                 return getById(id);
             }
-            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Closing cycles cannot be reactivated.");
+            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
             }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
             cycle.setClosingRequestedAt(null);
@@ -129,6 +157,11 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         "Only active cycles can be deactivated."
                 );
             }
+            if (isBeforeOfficialEndDate(cycle)) {
+                requestEarlyClose(cycle, request);
+                cycleRepository.save(cycle);
+                return getById(id);
+            }
         }
 
         cycle.setUpdatedByUser(currentUser());
@@ -142,6 +175,121 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         return getById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<KpiTemplateCycleResponseDTO> listPendingEarlyCloseRequests() {
+        return cycleRepository
+                .findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus.PENDING_APPROVAL)
+                .stream()
+                .map(this::toSummaryDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason) {
+        KpiTemplateCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        LocalDateTime now = LocalDateTime.now();
+        KpiGraceExtension extension = cycle.getGraceExtension();
+        if (extension == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
+        }
+
+        cycle.setEarlyCloseReviewedAt(now);
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.save(cycle);
+        cycleRepository.flush();
+
+        employeeKpiWorkflowService.startCycleClosingGrace(id, extension.addTo(now));
+        return getById(id);
+    }
+
+    @Override
+    @Transactional
+    public KpiTemplateCycleResponseDTO rejectEarlyClose(Integer id, String reviewReason) {
+        KpiTemplateCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+        cycle.setEarlyCloseReviewedAt(LocalDateTime.now());
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
+        cycle.setClosingRequestedAt(null);
+        cycle.setGraceEndsAt(null);
+        cycle.setClosedAt(null);
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.save(cycle);
+        return getById(id);
+    }
+
+    private KpiTemplateCycle requirePendingApproval(Integer id) {
+        KpiTemplateCycle cycle = cycleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
+        if (cycle.getStatus() != KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending KPI early close request exists for this cycle.");
+        }
+        return cycle;
+    }
+
+    private void requestEarlyClose(KpiTemplateCycle cycle, KpiTemplateCycleStatusRequestDTO request) {
+        String reason = normalizeText(request.getReason(), 1000);
+        if (reason == null || reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required to request early cycle closure.");
+        }
+        if (request.getGraceExtension() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is required.");
+        }
+        cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        cycle.setEarlyCloseReason(reason);
+        cycle.setGraceExtension(request.getGraceExtension());
+        cycle.setEarlyCloseRequestedAt(LocalDateTime.now());
+        cycle.setEarlyCloseRequestedByUser(currentUser());
+        cycle.setEarlyCloseReviewedAt(null);
+        cycle.setEarlyCloseReviewedByUser(null);
+        cycle.setEarlyCloseReviewDecision(null);
+        cycle.setEarlyCloseReviewReason(null);
+        cycle.setUpdatedByUser(cycle.getEarlyCloseRequestedByUser());
+    }
+
+    private void ensureCycleEditable(KpiTemplateCycle cycle) {
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cycles pending CEO approval cannot be edited.");
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getEarlyCloseReviewDecision() == KpiEarlyCloseReviewDecision.APPROVED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "CEO approved closure; this cycle can no longer be edited."
+            );
+        }
+        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                && cycle.getGraceEndsAt() != null
+                && !cycle.getGraceEndsAt().isAfter(LocalDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Grace period has ended; this cycle can no longer be edited."
+            );
+        }
+    }
+
+    private boolean isBeforeOfficialEndDate(KpiTemplateCycle cycle) {
+        LocalDate officialEnd = cyclePeriodRepository
+                .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
+                        cycle.getId(),
+                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+                )
+                .map(KpiTemplateCyclePeriod::getEndDate)
+                .orElse(cycle.getEndDate());
+        return officialEnd != null && LocalDate.now().isBefore(officialEnd);
+    }
+
     private void validateRequest(KpiTemplateCycleRequestDTO dto) {
         if (dto.getCycleName() == null || dto.getCycleName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cycle name is required.");
@@ -149,10 +297,14 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         if (dto.getStartDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date is required.");
         }
-        if (dto.getDurationMonths() == null || !ALLOWED_DURATION_MONTHS.contains(dto.getDurationMonths())) {
+        if (dto.getStartDate().isBefore(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be in the past.");
+        }
+        Integer durationYears = normalizedDurationYears(dto);
+        if (!ALLOWED_DURATION_YEARS.contains(durationYears)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Duration must be between 3 and 12 months."
+                    "Cycle period must be between 1 and 5 years."
             );
         }
         if (dto.getKpiFormIds() == null || dto.getKpiFormIds().isEmpty()) {
@@ -162,6 +314,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
     private void applyForms(KpiTemplateCycle cycle, List<Integer> kpiFormIds) {
         List<Integer> distinctIds = kpiFormIds.stream().distinct().toList();
+        assertFormsNotUsedByOtherRunningCycles(cycle.getId(), distinctIds);
         Map<Integer, KpiForm> formsById = new LinkedHashMap<>();
         for (Integer formId : distinctIds) {
             KpiForm form = kpiFormRepository.findById(formId)
@@ -186,15 +339,47 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         }
     }
 
-    private LocalDate calculateEndDate(LocalDate startDate, int durationMonths) {
-        return startDate.plusMonths(durationMonths).minusDays(1);
+    private void assertFormsNotUsedByOtherRunningCycles(Integer excludeCycleId, List<Integer> kpiFormIds) {
+        if (kpiFormIds == null || kpiFormIds.isEmpty()) {
+            return;
+        }
+        List<KpiTemplateCycleForm> conflicts = cycleFormRepository.findConflictingLinks(
+                RUNNING_CYCLE_STATUSES,
+                excludeCycleId,
+                kpiFormIds
+        );
+        if (conflicts == null || conflicts.isEmpty()) {
+            return;
+        }
+        KpiTemplateCycleForm conflict = conflicts.get(0);
+        String formTitle = conflict.getKpiForm().getTitle();
+        String cycleName = conflict.getCycle().getCycleName();
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "KPI form \"" + formTitle + "\" is already used by the running cycle \"" + cycleName + "\"."
+        );
     }
 
-    private String durationLabel(int months) {
-        if (months == 12) {
-            return "1 year";
+    private Integer normalizedDurationYears(KpiTemplateCycleRequestDTO dto) {
+        if (dto.getDurationYears() != null) {
+            return dto.getDurationYears();
         }
-        return months + " months";
+        if (dto.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(dto.getDurationMonths() / 12.0)));
+        }
+        return null;
+    }
+
+    private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
+        if (startDate.getMonth() == Month.FEBRUARY && startDate.getDayOfMonth() == 29
+                && !startDate.plusYears(durationYears).isLeapYear()) {
+            return startDate.plusYears(durationYears);
+        }
+        return startDate.plusYears(durationYears).minusDays(1);
+    }
+
+    private String durationLabel(int years) {
+        return years == 1 ? "1 year" : years + " years";
     }
 
     private KpiTemplateCycleResponseDTO toSummaryDto(KpiTemplateCycle cycle) {
@@ -212,6 +397,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCyclePeriod currentPeriod = cyclePeriodRepository
                 .findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
                 .orElse(null);
+        Integer durationYears = responseDurationYears(cycle);
 
         return KpiTemplateCycleResponseDTO.builder()
                 .id(cycle.getId())
@@ -219,7 +405,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .startDate(cycle.getStartDate())
                 .endDate(cycle.getEndDate())
                 .durationMonths(cycle.getDurationMonths())
-                .durationLabel(durationLabel(cycle.getDurationMonths()))
+                .durationYears(durationYears)
+                .durationLabel(durationLabel(durationYears))
                 .status(cycle.getStatus())
                 .currentPeriodId(currentPeriod != null ? currentPeriod.getId() : null)
                 .currentPeriodNumber(currentPeriod != null ? currentPeriod.getPeriodNumber() : null)
@@ -228,10 +415,51 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .closingRequestedAt(cycle.getClosingRequestedAt())
                 .graceEndsAt(cycle.getGraceEndsAt())
                 .closedAt(cycle.getClosedAt())
+                .earlyCloseReason(cycle.getEarlyCloseReason())
+                .graceExtension(cycle.getGraceExtension())
+                .earlyCloseRequestedAt(cycle.getEarlyCloseRequestedAt())
+                .earlyCloseRequestedByUserId(cycle.getEarlyCloseRequestedByUser() != null ? cycle.getEarlyCloseRequestedByUser().getId() : null)
+                .earlyCloseRequestedByName(displayUser(cycle.getEarlyCloseRequestedByUser()))
+                .earlyCloseReviewedAt(cycle.getEarlyCloseReviewedAt())
+                .earlyCloseReviewedByUserId(cycle.getEarlyCloseReviewedByUser() != null ? cycle.getEarlyCloseReviewedByUser().getId() : null)
+                .earlyCloseReviewedByName(displayUser(cycle.getEarlyCloseReviewedByUser()))
+                .earlyCloseReviewDecision(cycle.getEarlyCloseReviewDecision())
+                .earlyCloseReviewReason(cycle.getEarlyCloseReviewReason())
                 .createdAt(cycle.getCreatedAt())
                 .updatedAt(cycle.getUpdatedAt())
                 .kpiForms(forms)
                 .build();
+    }
+
+    private Integer responseDurationYears(KpiTemplateCycle cycle) {
+        if (cycle.getDurationYears() != null && ALLOWED_DURATION_YEARS.contains(cycle.getDurationYears())) {
+            return cycle.getDurationYears();
+        }
+        if (cycle.getDurationMonths() != null) {
+            return Math.max(1, Math.min(5, (int) Math.ceil(cycle.getDurationMonths() / 12.0)));
+        }
+        return 1;
+    }
+
+    private String normalizeText(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return normalized.length() > maxLength ? normalized.substring(0, maxLength) : normalized;
+    }
+
+    private String displayUser(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+            return user.getFullName();
+        }
+        return user.getEmail();
     }
 
     private User currentUser() {

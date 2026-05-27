@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { fetchDepartments } from '../../services/departmentService';
 import type { Department } from '../../services/departmentService';
 import { appraisalAuditService, appraisalCycleService, appraisalTemplateService, type AppraisalAuditLog } from '../../services/appraisalService';
+import { formatAppraisalAuditChangeCount, groupAppraisalAuditRecords, type GroupedAppraisalAuditLog } from '../../utils/appraisalAuditRecords';
 import { signatureService } from '../../services/signatureService';
 import { extractApiErrorMessage } from '../../services/apiError';
 import type {
@@ -11,12 +12,16 @@ import type {
   AppraisalCycleResponse,
   AppraisalCycleType,
   AppraisalScoreBandRequest,
+  AppraisalScoreBandResponse,
   AppraisalSectionRequest,
+  AppraisalSectionResponse,
   AppraisalTemplateRequest,
   AppraisalTemplateResponse,
 } from '../../types/appraisal';
 import type { Signature } from '../../types/signature';
 import AppraisalRatingDots from '../../components/appraisal/AppraisalRatingDots';
+import { formatDisplayDate, formatDisplayDateTime } from '../../utils/appraisalDateFormat';
+import { getAppraisalScoreBandToneClass } from '../../utils/appraisalScoreBandTone';
 import './appraisal.css';
 
 const currentYear = new Date().getFullYear();
@@ -55,6 +60,13 @@ type PopupState = {
   onConfirm?: () => void | Promise<void>;
 };
 
+type ReasonDialogState = {
+  title: string;
+  message: string;
+  confirmText?: string;
+  onConfirm: (reason: string) => void | Promise<void>;
+};
+
 const defaultScoreBands = (): AppraisalScoreBandRequest[] => [
   { minScore: 86, maxScore: 100, label: 'Outstanding', description: 'Performance exceptional and far exceeds expectations.', sortOrder: 1, active: true },
   { minScore: 71, maxScore: 85, label: 'Exceeds Requirements', description: 'Performance is consistent and clearly meets essential requirements.', sortOrder: 2, active: true },
@@ -74,24 +86,315 @@ const uniqueScoreBands = <T extends ScoreBandLike>(bands: T[]) => {
 
 const clampScore = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 
-const displayDate = (value?: string | null) => {
-  if (!value) return '-';
-  const [year, month, day] = value.slice(0, 10).split('-');
-  if (!year || !month || !day) return value;
-  return `${day}/${month}/${year}`;
+const displayDate = (value?: string | null) => formatDisplayDate(value);
+
+const displayDateTime = (value?: string | null) => formatDisplayDateTime(value);
+
+const normalizeAuditKey = (value: string) => value.trim().toLowerCase();
+
+const parseAuditSummary = (value?: string | null) => {
+  const map = new Map<string, string>();
+  if (!value) return map;
+  value.split('|').forEach((part) => {
+    const separatorIndex = part.indexOf(':');
+    if (separatorIndex < 0) return;
+    const key = normalizeAuditKey(part.slice(0, separatorIndex));
+    const itemValue = part.slice(separatorIndex + 1).trim();
+    if (key) map.set(key, itemValue);
+  });
+  return map;
 };
 
-const displayDateTime = (value?: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+const stripAuditTemplateMarker = (value?: string | null) => (value ?? '')
+  .replace(/\s*@@templateId=\d+/ig, '')
+  .replace(/\s*@@auditBatch=[a-z0-9-]+/ig, '')
+  .trim();
+
+const auditTemplateIdFromRecord = (record?: AppraisalAuditLog | null) => {
+  const source = [record?.newValue, record?.changedColumn, record?.reason].filter(Boolean).join(' ');
+  const match = source.match(/@@templateId=(\d+)/i);
+  return match?.[1] ? Number(match[1]) : null;
 };
+
+const parseAuditStoredValue = (value?: string | null) => {
+  const raw = stripAuditTemplateMarker(value);
+  const separator = raw.indexOf('::');
+  const rawState = separator >= 0 ? raw.slice(0, separator) : raw;
+  const detail = separator >= 0 ? raw.slice(separator + 2).trim() : '';
+  const state = normalizeAuditKey(rawState || 'changed');
+  return { state, detail };
+};
+
+const auditChangedFields = (record?: AppraisalAuditLog | null) => {
+  const changed = new Set<string>();
+  if (!record) return changed;
+
+  // New appraisal edit records are saved one row per changed item.
+  // Do not compare this record against any later audit record; each row must stay independent.
+  if (record.changedColumn) {
+    record.changedColumn.split('|').forEach((part) => {
+      const [rawToken] = stripAuditTemplateMarker(part).split(':');
+      const key = normalizeAuditKey(rawToken ?? '');
+      if (key) changed.add(key);
+    });
+    return changed;
+  }
+
+  const before = parseAuditSummary(record.oldValue);
+  const after = parseAuditSummary(record.newValue);
+  const keys = new Set([...before.keys(), ...after.keys()]);
+  keys.forEach((key) => {
+    if ((before.get(key) ?? '') !== (after.get(key) ?? '')) changed.add(key);
+  });
+  if (changed.size === 0 && (record.oldValue ?? '') !== (record.newValue ?? '')) changed.add('all');
+  return changed;
+};
+
+const hasAuditChange = (fields: Set<string>, ...labels: string[]) => fields.has('all') || labels.some((label) => fields.has(normalizeAuditKey(label)));
+
+const auditHighlightClass = (fields: Set<string>, ...labels: string[]) => (hasAuditChange(fields, ...labels) ? 'appraisal-audit-highlight' : '');
+
+type RemovedCriteriaDisplay = { criteriaIndex: number; text: string };
+
+type RemovedSectionDisplay = { sectionIndex: number; name: string; criteria: string[] };
+
+type TemplateAuditDetail = {
+  fields: Set<string>;
+  sectionIndexes: Set<number>;
+  criteriaKeys: Set<string>;
+  scoreBandIndexes: Set<number>;
+  removedSectionIndexes: Set<number>;
+  removedCriteriaKeys: Set<string>;
+  removedScoreBandIndexes: Set<number>;
+  removedScoreBandTextByIndex: Map<number, string>;
+  removedSections: RemovedSectionDisplay[];
+  removedCriteriaBySection: Map<number, RemovedCriteriaDisplay[]>;
+};
+
+type AuditSectionSnapshot = { name: string; criteria: string[] };
+
+const emptyTemplateAuditDetail = (): TemplateAuditDetail => ({
+  fields: new Set<string>(),
+  sectionIndexes: new Set<number>(),
+  criteriaKeys: new Set<string>(),
+  scoreBandIndexes: new Set<number>(),
+  removedSectionIndexes: new Set<number>(),
+  removedCriteriaKeys: new Set<string>(),
+  removedScoreBandIndexes: new Set<number>(),
+  removedScoreBandTextByIndex: new Map<number, string>(),
+  removedSections: [],
+  removedCriteriaBySection: new Map<number, RemovedCriteriaDisplay[]>(),
+});
+
+const parseEvaluationSnapshot = (value?: string | null): AuditSectionSnapshot[] => {
+  if (!value || value.trim() === '-') return [];
+  return value
+    .split(/\s*;\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const open = part.indexOf('[');
+      const close = part.lastIndexOf(']');
+      const name = open >= 0 ? part.slice(0, open).trim() : part;
+      const criteriaText = open >= 0 && close > open ? part.slice(open + 1, close).trim() : '';
+      const criteria = criteriaText && criteriaText !== '-'
+        ? criteriaText.split(/\s*\/\s*/).map((item) => item.trim()).filter(Boolean)
+        : [];
+      return { name, criteria };
+    });
+};
+
+const addRemovedCriteria = (detail: TemplateAuditDetail, sectionIndex: number, criteriaIndex: number, text: string) => {
+  const key = `${sectionIndex}.${criteriaIndex}`;
+  detail.removedCriteriaKeys.add(key);
+  const cleanText = (text || '').trim() || `Removed criteria ${sectionIndex}.${criteriaIndex}`;
+  const items = detail.removedCriteriaBySection.get(sectionIndex) ?? [];
+  const existingIndex = items.findIndex((item) => item.criteriaIndex === criteriaIndex);
+  if (existingIndex >= 0) {
+    items[existingIndex] = { criteriaIndex, text: cleanText };
+  } else {
+    items.push({ criteriaIndex, text: cleanText });
+  }
+  detail.removedCriteriaBySection.set(sectionIndex, items);
+};
+
+const auditSourceRecords = (record: AppraisalAuditLog | GroupedAppraisalAuditLog): AppraisalAuditLog[] => {
+  const grouped = record as GroupedAppraisalAuditLog;
+  return grouped.sourceRecords?.length ? grouped.sourceRecords : [record];
+};
+
+const addRemovedSection = (detail: TemplateAuditDetail, sectionIndex: number, text: string) => {
+  detail.removedSectionIndexes.add(sectionIndex);
+  const parsedSection = parseEvaluationSnapshot(text)[0];
+  const display: RemovedSectionDisplay = {
+    sectionIndex,
+    name: parsedSection?.name || text || `Removed section ${sectionIndex}`,
+    criteria: parsedSection?.criteria?.length ? parsedSection.criteria : [],
+  };
+  const existingIndex = detail.removedSections.findIndex((section) => section.sectionIndex === sectionIndex);
+  if (existingIndex >= 0) {
+    detail.removedSections[existingIndex] = display;
+  } else {
+    detail.removedSections.push(display);
+  }
+  display.criteria.forEach((criteriaText, criteriaIndex) => addRemovedCriteria(detail, sectionIndex, criteriaIndex + 1, criteriaText));
+};
+
+const applyRemovedTextFromAuditSources = (detail: TemplateAuditDetail, record: AppraisalAuditLog | GroupedAppraisalAuditLog) => {
+  auditSourceRecords(record).forEach((source) => {
+    const removedText = stripAuditTemplateMarker(source.oldValue);
+    if (!removedText) return;
+    const stateFromRecord = parseAuditStoredValue(source.newValue).state;
+    stripAuditTemplateMarker(source.changedColumn).split('|').forEach((part) => {
+      const [rawToken, rawState = ''] = stripAuditTemplateMarker(part).split(':');
+      const token = normalizeAuditKey(rawToken ?? '');
+      const state = normalizeAuditKey(rawState || stateFromRecord || 'changed');
+      if (!state.includes('removed')) return;
+
+      const sectionMatch = token.match(/^section\s+(\d+)$/);
+      if (sectionMatch?.[1]) {
+        addRemovedSection(detail, Number(sectionMatch[1]), removedText);
+      }
+
+      const criteriaMatch = token.match(/^criteria\s+(\d+)\.(\d+)$/);
+      if (criteriaMatch?.[1] && criteriaMatch?.[2]) {
+        addRemovedCriteria(detail, Number(criteriaMatch[1]), Number(criteriaMatch[2]), removedText);
+      }
+
+      const scoreMatch = token.match(/^score\s+range\s+(\d+)$/);
+      if (scoreMatch?.[1]) {
+        const scoreNo = Number(scoreMatch[1]);
+        detail.removedScoreBandIndexes.add(scoreNo);
+        detail.removedScoreBandTextByIndex.set(scoreNo, removedText);
+      }
+    });
+  });
+};
+
+const addEvaluationDiff = (detail: TemplateAuditDetail, beforeValue?: string | null, afterValue?: string | null) => {
+  if ((beforeValue ?? '') === (afterValue ?? '')) return;
+  const beforeSections = parseEvaluationSnapshot(beforeValue);
+  const afterSections = parseEvaluationSnapshot(afterValue);
+  const maxSections = Math.max(beforeSections.length, afterSections.length);
+  for (let sectionIndex = 0; sectionIndex < maxSections; sectionIndex += 1) {
+    const sectionNo = sectionIndex + 1;
+    const beforeSection = beforeSections[sectionIndex];
+    const afterSection = afterSections[sectionIndex];
+    if (beforeSection && !afterSection) {
+      detail.removedSectionIndexes.add(sectionNo);
+      detail.removedSections.push({ sectionIndex: sectionNo, name: beforeSection.name, criteria: beforeSection.criteria });
+      beforeSection.criteria.forEach((_, criteriaIndex) => detail.removedCriteriaKeys.add(`${sectionNo}.${criteriaIndex + 1}`));
+      continue;
+    }
+    if (!beforeSection && afterSection) {
+      detail.sectionIndexes.add(sectionNo);
+      afterSection.criteria.forEach((_, criteriaIndex) => detail.criteriaKeys.add(`${sectionNo}.${criteriaIndex + 1}`));
+      continue;
+    }
+    if ((beforeSection?.name ?? '') !== (afterSection?.name ?? '')) detail.sectionIndexes.add(sectionNo);
+    const maxCriteria = Math.max(beforeSection?.criteria.length ?? 0, afterSection?.criteria.length ?? 0);
+    for (let criteriaIndex = 0; criteriaIndex < maxCriteria; criteriaIndex += 1) {
+      const criteriaNo = criteriaIndex + 1;
+      const beforeCriteria = beforeSection?.criteria[criteriaIndex];
+      const afterCriteria = afterSection?.criteria[criteriaIndex];
+      if (beforeCriteria && !afterCriteria) addRemovedCriteria(detail, sectionNo, criteriaNo, beforeCriteria);
+      else if (!beforeCriteria && afterCriteria) detail.criteriaKeys.add(`${sectionNo}.${criteriaNo}`);
+      else if ((beforeCriteria ?? '') !== (afterCriteria ?? '')) detail.criteriaKeys.add(`${sectionNo}.${criteriaNo}`);
+    }
+  }
+};
+
+const addScoreRangeDiff = (detail: TemplateAuditDetail, beforeValue?: string | null, afterValue?: string | null) => {
+  if ((beforeValue ?? '') === (afterValue ?? '')) return;
+  const beforeRanges = (beforeValue || '').split(/\s*;\s*/).map((item) => item.trim()).filter(Boolean);
+  const afterRanges = (afterValue || '').split(/\s*;\s*/).map((item) => item.trim()).filter(Boolean);
+  const maxRanges = Math.max(beforeRanges.length, afterRanges.length);
+  for (let index = 0; index < maxRanges; index += 1) {
+    if (beforeRanges[index] && !afterRanges[index]) detail.removedScoreBandIndexes.add(index + 1);
+    else if ((beforeRanges[index] ?? '') !== (afterRanges[index] ?? '')) detail.scoreBandIndexes.add(index + 1);
+  }
+};
+
+const buildTemplateAuditDetail = (record?: AppraisalAuditLog | null): TemplateAuditDetail => {
+  const detail = emptyTemplateAuditDetail();
+  if (!record) return detail;
+  auditChangedFields(record).forEach((field) => detail.fields.add(field));
+  const stateFromRecord = parseAuditStoredValue(record.newValue).state;
+  const tokenSource = [record.changedColumn].filter(Boolean).join(' | ');
+  tokenSource.split('|').forEach((part) => {
+    const [rawToken, rawState = ''] = stripAuditTemplateMarker(part).split(':');
+    const token = normalizeAuditKey(rawToken ?? part);
+    const state = normalizeAuditKey(rawState || stateFromRecord || 'changed');
+    const isRemoved = state.includes('removed');
+    const sectionMatch = token.match(/^section\s+(\d+)$/);
+    if (sectionMatch?.[1]) {
+      const sectionNo = Number(sectionMatch[1]);
+      if (isRemoved) detail.removedSectionIndexes.add(sectionNo);
+      else detail.sectionIndexes.add(sectionNo);
+    }
+    const criteriaMatch = token.match(/^criteria\s+(\d+)\.(\d+)$/);
+    if (criteriaMatch?.[1] && criteriaMatch?.[2]) {
+      const key = `${Number(criteriaMatch[1])}.${Number(criteriaMatch[2])}`;
+      if (isRemoved) detail.removedCriteriaKeys.add(key);
+      else detail.criteriaKeys.add(key);
+    }
+    const scoreMatch = token.match(/^score\s+range\s+(\d+)$/);
+    if (scoreMatch?.[1]) {
+      const scoreNo = Number(scoreMatch[1]);
+      if (isRemoved) detail.removedScoreBandIndexes.add(scoreNo);
+      else detail.scoreBandIndexes.add(scoreNo);
+    }
+  });
+  const before = parseAuditSummary(record.oldValue);
+  const after = parseAuditSummary(record.newValue);
+  addEvaluationDiff(detail, before.get('evaluation details'), after.get('evaluation details'));
+  addScoreRangeDiff(detail, before.get('score ranges'), after.get('score ranges'));
+  applyRemovedTextFromAuditSources(detail, record);
+
+  // Newer audit logs store a compact changed-field list to avoid DB truncation errors.
+  // When old/new snapshots are not present, still render removed items in red using placeholders.
+  detail.removedCriteriaKeys.forEach((key) => {
+    const [sectionText, criteriaText] = key.split('.');
+    const sectionNo = Number(sectionText);
+    const criteriaNo = Number(criteriaText);
+    if (!sectionNo || !criteriaNo) return;
+    const existing = detail.removedCriteriaBySection.get(sectionNo) ?? [];
+    if (!existing.some((item) => item.criteriaIndex === criteriaNo)) {
+      const oldText = stripAuditTemplateMarker(record.oldValue) && !stripAuditTemplateMarker(record.oldValue).includes(':') && !stripAuditTemplateMarker(record.oldValue).includes('|')
+        ? stripAuditTemplateMarker(record.oldValue)
+        : `Removed criteria ${sectionNo}.${criteriaNo}`;
+      existing.push({ criteriaIndex: criteriaNo, text: oldText });
+      detail.removedCriteriaBySection.set(sectionNo, existing);
+    }
+  });
+  detail.removedSectionIndexes.forEach((sectionNo) => {
+    if (!detail.removedSections.some((section) => section.sectionIndex === sectionNo)) {
+      const oldSectionText = stripAuditTemplateMarker(record.oldValue);
+      const oldSection = oldSectionText && !oldSectionText.includes('|') ? parseEvaluationSnapshot(oldSectionText)[0] : undefined;
+      detail.removedSections.push({
+        sectionIndex: sectionNo,
+        name: oldSection?.name || `Removed section ${sectionNo}`,
+        criteria: oldSection?.criteria?.length ? oldSection.criteria : ['Criteria under this section were removed.'],
+      });
+    }
+  });
+
+  return detail;
+};
+
+const auditSectionHighlightClass = (detail: TemplateAuditDetail, sectionIndex: number) => (
+  detail.sectionIndexes.has(sectionIndex + 1) ? 'appraisal-audit-highlight' : ''
+);
+
+const auditCriteriaHighlightClass = (detail: TemplateAuditDetail, sectionIndex: number, criteriaIndex: number) => (
+  detail.criteriaKeys.has(`${sectionIndex + 1}.${criteriaIndex + 1}`) ? 'appraisal-audit-highlight' : ''
+);
+
+const auditRemovedClass = 'appraisal-audit-removed';
+
+const auditScoreBandHighlightClass = (detail: TemplateAuditDetail, index: number) => (
+  detail.scoreBandIndexes.has(index + 1) ? 'appraisal-audit-highlight' : ''
+);
 
 const formatDateByPattern = (date: Date, pattern: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD') => {
   const day = `${date.getDate()}`.padStart(2, '0');
@@ -166,7 +469,29 @@ const statusClass = (status: string) => {
   return '';
 };
 
+const startOfLocalDay = (value: Date) =>
+  new Date(value.getFullYear(), value.getMonth(), value.getDate());
+
+const toLocalDateOnly = (value?: string | null) => {
+  if (!value) return null;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const hasCycleEndDateReached = (cycle: AppraisalCycleResponse) => {
+  const endDate = toLocalDateOnly(cycle.endDate);
+  if (!endDate) return false;
+  return endDate.getTime() <= startOfLocalDay(new Date()).getTime();
+};
+
 const canCompleteCycle = (cycle: AppraisalCycleResponse) => Boolean(cycle.locked) || cycle.status === 'LOCKED';
+
+const canEditCycleDraft = (cycle: AppraisalCycleResponse) => cycle.status === 'DRAFT';
+
+const canLockCycle = (cycle: AppraisalCycleResponse) =>
+  cycle.status === 'ACTIVE' && !cycle.locked && hasCycleEndDateReached(cycle);
+
 
 const formatCycleType = (value: AppraisalCycleType) => {
   if (value === 'SEMI_ANNUAL') return 'Semi-Annual';
@@ -260,11 +585,13 @@ const templateToReusableForm = (template: AppraisalTemplateResponse): AppraisalT
   targetAllDepartments: true,
   departmentIds: [],
   sections: template.sections.map((section, sectionIndex) => ({
+    id: section.id,
     sectionName: section.sectionName,
     description: section.description ?? '',
     sortOrder: section.sortOrder ?? sectionIndex + 1,
     active: true,
     criteria: section.criteria.map((criteria, criteriaIndex) => ({
+      id: criteria.id,
       criteriaText: criteria.criteriaText,
       description: '',
       sortOrder: criteria.sortOrder ?? criteriaIndex + 1,
@@ -274,6 +601,7 @@ const templateToReusableForm = (template: AppraisalTemplateResponse): AppraisalT
     })),
   })),
   scoreBands: uniqueScoreBands(template.scoreBands?.length ? template.scoreBands : defaultScoreBands()).map((band, index) => ({
+    id: band.id,
     minScore: clampScore(Number(band.minScore)),
     maxScore: clampScore(Number(band.maxScore)),
     label: band.label,
@@ -282,6 +610,108 @@ const templateToReusableForm = (template: AppraisalTemplateResponse): AppraisalT
     active: true,
   })),
 });
+
+
+const TEMPLATE_CHANGE_RECORD_SEPARATOR = '\u001E';
+const TEMPLATE_CHANGE_FIELD_SEPARATOR = '\u001F';
+
+const cleanAuditText = (value?: string | number | null) => String(value ?? '-').replace(/[|\u001E\u001F]+/g, '/').replace(/\s+/g, ' ').trim() || '-';
+
+const encodeTemplateChange = (field: string, state: 'added' | 'changed' | 'removed', oldValue?: string | null, newValue?: string | null) => (
+  [cleanAuditText(field), state, cleanAuditText(oldValue), cleanAuditText(newValue)].join(TEMPLATE_CHANGE_FIELD_SEPARATOR)
+);
+
+const scoreBandAuditText = (band?: AppraisalScoreBandRequest | AppraisalScoreBandResponse | null) => {
+  if (!band) return '-';
+  return `${cleanAuditText(band.label)} ${band.minScore ?? 0}-${band.maxScore ?? 0}`;
+};
+
+const sectionAuditTextFromForm = (section: AppraisalSectionRequest) => {
+  const criteria = (section.criteria ?? []).map((item) => cleanAuditText(item.criteriaText)).join(' / ') || '-';
+  return `${cleanAuditText(section.sectionName)}[${criteria}]`;
+};
+
+const sectionAuditTextFromResponse = (section: AppraisalSectionResponse) => {
+  const criteria = (section.criteria ?? []).map((item) => cleanAuditText(item.criteriaText)).join(' / ') || '-';
+  return `${cleanAuditText(section.sectionName)}[${criteria}]`;
+};
+
+const buildTemplateChangeSummary = (sourceTemplate: AppraisalTemplateResponse | null, form: AppraisalTemplateRequest | null) => {
+  if (!sourceTemplate || !form) return '';
+  const records: string[] = [];
+  const sourceSectionsById = new Map(sourceTemplate.sections.map((section) => [section.id, section]));
+  const requestedSectionIds = new Set<number>();
+
+  form.sections.forEach((section, sectionIndex) => {
+    const sectionNo = sectionIndex + 1;
+    const sourceSection = section.id ? sourceSectionsById.get(section.id) : undefined;
+    if (!sourceSection) {
+      records.push(encodeTemplateChange(`Section ${sectionNo}`, 'added', '', sectionAuditTextFromForm(section)));
+      (section.criteria ?? []).forEach((criteria, criteriaIndex) => {
+        records.push(encodeTemplateChange(`Criteria ${sectionNo}.${criteriaIndex + 1}`, 'added', '', criteria.criteriaText));
+      });
+      return;
+    }
+    requestedSectionIds.add(sourceSection.id);
+    if (cleanAuditText(sourceSection.sectionName) !== cleanAuditText(section.sectionName)) {
+      records.push(encodeTemplateChange(`Section ${sectionNo}`, 'changed', sourceSection.sectionName, section.sectionName));
+    }
+
+    const sourceCriteriaById = new Map(sourceSection.criteria.map((criteria) => [criteria.id, criteria]));
+    const requestedCriteriaIds = new Set<number>();
+    (section.criteria ?? []).forEach((criteria, criteriaIndex) => {
+      const criteriaNo = criteriaIndex + 1;
+      const sourceCriteria = criteria.id ? sourceCriteriaById.get(criteria.id) : undefined;
+      if (!sourceCriteria) {
+        records.push(encodeTemplateChange(`Criteria ${sectionNo}.${criteriaNo}`, 'added', '', criteria.criteriaText));
+        return;
+      }
+      requestedCriteriaIds.add(sourceCriteria.id);
+      if (cleanAuditText(sourceCriteria.criteriaText) !== cleanAuditText(criteria.criteriaText)) {
+        records.push(encodeTemplateChange(`Criteria ${sectionNo}.${criteriaNo}`, 'changed', sourceCriteria.criteriaText, criteria.criteriaText));
+      }
+    });
+    sourceSection.criteria.forEach((criteria, criteriaIndex) => {
+      if (!requestedCriteriaIds.has(criteria.id)) {
+        records.push(encodeTemplateChange(`Criteria ${sectionNo}.${criteriaIndex + 1}`, 'removed', criteria.criteriaText, ''));
+      }
+    });
+  });
+
+  sourceTemplate.sections.forEach((section, sectionIndex) => {
+    if (!requestedSectionIds.has(section.id)) {
+      const sectionNo = sectionIndex + 1;
+      records.push(encodeTemplateChange(`Section ${sectionNo}`, 'removed', sectionAuditTextFromResponse(section), ''));
+      section.criteria.forEach((criteria, criteriaIndex) => {
+        records.push(encodeTemplateChange(`Criteria ${sectionNo}.${criteriaIndex + 1}`, 'removed', criteria.criteriaText, ''));
+      });
+    }
+  });
+
+  const sourceBandsById = new Map((sourceTemplate.scoreBands ?? []).map((band) => [band.id, band]));
+  const requestedBandIds = new Set<number>();
+  const formBands = uniqueScoreBands(form.scoreBands?.length ? form.scoreBands : defaultScoreBands());
+  formBands.forEach((band, index) => {
+    const sourceBand = band.id ? sourceBandsById.get(band.id) : undefined;
+    if (!sourceBand) {
+      records.push(encodeTemplateChange(`Score Range ${index + 1}`, 'added', '', scoreBandAuditText(band)));
+      return;
+    }
+    requestedBandIds.add(sourceBand.id);
+    const oldValue = scoreBandAuditText(sourceBand);
+    const newValue = scoreBandAuditText(band);
+    if (oldValue !== newValue) {
+      records.push(encodeTemplateChange(`Score Range ${index + 1}`, 'changed', oldValue, newValue));
+    }
+  });
+  (sourceTemplate.scoreBands ?? []).forEach((band, index) => {
+    if (!requestedBandIds.has(band.id)) {
+      records.push(encodeTemplateChange(`Score Range ${index + 1}`, 'removed', scoreBandAuditText(band), ''));
+    }
+  });
+
+  return records.join(TEMPLATE_CHANGE_RECORD_SEPARATOR);
+};
 
 const normalizeReusableTemplate = (form: AppraisalTemplateRequest, _cycleName: string, sourceCycleName: string): AppraisalTemplateRequest => ({
   ...form,
@@ -339,18 +769,24 @@ const AppraisalCyclesPage = () => {
   const [reuseDateText, setReuseDateText] = useState<DateTextState>(() => buildDateText(emptyCycle()));
   const [reuseAllDepartments, setReuseAllDepartments] = useState(true);
   const [reuseTemplateForm, setReuseTemplateForm] = useState<AppraisalTemplateRequest | null>(null);
+  const [reuseSourceTemplate, setReuseSourceTemplate] = useState<AppraisalTemplateResponse | null>(null);
   const [reuseTemplateLoading, setReuseTemplateLoading] = useState(false);
   const [reuseMode, setReuseMode] = useState<'reuse' | 'edit'>('reuse');
   const [loading, setLoading] = useState(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState | null>(null);
+  const [reasonText, setReasonText] = useState('');
   const [cycleSearch, setCycleSearch] = useState('');
-  const [cycleTemplateFilter, setCycleTemplateFilter] = useState('');
-  const [cycleDepartmentFilter, setCycleDepartmentFilter] = useState('');
   const [cycleTypeFilter, setCycleTypeFilter] = useState('');
   const [cycleYearFilter, setCycleYearFilter] = useState('');
   const [editRecordsTitle, setEditRecordsTitle] = useState('');
-  const [editRecords, setEditRecords] = useState<AppraisalAuditLog[]>([]);
+  const [editRecordsCycle, setEditRecordsCycle] = useState<AppraisalCycleResponse | null>(null);
+  const [editRecords, setEditRecords] = useState<GroupedAppraisalAuditLog[]>([]);
   const [editRecordsLoading, setEditRecordsLoading] = useState(false);
+  const [editRecordView, setEditRecordView] = useState<GroupedAppraisalAuditLog | null>(null);
+  const [editRecordCycleTemplate, setEditRecordCycleTemplate] = useState<AppraisalTemplateResponse | null>(null);
+  const [editRecordViewLoading, setEditRecordViewLoading] = useState(false);
+  const latestEditRecords = useMemo(() => editRecords.slice(0, 3), [editRecords]);
 
   const signatureById = useMemo(() => new Map(signatures.map((signature) => [signature.id, signature])), [signatures]);
 
@@ -364,22 +800,6 @@ const AppraisalCyclesPage = () => {
     [reuseForm.cycleType, reuseForm.cycleYear, reuseForm.startDate, reuseForm.endDate],
   );
 
-  const cycleTemplateOptions = useMemo(() => {
-    const optionMap = new Map<number, string>();
-    cycles.forEach((cycle) => optionMap.set(cycle.templateId, cycle.templateName || `Template #${cycle.templateId}`));
-    return Array.from(optionMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [cycles]);
-
-  const cycleDepartmentOptions = useMemo(() => {
-    const optionMap = new Map<number, string>();
-    departments.forEach((department) => optionMap.set(department.id, department.departmentName));
-    cycles.forEach((cycle) => {
-      cycle.departmentIds.forEach((departmentId, index) => {
-        optionMap.set(departmentId, cycle.departmentNames?.[index] || optionMap.get(departmentId) || `Department #${departmentId}`);
-      });
-    });
-    return Array.from(optionMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [cycles, departments]);
 
   const cycleYearFilterOptions = useMemo(() => {
     const years = new Set<number>();
@@ -389,21 +809,16 @@ const AppraisalCyclesPage = () => {
 
   const filteredCycles = useMemo(() => {
     const searchText = cycleSearch.trim().toLowerCase();
-    const selectedDepartmentId = cycleDepartmentFilter ? Number(cycleDepartmentFilter) : null;
     return cycles.filter((cycle) => {
       const nameMatches = !searchText || cycle.cycleName.toLowerCase().includes(searchText);
-      const templateMatches = !cycleTemplateFilter || String(cycle.templateId) === cycleTemplateFilter;
-      const departmentMatches = selectedDepartmentId === null || cycle.departmentIds.length === 0 || cycle.departmentIds.includes(selectedDepartmentId);
       const typeMatches = !cycleTypeFilter || cycle.cycleType === cycleTypeFilter;
       const yearMatches = !cycleYearFilter || String(cycle.cycleYear) === cycleYearFilter;
-      return nameMatches && templateMatches && departmentMatches && typeMatches && yearMatches;
+      return nameMatches && typeMatches && yearMatches;
     });
-  }, [cycleDepartmentFilter, cycleSearch, cycleTemplateFilter, cycleTypeFilter, cycleYearFilter, cycles]);
+  }, [cycleSearch, cycleTypeFilter, cycleYearFilter, cycles]);
 
   const clearCycleFilters = () => {
     setCycleSearch('');
-    setCycleTemplateFilter('');
-    setCycleDepartmentFilter('');
     setCycleTypeFilter('');
     setCycleYearFilter('');
   };
@@ -422,6 +837,28 @@ const AppraisalCyclesPage = () => {
     const handler = popup?.onConfirm;
     setPopup(null);
     if (handler) void handler();
+  };
+
+  const openReasonDialog = (dialog: ReasonDialogState) => {
+    setReasonText('');
+    setReasonDialog(dialog);
+  };
+
+  const closeReasonDialog = () => {
+    setReasonDialog(null);
+    setReasonText('');
+  };
+
+  const confirmReasonDialog = () => {
+    if (!reasonDialog) return;
+    const normalized = reasonText.trim();
+    if (!normalized) {
+      showPopup({ title: 'Validation Error', message: 'Edit reason is required.', type: 'error' });
+      return;
+    }
+    const handler = reasonDialog.onConfirm;
+    closeReasonDialog();
+    void handler(normalized);
   };
 
   const loadData = async () => {
@@ -498,23 +935,53 @@ const AppraisalCyclesPage = () => {
 
   const openEditRecords = async (cycle: AppraisalCycleResponse) => {
     setEditRecordsTitle(cycle.cycleName);
+    setEditRecordsCycle(cycle);
     setEditRecords([]);
+    setEditRecordView(null);
+    setEditRecordCycleTemplate(null);
     setEditRecordsLoading(true);
     try {
       const records = await appraisalAuditService.list('APPRAISAL_CYCLE', cycle.id);
-      setEditRecords(records);
+      setEditRecords(groupAppraisalAuditRecords(records));
     } catch (error) {
       showPopup({ title: 'Load Failed', message: extractApiErrorMessage(error, 'Edit records could not be loaded.'), type: 'error' });
       setEditRecordsTitle('');
+      setEditRecordsCycle(null);
     } finally {
       setEditRecordsLoading(false);
     }
   };
 
+  const openEditRecordView = async (record: AppraisalAuditLog) => {
+    setEditRecordView(record);
+    setEditRecordCycleTemplate(null);
+    if (!editRecordsCycle) return;
+    const templateId = auditTemplateIdFromRecord(record) || editRecordsCycle.templateId;
+    setEditRecordViewLoading(true);
+    try {
+      const template = await appraisalTemplateService.get(templateId);
+      setEditRecordCycleTemplate(template);
+    } catch (error) {
+      showPopup({ title: 'Load Failed', message: extractApiErrorMessage(error, 'Template form could not be loaded.'), type: 'error' });
+    } finally {
+      setEditRecordViewLoading(false);
+    }
+  };
+
+  const closeEditRecordView = () => {
+    setEditRecordView(null);
+    setEditRecordCycleTemplate(null);
+    setEditRecordViewLoading(false);
+  };
+
   const closeEditRecords = () => {
     setEditRecordsTitle('');
+    setEditRecordsCycle(null);
     setEditRecords([]);
+    setEditRecordView(null);
+    setEditRecordCycleTemplate(null);
     setEditRecordsLoading(false);
+    setEditRecordViewLoading(false);
   };
 
   const buildReusePayload = (cycle: AppraisalCycleResponse): AppraisalCycleRequest => {
@@ -538,6 +1005,10 @@ const AppraisalCyclesPage = () => {
   };
 
   const openReuseModal = async (cycle: AppraisalCycleResponse) => {
+    if (cycle.status !== 'COMPLETED') {
+      showPopup({ title: 'Re-use Unavailable', message: 'Only completed appraisal cycles can be re-used.', type: 'info' });
+      return;
+    }
     setReuseMode('reuse');
     const payload = buildReusePayload(cycle);
     setReuseSourceCycle(cycle);
@@ -546,9 +1017,11 @@ const AppraisalCyclesPage = () => {
     setReuseDateText(buildDateText(payload));
     setReuseAllDepartments(!payload.departmentIds.length);
     setReuseTemplateForm(null);
+    setReuseSourceTemplate(null);
     setReuseTemplateLoading(true);
     try {
       const template = await appraisalTemplateService.get(cycle.templateId);
+      setReuseSourceTemplate(template);
       setReuseTemplateForm(templateToReusableForm(template));
     } catch (error) {
       showPopup({ title: 'Load Failed', message: extractApiErrorMessage(error, 'Template form for this cycle could not be loaded.'), type: 'error' });
@@ -583,9 +1056,11 @@ const AppraisalCyclesPage = () => {
     setReuseDateText(buildDateText(payload));
     setReuseAllDepartments(!payload.departmentIds.length);
     setReuseTemplateForm(null);
+    setReuseSourceTemplate(null);
     setReuseTemplateLoading(true);
     try {
       const template = await appraisalTemplateService.get(cycle.templateId);
+      setReuseSourceTemplate(template);
       setReuseTemplateForm(templateToReusableForm(template));
     } catch (error) {
       showPopup({ title: 'Load Failed', message: extractApiErrorMessage(error, 'Template form for this cycle could not be loaded.'), type: 'error' });
@@ -598,6 +1073,7 @@ const AppraisalCyclesPage = () => {
   const closeReuseModal = () => {
     setReuseSourceCycle(null);
     setReuseTemplateForm(null);
+    setReuseSourceTemplate(null);
   };
 
   const setCycleType = (cycleType: AppraisalCycleType) => {
@@ -820,17 +1296,35 @@ const AppraisalCyclesPage = () => {
       showPopup({ title: 'Validation Error', message: validationMessage, type: 'error' });
       return;
     }
+    if (reuseMode === 'edit') {
+      openReasonDialog({
+        title: 'Confirm Appraisal Cycle Edit',
+        message: 'Please enter the reason for editing this appraisal cycle.',
+        confirmText: 'Continue',
+        onConfirm: (reason) => {
+          showPopup({
+            title: 'Confirm Update Cycle',
+            message: 'Save changes to this draft appraisal cycle?',
+            type: 'confirm',
+            confirmText: 'Submit',
+            cancelText: 'Cancel',
+            onConfirm: () => submitReuseCycle(reason),
+          });
+        },
+      });
+      return;
+    }
     showPopup({
-      title: reuseMode === 'edit' ? 'Confirm Update Cycle' : 'Confirm Re-use Cycle',
-      message: reuseMode === 'edit' ? 'Save changes to this draft appraisal cycle?' : 'Are you sure you want to save this re-used appraisal cycle as a new draft record?',
+      title: 'Confirm Re-use Cycle',
+      message: 'Are you sure you want to save this re-used appraisal cycle as a new draft record?',
       type: 'confirm',
       confirmText: 'Submit',
       cancelText: 'Cancel',
-      onConfirm: submitReuseCycle,
+      onConfirm: () => submitReuseCycle(''),
     });
   };
 
-  const submitReuseCycle = async () => {
+  const submitReuseCycle = async (editReason = '') => {
     if (!reuseSourceCycle || !reuseTemplateForm) return;
     const year = Number(reuseYearText);
     const dates = getComputedDates(reuseForm.cycleType, year, reuseForm.startDate, reuseForm.endDate);
@@ -849,6 +1343,8 @@ const AppraisalCyclesPage = () => {
         managerSubmissionDeadline: reuseForm.managerSubmissionDeadline || reuseForm.submissionDeadline,
         deptHeadSubmissionDeadline: reuseForm.deptHeadSubmissionDeadline || reuseForm.submissionDeadline,
         departmentIds: reuseAllDepartments ? [] : reuseForm.departmentIds,
+        editReason: reuseMode === 'edit' ? editReason : undefined,
+        templateChangeSummary: reuseMode === 'edit' ? buildTemplateChangeSummary(reuseSourceTemplate, reuseTemplateForm) : undefined,
       };
       if (reuseMode === 'edit') {
         await appraisalCycleService.updateDraft(reuseSourceCycle.id, payload);
@@ -961,7 +1457,7 @@ const AppraisalCyclesPage = () => {
     </label>
   );
 
-  const renderScoreGuide = (template: AppraisalTemplateResponse) => {
+  const renderScoreGuide = (template: AppraisalTemplateResponse, auditDetail?: TemplateAuditDetail) => {
     const bands = uniqueScoreBands(template.scoreBands?.length ? template.scoreBands : defaultScoreBands());
     return (
       <div className="appraisal-score-band-editor read-only">
@@ -971,12 +1467,22 @@ const AppraisalCyclesPage = () => {
           <span>Explanation</span>
         </div>
         {bands.map((band, index) => (
-          <div className="appraisal-score-band-row" key={`${band.label}-${index}`}>
+          <div className={`appraisal-score-band-row ${getAppraisalScoreBandToneClass(band.label)} ${auditDetail ? auditScoreBandHighlightClass(auditDetail, index) : ''}`.trim()} key={`${band.label}-${index}`}>
             <div className="appraisal-score-range-inputs"><strong>{String(band.minScore).padStart(2, '0')}-{band.maxScore}</strong></div>
             <strong>{band.label}</strong>
-            <span className="appraisal-muted">{band.description}</span>
+            <span className="appraisal-muted appraisal-score-band-description">{band.description}</span>
           </div>
         ))}
+        {auditDetail && Array.from(auditDetail.removedScoreBandIndexes).sort((a, b) => a - b).map((scoreNo) => {
+          const removedScoreText = auditDetail.removedScoreBandTextByIndex.get(scoreNo);
+          return (
+            <div className={`appraisal-score-band-row ${auditRemovedClass}`} key={`removed-score-${scoreNo}`}>
+              <div className="appraisal-score-range-inputs"><strong>-</strong></div>
+              <strong>{removedScoreText || `Removed score range ${scoreNo}`}</strong>
+              <span className="appraisal-muted appraisal-score-band-description">Removed</span>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -992,7 +1498,7 @@ const AppraisalCyclesPage = () => {
           <span>Explanation</span>
         </div>
         {bands.map((band, index) => (
-          <div className="appraisal-score-band-row" key={`${band.label}-${index}`}>
+          <div className={`appraisal-score-band-row ${getAppraisalScoreBandToneClass(band.label)}`.trim()} key={`${band.label}-${index}`}>
             <div className="appraisal-score-range-inputs">
               <input
                 type="number"
@@ -1011,7 +1517,7 @@ const AppraisalCyclesPage = () => {
               />
             </div>
             <strong>{band.label}</strong>
-            <span className="appraisal-muted">{band.description}</span>
+            <span className="appraisal-muted appraisal-score-band-description">{band.description}</span>
           </div>
         ))}
       </div>
@@ -1057,6 +1563,32 @@ const AppraisalCyclesPage = () => {
     );
   };
 
+
+  const renderReasonDialog = () => {
+    if (!reasonDialog) return null;
+    return (
+      <div className="appraisal-popup-backdrop">
+        <div className="appraisal-popup-box confirm appraisal-reason-popup">
+          <div className="appraisal-popup-icon"><i className="bi bi-pencil-square" /></div>
+          <h3>{reasonDialog.title}</h3>
+          <p>{reasonDialog.message}</p>
+          <textarea
+            className="appraisal-reason-input"
+            rows={4}
+            value={reasonText}
+            onChange={(event) => setReasonText(event.target.value)}
+            placeholder="Enter edit reason"
+            autoFocus
+          />
+          <div className="appraisal-popup-actions">
+            <button className="appraisal-button secondary" type="button" onClick={closeReasonDialog}>Cancel</button>
+            <button className="appraisal-button primary" type="button" onClick={confirmReasonDialog}>{reasonDialog.confirmText ?? 'Confirm'}</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderCycleFormPreview = () => {
     if (!selectedCycle) return null;
     let globalNo = 0;
@@ -1085,7 +1617,7 @@ const AppraisalCyclesPage = () => {
                     <label className="appraisal-field"><span>Employee ID</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Current Position</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Department</span><input value={selectedCycle.departmentNames?.join(', ') || 'All Departments'} readOnly disabled /></label>
-                    <label className="appraisal-field"><span>Assessment Date</span><input value={displayDate(selectedCycle.startDate)} readOnly disabled /></label>
+                    <label className="appraisal-field"><span>Start Date</span><input value={displayDate(selectedCycle.startDate)} readOnly disabled /></label>
                     <label className="appraisal-field"><span>End Date</span><input value={displayDate(selectedCycle.endDate)} readOnly disabled /></label>
                   </div>
                 </div>
@@ -1159,7 +1691,7 @@ const AppraisalCyclesPage = () => {
                     <label className="appraisal-field"><span>Cycle Type</span><select value={reuseForm.cycleType} onChange={(event) => setReuseCycleType(event.target.value as AppraisalCycleType)}><option value="ANNUAL">Annual</option><option value="SEMI_ANNUAL">Semi-Annual</option><option value="CUSTOM">Custom</option></select></label>
                   </div>
                   <div className="appraisal-inline-grid three">
-                    {renderDatePickerField({ label: 'Assessment Date', field: 'startDate', textValue: reuseForm.cycleType === 'ANNUAL' ? displayDate(reuseComputedDates.startDate) : reuseDateText.startDate, isoValue: reuseForm.cycleType === 'ANNUAL' ? reuseComputedDates.startDate : reuseForm.startDate, disabled: reuseForm.cycleType === 'ANNUAL', helper: reuseForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : 'Use DD/MM/YYYY or choose from calendar.', reuse: true })}
+                    {renderDatePickerField({ label: 'Start Date', field: 'startDate', textValue: reuseForm.cycleType === 'ANNUAL' ? displayDate(reuseComputedDates.startDate) : reuseDateText.startDate, isoValue: reuseForm.cycleType === 'ANNUAL' ? reuseComputedDates.startDate : reuseForm.startDate, disabled: reuseForm.cycleType === 'ANNUAL', helper: reuseForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : 'Use DD/MM/YYYY or choose from calendar.', reuse: true })}
                     {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: reuseForm.cycleType === 'CUSTOM' ? reuseDateText.endDate : displayDate(reuseComputedDates.endDate), isoValue: reuseForm.cycleType === 'CUSTOM' ? reuseForm.endDate : reuseComputedDates.endDate, disabled: reuseForm.cycleType !== 'CUSTOM', helper: reuseForm.cycleType === 'CUSTOM' ? 'Use DD/MM/YYYY or choose from calendar.' : 'System calculated.', reuse: true })}
                     {renderDatePickerField({ label: 'Manager Deadline', field: 'managerSubmissionDeadline', textValue: reuseDateText.managerSubmissionDeadline, isoValue: reuseForm.managerSubmissionDeadline, reuse: true })}
                     {renderDatePickerField({ label: 'Dept Head Deadline', field: 'deptHeadSubmissionDeadline', textValue: reuseDateText.deptHeadSubmissionDeadline, isoValue: reuseForm.deptHeadSubmissionDeadline, reuse: true })}
@@ -1207,6 +1739,104 @@ const AppraisalCyclesPage = () => {
     );
   };
 
+  const renderCycleAuditForm = (cycle: AppraisalCycleResponse, template: AppraisalTemplateResponse, record: AppraisalAuditLog) => {
+    const auditDetail = buildTemplateAuditDetail(record);
+    const changedFields = auditDetail.fields;
+    let globalNo = 0;
+    const templateChangedClass = auditHighlightClass(changedFields, 'Template');
+
+    return (
+      <>
+        <div className="appraisal-edit-record-view-meta">
+          <span><strong>Edited By</strong>{record.changedByName || `User #${record.userId ?? '-'}`}</span>
+          <span><strong>Edited At</strong>{displayDateTime(record.timestamp)}</span>
+          {record.reason ? <span><strong>Reason</strong>{record.reason}</span> : null}
+        </div>
+        <div className="appraisal-template-banner center">
+          <h2>Performance Evaluation Form</h2>
+          <p>ACE Data Systems Ltd.</p>
+        </div>
+        <div className="appraisal-template-summary-card appraisal-cycle-summary-card compact-summary">
+          <div className={auditHighlightClass(changedFields, 'Name', 'Appraisal Name')}><strong>Appraisal Name</strong><span>{cycle.cycleName}</span></div>
+          <div className={templateChangedClass}><strong>Template</strong><span>{cycle.templateName || template.templateName}</span></div>
+          <div className={auditHighlightClass(changedFields, 'Cycle Type')}><strong>Cycle Type</strong><span>{formatCycleType(cycle.cycleType)}</span></div>
+          <div className={auditHighlightClass(changedFields, 'Year', 'Cycle Year')}><strong>Cycle Year</strong><span>{cycle.cycleYear}</span></div>
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Employee Information</h3>
+          <div className="appraisal-inline-grid three appraisal-cycle-employee-grid">
+            <label className="appraisal-field"><span>Employee Name</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
+            <label className="appraisal-field"><span>Employee ID</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
+            <label className="appraisal-field"><span>Current Position</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
+            <label className={`appraisal-field ${auditHighlightClass(changedFields, 'Departments')}`.trim()}><span>Department</span><input value={cycle.departmentNames?.join(', ') || 'All Departments'} readOnly disabled /></label>
+            <label className={`appraisal-field ${auditHighlightClass(changedFields, 'Start Date')}`.trim()}><span>Start Date</span><input value={displayDate(cycle.startDate)} readOnly disabled /></label>
+            <label className={`appraisal-field ${auditHighlightClass(changedFields, 'End Date')}`.trim()}><span>End Date</span><input value={displayDate(cycle.endDate)} readOnly disabled /></label>
+            <label className={`appraisal-field ${auditHighlightClass(changedFields, 'Manager Deadline')}`.trim()}><span>Manager Deadline</span><input value={displayDate(cycle.managerSubmissionDeadline || cycle.submissionDeadline)} readOnly disabled /></label>
+            <label className={`appraisal-field ${auditHighlightClass(changedFields, 'Dept Head Deadline')}`.trim()}><span>Dept Head Deadline</span><input value={displayDate(cycle.deptHeadSubmissionDeadline || cycle.submissionDeadline)} readOnly disabled /></label>
+          </div>
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Evaluations</h3>
+          {template.sections.map((section, sectionIndex) => {
+            const removedCriteria = auditDetail.removedCriteriaBySection.get(sectionIndex + 1) ?? [];
+            return (
+              <div className="appraisal-section-card" key={section.id}>
+                <div className={`appraisal-section-header ${auditSectionHighlightClass(auditDetail, sectionIndex)}`.trim()}><div className="appraisal-section-title-wrap"><strong>{section.sectionName}</strong><small>{section.criteria.length} criteria</small></div></div>
+                <div className="appraisal-template-table-wrap">
+                  <table className="appraisal-template-table">
+                    <thead><tr><th>#</th><th>Criteria</th><th>Rating 1-5</th></tr></thead>
+                    <tbody>
+                      {section.criteria.map((criteria, criteriaIndex) => {
+                        globalNo += 1;
+                        return <tr key={criteria.id} className={auditCriteriaHighlightClass(auditDetail, sectionIndex, criteriaIndex)}><td className="appraisal-center-cell">{globalNo}</td><td>{criteria.criteriaText}</td><td><AppraisalRatingDots value={null} max={criteria.maxRating || 5} disabled /></td></tr>;
+                      })}
+                      {removedCriteria.map((criteria) => {
+                        globalNo += 1;
+                        return <tr key={`removed-${section.id}-${criteria.criteriaIndex}`} className={auditRemovedClass}><td className="appraisal-center-cell">{globalNo}</td><td>{criteria.text}</td><td><AppraisalRatingDots value={null} max={5} disabled /></td></tr>;
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+          {auditDetail.removedSections.map((section) => (
+            <div className={`appraisal-section-card ${auditRemovedClass}`} key={`removed-section-${section.sectionIndex}`}>
+              <div className={`appraisal-section-header ${auditRemovedClass}`}><div className="appraisal-section-title-wrap"><strong>{section.name}</strong><small>{section.criteria.length} criteria removed</small></div></div>
+              <div className="appraisal-template-table-wrap">
+                <table className="appraisal-template-table">
+                  <thead><tr><th>#</th><th>Criteria</th><th>Rating 1-5</th></tr></thead>
+                  <tbody>
+                    {section.criteria.map((criteriaText, criteriaIndex) => {
+                      globalNo += 1;
+                      return <tr key={`removed-section-${section.sectionIndex}-${criteriaIndex}`} className={auditRemovedClass}><td className="appraisal-center-cell">{globalNo}</td><td>{criteriaText}</td><td><AppraisalRatingDots value={null} max={5} disabled /></td></tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="appraisal-form-block">
+          <h3>Score Calculation</h3>
+          <div className="appraisal-score-formula-card in-block">
+            <div className="appraisal-total-points-strip"><strong>Total Points</strong><span>Actual total points are shown after PM submits ratings.</span></div>
+            <table className="appraisal-score-formula-table">
+              <thead><tr><th>Analysis</th><th>Formula</th><th>Score</th></tr></thead>
+              <tbody><tr><td><strong>Total Points</strong></td><td><div className="formula-main">Total Point</div><div className="formula-divider" /><div>Number of Questions Answered × 5</div><div className="formula-multiply">× 100</div></td><td>Auto calculated from PM ratings</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div className={`appraisal-form-block ${templateChangedClass}`.trim()}><h3>Score Guide</h3>{renderScoreGuide(template, auditDetail)}</div>
+        <div className="appraisal-form-block"><h3>Other Remarks</h3><div className="appraisal-other-remarks-preview"><span>Appraiser's Comment for Discussion</span></div></div>
+        {renderSignaturePreview(template)}
+      </>
+    );
+  };
+
   const renderEditRecordsModal = () => {
     if (!editRecordsTitle) return null;
     return (
@@ -1214,35 +1844,43 @@ const AppraisalCyclesPage = () => {
         <div className="appraisal-modal-box appraisal-modal-box-xl appraisal-edit-records-modal" onMouseDown={(event) => event.stopPropagation()}>
           <div className="appraisal-modal-header">
             <div>
-              <h2>Appraisal Cycle Edit Records</h2>
+              <h2>{editRecordView ? 'Appraisal Cycle Edit Record' : 'Appraisal Cycle Edit Records'}</h2>
               <p>{editRecordsTitle}</p>
             </div>
             <button className="appraisal-modal-close" type="button" onClick={closeEditRecords}><i className="bi bi-x-lg" /></button>
           </div>
-          <div className="appraisal-modal-body">
-            {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
-            {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
-            {!editRecordsLoading && editRecords.length > 0 && (
-              <div className="appraisal-edit-record-list">
-                {editRecords.map((record) => (
-                  <div className="appraisal-edit-record-card" key={record.id}>
-                    <div className="appraisal-edit-record-card-head">
-                      <div>
-                        <strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong>
-                        <span>{displayDateTime(record.timestamp)}</span>
-                      </div>
-                      <span className="appraisal-status status-active">{record.action}</span>
-                    </div>
-                    <div className="appraisal-edit-record-values">
-                      <div><strong>Before</strong><p>{record.oldValue || '-'}</p></div>
-                      <div><strong>After</strong><p>{record.newValue || '-'}</p></div>
+          <div className="appraisal-modal-body template-form-modal-body">
+            {!editRecordView && (
+              <>
+                {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
+                {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
+                {!editRecordsLoading && editRecords.length > 0 && (
+                  <div className="appraisal-edit-record-history">
+                    <div className="appraisal-edit-record-history-note">Latest 3 edit records are shown first.</div>
+                    <div className="appraisal-edit-record-list">
+                      {latestEditRecords.map((record) => (
+                        <button className="appraisal-edit-record-row" type="button" key={record.id} onClick={() => void openEditRecordView(record)}>
+                          <span><strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong><small>Edited By</small></span>
+                          <span><strong>{formatAppraisalAuditChangeCount(record)}</strong><small>Changed Fields</small></span>
+                          <span><strong>{displayDateTime(record.timestamp)}</strong><small>Edited At</small></span>
+                          <i className="bi bi-chevron-right" />
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
+            )}
+            {editRecordView && (
+              <>
+                {editRecordViewLoading && <div className="appraisal-empty">Loading edited form...</div>}
+                {!editRecordViewLoading && (!editRecordsCycle || !editRecordCycleTemplate) && <div className="appraisal-empty">Appraisal cycle form could not be loaded.</div>}
+                {!editRecordViewLoading && editRecordsCycle && editRecordCycleTemplate && renderCycleAuditForm(editRecordsCycle, editRecordCycleTemplate, editRecordView)}
+              </>
             )}
           </div>
           <div className="appraisal-modal-footer">
+            {editRecordView && <button className="appraisal-button ghost" type="button" onClick={closeEditRecordView}>Back to List</button>}
             <button className="appraisal-button secondary" type="button" onClick={closeEditRecords}>Close</button>
           </div>
         </div>
@@ -1268,20 +1906,6 @@ const AppraisalCyclesPage = () => {
             <input value={cycleSearch} onChange={(event) => setCycleSearch(event.target.value)} placeholder="Search by appraisal name" />
           </label>
           <label className="appraisal-filter-field">
-            <span>Template</span>
-            <select value={cycleTemplateFilter} onChange={(event) => setCycleTemplateFilter(event.target.value)}>
-              <option value="">All Templates</option>
-              {cycleTemplateOptions.map(([templateId, templateName]) => <option key={templateId} value={templateId}>{templateName}</option>)}
-            </select>
-          </label>
-          <label className="appraisal-filter-field">
-            <span>Department</span>
-            <select value={cycleDepartmentFilter} onChange={(event) => setCycleDepartmentFilter(event.target.value)}>
-              <option value="">All Departments</option>
-              {cycleDepartmentOptions.map(([departmentId, departmentName]) => <option key={departmentId} value={departmentId}>{departmentName}</option>)}
-            </select>
-          </label>
-          <label className="appraisal-filter-field">
             <span>Cycle Type</span>
             <select value={cycleTypeFilter} onChange={(event) => setCycleTypeFilter(event.target.value)}>
               <option value="">All Cycle Types</option>
@@ -1304,14 +1928,24 @@ const AppraisalCyclesPage = () => {
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="appraisal-table appraisal-cycle-record-table">
-            <thead><tr><th>Appraisal Name</th><th>Template</th><th>Departments</th><th>Cycle Type</th><th>Cycle Year</th><th>Start Date</th><th>End Date</th><th>Manager Deadline</th><th>Dept Head Deadline</th><th>Created By</th><th>Created At</th><th>Status</th><th>Locked</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Appraisal Name</th><th>Cycle Type</th><th>Cycle Year</th><th>Start Date</th><th>End Date</th><th>Created At</th><th>Status</th><th>Locked</th><th>Actions</th></tr></thead>
             <tbody>
-              {cycles.length === 0 && <tr><td colSpan={14}><div className="appraisal-empty">No appraisal cycles yet.</div></td></tr>}
-              {cycles.length > 0 && filteredCycles.length === 0 && <tr><td colSpan={14}><div className="appraisal-empty">No appraisal cycles match the selected search/filter.</div></td></tr>}
+              {cycles.length === 0 && <tr><td colSpan={9}><div className="appraisal-empty">No appraisal cycles yet.</div></td></tr>}
+              {cycles.length > 0 && filteredCycles.length === 0 && <tr><td colSpan={9}><div className="appraisal-empty">No appraisal cycles match the selected search/filter.</div></td></tr>}
               {filteredCycles.map((cycle) => (
                 <tr key={cycle.id}>
-                  <td><strong>{cycle.cycleName}</strong></td><td>{cycle.templateName || '-'}</td><td>{cycle.departmentNames?.join(', ') || 'All Departments'}</td><td>{formatCycleType(cycle.cycleType)}</td><td>{cycle.cycleYear}</td><td>{displayDate(cycle.startDate)}</td><td>{displayDate(cycle.endDate)}</td><td>{displayDate(cycle.managerSubmissionDeadline || cycle.submissionDeadline)}</td><td>{displayDate(cycle.deptHeadSubmissionDeadline || cycle.submissionDeadline)}</td><td>{cycle.createdByEmployeeId || '-'}</td><td>{displayDateTime(cycle.createdAt)}</td><td><span className={`appraisal-status ${statusClass(cycle.status)}`}>{cycle.status}</span></td><td>{cycle.locked ? 'Yes' : 'No'}</td>
-                  <td><div className="appraisal-button-row record-actions"><button className="appraisal-button ghost" type="button" onClick={() => void openCycleView(cycle)}>View Cycle</button>{cycle.status === 'DRAFT' && <button className="appraisal-button secondary" type="button" onClick={() => void openEditCycle(cycle)}>Edit</button>}{cycle.status === 'DRAFT' && <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>Active</button>}{cycle.status === 'ACTIVE' && <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>Lock</button>}{cycle.status !== 'COMPLETED' && <button className="appraisal-button secondary" type="button" disabled={!canCompleteCycle(cycle)} title={canCompleteCycle(cycle) ? 'Complete this locked cycle' : 'Cycle must be locked first'} onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>Complete</button>}<button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(cycle)}>Edit Records</button><button className="appraisal-button ghost" type="button" onClick={() => void openReuseModal(cycle)}>Re-use</button></div></td>
+                  <td><strong>{cycle.cycleName}</strong></td><td>{formatCycleType(cycle.cycleType)}</td><td>{cycle.cycleYear}</td><td>{displayDate(cycle.startDate)}</td><td>{displayDate(cycle.endDate)}</td><td>{displayDateTime(cycle.createdAt)}</td><td><span className={`appraisal-status ${statusClass(cycle.status)}`}>{cycle.status}</span></td><td>{cycle.locked ? 'Yes' : 'No'}</td>
+                  <td>
+                    <div className="appraisal-button-row record-actions">
+                      <button className="appraisal-button ghost" type="button" onClick={() => void openCycleView(cycle)}>View Cycle</button>
+                      {canEditCycleDraft(cycle) && <button className="appraisal-button secondary" type="button" onClick={() => void openEditCycle(cycle)}>Edit</button>}
+                      {canEditCycleDraft(cycle) && <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>Active</button>}
+                      {canLockCycle(cycle) && <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>Lock</button>}
+                      {canCompleteCycle(cycle) && cycle.status !== 'COMPLETED' && <button className="appraisal-button secondary" type="button" onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>Complete</button>}
+                      {canEditCycleDraft(cycle) && <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(cycle)}>Edit Records</button>}
+                      {cycle.status === 'COMPLETED' && <button className="appraisal-button ghost" type="button" onClick={() => void openReuseModal(cycle)}>Re-use</button>}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1322,6 +1956,7 @@ const AppraisalCyclesPage = () => {
       {renderCycleFormPreview()}
       {renderReuseModal()}
       {renderEditRecordsModal()}
+      {renderReasonDialog()}
       {renderPopup()}
 
       {showCreateModal && (

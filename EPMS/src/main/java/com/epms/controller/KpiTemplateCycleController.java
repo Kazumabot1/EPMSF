@@ -47,6 +47,6 @@ public class KpiTemplateCycleController {
             @PathVariable Integer id,
             @Valid @RequestBody KpiTemplateCycleStatusRequestDTO request
     ) {
-        return ResponseEntity.ok(cycleService.updateStatus(id, Boolean.TRUE.equals(request.getActive())));
+        return ResponseEntity.ok(cycleService.updateStatus(id, request));
     }
 }
