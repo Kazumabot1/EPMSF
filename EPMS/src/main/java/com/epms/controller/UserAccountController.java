@@ -151,6 +151,7 @@ public class UserAccountController {
                 request.getEmployeeCode(),
                 request.getDepartmentId(),
                 request.getPositionId(),
+                request.getManagerId(),
                 request.getRoleName(),
                 request.getActive()
         );
@@ -204,6 +205,8 @@ public class UserAccountController {
         response.setEmployeeCode(user.getEmployeeCode());
         response.setEmployeeId(user.getEmployeeId());
         response.setDepartmentId(user.getDepartmentId());
+        response.setManagerId(user.getManagerId());
+        response.setManagerName(user.getManagerId() == null ? null : resolveUserDisplayName(user.getManagerId()));
         response.setActive(user.getActive() == null || user.getActive());
         response.setAccountStatus(user.getAccountStatus());
         response.setMustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()));
@@ -393,6 +396,7 @@ public class UserAccountController {
         private String employeeCode;
         private Integer departmentId;
         private Integer positionId;
+        private Integer managerId;
         private String roleName;
         private String dashboard;
         private Boolean active;
@@ -408,6 +412,9 @@ public class UserAccountController {
 
         private Integer departmentId;
         private String departmentName;
+
+        private Integer managerId;
+        private String managerName;
 
         private Integer positionId;
         private String positionName;

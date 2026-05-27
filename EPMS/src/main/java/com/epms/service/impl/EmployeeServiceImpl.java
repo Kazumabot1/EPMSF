@@ -29,6 +29,7 @@ import com.epms.repository.UserRoleRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeService;
+import com.epms.service.EmployeeCodeGeneratorService;
 import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.NotificationService;
 import com.epms.service.UserAccountProvisioningService;
@@ -64,6 +65,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final NotificationService notificationService;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
     private final AuditLogService auditLogService;
+    private final EmployeeCodeGeneratorService employeeCodeGeneratorService;
 
     @Override
     @Transactional(readOnly = true)
@@ -235,9 +237,17 @@ public class EmployeeServiceImpl implements EmployeeService {
                 currentDepartment
         );
         Department workingDepartment = getWorkingDepartment(currentDepartment, parentDepartment);
+        User manager = resolveManagerUser(request.getManagerId(), null);
 
         Employee employee = new Employee();
         copyRequestToEntity(request, employee);
+        employeeCodeGeneratorService.ensureEmployeeCode(
+                employee,
+                roleNameFromPosition(employee.getPosition()),
+                dashboardFromPosition(employee.getPosition())
+        );
+        employee.setDepartmentId(workingDepartment != null ? workingDepartment.getId() : null);
+        employee.setManagerId(manager != null ? manager.getId() : null);
 
         if (employee.getActive() == null) {
             employee.setActive(true);
@@ -314,6 +324,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 currentDepartment
         );
         Department newWorkingDepartment = getWorkingDepartment(currentDepartment, parentDepartment);
+        User manager = resolveManagerUser(request.getManagerId(), employee.getId());
 
         boolean workingDepartmentChanged = !Objects.equals(
                 oldWorkingDepartment != null ? oldWorkingDepartment.getId() : null,
@@ -360,6 +371,15 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
 
         copyRequestToEntity(request, employee);
+        if (trimToNull(employee.getEmployeeCode()) == null) {
+            employeeCodeGeneratorService.ensureEmployeeCode(
+                    employee,
+                    roleNameFromPosition(employee.getPosition()),
+                    dashboardFromPosition(employee.getPosition())
+            );
+        }
+        employee.setDepartmentId(newWorkingDepartment != null ? newWorkingDepartment.getId() : null);
+        employee.setManagerId(manager != null ? manager.getId() : null);
 
         Employee saved = employeeRepository.save(employee);
         Integer newPositionId = saved.getPosition() != null ? saved.getPosition().getId() : null;
@@ -485,7 +505,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             user.setEmployeeId(employee.getId());
             user.setFullName(fullName.isBlank() ? null : fullName);
             user.setEmail(trimToNull(employee.getEmail()));
-            user.setEmployeeCode(trimToNull(employee.getStaffNrc()));
+            user.setEmployeeCode(trimToNull(employee.getEmployeeCode()));
             user.setPosition(employee.getPosition());
 
             /*
@@ -494,6 +514,7 @@ public class EmployeeServiceImpl implements EmployeeService {
              * parentDepartment if present, otherwise currentDepartment.
              */
             user.setDepartmentId(workingDepartmentId);
+            user.setManagerId(employee.getManagerId());
 
             user.setDashboard(derivedDashboard != null ? derivedDashboard : dashboardFromPosition(employee.getPosition()));
             user.setActive(employee.getActive() == null || employee.getActive());
@@ -630,6 +651,25 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setPosition(position);
     }
 
+    private User resolveManagerUser(Integer managerId, Integer employeeIdBeingEdited) {
+        if (managerId == null) {
+            return null;
+        }
+
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assigned manager not found with user id: " + managerId));
+
+        if (manager.getActive() != null && !Boolean.TRUE.equals(manager.getActive())) {
+            throw new BusinessValidationException("Assigned manager is inactive.");
+        }
+
+        if (employeeIdBeingEdited != null && Objects.equals(manager.getEmployeeId(), employeeIdBeingEdited)) {
+            throw new BusinessValidationException("An employee cannot be assigned as their own manager.");
+        }
+
+        return manager;
+    }
+
     private Department requireDepartment(Integer departmentId, String label) {
         if (departmentId == null) {
             throw new BusinessValidationException(label + " is required.");
@@ -668,9 +708,12 @@ public class EmployeeServiceImpl implements EmployeeService {
                 ));
 
         if (currentDepartment == null) {
+            employee.setDepartmentId(null);
             currentOpt.ifPresent(this::closeDepartmentAssignment);
             return;
         }
+
+        employee.setDepartmentId(getWorkingDepartment(currentDepartment, parentDepartment).getId());
 
         Integer newCurrentDepartmentId = currentDepartment.getId();
         Integer newParentDepartmentId = parentDepartment != null ? parentDepartment.getId() : null;
@@ -962,6 +1005,10 @@ public class EmployeeServiceImpl implements EmployeeService {
             departmentEndDate = latestAssignment.getEnddate();
         }
 
+        if (workingDept == null && emp.getDepartmentId() != null) {
+            workingDept = departmentRepository.findById(emp.getDepartmentId()).orElse(null);
+        }
+
         String firstName = emp.getFirstName() != null ? emp.getFirstName() : "";
         String lastName = emp.getLastName() != null ? emp.getLastName() : "";
         String fullName = (firstName + " " + lastName).trim();
@@ -988,6 +1035,10 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
 
         User linkedUser = userRepository.findByEmployeeId(emp.getId()).orElse(null);
+        Integer managerId = emp.getManagerId() != null
+                ? emp.getManagerId()
+                : (linkedUser != null ? linkedUser.getManagerId() : null);
+        User managerUser = managerId != null ? userRepository.findById(managerId).orElse(null) : null;
 
         int departmentHistoryCount = emp.getEmployeeDepartments() == null
                 ? 0
@@ -996,6 +1047,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         EmployeeResponseDto dto = new EmployeeResponseDto();
 
         dto.setId(emp.getId());
+        dto.setEmployeeCode(emp.getEmployeeCode());
         dto.setFirstName(emp.getFirstName());
         dto.setLastName(emp.getLastName());
         dto.setFullName(fullName);
@@ -1023,6 +1075,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         dto.setDashboard(linkedUser != null && linkedUser.getDashboard() != null
                 ? linkedUser.getDashboard()
                 : derivedDashboard);
+
+        dto.setDepartmentId(workingDept != null ? workingDept.getId() : emp.getDepartmentId());
+        dto.setManagerId(managerId);
+        dto.setManagerName(managerUser != null ? userDisplayName(managerUser) : null);
+        dto.setManagerEmail(managerUser != null ? managerUser.getEmail() : null);
 
         dto.setCurrentDepartmentId(currentDept != null ? currentDept.getId() : null);
         dto.setCurrentDepartment(currentDept != null ? currentDept.getDepartmentName() : null);
@@ -1230,6 +1287,19 @@ public class EmployeeServiceImpl implements EmployeeService {
                 roleNameFromPosition(position),
                 null
         );
+    }
+
+    private String userDisplayName(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getFullName() != null && !user.getFullName().trim().isBlank()) {
+            return user.getFullName().trim();
+        }
+        if (user.getEmail() != null && !user.getEmail().trim().isBlank()) {
+            return user.getEmail().trim();
+        }
+        return "User #" + user.getId();
     }
 
     private String nullToBlank(String value) {

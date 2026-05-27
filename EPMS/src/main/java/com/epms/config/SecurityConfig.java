@@ -219,6 +219,13 @@ public class SecurityConfig {
                                 hasTeamApiPermission(authentication.get())
                         )
 
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/departments/comparison",
+                                "/api/departments/*/comparison"
+                        ).access((authentication, context) ->
+                                hasDepartmentComparisonViewPermission(authentication.get())
+                        )
+
                         .requestMatchers(
                                 "/api/departments",
                                 "/api/departments/**"
@@ -226,14 +233,14 @@ public class SecurityConfig {
                                 hasHrPermissionOrNonHrRole(authentication.get(), "departmentCrud")
                         )
 
-                      /*  .requestMatchers(
-                                "/api/employees",
-                                "/api/employees/**",
-                                "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                        )*/
+                        /*  .requestMatchers(
+                                  "/api/employees",
+                                  "/api/employees/**",
+                                  "/api/hr/employee-accounts",
+                                  "/api/hr/employee-accounts/**"
+                          ).access((authentication, context) ->
+                                  hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
+                          )*/
                         .requestMatchers(HttpMethod.GET, "/api/employees")
                         .access((authentication, context) ->
                                 hasHrDashboardOrNonHrRole(authentication.get())
@@ -571,13 +578,55 @@ public class SecurityConfig {
             return new AuthorizationDecision(true);
         }
 
-        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        try {
             return new AuthorizationDecision(
                     positionPermissionService.currentUserHasPermission("assessmentScoresView")
             );
+        } catch (RuntimeException ignored) {
+            return new AuthorizationDecision(false);
+        }
+    }
+
+    private AuthorizationDecision hasDepartmentComparisonViewPermission(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
         }
 
-        return hasRoleDashboardOrPosition(authentication, SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS);
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, HR_ROLES, HR_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, EXECUTIVE_ROLES, EXECUTIVE_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        try {
+            return new AuthorizationDecision(
+                    positionPermissionService.currentUserHasPermission("departmentComparisonView")
+            );
+        } catch (RuntimeException ignored) {
+            return new AuthorizationDecision(false);
+        }
     }
 
     private AuthorizationDecision hasAnyRoleAndPositionPermission(

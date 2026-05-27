@@ -46,6 +46,12 @@ public class EmployeeRequestDto {
     private Integer positionId;
 
     /**
+     * Optional direct reporting manager login user id.
+     * This is mirrored to both employee.manager_id and users.manager_id.
+     */
+    private Integer managerId;
+
+    /**
      * Legacy field kept for older frontend calls.
      * New UI should use currentDepartmentId.
      */

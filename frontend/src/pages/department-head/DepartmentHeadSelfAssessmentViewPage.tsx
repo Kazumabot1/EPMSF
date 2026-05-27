@@ -193,9 +193,9 @@ const DepartmentHeadSelfAssessmentViewPage = () => {
               <i className="bi bi-eye" />
               Department Head View
             </p>
-            <h1>View Self-assessment Form</h1>
+            <h1>Assessment Review</h1>
             <p>
-              Review submitted self-assessment forms from employees in your department. This page is view-only.
+              Review submitted assessment records from employees in your department. This page is view-only and includes reviewer signature status.
             </p>
           </div>
 
@@ -238,12 +238,12 @@ const DepartmentHeadSelfAssessmentViewPage = () => {
           {loading ? (
             <div className="dhsa-empty">
               <i className="bi bi-arrow-repeat dhsa-spin" />
-              Loading self-assessment forms...
+              Loading assessment records...
             </div>
           ) : filteredRows.length === 0 ? (
             <div className="dhsa-empty">
               <i className="bi bi-inbox" />
-              No self-assessment forms found for this filter.
+              No assessment records found for this filter.
             </div>
           ) : (
             <div className="dhsa-table-scroll">
@@ -300,7 +300,7 @@ const DepartmentHeadSelfAssessmentViewPage = () => {
           <div className="dhsa-modal" onClick={(event) => event.stopPropagation()}>
             <div className="dhsa-modal-head">
               <div>
-                <p className="dhsa-modal-kicker">Self-assessment Detail</p>
+                <p className="dhsa-modal-kicker">Assessment Detail</p>
                 <h3>{selected.formName || 'Employee Self-assessment Form'}</h3>
                 <span className={`dhsa-status ${statusClass(selected.status)}`}>
                   {statusLabel(selected.status)}
