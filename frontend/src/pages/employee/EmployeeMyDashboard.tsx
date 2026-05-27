@@ -375,7 +375,7 @@ const EmployeeMyDashboard = () => {
     {
       title: 'Feedback',
       value: loading ? '…' : String(feedbackReceived),
-      subtitle: `${feedbackPending} pending request${feedbackPending === 1 ? '' : 's'}`,
+      subtitle: `${feedbackPending} pending assignment${feedbackPending === 1 ? '' : 's'}`,
       helper: unreadNotifications ? `${unreadNotifications} unread notification${unreadNotifications === 1 ? '' : 's'}` : 'No urgent feedback alerts.',
       icon: <ChatIcon className="h-5 w-5" />,
       href: '/employee/feedback',

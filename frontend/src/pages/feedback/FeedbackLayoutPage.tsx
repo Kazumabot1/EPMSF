@@ -52,12 +52,12 @@ const MODULE_COPY: Record<
     eyebrow: 'Targeting rules',
     title: 'Question Rules',
     description:
-        'Control who sees each question by employee level, evaluator role, section, department, or position.',
+        'Control who sees each question by employee level, evaluator role, competency, department, or position.',
   },
   'dynamic-preview': {
-    eyebrow: 'Generated form preview',
+    eyebrow: 'Generated feedback preview',
     title: 'Dynamic Preview',
-    description: 'Preview the exact adaptive form before HR activates a campaign.',
+    description: 'Preview the exact evaluator question set before HR activates a campaign.',
   },
   campaigns: {
     eyebrow: 'Campaign workspace',
@@ -220,6 +220,7 @@ const FeedbackLayoutPage = () => {
           <Route path="rules" element={<Navigate to="/hr/feedback/question-rules" replace />} />
           <Route path="dynamic-preview" element={<DynamicFormPreviewTab />} />
           <Route path="preview" element={<Navigate to="/hr/feedback/dynamic-preview" replace />} />
+          <Route path="forms" element={<Navigate to="/hr/feedback/questions" replace />} />
 
           <Route
               path="campaigns"

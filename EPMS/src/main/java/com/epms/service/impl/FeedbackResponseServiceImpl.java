@@ -54,8 +54,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
     private static final String RESPONSE_RATING_WITH_COMMENT = "RATING_WITH_COMMENT";
     private static final String RESPONSE_RATING = "RATING";
-    private static final String RESPONSE_TEXT = "TEXT";
-    private static final String RESPONSE_YES_NO = "YES_NO";
     private static final String SCORING_SCORED = "SCORED";
     private static final int MIN_REQUIRED_COMMENT_LENGTH = 10;
     private static final int MAX_REQUIRED_COMMENT_LENGTH = 1000;
@@ -336,7 +334,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
     private String visibilityReason(com.epms.entity.FeedbackRequest request) {
         return isTargetResultPublished(request)
-                ? "Campaign closed and HR published the summary"
+                ? "HR published the 360 feedback summary"
                 : "Visible by HR/Admin role permission";
     }
 
@@ -390,7 +388,9 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     }
 
     private boolean isTargetResultPublished(com.epms.entity.FeedbackRequest request) {
-        return request.getCampaign().getStatus() == FeedbackCampaignStatus.CLOSED
+        FeedbackCampaignStatus status = request.getCampaign().getStatus();
+        boolean publishableStatus = status == FeedbackCampaignStatus.CLOSED || status == FeedbackCampaignStatus.PUBLISHED;
+        return publishableStatus
                 && feedbackSummaryRepository.existsByCampaign_IdAndTargetEmployeeIdAndVisibilityStatus(
                 request.getCampaign().getId(),
                 request.getTargetEmployeeId(),
@@ -480,63 +480,44 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             item.setAssignmentQuestion(assignmentQuestion);
             item.setQuestion(assignmentQuestion.getSourceQuestion());
 
-            String responseType = normalizeResponseType(assignmentQuestion.getResponseType());
             Double ratingValue = item.getRatingValue();
-            boolean ratingQuestion = isRatingResponseType(responseType);
-
-            if (!ratingQuestion) {
-                if (ratingValue != null) {
-                    throw new BusinessValidationException("Rating value is not allowed for non-rating question " + assignmentQuestion.getQuestionCode() + ".");
-                }
-                if (requireAnswersForRequiredQuestions
-                        && Boolean.TRUE.equals(assignmentQuestion.getRequired())
-                        && isBlank(item.getComment())) {
-                    throw new BusinessValidationException("Answer is required for question " + assignmentQuestion.getQuestionCode() + ".");
-                }
-                continue;
-            }
+            String label = questionLabel(assignmentQuestion);
 
             if (ratingValue == null) {
-                if (requireAnswersForRequiredQuestions && Boolean.TRUE.equals(assignmentQuestion.getRequired())) {
-                    throw new BusinessValidationException("Rating value is required for question " + assignmentQuestion.getQuestionCode() + ".");
+                if (requireAnswersForRequiredQuestions) {
+                    throw new BusinessValidationException(label + ": Rating is required.");
                 }
-                continue;
+            } else {
+                double maxRating = resolveMaxRating(assignmentQuestion);
+                if (ratingValue < 1.0 || ratingValue > maxRating) {
+                    throw new BusinessValidationException(
+                            label + ": Rating must be between 1 and " + formatScore(maxRating) + "."
+                    );
+                }
             }
 
-            double maxRating = resolveMaxRating(assignmentQuestion);
-            if (ratingValue < 1.0 || ratingValue > maxRating) {
-                throw new BusinessValidationException(
-                        "Rating for question " + assignmentQuestion.getQuestionCode() + " must be between 1 and " + formatScore(maxRating) + "."
-                );
-            }
             int commentLength = normalizedCommentLength(item.getComment());
-            if (requireAnswersForRequiredQuestions && Boolean.TRUE.equals(assignmentQuestion.getRequired())
-                    && commentLength < MIN_REQUIRED_COMMENT_LENGTH) {
+            if (requireAnswersForRequiredQuestions && commentLength < MIN_REQUIRED_COMMENT_LENGTH) {
                 throw new BusinessValidationException(
-                        "A supporting comment of at least " + MIN_REQUIRED_COMMENT_LENGTH + " characters is required for question "
-                                + assignmentQuestion.getQuestionCode() + "."
+                        label + ": Comment needs at least " + MIN_REQUIRED_COMMENT_LENGTH + " characters."
                 );
             }
             if (commentLength > MAX_REQUIRED_COMMENT_LENGTH) {
                 throw new BusinessValidationException(
-                        "Comment for question " + assignmentQuestion.getQuestionCode() + " must be "
-                                + MAX_REQUIRED_COMMENT_LENGTH + " characters or fewer."
+                        label + ": Comment must be " + MAX_REQUIRED_COMMENT_LENGTH + " characters or fewer."
                 );
             }
         }
     }
 
     private boolean isAnswered(FeedbackResponseItem item, FeedbackAssignmentQuestion question) {
-        if (question == null) {
+        if (question == null || item == null) {
             return false;
         }
-        if (isRatingResponseType(question.getResponseType())) {
-            int commentLength = normalizedCommentLength(item.getComment());
-            return item.getRatingValue() != null
-                    && commentLength >= MIN_REQUIRED_COMMENT_LENGTH
-                    && commentLength <= MAX_REQUIRED_COMMENT_LENGTH;
-        }
-        return !isBlank(item.getComment());
+        int commentLength = normalizedCommentLength(item.getComment());
+        return item.getRatingValue() != null
+                && commentLength >= MIN_REQUIRED_COMMENT_LENGTH
+                && commentLength <= MAX_REQUIRED_COMMENT_LENGTH;
     }
 
     private FeedbackAssignmentQuestion resolveIncomingAssignmentQuestion(
@@ -626,7 +607,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
             targetItem.setAssignmentQuestion(assignmentQuestion);
             targetItem.setQuestion(assignmentQuestion.getSourceQuestion());
-            targetItem.setRatingValue(isRatingResponseType(assignmentQuestion.getResponseType()) ? incomingItem.getRatingValue() : null);
+            targetItem.setRatingValue(incomingItem.getRatingValue());
             targetItem.setComment(incomingItem.getComment());
         }
 
@@ -728,10 +709,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     }
 
     private boolean isScoredQuestion(FeedbackAssignmentQuestion question) {
-        if (question == null) {
-            return false;
-        }
-        return isRatingResponseType(question.getResponseType()) && SCORING_SCORED.equals(normalizeScoringBehavior(question.getScoringBehavior()));
+        return question != null;
     }
 
     private boolean isRatingResponseType(String responseType) {
@@ -747,13 +725,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         if (value.equals("RATING_ONLY")) {
             value = RESPONSE_RATING;
         }
-        if (value.equals("WRITTEN_ANSWER") || value.equals("WRITTEN_ANSWER_ONLY")) {
-            value = RESPONSE_TEXT;
-        }
-        if (value.equals("YESNO") || value.equals("YES_OR_NO")) {
-            value = RESPONSE_YES_NO;
-        }
-        return value;
+        return RESPONSE_RATING_WITH_COMMENT;
     }
 
     private String normalizeScoringBehavior(String scoringBehavior) {
@@ -783,6 +755,19 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
     private int normalizedCommentLength(String value) {
         return value == null ? 0 : value.trim().length();
+    }
+
+    private String questionLabel(FeedbackAssignmentQuestion question) {
+        if (question == null) {
+            return "Question";
+        }
+        if (question.getDisplayOrder() != null) {
+            return "Question " + question.getDisplayOrder();
+        }
+        if (question.getQuestionCode() != null && !question.getQuestionCode().isBlank()) {
+            return "Question " + question.getQuestionCode();
+        }
+        return "Question";
     }
 
     private boolean isBlank(String value) {

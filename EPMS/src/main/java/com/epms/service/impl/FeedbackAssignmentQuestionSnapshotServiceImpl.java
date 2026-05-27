@@ -169,10 +169,10 @@ public class FeedbackAssignmentQuestionSnapshotServiceImpl implements FeedbackAs
         snapshot.setQuestionCode(normalizeCode(selection.getQuestionCode(), "CAMPAIGN-Q-" + selection.getId()));
         snapshot.setCompetencyCode(selection.getCompetencyCode());
         snapshot.setQuestionTextSnapshot(firstNonBlank(selection.getQuestionTextSnapshot(), "Untitled feedback question"));
-        snapshot.setResponseType(firstNonBlank(selection.getResponseType(), DEFAULT_RESPONSE_TYPE));
-        snapshot.setScoringBehavior(firstNonBlank(selection.getScoringBehavior(), SCORING_SCORED));
+        snapshot.setResponseType(RESPONSE_RATING_WITH_COMMENT);
+        snapshot.setScoringBehavior(SCORING_SCORED);
         snapshot.setRatingScaleId(selection.getRatingScaleId());
-        snapshot.setRequired(selection.getRequired() == null ? true : selection.getRequired());
+        snapshot.setRequired(true);
         snapshot.setWeight(selection.getWeight() == null || selection.getWeight() <= 0 ? 1.0 : selection.getWeight());
         snapshot.setSectionCode(normalizeCode(firstNonBlank(selection.getCompetencyCode(), selection.getSectionCode()), "GENERAL"));
         snapshot.setSectionTitle(firstNonBlank(selection.getSectionTitle(), selection.getCompetencyCode(), "General Feedback"));
@@ -222,9 +222,9 @@ public class FeedbackAssignmentQuestionSnapshotServiceImpl implements FeedbackAs
         String scoringBehavior = resolveScoringBehavior(version, bank, responseType);
         snapshot.setResponseType(responseType);
         snapshot.setScoringBehavior(scoringBehavior);
-        snapshot.setRatingScaleId(isRatingResponseType(responseType) ? firstNonNull(version.getRatingScaleId(), bank.getDefaultRatingScaleId()) : null);
-        snapshot.setRequired(bank.getDefaultRequired() == null ? true : bank.getDefaultRequired());
-        snapshot.setWeight(isScored(responseType, scoringBehavior) ? resolveWeight(bank.getDefaultWeight(), 1.0) : 1.0);
+        snapshot.setRatingScaleId(firstNonNull(version.getRatingScaleId(), bank.getDefaultRatingScaleId()));
+        snapshot.setRequired(true);
+        snapshot.setWeight(resolveWeight(bank.getDefaultWeight(), 1.0));
         snapshot.setSectionCode(normalizeCode(bank.getCompetencyCode(), "GENERAL"));
         snapshot.setSectionTitle(firstNonBlank(bank.getCompetencyCode(), "General Feedback"));
         snapshot.setSectionOrder(1);
@@ -240,59 +240,23 @@ public class FeedbackAssignmentQuestionSnapshotServiceImpl implements FeedbackAs
     }
 
     private String normalizeResponseType(String responseType) {
-        String value = firstNonBlank(responseType, DEFAULT_RESPONSE_TYPE)
-                .trim()
-                .toUpperCase()
-                .replace('-', '_')
-                .replace(' ', '_');
-        if (value.equals("RATING_ONLY")) {
-            value = RESPONSE_RATING;
-        }
-        if (value.equals("WRITTEN_ANSWER") || value.equals("WRITTEN_ANSWER_ONLY")) {
-            value = RESPONSE_TEXT;
-        }
-        if (value.equals("YESNO") || value.equals("YES_OR_NO")) {
-            value = RESPONSE_YES_NO;
-        }
-        if (List.of(RESPONSE_RATING_WITH_COMMENT, RESPONSE_RATING, RESPONSE_TEXT, RESPONSE_YES_NO).contains(value)) {
-            return value;
-        }
-        return DEFAULT_RESPONSE_TYPE;
+        return RESPONSE_RATING_WITH_COMMENT;
     }
 
     private String resolveScoringBehavior(FeedbackQuestionVersion version, FeedbackQuestionBank bank, String responseType) {
-        String scoring = firstNonBlank(
-                version == null ? null : version.getScoringBehavior(),
-                bank == null ? null : bank.getDefaultScoringBehavior(),
-                inferDefaultScoringBehavior(responseType)
-        ).trim().toUpperCase().replace('-', '_').replace(' ', '_');
-        if (!List.of(SCORING_SCORED, SCORING_NON_SCORED, SCORING_HR_REVIEW).contains(scoring)) {
-            scoring = inferDefaultScoringBehavior(responseType);
-        }
-        if (!isRatingResponseType(responseType) && SCORING_SCORED.equals(scoring)) {
-            return inferDefaultScoringBehavior(responseType);
-        }
-        return scoring;
+        return SCORING_SCORED;
     }
 
     private String inferDefaultScoringBehavior(String responseType) {
-        String normalized = normalizeResponseType(responseType);
-        if (isRatingResponseType(normalized)) {
-            return SCORING_SCORED;
-        }
-        if (RESPONSE_YES_NO.equals(normalized)) {
-            return SCORING_HR_REVIEW;
-        }
-        return SCORING_NON_SCORED;
+        return SCORING_SCORED;
     }
 
     private boolean isRatingResponseType(String responseType) {
-        String normalized = normalizeResponseType(responseType);
-        return RESPONSE_RATING_WITH_COMMENT.equals(normalized) || RESPONSE_RATING.equals(normalized);
+        return true;
     }
 
     private boolean isScored(String responseType, String scoringBehavior) {
-        return isRatingResponseType(responseType) && SCORING_SCORED.equals(scoringBehavior);
+        return true;
     }
 
     private Double resolveWeight(Double primary, Double fallback) {

@@ -19,6 +19,8 @@ public class FeedbackTeamSummaryResponse {
     String departmentName;
     Integer totalDirectReports;
     Integer totalDepartmentEmployees;
+    Integer totalManagedTeams;
+    Integer totalDepartmentTeams;
     Integer totalClosedResults;
     String accessTitle;
     String accessDescription;
