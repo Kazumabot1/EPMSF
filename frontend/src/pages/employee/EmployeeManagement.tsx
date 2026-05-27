@@ -18,6 +18,19 @@ const PAGE_SIZE = 10;
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
+type EmployeeWithCode = EmployeeResponse & {
+  employeeCode?: string | null;
+  employee_code?: string | null;
+};
+
+const getEmployeeCode = (emp: EmployeeResponse): string => {
+  const withCode = emp as EmployeeWithCode;
+  return String(withCode.employeeCode ?? withCode.employee_code ?? '').trim();
+};
+
+const employeeSubtitle = (emp: EmployeeResponse): string =>
+  getEmployeeCode(emp) || emp.staffNrc || emp.email || 'No employee code';
+
 const normalizeText = (value?: string | null) => String(value ?? '').trim().toLowerCase();
 
 const normalizeGender = (value?: string | null) =>
@@ -28,6 +41,7 @@ const normalizeGender = (value?: string | null) =>
 
 const employeeSearchText = (emp: EmployeeResponse) =>
     [
+      getEmployeeCode(emp),
       emp.fullName,
       emp.firstName,
       emp.lastName,
@@ -226,6 +240,7 @@ const EmployeeManagement = () => {
                   onClick={() =>
                       exportToExcel(
                           filtered.map((e) => ({
+                            employeeCode: getEmployeeCode(e),
                             fullName:
                                 e.fullName?.trim() ||
                                 [e.firstName, e.lastName].filter(Boolean).join(' ').trim() ||
@@ -241,6 +256,7 @@ const EmployeeManagement = () => {
                             email: e.email || '',
                           })) as any,
                           [
+                            { header: 'Employee Code', key: 'employeeCode' },
                             { header: 'Full Name',   key: 'fullName'    },
                             { header: 'Position',    key: 'position'    },
                             { header: 'Department',  key: 'department'  },
@@ -302,7 +318,7 @@ const EmployeeManagement = () => {
               <input
                   type="search"
                   className="epms-emp-input w-full"
-                  placeholder="Search name, NRC, email, phone, department…"
+                  placeholder="Search code, name, NRC, email, phone, department…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   aria-label="Search employees"
@@ -421,7 +437,7 @@ const EmployeeManagement = () => {
                               <div className="epms-emp-name-cell">
                                 <ProfileNameCell
                                     person={emp}
-                                    subtitle={emp.staffNrc || emp.email || 'No NRC'}
+                                    subtitle={employeeSubtitle(emp)}
                                 />
                               </div>
                             </td>
@@ -563,6 +579,10 @@ const EmployeeManagement = () => {
                                         emp.positionLevelCode ? ` · ${emp.positionLevelCode}` : ''
                                     }`
                                     : 'No position'}
+                              </p>
+
+                              <p className="truncate text-sm font-medium text-indigo-600">
+                                {employeeSubtitle(emp)}
                               </p>
 
                               <p className="truncate text-sm text-slate-400">

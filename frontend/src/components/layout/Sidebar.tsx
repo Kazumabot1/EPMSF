@@ -648,12 +648,7 @@ const departmentHeadNavItems: NavItem[] = compactItems([
     icon: 'bi bi-person',
   },
   {
-    to: '/department-head/self-assessment-forms',
-    label: 'View Self-assessment Form',
-    icon: 'bi bi-eye',
-  },
-  {
-    to: '/department-head/assessment-scores',
+    to: '/department-head/assessment-review',
     label: 'Assessment Review',
     icon: 'bi bi-clipboard-data',
   },

@@ -15,6 +15,7 @@ public class HrEmployeeAccountCreateRequest {
 
     private Integer departmentId;
     private Integer positionId;
+    private Integer managerId;
 
     private String departmentName;
     private String positionName;

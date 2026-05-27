@@ -258,7 +258,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     },
     {
       label: 'Assessment Review',
-      path: '/department-head/assessment-scores',
+      path: '/department-head/assessment-review',
       icon: 'bi-clipboard-data',
       permissionField: 'selfAssessmentView',
     },

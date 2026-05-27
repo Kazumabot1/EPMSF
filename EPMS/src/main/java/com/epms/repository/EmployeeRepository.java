@@ -66,6 +66,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
 
     Optional<Employee> findByEmail(String email);
 
+    Optional<Employee> findByEmployeeCodeIgnoreCase(String employeeCode);
+
+    boolean existsByEmployeeCodeIgnoreCase(String employeeCode);
+
+    boolean existsByEmployeeCodeIgnoreCaseAndIdNot(String employeeCode, Integer id);
+
+    List<Employee> findByManagerIdAndActiveTrue(Integer managerId);
+
+    List<Employee> findByDepartmentIdAndActiveTrue(Integer departmentId);
+
     boolean existsByEmailIgnoreCase(String email);
 
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
@@ -102,6 +112,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
                   ed.enddate IS NULL
                   AND COALESCE(pd.id, cd.id) = :departmentId
               )
+              OR e.departmentId = :departmentId
               OR (
                   (u.active IS NULL OR u.active = true)
                   AND u.departmentId = :departmentId
@@ -142,6 +153,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
                       OR pd.id = :departmentId
                   )
               )
+              OR e.departmentId = :departmentId
               OR (
                   (u.active IS NULL OR u.active = true)
                   AND u.departmentId = :departmentId

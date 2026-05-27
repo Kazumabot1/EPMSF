@@ -273,15 +273,15 @@ function App() {
               <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
 <Route
   path="/department-head/self-assessment"
-  element={<Navigate to="/department-head/self-assessment-forms" replace />}
+  element={<Navigate to="/department-head/assessment-review" replace />}
 />
 
 <Route
   path="/department-head/self-assessment-forms"
-  element={<DepartmentHeadSelfAssessmentViewPage />}
+  element={<Navigate to="/department-head/assessment-review" replace />}
 />
-              <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
-              <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
+              <Route path="/department-head/assessment-scores" element={<Navigate to="/department-head/assessment-review" replace />} />
+              <Route path="/department-head/assessment-review" element={<DepartmentHeadSelfAssessmentViewPage />} />
               <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
               <Route path="/department-head/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
               <Route path="/department-head/reports/department-performance" element={<DepartmentKpiResultsPage departmentHead />} />
