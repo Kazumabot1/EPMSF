@@ -46,7 +46,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
-import SelfAssessmentFormRecordsPage from './pages/hr/SelfAssessmentFormRecordsPage';
 import ReportingDashboardPage from './pages/reports/ReportingDashboardPage';
 
 import PositionCreate from './pages/position/Create';

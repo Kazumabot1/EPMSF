@@ -17,6 +17,7 @@ import {
   buildKpiPositionDropdownOptions,
   countAvailableKpiPositions,
   DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
+  type KpiTemplateDurationMonths,
 } from './kpiTemplateUi';
 import {
   findExistingTemplateForPosition,
@@ -36,7 +37,7 @@ type Props = {
 };
 
 const fieldClass =
-    'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
+  'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
 
 const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Props) => {
   const navigate = useNavigate();
@@ -52,16 +53,16 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   const [title, setTitle] = useState('');
   const [, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [positionId, setPositionId] = useState<number | null>(null);
-  const [positionDurationMonths, setPositionDurationMonths] = useState(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
+  const [positionDurationMonths, setPositionDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
   const [positions, setPositions] = useState<PositionResponse[]>([]);
   const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
   const [existingTemplate, setExistingTemplate] = useState<ExistingKpiForPosition | null>(null);
   const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newKpiTemplateRow()]);
   const [removedItemReasons, setRemovedItemReasons] = useState<Record<number, string>>({});
   const [reasonAction, setReasonAction] = useState<
-      | { type: 'add' }
-      | { type: 'remove'; row: KpiTemplateRowDraft }
-      | null
+    | { type: 'add' }
+    | { type: 'remove'; row: KpiTemplateRowDraft }
+    | null
   >(null);
 
   const [categories, setCategories] = useState<KpiCategory[]>([]);
@@ -149,36 +150,38 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   }, [open, mode, templateId, applyFormFields, applyLookups, resetFormFields]);
 
   const positionOptions = useMemo(
-      () =>
-          buildKpiPositionDropdownOptions(positions, assignedPositionIds, positionId, {
-            createOrEditMode: false,
-          }),
-      [positions, assignedPositionIds, positionId],
+    () =>
+      buildKpiPositionDropdownOptions(positions, assignedPositionIds, positionId, {
+        createOrEditMode: false,
+      }),
+    [positions, assignedPositionIds, positionId],
   );
 
   const availablePositionCount = useMemo(
-      () => countAvailableKpiPositions(positionOptions),
-      [positionOptions],
+    () => countAvailableKpiPositions(positionOptions),
+    [positionOptions],
   );
 
   const totalWeight = useMemo(() => rows.reduce((sum, row) => sum + (row.weight ?? 0), 0), [rows]);
 
   const handlePositionChange = useCallback(
-      async (nextPositionId: number | null) => {
-        setPositionId(nextPositionId);
-        if (!isCreate || nextPositionId == null) {
-          setExistingTemplate(null);
-          return;
-        }
-        const existing = await findExistingTemplateForPosition(nextPositionId);
-        setExistingTemplate(existing);
-      },
-      [isCreate],
+    async (nextPositionId: number | null) => {
+      setPositionId(nextPositionId);
+      if (!isCreate || nextPositionId == null) {
+        setExistingTemplate(null);
+        return;
+      }
+      const existing = await findExistingTemplateForPosition(nextPositionId);
+      setExistingTemplate(existing);
+    },
+    [isCreate],
   );
 
   const buildPayload = (submitStatus: KpiFormStatus): KpiTemplateRequest => ({
     title: title.trim(),
     status: submitStatus,
+    startDate: null,
+    endDate: null,
     positionDurationMonths,
     positionIds: positionId != null ? [positionId] : [],
     items: rows.map((row, index) => ({
@@ -309,11 +312,11 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
         return;
       }
       const handled = await handleKpiTemplateSaveError(
-          err,
-          navigate,
-          positionId,
-          activeTemplateId ?? undefined,
-          { onConflict: refreshAfterConflict },
+        err,
+        navigate,
+        positionId,
+        activeTemplateId ?? undefined,
+        { onConflict: refreshAfterConflict },
       );
       if (!handled) {
         toast.error(apiError.message);
@@ -332,84 +335,84 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   const headerTitle = isCreate ? 'New KPI Template' : isEdit ? 'Update KPI Template' : 'KPI Template Detail';
 
   return createPortal(
-      <div className="kpi-tpl-modal-backdrop" role="dialog" aria-modal="true">
-        <MotionlessModalShell
-            headerKicker={headerKicker}
-            headerTitle={headerTitle}
-            onClose={onClose}
-            loading={loading}
-            isView={isView}
-            isCreate={isCreate}
-            title={title}
-            setTitle={setTitle}
-            fieldClass={fieldClass}
-            positionOptions={positionOptions}
-            availablePositionCount={availablePositionCount}
-            positionsCount={positions.length}
-            positionId={positionId}
-            onPositionChange={handlePositionChange}
-            existingTemplate={existingTemplate}
-            onOpenExistingTemplate={(existing, nextMode) => {
-              void (async () => {
-                try {
-                  setLoading(true);
-                  const fields = await loadTemplateFormFields(existing.templateId);
-                  applyLookups(await loadKpiTemplateEditorLookups(existing.templateId, { toastOnPartialFailure: false }));
-                  applyFormFields(fields);
-                  setWorkflowMode(nextMode);
-                  setActiveTemplateId(existing.templateId);
-                  setExistingTemplate(null);
-                } catch (err) {
-                  toast.error(toApiRequestError(err, 'Could not load the existing KPI form.').message);
-                } finally {
-                  setLoading(false);
-                }
-              })();
-            }}
-            rows={rows}
-            setRows={setRows}
-            onRequestAddRow={() => {
-              if (isEdit) {
-                setReasonAction({ type: 'add' });
-                return;
-              }
-              setRows((prev) => [...prev, newKpiTemplateRow()]);
-            }}
-            onRequestRemoveRow={(row) => setReasonAction({ type: 'remove', row })}
-            categories={categories}
-            units={units}
-            items={items}
-            totalWeight={totalWeight}
-            isSubmitting={isSubmitting}
-            saveTemplate={saveTemplate}
-            savingAction={savingAction}
-        />
-        <KpiRowReasonModal
-            open={reasonAction !== null}
-            title={reasonAction?.type === 'remove' ? 'Remove KPI row' : 'Add KPI row'}
-            rowLabel={
-              reasonAction?.type === 'remove'
-                  ? formatRowLabel(reasonAction.row, items)
-                  : undefined
+    <div className="kpi-tpl-modal-backdrop" role="dialog" aria-modal="true">
+      <MotionlessModalShell
+        headerKicker={headerKicker}
+        headerTitle={headerTitle}
+        onClose={onClose}
+        loading={loading}
+        isView={isView}
+        isCreate={isCreate}
+        title={title}
+        setTitle={setTitle}
+        fieldClass={fieldClass}
+        positionOptions={positionOptions}
+        availablePositionCount={availablePositionCount}
+        positionsCount={positions.length}
+        positionId={positionId}
+        onPositionChange={handlePositionChange}
+        existingTemplate={existingTemplate}
+        onOpenExistingTemplate={(existing, nextMode) => {
+          void (async () => {
+            try {
+              setLoading(true);
+              const fields = await loadTemplateFormFields(existing.templateId);
+              applyLookups(await loadKpiTemplateEditorLookups(existing.templateId, { toastOnPartialFailure: false }));
+              applyFormFields(fields);
+              setWorkflowMode(nextMode);
+              setActiveTemplateId(existing.templateId);
+              setExistingTemplate(null);
+            } catch (err) {
+              toast.error(toApiRequestError(err, 'Could not load the existing KPI form.').message);
+            } finally {
+              setLoading(false);
             }
-            confirmText={reasonAction?.type === 'remove' ? 'Remove row' : 'Add row'}
-            onConfirm={(reason) => {
-              if (reasonAction?.type === 'add') {
-                setRows((prev) => [...prev, { ...newKpiTemplateRow(), changeReason: reason }]);
-              }
-              if (reasonAction?.type === 'remove') {
-                const removed = reasonAction.row;
-                setRows((prev) => (prev.length > 1 ? prev.filter((row) => row.rowId !== removed.rowId) : prev));
-                if (removed.id != null) {
-                  setRemovedItemReasons((prev) => ({ ...prev, [removed.id as number]: reason }));
-                }
-              }
-              setReasonAction(null);
-            }}
-            onCancel={() => setReasonAction(null)}
-        />
-      </div>,
-      document.body,
+          })();
+        }}
+        rows={rows}
+        setRows={setRows}
+        onRequestAddRow={() => {
+          if (isEdit) {
+            setReasonAction({ type: 'add' });
+            return;
+          }
+          setRows((prev) => [...prev, newKpiTemplateRow()]);
+        }}
+        onRequestRemoveRow={(row) => setReasonAction({ type: 'remove', row })}
+        categories={categories}
+        units={units}
+        items={items}
+        totalWeight={totalWeight}
+        isSubmitting={isSubmitting}
+        saveTemplate={saveTemplate}
+        savingAction={savingAction}
+      />
+      <KpiRowReasonModal
+        open={reasonAction !== null}
+        title={reasonAction?.type === 'remove' ? 'Remove KPI row' : 'Add KPI row'}
+        rowLabel={
+          reasonAction?.type === 'remove'
+            ? formatRowLabel(reasonAction.row, items)
+            : undefined
+        }
+        confirmText={reasonAction?.type === 'remove' ? 'Remove row' : 'Add row'}
+        onConfirm={(reason) => {
+          if (reasonAction?.type === 'add') {
+            setRows((prev) => [...prev, { ...newKpiTemplateRow(), changeReason: reason }]);
+          }
+          if (reasonAction?.type === 'remove') {
+            const removed = reasonAction.row;
+            setRows((prev) => (prev.length > 1 ? prev.filter((row) => row.rowId !== removed.rowId) : prev));
+            if (removed.id != null) {
+              setRemovedItemReasons((prev) => ({ ...prev, [removed.id as number]: reason }));
+            }
+          }
+          setReasonAction(null);
+        }}
+        onCancel={() => setReasonAction(null)}
+      />
+    </div>,
+    document.body,
   );
 };
 
@@ -475,130 +478,130 @@ function MotionlessModalShell(props: ShellProps) {
   } = props;
 
   return (
-      <div className="kpi-tpl-modal">
-        <div className="kpi-tpl-modal-header">
-          <div>
-            <p className="kpi-tpl-modal-kicker">{headerKicker}</p>
-            <h2>{headerTitle}</h2>
-          </div>
-          <button type="button" onClick={onClose} className="kpi-tpl-btn-secondary">
-            <i className="bi bi-x-lg" aria-hidden />
-            Close
-          </button>
+    <div className="kpi-tpl-modal">
+      <div className="kpi-tpl-modal-header">
+        <div>
+          <p className="kpi-tpl-modal-kicker">{headerKicker}</p>
+          <h2>{headerTitle}</h2>
         </div>
-
-        {loading ? (
-            <div className="kpi-tpl-modal-loading">
-              <MotionlessModalLoadingShimmer />
-              Loading form...
-            </div>
-        ) : (
-            <form noValidate className="kpi-tpl-modal-body">
-              <div className="kpi-tpl-modal-grid">
-                <label>
-                  Title
-                  <input
-                      value={title}
-                      disabled={isView}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className={fieldClass}
-                  />
-                </label>
-
-                <label className="kpi-tpl-modal-positions">
-                  <p>Position</p>
-                  <select
-                      required
-                      value={positionId ?? ''}
-                      disabled={isView || isSubmitting}
-                      onChange={(event) => {
-                        const next = event.target.value ? Number(event.target.value) : null;
-                        void onPositionChange(next != null && Number.isNaN(next) ? null : next);
-                      }}
-                      className={`${fieldClass} cursor-pointer`}
-                  >
-                    <option value="">
-                      {positionsCount === 0
-                          ? 'No positions in system'
-                          : availablePositionCount === 0
-                              ? 'All positions already have a KPI form'
-                              : 'Select position...'}
-                    </option>
-                    {positionOptions.map((option) => (
-                        <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
-                          {option.label}
-                        </option>
-                    ))}
-                  </select>
-                  {positionsCount > 0 && isCreate && (
-                      <p className="mt-2 text-sm text-gray-500">
-                        {availablePositionCount} of {positionsCount} position
-                        {positionsCount === 1 ? '' : 's'} available for a new KPI form.
-                      </p>
-                  )}
-                  {isCreate && existingTemplate && (
-                      <KpiPositionExistingAlert
-                          templateTitle={existingTemplate.templateTitle}
-                          onEdit={() => onOpenExistingTemplate(existingTemplate, 'edit')}
-                          onView={() => onOpenExistingTemplate(existingTemplate, 'view')}
-                      />
-                  )}
-                </label>
-              </div>
-
-              <KpiTemplateRowsTable
-                  rows={rows}
-                  categories={categories}
-                  units={units}
-                  items={items}
-                  onAddRow={onRequestAddRow}
-                  onRemoveRow={(rowId) => {
-                    const row = rows.find((candidate) => candidate.rowId === rowId);
-                    if (row && rows.length > 1) {
-                      onRequestRemoveRow(row);
-                    }
-                  }}
-                  onRowChange={(rowId, patch) =>
-                      setRows((prev) => prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row)))
-                  }
-                  readOnly={isView}
-              />
-
-              <div className="kpi-tpl-modal-footer">
-                <p className={totalWeight !== 100 ? 'text-amber-700' : ''}>Total weight: {totalWeight}%</p>
-                {!isView && (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                          type="button"
-                          onClick={() => void saveTemplate('draft')}
-                          disabled={
-                              isSubmitting ||
-                              positionsCount === 0 ||
-                              (isCreate && (availablePositionCount === 0 || Boolean(existingTemplate)))
-                          }
-                          className="kpi-tpl-btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {savingAction === 'draft' ? 'Saving…' : isCreate ? 'Save Draft' : 'Save changes'}
-                      </button>
-                      <button
-                          type="button"
-                          onClick={() => void saveTemplate('use-in-cycle')}
-                          disabled={
-                              isSubmitting ||
-                              positionsCount === 0 ||
-                              (isCreate && (availablePositionCount === 0 || Boolean(existingTemplate)))
-                          }
-                          className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Save and open KPI template cycle to include this form"
-                      >
-                        {savingAction === 'use-in-cycle' ? 'Saving…' : 'Use Form'}
-                      </button>
-                    </div>
-                )}
-              </div>
-            </form>
-        )}
+        <button type="button" onClick={onClose} className="kpi-tpl-btn-secondary">
+          <i className="bi bi-x-lg" aria-hidden />
+          Close
+        </button>
       </div>
+
+      {loading ? (
+        <div className="kpi-tpl-modal-loading">
+          <MotionlessModalLoadingShimmer />
+          Loading form...
+        </div>
+      ) : (
+        <form noValidate className="kpi-tpl-modal-body">
+          <div className="kpi-tpl-modal-grid">
+            <label>
+              Title
+              <input
+                value={title}
+                disabled={isView}
+                onChange={(e) => setTitle(e.target.value)}
+                className={fieldClass}
+              />
+            </label>
+
+            <label className="kpi-tpl-modal-positions">
+              <p>Position</p>
+              <select
+                required
+                value={positionId ?? ''}
+                disabled={isView || isSubmitting}
+                onChange={(event) => {
+                  const next = event.target.value ? Number(event.target.value) : null;
+                  void onPositionChange(next != null && Number.isNaN(next) ? null : next);
+                }}
+                className={`${fieldClass} cursor-pointer`}
+              >
+                <option value="">
+                  {positionsCount === 0
+                    ? 'No positions in system'
+                    : availablePositionCount === 0
+                      ? 'All positions already have a KPI form'
+                      : 'Select position...'}
+                </option>
+                {positionOptions.map((option) => (
+                  <option key={option.position.id} value={option.position.id} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {positionsCount > 0 && isCreate && (
+                <p className="mt-2 text-sm text-gray-500">
+                  {availablePositionCount} of {positionsCount} position
+                  {positionsCount === 1 ? '' : 's'} available for a new KPI form.
+                </p>
+              )}
+              {isCreate && existingTemplate && (
+                <KpiPositionExistingAlert
+                  templateTitle={existingTemplate.templateTitle}
+                  onEdit={() => onOpenExistingTemplate(existingTemplate, 'edit')}
+                  onView={() => onOpenExistingTemplate(existingTemplate, 'view')}
+                />
+              )}
+            </label>
+          </div>
+
+          <KpiTemplateRowsTable
+            rows={rows}
+            categories={categories}
+            units={units}
+            items={items}
+            onAddRow={onRequestAddRow}
+            onRemoveRow={(rowId) => {
+              const row = rows.find((candidate) => candidate.rowId === rowId);
+              if (row && rows.length > 1) {
+                onRequestRemoveRow(row);
+              }
+            }}
+            onRowChange={(rowId, patch) =>
+              setRows((prev) => prev.map((row) => (row.rowId === rowId ? { ...row, ...patch } : row)))
+            }
+            readOnly={isView}
+          />
+
+          <div className="kpi-tpl-modal-footer">
+            <p className={totalWeight !== 100 ? 'text-amber-700' : ''}>Total weight: {totalWeight}%</p>
+            {!isView && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveTemplate('draft')}
+                  disabled={
+                    isSubmitting ||
+                    positionsCount === 0 ||
+                    (isCreate && (availablePositionCount === 0 || Boolean(existingTemplate)))
+                  }
+                  className="kpi-tpl-btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingAction === 'draft' ? 'Saving…' : isCreate ? 'Save Draft' : 'Save changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveTemplate('use-in-cycle')}
+                  disabled={
+                    isSubmitting ||
+                    positionsCount === 0 ||
+                    (isCreate && (availablePositionCount === 0 || Boolean(existingTemplate)))
+                  }
+                  className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Save and open KPI template cycle to include this form"
+                >
+                  {savingAction === 'use-in-cycle' ? 'Saving…' : 'Use Form'}
+                </button>
+              </div>
+            )}
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 
