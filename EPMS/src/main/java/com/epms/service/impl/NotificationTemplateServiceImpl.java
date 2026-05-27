@@ -9,6 +9,7 @@ import com.epms.entity.NotificationTemplate;
 import com.epms.entity.User;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.NotificationTemplateRepository;
 import com.epms.repository.UserRepository;
@@ -168,14 +169,20 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
 
         for (User recipient : recipients) {
             try {
-                notificationService.send(
+                boolean delivered = notificationService.sendEvent(
                         recipient.getId(),
+                        NotificationEventKey.HR_ANNOUNCEMENT_NORMAL,
                         template.getSubjectTemplate(),
                         template.getBodyTemplate(),
                         "GENERAL"
                 );
-                sent++;
-                recipientRows.add(recipientResult(recipient, resolveOnboardEmail(recipient), "sent", null));
+                if (delivered) {
+                    sent++;
+                    recipientRows.add(recipientResult(recipient, resolveOnboardEmail(recipient), "sent", null));
+                } else {
+                    skipped++;
+                    recipientRows.add(recipientResult(recipient, resolveOnboardEmail(recipient), "skipped", "disabled by notification settings"));
+                }
             } catch (Exception ex) {
                 skipped++;
                 String failure = safeFailure(ex.getMessage());

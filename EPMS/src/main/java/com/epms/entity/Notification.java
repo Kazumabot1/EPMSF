@@ -25,6 +25,17 @@ public class Notification {
     private String message;
     private String type; // APPRAISAL, FEEDBACK, etc.
 
+    /** High-level delivery setting category resolved by NotificationPolicyRegistry. */
+    @Column(length = 80)
+    private String category;
+
+    /** Exact notification event key used for user preferences and later analytics. */
+    @Column(length = 120)
+    private String eventKey;
+
+    /** Locked notifications are required for workflow safety and ignore user opt-out settings. */
+    private Boolean mandatory = false;
+
     /** Optional FK target (e.g. kpi_form.id for KPI_* notification types). */
     private Integer referenceId;
 

@@ -8,6 +8,7 @@ import com.epms.entity.enums.KpiFormStatus;
 import com.epms.entity.enums.KpiGraceExtension;
 import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.*;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
@@ -773,16 +774,16 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     private DepartmentKpiTemplateResponseDto toTemplateDto(DepartmentKpiTemplate t) {
         List<DepartmentKpiTemplateResponseDto.DepartmentSummary> departments = t.getDepartments() == null ? List.of() : t.getDepartments().stream()
-                .filter(d -> d.getDepartment() != null)
-                .map(d -> DepartmentKpiTemplateResponseDto.DepartmentSummary.builder()
-                        .id(d.getDepartment().getId())
-                        .departmentName(d.getDepartment().getDepartmentName())
-                        .build())
-                .toList();
+                                                                                                                        .filter(d -> d.getDepartment() != null)
+                                                                                                                        .map(d -> DepartmentKpiTemplateResponseDto.DepartmentSummary.builder()
+                                                                                                                                  .id(d.getDepartment().getId())
+                                                                                                                                  .departmentName(d.getDepartment().getDepartmentName())
+                                                                                                                                  .build())
+                                                                                                                        .toList();
         List<KpiFormItemDTO> rows = t.getRows() == null ? List.of() : t.getRows().stream()
-                .sorted(Comparator.comparing(r -> r.getSortOrder() == null ? 0 : r.getSortOrder()))
-                .map(this::toRowDto)
-                .toList();
+                                                                      .sorted(Comparator.comparing(r -> r.getSortOrder() == null ? 0 : r.getSortOrder()))
+                                                                      .map(this::toRowDto)
+                                                                      .toList();
         return DepartmentKpiTemplateResponseDto.builder()
                 .id(t.getId())
                 .title(t.getTitle())
@@ -898,8 +899,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     private void notifyDepartmentHeads(DepartmentKpiResult result) {
         for (User head : userRepository.findActiveDepartmentHeadsByDepartmentId(result.getDepartment().getId())) {
-            notificationService.send(
+            notificationService.sendEvent(
                     head.getId(),
+                    NotificationEventKey.DEPARTMENT_KPI_FINALIZED,
                     "Department KPI finalized",
                     "HR finalized Department KPI \"" + result.getTemplate().getTitle() + "\" for " + result.getDepartment().getDepartmentName()
                             + ". Weighted score: " + (result.getTotalWeightedScore() == null ? "-" : String.format("%.2f", result.getTotalWeightedScore())) + ".",
@@ -911,8 +913,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     private void notifyExecutivesOfFinalizationRequest(DepartmentKpiResult result) {
         for (User executive : userRepository.findActiveUsersByNormalizedRoleNames(List.of("CEO", "EXECUTIVE"))) {
-            notificationService.send(
+            notificationService.sendEvent(
                     executive.getId(),
+                    NotificationEventKey.DEPARTMENT_KPI_APPROVAL_REQUESTED,
                     "Department KPI finalization approval needed",
                     "HR requested final approval for Department KPI \"" + result.getTemplate().getTitle() + "\" for "
                             + result.getDepartment().getDepartmentName() + ".",
@@ -927,8 +930,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (requester == null || requester.getId() == null) {
             return;
         }
-        notificationService.send(
+        notificationService.sendEvent(
                 requester.getId(),
+                NotificationEventKey.DEPARTMENT_KPI_APPROVAL_DECIDED,
                 approved ? "Department KPI finalization approved" : "Department KPI finalization rejected",
                 approved
                         ? "CEO approved Department KPI finalization for " + result.getDepartment().getDepartmentName() + "."

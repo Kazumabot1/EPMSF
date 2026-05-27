@@ -15,6 +15,7 @@ import com.epms.entity.User;
 import com.epms.entity.UserRole;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeAuditHistoryRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
@@ -799,7 +800,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         recipientIds.stream()
                 .filter(Objects::nonNull)
-                .forEach(userId -> notificationService.send(userId, title, message, "GENERAL"));
+                .forEach(userId -> notificationService.sendEvent(userId, NotificationEventKey.POSITION_DEPARTMENT_CHANGED, title, message, "GENERAL"));
     }
 
     private void addTeamRecipients(Set<Integer> recipientIds, Team team) {

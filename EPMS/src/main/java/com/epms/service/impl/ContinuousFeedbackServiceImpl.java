@@ -11,6 +11,7 @@ import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
 import com.epms.exception.UnauthorizedActionException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.ContinuousFeedbackRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
@@ -316,8 +317,9 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
     private void notifyEmployee(ContinuousFeedback feedback) {
         userRepository.findActiveByEmployeeId(feedback.getEmployee().getId())
                 .or(() -> userRepository.findByEmployeeId(feedback.getEmployee().getId()))
-                .ifPresent(employeeUser -> notificationService.send(
+                .ifPresent(employeeUser -> notificationService.sendEvent(
                         employeeUser.getId(),
+                        NotificationEventKey.CONTINUOUS_FEEDBACK_RECEIVED,
                         "New Continuous Feedback",
                         displayUser(feedback.getGiverUser())
                                 + " gave you continuous feedback"

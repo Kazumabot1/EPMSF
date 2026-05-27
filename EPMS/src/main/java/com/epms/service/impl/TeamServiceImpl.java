@@ -14,6 +14,7 @@ import com.epms.entity.User;
 import com.epms.entity.UserRole;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.RoleRepository;
@@ -145,6 +146,7 @@ public class TeamServiceImpl implements TeamService {
 
         sendTeamNotification(
                 saved,
+                NotificationEventKey.TEAM_CREATED,
                 "Team Modified",
                 "Team " + saved.getTeamName() + " was created. By " + displayUser(editor) + ".",
                 Set.of()
@@ -338,7 +340,22 @@ public class TeamServiceImpl implements TeamService {
                     + displayUser(editor)
                     + ".";
 
-            sendTeamNotification(saved, "Team Modified", message, extraRecipients);
+            sendTeamNotification(
+                    saved,
+                    resolveTeamNotificationEventKey(
+                            oldLeader,
+                            newLeader,
+                            oldProjectManager,
+                            newProjectManager,
+                            addedMembers,
+                            removedMembers,
+                            oldStatus,
+                            newStatus
+                    ),
+                    "Team Modified",
+                    message,
+                    extraRecipients
+            );
         }
 
         return toDto(saved);
@@ -1181,8 +1198,37 @@ public class TeamServiceImpl implements TeamService {
         return "UPDATE";
     }
 
+    private String resolveTeamNotificationEventKey(
+            User oldLeader,
+            User newLeader,
+            User oldProjectManager,
+            User newProjectManager,
+            Set<Integer> addedMembers,
+            Set<Integer> removedMembers,
+            String oldStatus,
+            String newStatus
+    ) {
+        if (!sameUser(oldLeader, newLeader)) {
+            return NotificationEventKey.TEAM_LEADER_CHANGED;
+        }
+        if (!sameUser(oldProjectManager, newProjectManager)) {
+            return NotificationEventKey.PROJECT_MANAGER_CHANGED;
+        }
+        if (addedMembers != null && !addedMembers.isEmpty()) {
+            return NotificationEventKey.TEAM_MEMBER_ADDED;
+        }
+        if (removedMembers != null && !removedMembers.isEmpty()) {
+            return NotificationEventKey.TEAM_MEMBER_REMOVED;
+        }
+        if (!Objects.equals(normalizeStatus(oldStatus), normalizeStatus(newStatus))) {
+            return NotificationEventKey.TEAM_STRUCTURE_CHANGED;
+        }
+        return NotificationEventKey.TEAM_ANNOUNCEMENT;
+    }
+
     private void sendTeamNotification(
             Team team,
+            String eventKey,
             String title,
             String message,
             Set<Integer> extraRecipients
@@ -1218,7 +1264,7 @@ public class TeamServiceImpl implements TeamService {
 
         recipientIds.stream()
                 .filter(Objects::nonNull)
-                .forEach(userId -> notificationService.send(userId, title, message, "GENERAL"));
+                .forEach(userId -> notificationService.sendEvent(userId, eventKey, title, message, "GENERAL"));
     }
 
     private TeamResponseDto toDto(Team team) {
@@ -1267,20 +1313,20 @@ public class TeamServiceImpl implements TeamService {
         List<TeamResponseDto.MemberInfo> members = team.getTeamMembers() == null
                 ? List.of()
                 : team.getTeamMembers()
-                .stream()
-                .filter(Objects::nonNull)
-                .filter(member -> member.getEndedDate() == null)
-                .filter(member -> member.getMemberUser() != null)
-                .sorted(Comparator.comparing(
-                        member -> displayUser(member.getMemberUser()),
-                        String.CASE_INSENSITIVE_ORDER
-                ))
-                .map(member -> new TeamResponseDto.MemberInfo(
-                        member.getMemberUser().getId(),
-                        displayUser(member.getMemberUser()),
-                        member.getStartedDate()
-                ))
-                .toList();
+                  .stream()
+                  .filter(Objects::nonNull)
+                  .filter(member -> member.getEndedDate() == null)
+                  .filter(member -> member.getMemberUser() != null)
+                  .sorted(Comparator.comparing(
+                          member -> displayUser(member.getMemberUser()),
+                          String.CASE_INSENSITIVE_ORDER
+                  ))
+                  .map(member -> new TeamResponseDto.MemberInfo(
+                          member.getMemberUser().getId(),
+                          displayUser(member.getMemberUser()),
+                          member.getStartedDate()
+                  ))
+                  .toList();
 
         dto.setMembers(members);
 

@@ -19,6 +19,7 @@ import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
 import com.epms.entity.UserRole;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
@@ -186,8 +187,9 @@ public class PipServiceImpl implements PipService {
                 null
         );
 
-        notificationService.send(
+        notificationService.sendEvent(
                 employee.getId(),
+                NotificationEventKey.PIP_CREATED,
                 "PIP Created",
                 displayName(currentUser) + " (" + positionName(currentUser) + ") created a PIP for you at "
                         + LocalDateTime.now().format(NOTIFICATION_DATE)
@@ -195,8 +197,9 @@ public class PipServiceImpl implements PipService {
                 "PIP"
         );
 
-        notificationService.send(
+        notificationService.sendEvent(
                 currentUser.getId(),
+                NotificationEventKey.PIP_CREATOR_CONFIRMATION,
                 "PIP Created",
                 "You created a PIP for " + displayName(employee)
                         + ". The PIP will begin on " + saved.getStartDate() + ".",
@@ -312,8 +315,9 @@ public class PipServiceImpl implements PipService {
             phaseNote.append(" Note: ").append(note);
         }
 
-        notificationService.send(
+        notificationService.sendEvent(
                 pipEmployee.getId(),
+                NotificationEventKey.PIP_PHASE_UPDATED,
                 "PIP Phase Updated",
                 phaseNote.toString(),
                 "PIP"
@@ -365,16 +369,18 @@ public class PipServiceImpl implements PipService {
 
         User employee = getUser(pip.getEmployeeUserId(), "Employee user not found.");
 
-        notificationService.send(
+        notificationService.sendEvent(
                 employee.getId(),
+                NotificationEventKey.PIP_ENDED,
                 "PIP Ended",
                 "Your PIP \"" + pip.getGoal() + "\" has been finished by "
                         + displayName(currentUser) + " (" + positionName(currentUser) + ").",
                 "PIP"
         );
 
-        notificationService.send(
+        notificationService.sendEvent(
                 currentUser.getId(),
+                NotificationEventKey.PIP_CREATOR_CONFIRMATION,
                 "PIP Ended",
                 "You finished the PIP for " + displayName(employee) + ".",
                 "PIP"
@@ -535,9 +541,9 @@ public class PipServiceImpl implements PipService {
         List<PipPhaseResponseDto> phaseDtos = pip.getPhases() == null
                 ? List.of()
                 : pip.getPhases().stream()
-                .sorted(Comparator.comparing(PipPhase::getPhaseNumber))
-                .map(this::toPhaseDto)
-                .toList();
+                  .sorted(Comparator.comparing(PipPhase::getPhaseNumber))
+                  .map(this::toPhaseDto)
+                  .toList();
 
         List<PipUpdateHistoryDto> updateDtos = pipUpdateRepository.findByPipIdOrderByUpdatedAtDesc(pip.getId())
                 .stream()

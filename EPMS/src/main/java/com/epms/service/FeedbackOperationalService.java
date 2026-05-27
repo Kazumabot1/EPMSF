@@ -6,6 +6,7 @@ import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackSummary;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.UserRepository;
@@ -107,8 +108,9 @@ public class FeedbackOperationalService {
             String message = "You have been assigned to give " + relationship + " feedback for " + targetName
                     + " in " + campaign.getName() + ". Deadline: " + formatDeadline(campaign.getEndAt()) + ".";
 
-            if (notificationService.sendOnce(
+            if (notificationService.sendEventOnce(
                     user.getId(),
+                    NotificationEventKey.FEEDBACK_360_TASK_ASSIGNED,
                     "360 feedback task assigned",
                     message,
                     NOTIFICATION_TYPE
@@ -152,7 +154,15 @@ public class FeedbackOperationalService {
                     : "360 feedback deadline reminder";
             String message = buildReminderMessage(campaign, assignment, kind);
 
-            if (notificationService.sendOnce(user.getId(), title, message, NOTIFICATION_TYPE)) {
+            if (notificationService.sendEventOnce(
+                    user.getId(),
+                    kind == FeedbackReminderKind.OVERDUE
+                            ? NotificationEventKey.FEEDBACK_360_OVERDUE_REMINDER
+                            : NotificationEventKey.FEEDBACK_360_DEADLINE_REMINDER,
+                    title,
+                    message,
+                    NOTIFICATION_TYPE
+            )) {
                 sent++;
                 notifiedUsers.add(user.getId());
             }
@@ -188,8 +198,9 @@ public class FeedbackOperationalService {
             User user = maybeUser.get();
             String message = "Your 360 feedback summary for " + campaign.getName()
                     + " is now available. Open your feedback dashboard to review the published results.";
-            if (notificationService.sendOnce(
+            if (notificationService.sendEventOnce(
                     user.getId(),
+                    NotificationEventKey.FEEDBACK_360_SUMMARY_PUBLISHED,
                     "Your 360 feedback summary is now available",
                     message,
                     NOTIFICATION_TYPE
@@ -222,8 +233,9 @@ public class FeedbackOperationalService {
         String message = "A completed draft for " + relationship + " feedback about " + targetName
                 + " in " + campaign.getName()
                 + " was automatically submitted when the campaign reached its scheduled deadline. The response is now final and read-only.";
-        return notificationService.sendOnce(
+        return notificationService.sendEventOnce(
                 user.getId(),
+                NotificationEventKey.FEEDBACK_360_DRAFT_AUTO_SUBMITTED,
                 "Completed 360 feedback draft auto-submitted",
                 message,
                 NOTIFICATION_TYPE
@@ -238,7 +250,13 @@ public class FeedbackOperationalService {
             String message = "HR requested early close for " + campaign.getName()
                     + ". Completion: " + submittedAssignments + "/" + totalAssignments
                     + " submitted. Review the campaign information and approve or reject the request.";
-            if (notificationService.sendOnce(admin.getId(), "360 feedback early close approval needed", message, NOTIFICATION_TYPE)) {
+            if (notificationService.sendEventOnce(
+                    admin.getId(),
+                    NotificationEventKey.FEEDBACK_360_EARLY_CLOSE_REVIEW,
+                    "360 feedback early close approval needed",
+                    message,
+                    NOTIFICATION_TYPE
+            )) {
                 sent++;
             }
         }
@@ -263,7 +281,13 @@ public class FeedbackOperationalService {
         String message = approved
                 ? "Your early close request for " + campaign.getName() + " was approved. The campaign is now closed."
                 : "Your early close request for " + campaign.getName() + " was rejected. The campaign remains active until the scheduled deadline.";
-        return notificationService.sendOnce(requesterUserId.intValue(), title, message, NOTIFICATION_TYPE);
+        return notificationService.sendEventOnce(
+                requesterUserId.intValue(),
+                NotificationEventKey.FEEDBACK_360_EARLY_CLOSE_DECIDED,
+                title,
+                message,
+                NOTIFICATION_TYPE
+        );
     }
 
     private boolean isPendingEvaluatorAssignment(FeedbackEvaluatorAssignment assignment) {

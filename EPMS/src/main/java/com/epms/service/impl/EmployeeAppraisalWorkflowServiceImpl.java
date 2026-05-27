@@ -5,6 +5,7 @@ import com.epms.entity.*;
 import com.epms.entity.enums.*;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.repository.*;
 import com.epms.service.EmployeeAppraisalWorkflowService;
 import com.epms.service.NotificationService;
@@ -760,7 +761,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         String message = employeeName + " appraisal for " + cycleName + " is ready for Dept Head review.";
 
         userRepository.findActiveDepartmentHeadsByDepartmentId(form.getDepartment().getId())
-                .forEach(deptHead -> notificationService.sendOnce(deptHead.getId(), title, message, "APPRAISAL"));
+                .forEach(deptHead -> notificationService.sendEventOnce(deptHead.getId(), NotificationEventKey.APPRAISAL_REVIEW_SUBMITTED, title, message, "APPRAISAL"));
     }
 
 
@@ -859,7 +860,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         String message = employeeName + " appraisal for " + cycleName + " is ready for HR final review.";
 
         userRepository.findActiveUsersByNormalizedRoleNames(List.of("HR", "HUMAN_RESOURCES", "ADMIN"))
-                .forEach(hrUser -> notificationService.sendOnce(hrUser.getId(), title, message, "APPRAISAL"));
+                .forEach(hrUser -> notificationService.sendEventOnce(hrUser.getId(), NotificationEventKey.APPRAISAL_REVIEW_SUBMITTED, title, message, "APPRAISAL"));
     }
 
     private void notifyEmployeeCompleted(EmployeeAppraisalForm form) {
@@ -871,8 +872,9 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
             return;
         }
         String cycleName = form.getCycle() != null ? form.getCycle().getCycleName() : "Appraisal cycle";
-        notificationService.sendOnce(
+        notificationService.sendEventOnce(
                 employeeUser.getId(),
+                NotificationEventKey.APPRAISAL_RESULT_PUBLISHED,
                 "Appraisal Form Completed",
                 cycleName + " has been approved by HR and is available for you to view.",
                 "APPRAISAL"
@@ -921,22 +923,22 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         Set<Integer> departmentIds = cycle == null || cycle.getCycleDepartments() == null
                 ? Set.of()
                 : cycle.getCycleDepartments().stream()
-                .map(AppraisalCycleDepartment::getDepartment)
-                .filter(Objects::nonNull)
-                .map(Department::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                  .map(AppraisalCycleDepartment::getDepartment)
+                  .filter(Objects::nonNull)
+                  .map(Department::getId)
+                  .filter(Objects::nonNull)
+                  .collect(Collectors.toCollection(LinkedHashSet::new));
 
         Set<Integer> notifiedUserIds = new LinkedHashSet<>();
         for (Integer departmentId : departmentIds) {
             userRepository.findActiveManagersByDepartmentId(departmentId).forEach(user -> {
                 if (user != null && user.getId() != null && notifiedUserIds.add(user.getId())) {
-                    notificationService.sendOnce(user.getId(), title, message, "APPRAISAL", cycle.getId());
+                    notificationService.sendEventOnce(user.getId(), NotificationEventKey.APPRAISAL_CYCLE_LOCKED, title, message, "APPRAISAL", cycle.getId());
                 }
             });
             userRepository.findActiveDepartmentHeadsByDepartmentId(departmentId).forEach(user -> {
                 if (user != null && user.getId() != null && notifiedUserIds.add(user.getId())) {
-                    notificationService.sendOnce(user.getId(), title, message, "APPRAISAL", cycle.getId());
+                    notificationService.sendEventOnce(user.getId(), NotificationEventKey.APPRAISAL_CYCLE_LOCKED, title, message, "APPRAISAL", cycle.getId());
                 }
             });
         }
