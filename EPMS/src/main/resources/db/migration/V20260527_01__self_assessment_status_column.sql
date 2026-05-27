@@ -1,0 +1,2 @@
+ALTER TABLE employee_assessments
+    MODIFY COLUMN status VARCHAR(40) NOT NULL DEFAULT 'DRAFT';

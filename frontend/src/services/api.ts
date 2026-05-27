@@ -13,6 +13,8 @@ const TOKEN_FREE_ENDPOINTS = [
   '/auth/forgot-password/request',
   '/auth/forgot-password/verify',
   '/auth/forgot-password/reset',
+  '/auth/reset-password',
+  '/auth/change-password',
 ];
 
 const normalizeUrl = (url?: string): string => {

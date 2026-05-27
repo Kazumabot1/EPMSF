@@ -322,7 +322,7 @@ public class EmployeeAssessmentService {
             throw new BadRequestException("HR cannot approve until manager signature is completed.");
         }
 
-        Signature signature = currentDefaultSignature();
+        Signature signature = resolveReviewSignature(request);
 
         assessment.setHrSignatureId(signature.getId());
         assessment.setHrSignatureName(signature.getName());
@@ -1409,6 +1409,18 @@ public class EmployeeAssessmentService {
         return signatureRepository
                 .findByUserIdAndIsDefaultTrueAndIsActiveTrue(Long.valueOf(userId))
                 .orElseThrow(() -> new BadRequestException("Please create and set your own default signature before signing."));
+    }
+
+    private Signature resolveReviewSignature(ReviewActionRequest request) {
+        Integer currentUserId = SecurityUtils.currentUserId();
+
+        if (request != null && request.getSignatureId() != null) {
+            return signatureRepository
+                    .findByIdAndUserIdAndIsActiveTrue(request.getSignatureId(), Long.valueOf(currentUserId))
+                    .orElseThrow(() -> new BadRequestException("Selected signature could not be found for your account."));
+        }
+
+        return currentDefaultSignature();
     }
 
     private void attachEmployeeSignature(EmployeeAssessment assessment) {

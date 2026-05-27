@@ -45,6 +45,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
 import ProfilePage from './pages/hr/ProfilePage';
 import AssessmentScoreTablePage from './pages/hr/AssessmentScoreTablePage';
+import SelfAssessmentFormRecordsPage from './pages/hr/SelfAssessmentFormRecordsPage';
 import ReportingDashboardPage from './pages/reports/ReportingDashboardPage';
 
 import PositionCreate from './pages/position/Create';
@@ -270,8 +271,15 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
               <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
-<Route path="/department-head/self-assessment" element={<Navigate to="/department-head/assessment-review" replace />} />
-<Route path="/department-head/self-assessment-forms" element={<Navigate to="/department-head/assessment-review" replace />} />
+<Route
+  path="/department-head/self-assessment"
+  element={<Navigate to="/department-head/self-assessment-forms" replace />}
+/>
+
+<Route
+  path="/department-head/self-assessment-forms"
+  element={<DepartmentHeadSelfAssessmentViewPage />}
+/>
               <Route path="/department-head/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
