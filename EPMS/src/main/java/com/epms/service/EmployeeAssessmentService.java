@@ -310,6 +310,10 @@ public class EmployeeAssessmentService {
             throw new UnauthorizedActionException("Only HR can approve this self-assessment.");
         }
 
+        if (!positionPermissionService.currentUserHasPermission("assessmentScoresView")) {
+            throw new UnauthorizedActionException("Your position does not have permission to approve self-assessment scores.");
+        }
+
         if (!AssessmentStatus.PENDING_HR.equals(assessment.getStatus())) {
             throw new BadRequestException("This assessment is not ready for HR approval.");
         }
@@ -341,6 +345,10 @@ public class EmployeeAssessmentService {
 
         if (!roles.contains("HR") && !roles.contains("ADMIN")) {
             throw new UnauthorizedActionException("Only HR can reject this self-assessment.");
+        }
+
+        if (!positionPermissionService.currentUserHasPermission("assessmentScoresView")) {
+            throw new UnauthorizedActionException("Your position does not have permission to reject self-assessment scores.");
         }
 
         if (AssessmentStatus.DRAFT.equals(assessment.getStatus())) {
@@ -417,11 +425,8 @@ public class EmployeeAssessmentService {
                     .toList();
         }
 
-        if (isDepartmentHeadRole(roles)) {
-            if (!positionPermissionService.currentUserHasPermission("selfAssessmentView")) {
-                throw new UnauthorizedActionException("Your position does not have permission to view self-assessments.");
-            }
 
+        if (isDepartmentHeadRole(roles)) {
             Map<Long, EmployeeAssessment> visible = new LinkedHashMap<>();
 
             for (Integer departmentId : currentUserDepartmentIds(principal)) {
@@ -433,6 +438,10 @@ public class EmployeeAssessmentService {
                         .forEach(assessment -> visible.put(assessment.getId(), assessment));
             }
 
+            /*
+             * Department Head assessment review is a default dashboard feature.
+             * It must not depend on position permission.
+             */
             return visible.values()
                     .stream()
                     .sorted(Comparator.comparing(
@@ -1608,8 +1617,7 @@ public class EmployeeAssessmentService {
         }
 
         if (isDepartmentHeadRole(roles)
-                && currentUserDepartmentIds(principal).contains(assessment.getDepartmentId())
-                && positionPermissionService.currentUserHasPermission("selfAssessmentView")) {
+                && currentUserDepartmentIds(principal).contains(assessment.getDepartmentId())) {
             return;
         }
 

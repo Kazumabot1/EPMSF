@@ -22,6 +22,7 @@ import com.epms.service.AssessmentFormDefinitionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.epms.service.PositionPermissionService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     private static final String HIDDEN_SECTION_TITLE = "Assessment Subjects";
     private static final String TARGET_ROLE_EMPLOYEE = "Employee";
 
+    private final PositionPermissionService positionPermissionService;
     private final AssessmentFormDefinitionRepository repository;
     private final AuditLogService auditLogService;
 
@@ -63,6 +65,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     @Override
     public AssessmentFormResponse create(AssessmentFormPayload payload) {
         validateCreatePayload(payload);
+        assertCanManageAssessmentForms();
 
         String formName = payload.getFormName().trim();
 
@@ -80,11 +83,13 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
     @Override
     public AssessmentFormResponse update(Integer id, AssessmentFormPayload payload) {
+        assertCanManageAssessmentForms();
         throw new BadRequestException("Assessment forms are locked after creation. Create a new form instead of editing an existing one.");
     }
 
     @Override
     public AssessmentFormResponse updateActivation(Integer id, AssessmentFormActivationPayload payload) {
+        assertCanManageAssessmentForms();
         expireEndedActiveForms();
 
         if (payload == null || payload.getActive() == null) {
@@ -115,6 +120,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
     @Override
     public void deactivate(Integer id) {
+        assertCanManageAssessmentForms();
         AssessmentFormDefinition form = getEntity(id);
         setInactive(form);
         AssessmentFormDefinition saved = repository.save(form);
@@ -146,6 +152,12 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
         if (changed) {
             repository.saveAll(forms);
+        }
+    }
+
+    private void assertCanManageAssessmentForms() {
+        if (!positionPermissionService.currentUserHasPermission("assessmentFormCreate")) {
+            throw new BadRequestException("Your position does not have permission to create or activate self-assessment forms.");
         }
     }
 

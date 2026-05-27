@@ -13,6 +13,18 @@ public class PositionPermissionDto {
     private Integer positionId;
     private String positionTitle;
 
+    private Boolean teamPermission;
+    private Boolean organizationPermission;
+    private Boolean assessmentPermission;
+    private Boolean assessmentScoresView;
+    private Boolean assessmentFormCreate;
+    private Boolean appraisalPermission;
+    private Boolean feedback360Permission;
+    private Boolean oneOnOnePermission;
+    private Boolean positionPermission;
+    private Boolean kpiPermission;
+    private Boolean departmentKpiPermission;
+
     private Boolean oneOnOneCreate;
     private Boolean oneOnOneDeptSelection;
     private Boolean oneOnOneTeamSelection;
