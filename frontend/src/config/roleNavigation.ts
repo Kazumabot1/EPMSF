@@ -88,6 +88,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
+    { label: 'Audit Logs', path: '/admin/audit-logs', icon: 'bi-clock-history' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Access Control',
@@ -152,6 +153,18 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
           path: '/hr/assessment-forms',
           icon: 'bi-ui-checks-grid',
           permissionField: 'selfAssessmentInput',
+        },
+        {
+          label: 'Review Form',
+          path: '/hr/assessment-review-forms',
+          icon: 'bi-clipboard-check',
+          permissionField: 'selfAssessmentView',
+        },
+        {
+          label: 'Form Record',
+          path: '/hr/assessment-form-records',
+          icon: 'bi-folder2-open',
+          permissionField: 'selfAssessmentView',
         },
       ],
     },

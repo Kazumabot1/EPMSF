@@ -45,7 +45,7 @@ public class SelfAssessmentScoreBandService {
                 .size();
 
         return ScoreTableResponse.builder()
-                .bands(readBandsOrDefaults().stream().map(this::toResponse).toList())
+                .bands(getReadonlyBands().stream().map(this::toResponse).toList())
                 .audits(getAudit())
                 .activeFormExists(activeFormCount > 0)
                 .activeFormCount(activeFormCount)
@@ -62,7 +62,7 @@ public class SelfAssessmentScoreBandService {
 
     @Transactional(readOnly = true)
     public List<EmployeeAssessmentDtos.AssessmentScoreBandResponse> getActiveBandsForAssessment() {
-        return readBandsOrDefaults()
+        return getReadonlyBands()
                 .stream()
                 .map(band -> EmployeeAssessmentDtos.AssessmentScoreBandResponse.builder()
                         .id(band.getId())
@@ -294,14 +294,22 @@ public class SelfAssessmentScoreBandService {
         }
     }
 
-    private List<SelfAssessmentScoreBand> readBandsOrDefaults() {
-        List<SelfAssessmentScoreBand> existingBands = scoreBandRepository.findAllByOrderBySortOrderAsc();
-
-        if (existingBands.size() >= REQUIRED_ROW_COUNT) {
-            return existingBands;
+    private List<SelfAssessmentScoreBand> getReadonlyBands() {
+        List<SelfAssessmentScoreBand> existing = scoreBandRepository.findAllByOrderBySortOrderAsc();
+        if (existing.size() >= REQUIRED_ROW_COUNT) {
+            return existing;
         }
 
         return defaultBands();
+    }
+
+    private void ensureDefaults() {
+        if (scoreBandRepository.count() >= REQUIRED_ROW_COUNT) {
+            return;
+        }
+
+        scoreBandRepository.deleteAll();
+        scoreBandRepository.saveAll(defaultBands());
     }
 
     private List<SelfAssessmentScoreBand> defaultBands() {
@@ -319,16 +327,6 @@ public class SelfAssessmentScoreBandService {
                 "Performance does not meet the minimum requirement of the job.", 5));
 
         return defaults;
-    }
-
-    private void ensureDefaults() {
-        if (scoreBandRepository.count() >= REQUIRED_ROW_COUNT) {
-            return;
-        }
-
-        scoreBandRepository.deleteAll();
-
-        scoreBandRepository.saveAll(defaultBands());
     }
 
     private SelfAssessmentScoreBand defaultBand(

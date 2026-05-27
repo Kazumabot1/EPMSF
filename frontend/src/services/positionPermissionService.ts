@@ -15,6 +15,18 @@ type ApiEnvelope<T> = {
 const POSITION_PERMISSION_ENDPOINT = '/position-permissions';
 
 export const POSITION_PERMISSION_FIELDS: Array<keyof PositionPermission> = [
+    'teamPermission',
+    'organizationPermission',
+    'assessmentPermission',
+    'assessmentScoresView',
+    'assessmentFormCreate',
+    'appraisalPermission',
+    'feedback360Permission',
+    'oneOnOnePermission',
+    'positionPermission',
+    'kpiPermission',
+    'departmentKpiPermission',
+
   'oneOnOneCreate',
   'oneOnOneDeptSelection',
   'oneOnOneTeamSelection',
@@ -97,6 +109,19 @@ const extractApiErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 export const emptyPositionPermission = (): PositionPermission => ({
+
+    teamPermission: false,
+    organizationPermission: false,
+    assessmentPermission: false,
+    assessmentScoresView: false,
+    assessmentFormCreate: false,
+    appraisalPermission: false,
+    feedback360Permission: false,
+    oneOnOnePermission: false,
+    positionPermission: false,
+    kpiPermission: false,
+    departmentKpiPermission: false,
+
   oneOnOneCreate: false,
   oneOnOneDeptSelection: false,
   oneOnOneTeamSelection: false,

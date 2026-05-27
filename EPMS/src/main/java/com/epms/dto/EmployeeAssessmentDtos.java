@@ -46,6 +46,10 @@ public final class EmployeeAssessmentDtos {
     public static class ReviewActionRequest {
         private String comment;
         private String reason;
+        private Long signatureId;
+        private String signatureImageData;
+        private String signatureImageType;
+        private String signatureName;
     }
 
     @Data

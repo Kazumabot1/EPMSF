@@ -26,6 +26,40 @@ public class PositionPermission {
     @Column(name = "position_id", nullable = false, unique = true)
     private Integer positionId;
 
+
+    @Column(name = "team_permission", nullable = false)
+    private Boolean teamPermission = false;
+
+    @Column(name = "organization_permission", nullable = false)
+    private Boolean organizationPermission = false;
+
+    @Column(name = "assessment_permission", nullable = false)
+    private Boolean assessmentPermission = false;
+
+    @Column(name = "assessment_scores_view", nullable = false)
+    private Boolean assessmentScoresView = false;
+
+    @Column(name = "assessment_form_create", nullable = false)
+    private Boolean assessmentFormCreate = false;
+
+    @Column(name = "appraisal_permission", nullable = false)
+    private Boolean appraisalPermission = false;
+
+    @Column(name = "feedback360_permission", nullable = false)
+    private Boolean feedback360Permission = false;
+
+    @Column(name = "one_on_one_permission", nullable = false)
+    private Boolean oneOnOnePermission = false;
+
+    @Column(name = "position_permission", nullable = false)
+    private Boolean positionPermission = false;
+
+    @Column(name = "kpi_permission", nullable = false)
+    private Boolean kpiPermission = false;
+
+    @Column(name = "department_kpi_permission", nullable = false)
+    private Boolean departmentKpiPermission = false;
+
     private Boolean oneOnOneCreate = false;
     private Boolean oneOnOneDeptSelection = false;
     private Boolean oneOnOneTeamSelection = false;
@@ -88,6 +122,18 @@ public class PositionPermission {
     }
 
     public void normalizeNullBooleans() {
+        teamPermission = bool(teamPermission);
+        organizationPermission = bool(organizationPermission);
+        assessmentPermission = bool(assessmentPermission);
+        assessmentScoresView = bool(assessmentScoresView);
+        assessmentFormCreate = bool(assessmentFormCreate);
+        appraisalPermission = bool(appraisalPermission);
+        feedback360Permission = bool(feedback360Permission);
+        oneOnOnePermission = bool(oneOnOnePermission);
+        positionPermission = bool(positionPermission);
+        kpiPermission = bool(kpiPermission);
+        departmentKpiPermission = bool(departmentKpiPermission);
+
         oneOnOneCreate = bool(oneOnOneCreate);
         oneOnOneDeptSelection = bool(oneOnOneDeptSelection);
         oneOnOneTeamSelection = bool(oneOnOneTeamSelection);

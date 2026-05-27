@@ -37,6 +37,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final SignatureRepository signatureRepository;
     private final NotificationService notificationService;
 
@@ -44,9 +45,12 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
     public List<AppraisalEmployeeOptionResponse> getPmEligibleEmployees(Integer cycleId, Integer pmUserId) {
         AppraisalCycle cycle = getActiveCycle(cycleId);
 
+        User managerUser = getUser(pmUserId);
+
         List<Employee> candidateEmployees = new ArrayList<>();
         Set<Integer> seenEmployeeIds = new HashSet<>();
         collectManagerTeamEmployees(pmUserId, candidateEmployees, seenEmployeeIds);
+        collectDepartmentNoTeamEmployees(cycle, managerUser, candidateEmployees, seenEmployeeIds);
 
         Set<Integer> employeeLevelEmployeeIds = getActiveEmployeeLevelEmployeeIds();
 
@@ -604,6 +608,77 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
                 .ifPresent(employee -> addCandidate(candidates, seenEmployeeIds, employee));
     }
 
+    private void collectDepartmentNoTeamEmployees(
+            AppraisalCycle cycle,
+            User managerUser,
+            List<Employee> candidates,
+            Set<Integer> seenEmployeeIds
+    ) {
+        Integer managerDepartmentId = resolveManagerDepartmentId(managerUser);
+        if (managerDepartmentId == null) {
+            return;
+        }
+
+        try {
+            ensureCycleTargetsDepartment(cycle, managerDepartmentId);
+        } catch (BadRequestException ex) {
+            return;
+        }
+
+        employeeRepository.findCurrentByWorkingDepartmentId(managerDepartmentId, false)
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(employee -> !Objects.equals(employee.getId(), managerUser.getEmployeeId()))
+                .filter(employee -> isEmployeeInManagerDepartment(employee, managerDepartmentId))
+                .filter(this::hasNoActiveTeamMembership)
+                .forEach(employee -> addCandidate(candidates, seenEmployeeIds, employee));
+    }
+
+    private Integer resolveManagerDepartmentId(User managerUser) {
+        if (managerUser == null) {
+            return null;
+        }
+        if (managerUser.getDepartmentId() != null) {
+            return managerUser.getDepartmentId();
+        }
+        if (managerUser.getEmployeeId() == null) {
+            return null;
+        }
+        return employeeRepository.findWithDepartmentsById(managerUser.getEmployeeId())
+                .map(employee -> {
+                    try {
+                        return resolveEmployeeDepartment(employee, managerUser).getId();
+                    } catch (RuntimeException ex) {
+                        return null;
+                    }
+                })
+                .orElse(null);
+    }
+
+    private boolean isEmployeeInManagerDepartment(Employee employee, Integer managerDepartmentId) {
+        if (employee == null || employee.getId() == null || managerDepartmentId == null) {
+            return false;
+        }
+        User employeeUser = userRepository.findActiveByEmployeeId(employee.getId()).orElse(null);
+        try {
+            Department employeeDepartment = resolveEmployeeDepartment(employee, employeeUser);
+            return employeeDepartment != null && Objects.equals(employeeDepartment.getId(), managerDepartmentId);
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private boolean hasNoActiveTeamMembership(Employee employee) {
+        if (employee == null || employee.getId() == null) {
+            return false;
+        }
+        User employeeUser = userRepository.findActiveByEmployeeId(employee.getId()).orElse(null);
+        if (employeeUser == null || employeeUser.getId() == null) {
+            return true;
+        }
+        return !teamMemberRepository.existsActiveMembershipByMemberUserId(employeeUser.getId());
+    }
+
     private void addCandidate(List<Employee> candidates, Set<Integer> seenEmployeeIds, Employee employee) {
         if (employee == null || employee.getId() == null || seenEmployeeIds.contains(employee.getId())) {
             return;
@@ -657,9 +732,22 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         List<Employee> managerTeamEmployees = new ArrayList<>();
         collectManagerTeamEmployees(managerUser.getId(), managerTeamEmployees, managerTeamEmployeeIds);
 
-        if (!managerTeamEmployeeIds.contains(employee.getId())) {
-            throw new BadRequestException("Only employees from your assigned team can be selected for appraisal review.");
+        if (managerTeamEmployeeIds.contains(employee.getId())) {
+            return;
         }
+
+        if (canManagerReviewDepartmentNoTeamEmployee(managerUser, employee)) {
+            return;
+        }
+
+        throw new BadRequestException("Only employees from your assigned team, or same-department employees without an active team, can be selected for appraisal review.");
+    }
+
+    private boolean canManagerReviewDepartmentNoTeamEmployee(User managerUser, Employee employee) {
+        Integer managerDepartmentId = resolveManagerDepartmentId(managerUser);
+        return managerDepartmentId != null
+                && isEmployeeInManagerDepartment(employee, managerDepartmentId)
+                && hasNoActiveTeamMembership(employee);
     }
 
     private void notifyDepartmentHeads(EmployeeAppraisalForm form) {

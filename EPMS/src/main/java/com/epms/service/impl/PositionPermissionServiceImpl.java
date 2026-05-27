@@ -74,6 +74,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     return created;
                 });
 
+        normalizeParentChildPermissions(dto);
         normalizeTeamAssignmentPermissions(dto);
 
         List<PositionPermissionAudit> auditRows = buildAuditRows(
@@ -203,21 +204,36 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
 
     private boolean hasPermission(PositionPermission pp, String field) {
         return switch (field) {
+
+            case "teamPermission" -> safe(pp.getTeamPermission());
+            case "organizationPermission" -> safe(pp.getOrganizationPermission());
+            case "assessmentPermission" -> safe(pp.getAssessmentPermission());
+            case "assessmentScoresView" -> safe(pp.getAssessmentPermission()) && safe(pp.getAssessmentScoresView());
+            case "assessmentFormCreate" -> safe(pp.getAssessmentPermission()) && safe(pp.getAssessmentFormCreate());
+            case "appraisalPermission" -> safe(pp.getAppraisalPermission());
+            case "feedback360Permission" -> safe(pp.getFeedback360Permission());
+            case "oneOnOnePermission" -> safe(pp.getOneOnOnePermission());
+            case "positionPermission" -> safe(pp.getPositionPermission());
+            case "kpiPermission" -> safe(pp.getKpiPermission());
+            case "departmentKpiPermission" -> safe(pp.getDepartmentKpiPermission());
+
             case "oneOnOneCreate" -> safe(pp.getOneOnOneCreate());
             case "oneOnOneDeptSelection" -> safe(pp.getOneOnOneDeptSelection());
             case "oneOnOneTeamSelection" -> safe(pp.getOneOnOneTeamSelection());
 
             case "teamCreate" -> safe(pp.getTeamCreate());
             case "teamEdit" -> safe(pp.getTeamEdit());
-            case "teamHistory" -> safe(pp.getTeamHistory());
-            case "teamView" -> safe(pp.getTeamView());
+
+            case "teamHistory" -> safe(pp.getTeamPermission());
+            case "teamView" -> safe(pp.getTeamPermission());
+
             case "teamAssignAsLeader" -> safe(pp.getTeamAssignAsLeader());
             case "teamAssignAsPm" -> safe(pp.getTeamAssignAsPm());
             case "teamAssignAsMember" -> safe(pp.getTeamAssignAsMember());
 
-            case "pipCreate" -> safe(pp.getPipCreate());
+           /* case "pipCreate" -> safe(pp.getPipCreate());
             case "pipEdit" -> safe(pp.getPipEdit());
-            case "pipViewAll" -> safe(pp.getPipViewAll());
+            case "pipViewAll" -> safe(pp.getPipViewAll());*/
 
             case "appraisalReview" -> safe(pp.getAppraisalReview());
             case "appraisalApprove" -> safe(pp.getAppraisalApprove());
@@ -238,13 +254,19 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
 
             case "feedbackFormCreate" -> safe(pp.getFeedbackFormCreate());
             case "feedbackSend" -> safe(pp.getFeedbackSend());
+
             case "continuousFeedbackView" -> safe(pp.getContinuousFeedbackView());
             case "continuousFeedbackGive" -> safe(pp.getContinuousFeedbackGive());
 
-            case "departmentCrud" -> safe(pp.getDepartmentCrud());
-            case "departmentComparisonView" -> safe(pp.getDepartmentComparisonView());
-            case "positionCrud" -> safe(pp.getPositionCrud());
-            case "employeeCrud" -> safe(pp.getEmployeeCrud());
+            case "pipViewAll" -> safe(pp.getPipViewAll());
+            case "pipCreate" -> safe(pp.getPipViewAll());
+            case "pipEdit" -> safe(pp.getPipViewAll());
+
+            case "departmentCrud" -> safe(pp.getOrganizationPermission()) && safe(pp.getDepartmentCrud());
+            case "departmentComparisonView" -> safe(pp.getOrganizationPermission()) && safe(pp.getDepartmentComparisonView());
+            case "positionCrud" -> safe(pp.getPositionPermission()) && safe(pp.getPositionCrud());
+            case "employeeCrud" -> safe(pp.getOrganizationPermission()) && safe(pp.getEmployeeCrud());
+
             case "employeeExcelImport" -> safe(pp.getEmployeeExcelImport());
 
             default -> false;
@@ -259,6 +281,19 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
         pp.normalizeNullBooleans();
 
         return PositionPermissionDto.builder()
+
+                .teamPermission(safe(pp.getTeamPermission()))
+                .organizationPermission(safe(pp.getOrganizationPermission()))
+                .assessmentPermission(safe(pp.getAssessmentPermission()))
+                .assessmentScoresView(safe(pp.getAssessmentScoresView()))
+                .assessmentFormCreate(safe(pp.getAssessmentFormCreate()))
+                .appraisalPermission(safe(pp.getAppraisalPermission()))
+                .feedback360Permission(safe(pp.getFeedback360Permission()))
+                .oneOnOnePermission(safe(pp.getOneOnOnePermission()))
+                .positionPermission(safe(pp.getPositionPermission()))
+                .kpiPermission(safe(pp.getKpiPermission()))
+                .departmentKpiPermission(safe(pp.getDepartmentKpiPermission()))
+
                 .oneOnOneCreate(safe(pp.getOneOnOneCreate()))
                 .oneOnOneDeptSelection(safe(pp.getOneOnOneDeptSelection()))
                 .oneOnOneTeamSelection(safe(pp.getOneOnOneTeamSelection()))
@@ -307,6 +342,18 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
 
     private void applyDto(PositionPermission pp, PositionPermissionDto dto) {
         PositionPermissionDto safeDto = dto == null ? new PositionPermissionDto() : dto;
+
+        pp.setTeamPermission(safe(safeDto.getTeamPermission()));
+        pp.setOrganizationPermission(safe(safeDto.getOrganizationPermission()));
+        pp.setAssessmentPermission(safe(safeDto.getAssessmentPermission()));
+        pp.setAssessmentScoresView(safe(safeDto.getAssessmentScoresView()));
+        pp.setAssessmentFormCreate(safe(safeDto.getAssessmentFormCreate()));
+        pp.setAppraisalPermission(safe(safeDto.getAppraisalPermission()));
+        pp.setFeedback360Permission(safe(safeDto.getFeedback360Permission()));
+        pp.setOneOnOnePermission(safe(safeDto.getOneOnOnePermission()));
+        pp.setPositionPermission(safe(safeDto.getPositionPermission()));
+        pp.setKpiPermission(safe(safeDto.getKpiPermission()));
+        pp.setDepartmentKpiPermission(safe(safeDto.getDepartmentKpiPermission()));
 
         pp.setOneOnOneCreate(safe(safeDto.getOneOnOneCreate()));
         pp.setOneOnOneDeptSelection(safe(safeDto.getOneOnOneDeptSelection()));
@@ -360,6 +407,18 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
             User editor
     ) {
         List<PositionPermissionAudit> rows = new ArrayList<>();
+
+        addAudit(rows, position, editor, "teamPermission", oldPermission.getTeamPermission(), newDto.getTeamPermission());
+        addAudit(rows, position, editor, "organizationPermission", oldPermission.getOrganizationPermission(), newDto.getOrganizationPermission());
+        addAudit(rows, position, editor, "assessmentPermission", oldPermission.getAssessmentPermission(), newDto.getAssessmentPermission());
+        addAudit(rows, position, editor, "assessmentScoresView", oldPermission.getAssessmentScoresView(), newDto.getAssessmentScoresView());
+        addAudit(rows, position, editor, "assessmentFormCreate", oldPermission.getAssessmentFormCreate(), newDto.getAssessmentFormCreate());
+        addAudit(rows, position, editor, "appraisalPermission", oldPermission.getAppraisalPermission(), newDto.getAppraisalPermission());
+        addAudit(rows, position, editor, "feedback360Permission", oldPermission.getFeedback360Permission(), newDto.getFeedback360Permission());
+        addAudit(rows, position, editor, "oneOnOnePermission", oldPermission.getOneOnOnePermission(), newDto.getOneOnOnePermission());
+        addAudit(rows, position, editor, "positionPermission", oldPermission.getPositionPermission(), newDto.getPositionPermission());
+        addAudit(rows, position, editor, "kpiPermission", oldPermission.getKpiPermission(), newDto.getKpiPermission());
+        addAudit(rows, position, editor, "departmentKpiPermission", oldPermission.getDepartmentKpiPermission(), newDto.getDepartmentKpiPermission());
 
         addAudit(rows, position, editor, "oneOnOneCreate", oldPermission.getOneOnOneCreate(), newDto.getOneOnOneCreate());
         addAudit(rows, position, editor, "oneOnOneDeptSelection", oldPermission.getOneOnOneDeptSelection(), newDto.getOneOnOneDeptSelection());
@@ -448,6 +507,70 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .editedAt(audit.getEditedAt())
                 .build();
     }
+
+    private void normalizeParentChildPermissions(PositionPermissionDto dto) {
+        if (dto == null) {
+            return;
+        }
+
+        boolean team = safe(dto.getTeamPermission());
+        dto.setTeamView(team);
+        dto.setTeamHistory(team);
+
+        if (!safe(dto.getOrganizationPermission())) {
+            dto.setDepartmentCrud(false);
+            dto.setDepartmentComparisonView(false);
+            dto.setEmployeeCrud(false);
+            dto.setEmployeeExcelImport(false);
+        }
+
+        if (!safe(dto.getAssessmentPermission())) {
+            dto.setAssessmentScoresView(false);
+            dto.setAssessmentFormCreate(false);
+        }
+
+        boolean appraisal = safe(dto.getAppraisalPermission());
+        dto.setAppraisalView(appraisal);
+        dto.setAppraisalReview(appraisal);
+        dto.setAppraisalApprove(appraisal);
+        dto.setAppraisalScoreInput(appraisal);
+        dto.setAppraisalSign(appraisal);
+
+        boolean feedback360 = safe(dto.getFeedback360Permission());
+        dto.setFeedbackFormCreate(feedback360);
+        dto.setFeedbackSend(feedback360);
+
+        /*
+         * Continuous Feedback is one permission.
+         */
+        dto.setContinuousFeedbackGive(safe(dto.getContinuousFeedbackView()));
+
+        boolean oneOnOne = safe(dto.getOneOnOnePermission());
+        dto.setOneOnOneCreate(oneOnOne);
+        dto.setOneOnOneDeptSelection(oneOnOne);
+        dto.setOneOnOneTeamSelection(oneOnOne);
+
+        boolean pip = safe(dto.getPipViewAll());
+        dto.setPipCreate(pip);
+        dto.setPipEdit(pip);
+
+        boolean positions = safe(dto.getPositionPermission());
+        dto.setPositionCrud(positions);
+
+        boolean kpi = safe(dto.getKpiPermission());
+        dto.setKpiView(kpi);
+        dto.setKpiCreate(kpi);
+        dto.setKpiEdit(kpi);
+
+        boolean departmentKpi = safe(dto.getDepartmentKpiPermission());
+        if (!departmentKpi) {
+            /*
+             * Department KPI sidebar permission is separate from employee KPI permission.
+             * No old field exists for this group, so keep it on the new field only.
+             */
+        }
+    }
+
 
     private void normalizeTeamAssignmentPermissions(PositionPermissionDto dto) {
         if (dto == null) {

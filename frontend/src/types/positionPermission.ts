@@ -1,4 +1,17 @@
 export interface PositionPermission {
+
+      teamPermission: boolean;
+      organizationPermission: boolean;
+      assessmentPermission: boolean;
+      assessmentScoresView: boolean;
+      assessmentFormCreate: boolean;
+      appraisalPermission: boolean;
+      feedback360Permission: boolean;
+      oneOnOnePermission: boolean;
+      positionPermission: boolean;
+      kpiPermission: boolean;
+      departmentKpiPermission: boolean;
+
   oneOnOneCreate: boolean;
   oneOnOneDeptSelection: boolean;
   oneOnOneTeamSelection: boolean;
