@@ -425,6 +425,31 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         return getEmployeeById(id);
     }
+
+    @Override
+    @Transactional
+    public EmployeeResponseDto activateEmployee(Integer id) {
+        Employee employee = employeeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
+
+        if (!Boolean.FALSE.equals(employee.getActive())) {
+            throw new BusinessValidationException("Employee is already active.");
+        }
+
+        employee.setActive(true);
+        employeeRepository.save(employee);
+
+        findLinkedUserByEmployeeOrEmail(employee).ifPresent(user -> {
+            user.setEmployeeId(employee.getId());
+            user.setActive(true);
+            user.setUpdatedAt(new Date());
+            userRepository.save(user);
+            syncUserRoleFromPosition(user, employee.getPosition());
+        });
+
+        return getEmployeeById(id);
+    }
+
     private void syncLinkedUserFromEmployee(
             Employee employee,
             Integer workingDepartmentId,

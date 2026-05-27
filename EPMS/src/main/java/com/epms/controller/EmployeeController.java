@@ -151,6 +151,17 @@ public class EmployeeController {
         return ResponseEntity.ok(GenericApiResponse.success("Employee deactivated", dto));
     }
 
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize(
+            "hasAnyRole('HR', 'ADMIN') "
+                    + "or principal.dashboard == 'HR_DASHBOARD' "
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+    )
+    public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> activateEmployee(@PathVariable Integer id) {
+        EmployeeResponseDto dto = employeeService.activateEmployee(id);
+        return ResponseEntity.ok(GenericApiResponse.success("Employee activated", dto));
+    }
+
     private EmployeeDropdownDto toDropdownDto(Employee employee) {
         EmployeeDropdownDto dto = new EmployeeDropdownDto();
 

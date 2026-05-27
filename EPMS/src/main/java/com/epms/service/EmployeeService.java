@@ -53,6 +53,8 @@ public interface EmployeeService {
 
     EmployeeResponseDto deactivateEmployee(Integer id);
 
+    EmployeeResponseDto activateEmployee(Integer id);
+
     List<EmployeeResponseDto> getMyDepartmentEmployees(boolean includeInactive);
 
     EmployeeResponseDto getMyDepartmentEmployeeById(Integer id);

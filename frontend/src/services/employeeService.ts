@@ -46,8 +46,8 @@ export interface EmployeeResponse {
   positionId?: number | null;
   positionTitle?: string | null;
   positionLevelCode?: string | null;
-    positionRoleName?: string | null;
-    dashboard?: string | null;
+  positionRoleName?: string | null;
+  dashboard?: string | null;
 
 
   userId?: number | null;
@@ -141,13 +141,13 @@ export interface EmployeeTransferTeamOption {
 const unwrap = <T>(response: { data: GenericApiResponse<T> }): T => response.data.data;
 
 export const isEmployeeActive = (emp: Pick<EmployeeResponse, 'active'>): boolean =>
-  emp.active !== false;
+    emp.active !== false;
 
 export const parseApiError = (err: unknown): string => {
   if (isAxiosError(err)) {
     const data = err.response?.data as
-      | { message?: string; validationErrors?: Record<string, string> }
-      | undefined;
+        | { message?: string; validationErrors?: Record<string, string> }
+        | undefined;
 
     if (data?.validationErrors && Object.keys(data.validationErrors).length > 0) {
       return Object.values(data.validationErrors).join(' ');
@@ -179,14 +179,14 @@ export const getAllEmployees = async (includeInactive = false): Promise<Employee
   return employees.map((employee) => ({
     ...employee,
     name:
-      employee.fullName?.trim() ||
-      `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() ||
-      `Employee #${employee.id}`,
+        employee.fullName?.trim() ||
+        `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim() ||
+        `Employee #${employee.id}`,
     department:
-      employee.workingDepartment ??
-      employee.parentDepartment ??
-      employee.currentDepartment ??
-      null,
+        employee.workingDepartment ??
+        employee.parentDepartment ??
+        employee.currentDepartment ??
+        null,
   }));
 };
 
@@ -196,25 +196,25 @@ export const getEmployee = async (id: number): Promise<EmployeeResponse> => {
 };
 
 export const previewEmployeeDepartmentTransfer = async (
-  id: number,
-  currentDepartmentId: number | null,
-  parentDepartmentId: number | null
+    id: number,
+    currentDepartmentId: number | null,
+    parentDepartmentId: number | null
 ): Promise<EmployeeDepartmentTransferPreview> => {
   const response = await api.get<GenericApiResponse<EmployeeDepartmentTransferPreview>>(
-    `/employees/${id}/department-transfer-preview`,
-    {
-      params: {
-        currentDepartmentId,
-        parentDepartmentId,
-      },
-    }
+      `/employees/${id}/department-transfer-preview`,
+      {
+        params: {
+          currentDepartmentId,
+          parentDepartmentId,
+        },
+      }
   );
 
   return unwrap(response);
 };
 
 export const createEmployee = async (
-  payload: EmployeeRequestPayload
+    payload: EmployeeRequestPayload
 ): Promise<EmployeeResponse> => {
   const body = buildJsonBody(payload);
   const response = await api.post<GenericApiResponse<EmployeeResponse>>('/employees', body);
@@ -222,8 +222,8 @@ export const createEmployee = async (
 };
 
 export const updateEmployee = async (
-  id: number,
-  payload: EmployeeRequestPayload
+    id: number,
+    payload: EmployeeRequestPayload
 ): Promise<EmployeeResponse> => {
   const body = buildJsonBody(payload);
   const response = await api.put<GenericApiResponse<EmployeeResponse>>(`/employees/${id}`, body);
@@ -232,7 +232,15 @@ export const updateEmployee = async (
 
 export const deactivateEmployee = async (id: number): Promise<EmployeeResponse> => {
   const response = await api.patch<GenericApiResponse<EmployeeResponse>>(
-    `/employees/${id}/deactivate`
+      `/employees/${id}/deactivate`
+  );
+
+  return unwrap(response);
+};
+
+export const activateEmployee = async (id: number): Promise<EmployeeResponse> => {
+  const response = await api.patch<GenericApiResponse<EmployeeResponse>>(
+      `/employees/${id}/activate`
   );
 
   return unwrap(response);
@@ -321,17 +329,17 @@ export const responseToFormDefaults = (e: EmployeeResponse) => ({
   fatherNrc: e.fatherNrc ?? '',
   positionId: e.positionId != null && e.positionId !== undefined ? String(e.positionId) : '',
   currentDepartmentId:
-    e.currentDepartmentId != null && e.currentDepartmentId !== undefined
-      ? String(e.currentDepartmentId)
-      : '',
+      e.currentDepartmentId != null && e.currentDepartmentId !== undefined
+          ? String(e.currentDepartmentId)
+          : '',
   parentDepartmentId:
-    e.parentDepartmentId != null && e.parentDepartmentId !== undefined
-      ? String(e.parentDepartmentId)
-      : '',
+      e.parentDepartmentId != null && e.parentDepartmentId !== undefined
+          ? String(e.parentDepartmentId)
+          : '',
   departmentId:
-    e.currentDepartmentId != null && e.currentDepartmentId !== undefined
-      ? String(e.currentDepartmentId)
-      : '',
+      e.currentDepartmentId != null && e.currentDepartmentId !== undefined
+          ? String(e.currentDepartmentId)
+          : '',
   createLoginAccount: true,
   sendTemporaryPasswordEmail: true,
 });
@@ -348,10 +356,10 @@ export type AccountProvisionResult = {
 };
 
 export const resendTemporaryPasswordEmail = async (
-  userId: number
+    userId: number
 ): Promise<AccountProvisionResult> => {
   const response = await api.post<GenericApiResponse<AccountProvisionResult>>(
-    `/users/${userId}/resend-temporary-password`
+      `/users/${userId}/resend-temporary-password`
   );
 
   return unwrap(response);
