@@ -6,6 +6,7 @@ import { kpiWorkflowService } from '../../../services/kpiWorkflowService';
 import { fetchDepartments, type Department } from '../../../services/departmentService';
 import type { HrEmployeeKpiRow } from '../../../types/kpiWorkflow';
 import HrEmployeeKpiModal from './HrEmployeeKpiModal';
+import { exportExcelTable } from '../../../utils/exportExcelTable';
 
 type HrKpiTab = 'finalized' | 'in_progress';
 
@@ -17,6 +18,20 @@ const formatWhen = (value: string | null) => {
 
 const linesEnteredCount = (r: HrEmployeeKpiRow) =>
   r.lines.filter((l) => l.score != null || l.actualValue != null).length;
+
+const yyyyMmDd = (value?: string | null): string | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+};
+
+const formatPeriod = (start?: string | null, end?: string | null): string => {
+  const s = yyyyMmDd(start);
+  const e = yyyyMmDd(end);
+  if (!s || !e) return '-';
+  return `${s} to ${e}`;
+};
 
 const HrEmployeeKpiListPage = () => {
   const [tab, setTab] = useState<HrKpiTab>('finalized');
@@ -101,6 +116,49 @@ const HrEmployeeKpiListPage = () => {
     cursor: 'pointer',
   });
 
+  const canExport = tab === 'finalized' && sorted.length > 0 && !loading;
+
+  const onExport = async () => {
+    try {
+      const highlightIndexes: number[] = [];
+      const numericScores = sorted
+        .map((r, idx) => ({ idx, score: r.totalWeightedScore }))
+        .filter((x): x is { idx: number; score: number } => typeof x.score === 'number' && Number.isFinite(x.score));
+
+      if (numericScores.length > 0) {
+        const max = Math.max(...numericScores.map((x) => x.score));
+        for (const x of numericScores) {
+          if (x.score === max) highlightIndexes.push(x.idx);
+        }
+      }
+
+      await exportExcelTable({
+        sheetName: 'Finalized KPI Scores',
+        tableName: 'FinalizedEmployeeKpiScores',
+        filenameBase: 'hr_finalized_employee_kpi_scores',
+        columns: [
+          { header: 'Employee Name', key: 'employeeName', width: 26 },
+          { header: 'Department', key: 'departmentName', width: 22 },
+          { header: 'Position', key: 'positionTitle', width: 22 },
+          { header: 'KPI Template', key: 'kpiTitle', width: 26 },
+          { header: 'KPI Period', key: 'kpiPeriod', width: 24 },
+          { header: 'KPI Total Weight Score', key: 'totalWeightedScore', width: 22, numFmt: '0.00' },
+        ],
+        rows: sorted.map((r) => ({
+          employeeName: r.employeeName ?? '-',
+          departmentName: r.departmentName ?? '-',
+          positionTitle: r.positionTitle ?? '-',
+          kpiTitle: r.kpiTitle ?? '-',
+          kpiPeriod: formatPeriod(r.periodStartDate, r.periodEndDate),
+          totalWeightedScore: typeof r.totalWeightedScore === 'number' ? r.totalWeightedScore : '-',
+        })),
+        highlightRowIndexes: highlightIndexes,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export Excel.');
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', maxWidth: '1100px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       <nav style={{ marginBottom: '1rem', fontSize: '.85rem', color: '#64748b' }}>
@@ -162,13 +220,46 @@ const HrEmployeeKpiListPage = () => {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.25rem' }}>
-        <button type="button" style={tabBtnStyle(tab === 'finalized')} onClick={() => setTab('finalized')}>
-          Finalized
-        </button>
-        <button type="button" style={tabBtnStyle(tab === 'in_progress')} onClick={() => setTab('in_progress')}>
-          In progress
-        </button>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '.5rem',
+          marginBottom: '1.25rem',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
+          <button type="button" style={tabBtnStyle(tab === 'finalized')} onClick={() => setTab('finalized')}>
+            Finalized
+          </button>
+          <button type="button" style={tabBtnStyle(tab === 'in_progress')} onClick={() => setTab('in_progress')}>
+            In progress
+          </button>
+        </div>
+
+        {tab === 'finalized' && (
+          <button
+            type="button"
+            onClick={() => void onExport()}
+            disabled={!canExport}
+            style={{
+              border: '1px solid #059669',
+              background: canExport ? '#059669' : '#e2e8f0',
+              color: canExport ? '#fff' : '#64748b',
+              borderRadius: '10px',
+              padding: '.5rem .85rem',
+              fontSize: '.82rem',
+              fontWeight: 700,
+              cursor: canExport ? 'pointer' : 'not-allowed',
+              opacity: canExport ? 1 : 0.85,
+            }}
+            title={!canExport ? 'No finalized rows to export.' : 'Export filtered finalized KPI scores.'}
+          >
+            Export Excel
+          </button>
+        )}
       </div>
 
       {loading && <p style={{ color: '#64748b' }}>Loading…</p>}
