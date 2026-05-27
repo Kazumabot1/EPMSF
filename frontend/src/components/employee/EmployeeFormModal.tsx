@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type SubmitEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import api from '../../services/api';
 import {
   defaultDashboardForRole,
@@ -126,8 +126,6 @@ const getRoleNameFromPosition = (position?: PositionOption | null) => {
     if (roleName) {
       return roleName;
     }
-  if (position.role && typeof position.role === 'object' && position.role.name && String(position.role.name).trim()) {
-    return String(position.role.name).trim();
   }
 
   return '';
@@ -328,7 +326,7 @@ const EmployeeFormModal = ({
     fatherNrc: form.fatherNrc.trim() || null,
   });
 
-  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const validation = validate();

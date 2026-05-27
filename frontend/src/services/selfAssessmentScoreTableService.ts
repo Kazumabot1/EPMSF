@@ -68,8 +68,10 @@ const normalizeResponse = (payload: any): SelfAssessmentScoreTableResponse => {
 
   return {
     bands: Array.isArray(data.bands)
-      ? data.bands.map(normalizeBand).sort((a, b) => a.sortOrder - b.sortOrder)
-      : [],
+        ? data.bands
+            .map(normalizeBand)
+            .sort((a: SelfAssessmentScoreBand, b: SelfAssessmentScoreBand) => a.sortOrder - b.sortOrder)
+        : [],
     audits: Array.isArray(data.audits) ? data.audits.map(normalizeAudit) : [],
     activeFormExists: Boolean(data.activeFormExists),
     activeFormCount: Number(data.activeFormCount ?? 0),
@@ -83,7 +85,7 @@ export const selfAssessmentScoreTableService = {
   },
 
   async updateTable(
-    payload: SelfAssessmentScoreTableUpdateRequest,
+      payload: SelfAssessmentScoreTableUpdateRequest,
   ): Promise<SelfAssessmentScoreTableResponse> {
     const response = await api.put('/self-assessment-score-table', payload);
     return normalizeResponse(unwrap<any>(response, {}));

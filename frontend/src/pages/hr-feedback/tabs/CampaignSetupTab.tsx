@@ -35,7 +35,6 @@ import type {
   FeedbackCampaignQuestionReview,
   FeedbackCampaignActivationReadiness,
   FeedbackCampaignScoringConfig,
-  FeedbackRelationshipType,
   FeedbackTargetEmployee,
 } from '../../../types/feedbackCampaign';
 import type {
@@ -185,7 +184,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     hasDraftEvaluatorChanges,
     assignmentsByTarget,
     evaluatorTargets,
-    selectedEvaluatorTargetId,
     setSelectedEvaluatorTargetId,
     activeEvaluatorTargetId,
     activeEvaluatorTarget,
@@ -227,7 +225,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     questionSaveDisabled,
     questionReviewReady,
     activationWarnings,
-    setupReady,
     canValidateSetup,
     canActivate,
     campaignLaunched,
