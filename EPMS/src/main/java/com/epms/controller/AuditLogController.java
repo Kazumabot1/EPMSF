@@ -378,11 +378,13 @@ public class AuditLogController {
 
         List<AuditLog> logs;
         if (normalizedEntityType != null) {
-            if (!allowedTypes.contains(normalizedEntityType)) {
+            if (!admin && !allowedTypes.contains(normalizedEntityType)) {
                 throw new UnauthorizedActionException("You are not allowed to view this audit log type.");
             }
 
             logs = auditLogService.getRecent(normalizedEntityType, entityId, effectiveUserId);
+        } else if (admin) {
+            logs = auditLogService.getRecent(null, null, effectiveUserId);
         } else {
             logs = auditLogService.getRecentForEntityTypes(allowedTypes, effectiveUserId);
         }
@@ -411,7 +413,6 @@ public class AuditLogController {
         List<AuditLogResponse> response = logs.stream()
                 .map(log -> map(log, actors))
                 .filter(row -> admin || !isAdminOrSystemRole(row.getDashboardRole()))
-                .filter(row -> !admin || isTrackedHumanActor(row.getDashboardRole()))
                 .filter(row -> normalizedAction == null || normalizeToken(row.getAction()).equals(normalizedAction))
                 .filter(row -> normalizedActorRole == null || normalizeRole(row.getDashboardRole()).equals(normalizedActorRole))
                 .filter(row -> normalizedSearch == null || searchableText(row).contains(normalizedSearch))

@@ -66,6 +66,14 @@ public class AuditLog {
     @Column(length = 500)
     private String reason;
 
+    @Column(name = "timestamp")
     @Temporal(TemporalType.TIMESTAMP)
-    private Date timestamp = new Date();
+    private Date timestamp;
+
+    @PrePersist
+    void ensureTimestamp() {
+        if (timestamp == null) {
+            timestamp = new Date();
+        }
+    }
 }

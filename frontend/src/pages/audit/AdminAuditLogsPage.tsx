@@ -37,6 +37,8 @@ const ENTITY_OPTIONS = [
   ['ONE_ON_ONE_MEETING', 'One-on-One Meeting'],
   ['POSITION_LEVEL', 'Position Level'],
   ['POSITION', 'Position'],
+  ['ROLE', 'Role'],
+  ['USER_DASHBOARD', 'User Dashboard'],
   ['KPI_TEMPLATE_FORM', 'KPI Template Form'],
   ['KPI_TEMPLATE_CYCLE', 'KPI Template Cycle'],
   ['KPI_UNIT', 'KPI Unit'],
@@ -49,9 +51,11 @@ const ENTITY_OPTIONS = [
 
 const ROLE_OPTIONS = [
   ['', 'All Roles'],
+  ['ADMIN', 'Admin'],
   ['HR', 'HR'],
   ['MANAGER', 'Manager'],
   ['DEPARTMENT_HEAD', 'Department Head'],
+  ['SYSTEM', 'System'],
 ] as const;
 
 const ACTION_OPTIONS = [
@@ -71,10 +75,12 @@ const unwrap = <T,>(payload: ApiEnvelope<T> | T, fallback: T): T => {
   return (payload as ApiEnvelope<T>).data ?? fallback;
 };
 
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+const formatDateTime = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === '') return '-';
+
+  const date = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+
   return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',

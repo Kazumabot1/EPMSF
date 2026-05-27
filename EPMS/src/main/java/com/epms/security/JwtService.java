@@ -17,7 +17,7 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    @Value("${app.jwt.secret}")
+    @Value("${app.jwt.secret:${JWT_SECRET:VGhpc0lzQVN1cGVyU2VjcmV0S2V5Rm9ySldUVG9rZW5HZW5lcmF0aW9uMTIzNDU2Nzg5MDEyMzQ1Ng==}}")
     private String jwtSecret;
 
     @Value("${app.jwt.access-token-expiration-ms:3600000}")

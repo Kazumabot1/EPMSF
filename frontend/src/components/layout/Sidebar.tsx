@@ -803,20 +803,13 @@ const departmentHeadNavItems: NavItem[] = compactItems([
   },
 ]);
 
-if (variant === 'admin') return adminNavItems;
-if (variant === 'hr') return hrNavItems;
-if (isAdmin) return adminNavItems;
-if (isHr) return hrNavItems;
-if (isDepartmentHead) return departmentHeadNavItems;
-if (isManager) return managerNavItems;
-if (isEmployee) return employeeNavItems;
-  if (variant === 'admin') return adminNavItems;
-  if (variant === 'hr') return hrNavItems;
-  if (isAdmin) return adminNavItems;
-  if (isHr) return hrNavItems;
-  if (isDepartmentHead) return departmentHeadNavItems;
-  if (isExecutive) return executiveNavItems;
-  if (isEmployee) return employeeNavItems;
+    if (variant === 'admin') return adminNavItems;
+    if (variant === 'hr') return hrNavItems;
+    if (isAdmin) return adminNavItems;
+    if (isHr) return hrNavItems;
+    if (isDepartmentHead) return departmentHeadNavItems;
+    if (isManager) return managerNavItems;
+    if (isEmployee) return employeeNavItems;
 
     return hrNavItems;
   }, [
@@ -824,12 +817,11 @@ if (isEmployee) return employeeNavItems;
     isAdmin,
     isHr,
     isDepartmentHead,
+    isManager,
     isEmployee,
     canCreatePip,
     positionPermissions,
   ]);
-
-}, [variant, isAdmin, isHr, isDepartmentHead, isExecutive, isEmployee, canCreatePip]);
   const loadUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/notifications/unread-count');
@@ -1027,38 +1019,20 @@ if (isEmployee) return employeeNavItems;
                   <>
                     <span>{item.label}</span>
                     {item.to.includes('notifications') && notificationBadge}
-<i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} hr-submenu-caret`} />                  </>
+                    <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} hr-submenu-caret`} />
+                  </>
                 )}
               </button>
 
               {!collapsed && isExpanded && (
-               <div className="hr-submenu">
-                  {item.children.map((child) => (
-                    <NavLink
-                      key={child.to}
-                      to={child.to}
-                      end={child.end}
-className={({ isActive }) => `hr-submenu-link ${isActive ? 'active' : ''}`}
-                    >
-                      <i className={child.icon} />
-                      <span>{child.label}</span>
-                    </NavLink>
-                  ))}
+                <div className="hr-submenu">
+                  {item.children.map((child) => renderSubmenuItem(child))}
                 </div>
               )}
             </div>
           );
         })}
       </nav>
-                  {!collapsed && isExpanded && (
-                      <div className="hr-submenu">
-                        {item.children.map((child) => renderSubmenuItem(child))}
-                      </div>
-                  )}
-                </div>
-            );
-          })}
-        </nav>
 
              <div className="hr-sidebar-footer">
                <button type="button" className="hr-sidebar-collapse" onClick={onToggle}>
