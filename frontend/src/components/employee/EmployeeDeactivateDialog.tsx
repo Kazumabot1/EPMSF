@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { deactivateEmployee, parseApiError, type EmployeeResponse } from '../../services/employeeService';
+import {
+  activateEmployee,
+  deactivateEmployee,
+  isEmployeeActive,
+  parseApiError,
+  type EmployeeResponse,
+} from '../../services/employeeService';
 
 type Props = {
   open: boolean;
@@ -16,16 +22,32 @@ const EmployeeDeactivateDialog = ({ open, employee, onClose, onDeactivated }: Pr
     return null;
   }
 
-  const name =
-    employee.fullName?.trim() ||
-    [employee.firstName, employee.lastName].filter(Boolean).join(' ') ||
-    `Employee #${employee.id}`;
+  const active = isEmployeeActive(employee);
+  const actionLabel = active ? 'Deactivate' : 'Activate';
+  const pendingLabel = active ? 'Deactivating…' : 'Activating…';
+  const title = active ? 'Deactivate this employee?' : 'Activate this employee?';
+  const icon = active ? 'bi-person-x' : 'bi-person-check';
+  const buttonClass = active
+      ? 'epms-emp-confirm__btn epms-emp-confirm__btn--danger'
+      : 'epms-emp-confirm__btn epms-emp-confirm__btn--success';
 
-  const runDeactivate = async () => {
+  const name =
+      employee.fullName?.trim() ||
+      [employee.firstName, employee.lastName].filter(Boolean).join(' ') ||
+      `Employee #${employee.id}`;
+
+  const runStatusChange = async () => {
     try {
       setPending(true);
-      await deactivateEmployee(employee.id);
-      toast.success('Employee deactivated');
+
+      if (active) {
+        await deactivateEmployee(employee.id);
+        toast.success('Employee deactivated');
+      } else {
+        await activateEmployee(employee.id);
+        toast.success('Employee activated');
+      }
+
       onDeactivated();
       onClose();
     } catch (e) {
@@ -36,40 +58,54 @@ const EmployeeDeactivateDialog = ({ open, employee, onClose, onDeactivated }: Pr
   };
 
   return (
-    <div className="epms-emp-modal-overlay" role="presentation" onClick={onClose}>
-      <div
-        className="epms-emp-confirm"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="emp-deact-title"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <div className="epms-emp-confirm__warn" aria-hidden>
-          <i className="bi bi-exclamation-triangle-fill" />
-        </div>
-        <h2 id="emp-deact-title" className="epms-emp-confirm__title">
-          Deactivate this employee?
-        </h2>
-        <p className="epms-emp-confirm__msg">
-          <strong className="text-slate-800">{name}</strong> will be marked inactive. This does not remove their
-          record; you can include inactive people in the list by changing the status filter.
-        </p>
-        <div className="epms-emp-confirm__actions">
-          <button type="button" className="epms-emp-confirm__btn" onClick={onClose} disabled={pending}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="epms-emp-confirm__btn epms-emp-confirm__btn--danger"
-            onClick={runDeactivate}
-            disabled={pending}
+      <div className="epms-emp-modal-overlay" role="presentation" onClick={onClose}>
+        <div
+            className="epms-emp-confirm"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="emp-status-title"
+            onClick={(ev) => ev.stopPropagation()}
+        >
+          <div
+              className={`epms-emp-confirm__warn ${
+                  active ? '' : 'epms-emp-confirm__warn--success'
+              }`}
+              aria-hidden
           >
-            <i className="bi bi-person-x" aria-hidden />
-            {pending ? 'Deactivating…' : 'Deactivate'}
-          </button>
+            <i className={`bi ${active ? 'bi-exclamation-triangle-fill' : 'bi-person-check-fill'}`} />
+          </div>
+          <h2 id="emp-status-title" className="epms-emp-confirm__title">
+            {title}
+          </h2>
+          <p className="epms-emp-confirm__msg">
+            {active ? (
+                <>
+                  <strong className="text-slate-800">{name}</strong> will be marked inactive. Their linked login account
+                  will also be disabled, but the employee record will remain available when inactive records are shown.
+                </>
+            ) : (
+                <>
+                  <strong className="text-slate-800">{name}</strong> will be marked active again. Their linked login
+                  account will also be re-enabled when one exists.
+                </>
+            )}
+          </p>
+          <div className="epms-emp-confirm__actions">
+            <button type="button" className="epms-emp-confirm__btn" onClick={onClose} disabled={pending}>
+              Cancel
+            </button>
+            <button
+                type="button"
+                className={buttonClass}
+                onClick={runStatusChange}
+                disabled={pending}
+            >
+              <i className={`bi ${icon}`} aria-hidden />
+              {pending ? pendingLabel : actionLabel}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
   );
 };
 

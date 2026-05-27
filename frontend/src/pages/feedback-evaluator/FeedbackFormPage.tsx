@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   useFeedbackAssignmentDetail,
   useSaveFeedbackDraft,
@@ -12,6 +12,25 @@ import type {
   FeedbackRatingOption,
   FeedbackRelationshipType,
 } from '../../types/feedbackEvaluator';
+import {
+  Feedback360Avatar,
+  Feedback360Banner,
+  Feedback360Button,
+  Feedback360ButtonLink,
+  Feedback360CharacterCount,
+  Feedback360EmptyState,
+  Feedback360Field,
+  Feedback360GuidanceGrid,
+  Feedback360HelpTip,
+  Feedback360Hero,
+  Feedback360InfoGrid,
+  Feedback360InfoItem,
+  Feedback360Panel,
+  Feedback360PanelHeader,
+  Feedback360Shell,
+  Feedback360StatusPill,
+  cx,
+} from '../../components/feedback360/Feedback360Ui';
 
 type FormValues = {
   assessmentDateText: string;
@@ -80,11 +99,6 @@ const getQuestionRatingBounds = (question?: FeedbackAssignmentQuestionDetail | n
   };
 };
 
-const isRatingQuestion = (question?: FeedbackAssignmentQuestionDetail | null) => {
-  const responseType = String(question?.responseType ?? 'RATING_WITH_COMMENT').trim().toUpperCase().replace(/[-\s]+/g, '_');
-  return responseType === 'RATING' || responseType === 'RATING_WITH_COMMENT' || responseType === 'RATING_ONLY';
-};
-
 const formatDateTime = (value: string | null) => {
   if (!value) return 'No deadline';
   const date = new Date(value);
@@ -118,26 +132,13 @@ const displayValue = (value?: string | number | null) => {
   return text || '—';
 };
 
-const initials = (name?: string | null) =>
-    (name || 'Employee')
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('') || 'E';
+const questionLabel = (index: number) => `Question ${index + 1}`;
 
 const feedbackHomePathFor = (pathname: string) => {
   if (pathname.startsWith('/manager/')) return '/manager/feedback';
   if (pathname.startsWith('/department-head/')) return '/department-head/feedback';
   return '/employee/feedback';
 };
-
-const InfoField = ({ label, value }: { label: string; value?: string | number | null }) => (
-    <label className="feedback-form-info-field">
-      <span>{label}</span>
-      <input value={displayValue(value)} readOnly />
-    </label>
-);
 
 const EmployeeInfoPanel = ({
                              title,
@@ -150,22 +151,24 @@ const EmployeeInfoPanel = ({
   fallbackName?: string | null;
   roleLabel?: string;
 }) => (
-    <section className="feedback-form-info-card">
-      <div className="feedback-form-info-card-head">
-        <div className="feedback-form-avatar">{initials(person?.employeeName ?? fallbackName)}</div>
-        <div>
-          <h3>{title}</h3>
-          <p>{displayValue(person?.employeeName ?? fallbackName)}</p>
+    <Feedback360Panel>
+      <div className="f360-person-card">
+        <div className="f360-person-head">
+          <Feedback360Avatar name={person?.employeeName ?? fallbackName} />
+          <div>
+            <h3>{title}</h3>
+            <p>{displayValue(person?.employeeName ?? fallbackName)}</p>
+          </div>
         </div>
+        <Feedback360InfoGrid columns={2}>
+          <Feedback360InfoItem label="Employee name" value={displayValue(person?.employeeName ?? fallbackName)} />
+          <Feedback360InfoItem label="Employee ID" value={displayValue(person?.employeeCode ?? person?.employeeId)} />
+          <Feedback360InfoItem label="Current position" value={displayValue(person?.positionName)} />
+          <Feedback360InfoItem label="Department" value={displayValue(person?.departmentName)} />
+          {roleLabel ? <Feedback360InfoItem label="Role" value={roleLabel} /> : null}
+        </Feedback360InfoGrid>
       </div>
-      <div className="feedback-form-info-grid">
-        <InfoField label="Employee name" value={person?.employeeName ?? fallbackName} />
-        <InfoField label="Employee ID" value={person?.employeeCode ?? person?.employeeId} />
-        <InfoField label="Current position" value={person?.positionName} />
-        <InfoField label="Department" value={person?.departmentName} />
-        {roleLabel ? <InfoField label="Role" value={roleLabel} /> : null}
-      </div>
-    </section>
+    </Feedback360Panel>
 );
 
 const FeedbackFormPage = () => {
@@ -205,8 +208,8 @@ const FeedbackFormPage = () => {
     const groupMap = new Map<string, FeedbackQuestionGroup>();
 
     flatQuestions.forEach((question, responseIndex) => {
-      const rawCode = question.competencyCode || question.sectionTitle || `section-${question.sectionId}`;
-      const code = rawCode.trim() || `section-${question.sectionId}`;
+      const rawCode = question.competencyCode || question.sectionTitle || `competency-${question.sectionId}`;
+      const code = rawCode.trim() || `competency-${question.sectionId}`;
       const label = question.sectionTitle || question.competencyCode || 'Competency';
       let group = groupMap.get(code);
       if (!group) {
@@ -244,42 +247,40 @@ const FeedbackFormPage = () => {
   const watchedComments = watch('comments');
   const watchedResponses = watch('responses');
 
-  const requiredQuestions = useMemo(() => flatQuestions.filter((question) => question.required), [flatQuestions]);
   const answeredRequiredCount = useMemo(
       () =>
-          flatQuestions.filter((question, index) => {
-            if (!question.required) return false;
-            const ratingComplete = !isRatingQuestion(question) || Boolean(watchedResponses?.[index]?.ratingValue?.trim());
+          flatQuestions.filter((_question, index) => {
+            const ratingComplete = Boolean(watchedResponses?.[index]?.ratingValue?.trim());
             const length = normalizedLength(watchedResponses?.[index]?.comment);
             const commentComplete = length >= MIN_REQUIRED_COMMENT_LENGTH && length <= MAX_REQUIRED_COMMENT_LENGTH;
             return ratingComplete && commentComplete;
           }).length,
       [flatQuestions, watchedResponses],
   );
-  const requiredCount = requiredQuestions.length;
+  const requiredCount = flatQuestions.length;
   const completionPercent = requiredCount === 0 ? 100 : Math.min(100, Math.round((answeredRequiredCount / requiredCount) * 100));
   const additionalCommentsLength = normalizedLength(watchedComments);
   const additionalCommentsTooLong = additionalCommentsLength > MAX_ADDITIONAL_COMMENT_LENGTH;
-  const hasMissingRequired = requiredCount > 0 && answeredRequiredCount < requiredCount;
 
   const attentionItems = useMemo(() =>
-          flatQuestions.flatMap((question, index) => {
-            if (!question.required) return [];
+          flatQuestions.flatMap((_question, index) => {
             const response = watchedResponses?.[index];
+            const label = questionLabel(index);
             const items: Array<{ index: number; label: string; message: string }> = [];
-            if (isRatingQuestion(question) && !response?.ratingValue?.trim()) {
-              items.push({ index, label: question.sectionTitle || `Question ${index + 1}`, message: 'Rating is required.' });
+            if (!response?.ratingValue?.trim()) {
+              items.push({ index, label, message: 'Rating is required.' });
             }
             const length = normalizedLength(response?.comment);
             if (length < MIN_REQUIRED_COMMENT_LENGTH) {
-              items.push({ index, label: question.sectionTitle || `Question ${index + 1}`, message: `Comment needs at least ${MIN_REQUIRED_COMMENT_LENGTH} characters.` });
+              items.push({ index, label, message: `Comment needs at least ${MIN_REQUIRED_COMMENT_LENGTH} characters.` });
             } else if (length > MAX_REQUIRED_COMMENT_LENGTH) {
-              items.push({ index, label: question.sectionTitle || `Question ${index + 1}`, message: `Comment must be under ${MAX_REQUIRED_COMMENT_LENGTH} characters.` });
+              items.push({ index, label, message: `Comment must be ${MAX_REQUIRED_COMMENT_LENGTH} characters or fewer.` });
             }
             return items;
           }),
       [flatQuestions, watchedResponses],
   );
+  const attentionQuestionCount = useMemo(() => new Set(attentionItems.map((item) => item.index)).size, [attentionItems]);
 
   const scrollToQuestion = (index: number) => {
     document.getElementById(`feedback-question-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -370,57 +371,52 @@ const FeedbackFormPage = () => {
   const validateResponsesForSubmit = (values: FormValues) => {
     clearErrors();
     let hasClientError = false;
+    let firstInvalidIndex: number | null = null;
     const responses = values.responses
         .map((response, index) => {
           const question = flatQuestions[index];
           if (!question) return null;
           const rawValue = response.ratingValue.trim();
-          const requiresRating = isRatingQuestion(question);
 
-          if (question.required && requiresRating && rawValue.length === 0) {
-            setError(`responses.${index}.ratingValue`, { type: 'required', message: 'A rating is required for this question.' });
+          if (rawValue.length === 0) {
+            setError(`responses.${index}.ratingValue`, { type: 'required', message: `${questionLabel(index)}: Rating is required.` });
             hasClientError = true;
+            firstInvalidIndex ??= index;
             return null;
           }
 
           const responseCommentLength = normalizedLength(response.comment);
-          if (question.required && responseCommentLength < MIN_REQUIRED_COMMENT_LENGTH) {
-            setError(`responses.${index}.comment`, { type: 'required', message: `Comment must be at least ${MIN_REQUIRED_COMMENT_LENGTH} characters.` });
+          if (responseCommentLength < MIN_REQUIRED_COMMENT_LENGTH) {
+            setError(`responses.${index}.comment`, { type: 'required', message: `${questionLabel(index)}: Comment needs at least ${MIN_REQUIRED_COMMENT_LENGTH} characters.` });
             hasClientError = true;
+            firstInvalidIndex ??= index;
             return null;
           }
           if (responseCommentLength > MAX_REQUIRED_COMMENT_LENGTH) {
-            setError(`responses.${index}.comment`, { type: 'maxLength', message: `Comment must be ${MAX_REQUIRED_COMMENT_LENGTH} characters or fewer.` });
+            setError(`responses.${index}.comment`, { type: 'maxLength', message: `${questionLabel(index)}: Comment must be ${MAX_REQUIRED_COMMENT_LENGTH} characters or fewer.` });
             hasClientError = true;
+            firstInvalidIndex ??= index;
             return null;
           }
 
-          if (!requiresRating && !response.comment.trim()) {
+          const numericValue = Number(rawValue);
+          const bounds = getQuestionRatingBounds(question);
+          if (!Number.isFinite(numericValue) || numericValue < bounds.min || numericValue > bounds.max) {
+            setError(`responses.${index}.ratingValue`, { type: 'validate', message: `${questionLabel(index)}: Rating must be between ${bounds.min} and ${bounds.max}.` });
+            hasClientError = true;
+            firstInvalidIndex ??= index;
             return null;
-          }
-          if (requiresRating && rawValue.length === 0) {
-            return null;
-          }
-
-          const numericValue = rawValue ? Number(rawValue) : null;
-          if (requiresRating && numericValue != null) {
-            const bounds = getQuestionRatingBounds(question);
-            if (!Number.isFinite(numericValue) || numericValue < bounds.min || numericValue > bounds.max) {
-              setError(`responses.${index}.ratingValue`, { type: 'validate', message: `Ratings must be between ${bounds.min} and ${bounds.max}.` });
-              hasClientError = true;
-              return null;
-            }
           }
 
           return {
             assignmentQuestionId: response.assignmentQuestionId,
             questionId: response.questionId,
-            ratingValue: requiresRating ? numericValue : null,
-            comment: response.comment.trim() || undefined,
+            ratingValue: numericValue,
+            comment: response.comment.trim(),
           };
         })
         .filter((item): item is NonNullable<typeof item> => item != null);
-    return { hasClientError, responses };
+    return { hasClientError, firstInvalidIndex, responses };
   };
 
   const handleSaveDraft = async () => {
@@ -448,8 +444,14 @@ const FeedbackFormPage = () => {
   const onSubmit = handleSubmit(async (values) => {
     if (!assignment) return;
     setDraftSavedMessage('');
-    const { hasClientError, responses } = validateResponsesForSubmit(values);
-    if (hasClientError || normalizedLength(values.comments) > MAX_ADDITIONAL_COMMENT_LENGTH) return;
+    const { hasClientError, firstInvalidIndex, responses } = validateResponsesForSubmit(values);
+    if (hasClientError) {
+      if (firstInvalidIndex != null) {
+        window.setTimeout(() => scrollToQuestion(firstInvalidIndex), 0);
+      }
+      return;
+    }
+    if (normalizedLength(values.comments) > MAX_ADDITIONAL_COMMENT_LENGTH) return;
 
     const confirmed = window.confirm('Submit final feedback? After final submission, you will not be able to edit this response.');
     if (!confirmed) return;
@@ -470,9 +472,15 @@ const FeedbackFormPage = () => {
 
   const additionalCommentsRegistration = register('comments');
 
-  if (assignmentQuery.isLoading) return <div className="feedback-evaluator-empty">Loading feedback assignment...</div>;
-  if (assignmentQuery.error instanceof Error) return <div className="feedback-evaluator-banner error">{assignmentQuery.error.message}</div>;
-  if (!assignment) return <div className="feedback-evaluator-empty">Feedback assignment not found.</div>;
+  if (assignmentQuery.isLoading) {
+    return <Feedback360Shell><Feedback360EmptyState title="Loading feedback assignment..." /></Feedback360Shell>;
+  }
+  if (assignmentQuery.error instanceof Error) {
+    return <Feedback360Shell><Feedback360Banner tone="danger">{assignmentQuery.error.message}</Feedback360Banner></Feedback360Shell>;
+  }
+  if (!assignment) {
+    return <Feedback360Shell><Feedback360EmptyState title="Feedback assignment not found." /></Feedback360Shell>;
+  }
 
   const draftSaving = saveDraftMutation.isPending;
   const submitting = submitMutation.isPending;
@@ -489,171 +497,181 @@ const FeedbackFormPage = () => {
                   : assignment.status === 'IN_PROGRESS' ? 'Draft saved previously' : 'Draft not saved yet';
 
   return (
-      <div className="feedback-form-page-clean">
-        <section className="feedback-form-hero-clean">
-          <div className="feedback-form-title-center">
-            <p className="feedback-form-company-title">ACE Data Systems Ltd.,</p>
-            <h1>360° Feedback Form</h1>
-            <span>{assignment.campaignName} · {roleLabel}</span>
-          </div>
-          <Link className="feedback-evaluator-secondary" to={feedbackHomePath}>Back to feedback</Link>
+      <Feedback360Shell>
+        <Feedback360Hero
+            eyebrow="Rating 1–5 + required comment"
+            title="360° Feedback Form"
+            description={`${assignment.campaignName} · ${roleLabel}`}
+            action={<Feedback360ButtonLink to={feedbackHomePath} variant="secondary">Back to feedback</Feedback360ButtonLink>}
+            aside={(
+                <>
+                  <span>Required progress</span>
+                  <strong>{answeredRequiredCount}/{requiredCount} questions completed</strong>
+                  <p>{attentionQuestionCount > 0 ? `${attentionQuestionCount} question${attentionQuestionCount === 1 ? '' : 's'} still need attention.` : 'Ready for final submission when you are.'}</p>
+                </>
+            )}
+        />
+
+        <section className="f360-status-strip">
+          <Feedback360InfoItem label="Deadline" value={formatDateTime(assignment.dueAt)} />
+          <Feedback360InfoItem label="Required progress" value={`${answeredRequiredCount}/${requiredCount}`} />
+          <Feedback360InfoItem label="Completion" value={`${completionPercent}%`} />
+          <Feedback360InfoItem label="Status" value={assignment.status.replace('_', ' ')} />
         </section>
 
-        <section className="feedback-form-status-strip-clean">
-          <div>
-            <span>Deadline</span>
-            <strong>{formatDateTime(assignment.dueAt)}</strong>
-          </div>
-          <div>
-            <span>Required progress</span>
-            <strong>{answeredRequiredCount}/{requiredCount || flatQuestions.length}</strong>
-          </div>
-          <div>
-            <span>Completion</span>
-            <strong>{completionPercent}%</strong>
-          </div>
-          <div>
-            <span>Status</span>
-            <strong>{assignment.status.replace('_', ' ')}</strong>
-          </div>
-        </section>
+        {assignment.lifecycleMessage ? <Feedback360Banner tone={assignment.canSubmit ? 'info' : 'warning'}>{assignment.lifecycleMessage}</Feedback360Banner> : null}
+        {assignment.autoSubmitNotice ? <Feedback360Banner tone="info">{assignment.autoSubmitNotice}</Feedback360Banner> : null}
+        {draftSavedMessage ? <Feedback360Banner tone="success">{draftSavedMessage}</Feedback360Banner> : null}
 
-        {assignment.lifecycleMessage ? <div className={`feedback-evaluator-banner ${assignment.canSubmit ? 'info' : 'warning'}`}>{assignment.lifecycleMessage}</div> : null}
-        {assignment.autoSubmitNotice ? <div className="feedback-evaluator-banner info">{assignment.autoSubmitNotice}</div> : null}
-        {draftSavedMessage ? <div className="feedback-evaluator-banner success">{draftSavedMessage}</div> : null}
+        <Feedback360GuidanceGrid
+            items={[
+              {
+                title: 'Privacy note',
+                body: 'Your feedback will be used in aggregated 360 results. Peer and direct-report feedback may be hidden when the confidentiality threshold is not met.',
+                tone: 'info',
+              },
+              {
+                title: 'Comment guidance',
+                body: 'Use specific examples. Avoid personal, insulting, or inappropriate comments.',
+                tone: 'success',
+              },
+            ]}
+        />
+
         {attentionItems.length > 0 && assignment.canSubmit ? (
-            <section className="feedback-warm-attention-card">
-              <div>
-                <strong>{attentionItems.length} item{attentionItems.length === 1 ? '' : 's'} need attention before submitting.</strong>
-                <p>Comments must be {MIN_REQUIRED_COMMENT_LENGTH}–{MAX_REQUIRED_COMMENT_LENGTH} characters. Select an item to jump to it.</p>
-              </div>
-              <div className="feedback-warm-attention-list">
-                {attentionItems.slice(0, 6).map((item, itemIndex) => (
+            <Feedback360Panel>
+              <Feedback360PanelHeader
+                  compact
+                  eyebrow="Needs attention"
+                  title={`${attentionQuestionCount} question${attentionQuestionCount === 1 ? '' : 's'} still need attention before submitting`}
+                  description={`Every question needs a rating and a supporting comment of ${MIN_REQUIRED_COMMENT_LENGTH}–${MAX_REQUIRED_COMMENT_LENGTH} characters. Select an item to jump to it.`}
+              />
+              <div className="f360-attention-list">
+                {attentionItems.slice(0, 8).map((item, itemIndex) => (
                     <button type="button" key={`${item.index}-${item.message}-${itemIndex}`} onClick={() => scrollToQuestion(item.index)}>
                       <span>{item.label}</span>
                       <em>{item.message}</em>
                     </button>
                 ))}
-                {attentionItems.length > 6 ? <small>+{attentionItems.length - 6} more items</small> : null}
+                {attentionItems.length > 8 ? <small>+{attentionItems.length - 8} more items</small> : null}
               </div>
-            </section>
+            </Feedback360Panel>
         ) : null}
-        {additionalCommentsTooLong ? <div className="feedback-evaluator-banner warning">Additional comments must be {MAX_ADDITIONAL_COMMENT_LENGTH} characters or fewer.</div> : null}
-        {saveDraftMutation.error instanceof Error ? <div className="feedback-evaluator-banner error">{saveDraftMutation.error.message}</div> : null}
-        {submitMutation.error instanceof Error ? <div className="feedback-evaluator-banner error">{submitMutation.error.message}</div> : null}
+        {additionalCommentsTooLong ? <Feedback360Banner tone="warning">Additional comments must be {MAX_ADDITIONAL_COMMENT_LENGTH} characters or fewer.</Feedback360Banner> : null}
+        {saveDraftMutation.error instanceof Error ? <Feedback360Banner tone="danger">{saveDraftMutation.error.message}</Feedback360Banner> : null}
+        {submitMutation.error instanceof Error ? <Feedback360Banner tone="danger">{submitMutation.error.message}</Feedback360Banner> : null}
 
-        <form className="feedback-form-clean-stack" onSubmit={onSubmit}>
-          <div className="feedback-form-info-layout">
-            <EmployeeInfoPanel title="Target employee information" person={assignment.target} fallbackName={assignment.targetEmployeeName} />
-            {!isSelfFeedback ? (
-                <EmployeeInfoPanel title="Evaluator information" person={assignment.evaluator} roleLabel={roleLabel} />
-            ) : null}
+        <form className="f360-form-grid" onSubmit={onSubmit}>
+          <div className="f360-person-grid">
+            <EmployeeInfoPanel title="Employee receiving feedback" person={assignment.target} fallbackName={assignment.targetEmployeeName} />
+            {isSelfFeedback ? null : <EmployeeInfoPanel title="Evaluator" person={assignment.evaluator} roleLabel={roleLabel} />}
           </div>
 
-          <section className="feedback-form-info-card">
-            <div className="feedback-form-info-card-head no-avatar">
-              <div>
-                <h3>Evaluation dates</h3>
-                <p>Assessment Date and Effective Date are kept as text until the business rule is finalized.</p>
-              </div>
-            </div>
-            <div className="feedback-form-info-grid two">
-              <label className="feedback-form-info-field editable">
-                <span>Assessment Date</span>
+          <Feedback360Panel>
+            <Feedback360PanelHeader
+                compact
+                title="Assessment details"
+                description="Assessment Date and Effective Date are kept as text until the business rule is finalized."
+            />
+            <Feedback360InfoGrid columns={2}>
+              <Feedback360Field label="Assessment Date">
                 <input disabled={!assignment.canSubmit || submitting} placeholder="Enter assessment date" {...register('assessmentDateText')} />
-              </label>
-              <label className="feedback-form-info-field editable">
-                <span>Effective Date</span>
+              </Feedback360Field>
+              <Feedback360Field label="Effective Date">
                 <input disabled={!assignment.canSubmit || submitting} placeholder="Enter effective date" {...register('effectiveDateText')} />
-              </label>
-            </div>
-          </section>
+              </Feedback360Field>
+            </Feedback360InfoGrid>
+          </Feedback360Panel>
 
-          <section className="feedback-form-question-section-clean">
-            <div className="feedback-form-section-head-clean">
-              <div>
-                <h2>Evaluation questions</h2>
-                <p>Choose a rating, then add a clear supporting comment for each question.</p>
-              </div>
-            </div>
-
-            <div className="feedback-form-question-list-preview">
+          <Feedback360Panel>
+            <Feedback360PanelHeader
+                compact
+                title="Evaluation questions"
+                description="Choose a rating, then add a clear supporting comment for each question."
+            />
+            <div className="f360-section-grid">
               {groupedQuestions.map((group) => (
-                  <section key={group.code} className="feedback-preview-competency-section">
+                  <section key={group.code} className="f360-competency-section">
                     <header>
                       <div>
-                        <span>{group.questions.length}</span>
-                        <h4>{group.label}</h4>
+                        <h3>{group.label}</h3>
+                        <p>{group.questions.length} rating question{group.questions.length === 1 ? '' : 's'}</p>
                       </div>
+                      <Feedback360StatusPill tone="brand">Competency</Feedback360StatusPill>
                     </header>
-                    <div className="feedback-preview-question-stack">
+                    <div className="f360-question-stack">
                       {group.questions.map((question) => {
                         const index = question.responseIndex;
                         const selectedRating = watchedResponses?.[index]?.ratingValue ?? '';
                         const ratingOptions = getQuestionRatingOptions(question);
                         const responseCommentRegistration = register(`responses.${index}.comment`);
-                        const requiresRating = isRatingQuestion(question);
                         const commentLength = normalizedLength(watchedResponses?.[index]?.comment);
-                        const commentTooShort = question.required && commentLength > 0 && commentLength < MIN_REQUIRED_COMMENT_LENGTH;
+                        const commentTooShort = commentLength > 0 && commentLength < MIN_REQUIRED_COMMENT_LENGTH;
                         const commentTooLong = commentLength > MAX_REQUIRED_COMMENT_LENGTH;
+                        const questionHasError = Boolean(errors.responses?.[index]?.comment || errors.responses?.[index]?.ratingValue);
                         return (
-                            <article id={`feedback-question-${index}`} key={question.id} className={`feedback-preview-question-card ${errors.responses?.[index]?.comment || errors.responses?.[index]?.ratingValue ? 'has-error' : ''}`}>
-                              <div className="feedback-preview-question-index">{index + 1}</div>
-                              <div className="feedback-preview-question-body">
-                                <div className="feedback-preview-question-meta">
-                                  {question.questionCode ? <span>{question.questionCode}</span> : null}
-                                  <em>Rating 1–5 + Required comment</em>
+                            <article id={`feedback-question-${index}`} key={question.id} className={cx('f360-question-card', questionHasError && 'has-error')}>
+                              <div className="f360-question-index">{index + 1}</div>
+                              <div className="f360-question-body">
+                                <div className="f360-question-topline">
+                                  <div className="f360-question-meta">
+                                    {question.questionCode ? <Feedback360StatusPill>{question.questionCode}</Feedback360StatusPill> : null}
+                                    <Feedback360StatusPill tone="success">Rating 1–5 + required comment</Feedback360StatusPill>
+                                  </div>
+                                  {normalizedLength(question.helpText) > 0 ? (
+                                      <Feedback360HelpTip>{question.helpText}</Feedback360HelpTip>
+                                  ) : null}
                                 </div>
-                                <p>{question.questionText}</p>
+                                <p className="f360-question-text">{question.questionText}</p>
 
                                 <input type="hidden" {...register(`responses.${index}.assignmentQuestionId`, { value: question.assignmentQuestionId ?? question.id, valueAsNumber: true })} />
                                 <input type="hidden" {...register(`responses.${index}.questionId`, { value: question.sourceQuestionId ?? question.id, valueAsNumber: true })} />
 
-                                {requiresRating ? (
-                                    <div className="feedback-preview-rating-block">
-                                      <div className="feedback-preview-response-row" role="radiogroup" aria-label={`Rating for question ${index + 1}`}>
-                                        {ratingOptions.map((option) => {
-                                          const isSelected = selectedRating === String(option.value);
-                                          return (
-                                              <button
-                                                  key={option.value}
-                                                  type="button"
-                                                  disabled={!assignment.canSubmit || submitting}
-                                                  className={isSelected ? 'selected' : ''}
-                                                  onClick={() => {
-                                                    setValue(`responses.${index}.ratingValue`, String(option.value), { shouldDirty: true, shouldValidate: true });
-                                                    clearErrors(`responses.${index}.ratingValue`);
-                                                    setDraftSavedMessage('');
-                                                  }}
-                                                  aria-pressed={isSelected}
-                                              >
-                                                {option.value}
-                                              </button>
-                                          );
-                                        })}
-                                      </div>
-                                      <input type="hidden" {...register(`responses.${index}.ratingValue`)} />
-                                      {errors.responses?.[index]?.ratingValue ? <small className="feedback-evaluator-error">{errors.responses[index]?.ratingValue?.message}</small> : null}
-                                    </div>
-                                ) : null}
+                                <div className="f360-rating-row" role="radiogroup" aria-label={`Rating for question ${index + 1}`}>
+                                  {ratingOptions.map((option) => {
+                                    const isSelected = selectedRating === String(option.value);
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            disabled={!assignment.canSubmit || submitting}
+                                            className={isSelected ? 'selected' : ''}
+                                            onClick={() => {
+                                              setValue(`responses.${index}.ratingValue`, String(option.value), { shouldDirty: true, shouldValidate: true });
+                                              clearErrors(`responses.${index}.ratingValue`);
+                                              setDraftSavedMessage('');
+                                            }}
+                                            aria-pressed={isSelected}
+                                            title={option.label}
+                                        >
+                                          {option.value}
+                                        </button>
+                                    );
+                                  })}
+                                </div>
+                                <input type="hidden" {...register(`responses.${index}.ratingValue`)} />
+                                {errors.responses?.[index]?.ratingValue ? <small className="f360-error">{errors.responses[index]?.ratingValue?.message}</small> : null}
 
-                                <label className="feedback-preview-comment-block">
-                                  <span>Comment {question.required ? <em>*</em> : null}</span>
-                                  <textarea
-                                      disabled={!assignment.canSubmit || submitting}
-                                      {...responseCommentRegistration}
-                                      maxLength={MAX_REQUIRED_COMMENT_LENGTH + 100}
-                                      placeholder="Share a specific example, observed behavior, or impact."
-                                      onChange={(event) => {
-                                        responseCommentRegistration.onChange(event);
-                                        setDraftSavedMessage('');
-                                      }}
+                                <Feedback360Field label={<span>Comment <em>*</em></span>}>
+                            <textarea
+                                disabled={!assignment.canSubmit || submitting}
+                                {...responseCommentRegistration}
+                                maxLength={MAX_REQUIRED_COMMENT_LENGTH + 100}
+                                placeholder="Share a specific example, observed behavior, or impact."
+                                onChange={(event) => {
+                                  responseCommentRegistration.onChange(event);
+                                  setDraftSavedMessage('');
+                                }}
+                            />
+                                  <Feedback360CharacterCount
+                                      current={commentLength}
+                                      max={MAX_REQUIRED_COMMENT_LENGTH}
+                                      min={MIN_REQUIRED_COMMENT_LENGTH}
+                                      invalid={commentTooShort || commentTooLong}
+                                      valid={commentLength >= MIN_REQUIRED_COMMENT_LENGTH && !commentTooLong}
                                   />
-                                  <small className={`feedback-warm-char-count ${commentTooShort || commentTooLong ? 'invalid' : commentLength >= MIN_REQUIRED_COMMENT_LENGTH ? 'valid' : ''}`}>
-                                    {commentLength}/{MAX_REQUIRED_COMMENT_LENGTH} characters · minimum {MIN_REQUIRED_COMMENT_LENGTH}
-                                  </small>
-                                  {errors.responses?.[index]?.comment ? <small className="feedback-evaluator-error">{errors.responses[index]?.comment?.message}</small> : null}
-                                </label>
+                                  {errors.responses?.[index]?.comment ? <small className="f360-error">{errors.responses[index]?.comment?.message}</small> : null}
+                                </Feedback360Field>
                               </div>
                             </article>
                         );
@@ -662,10 +680,10 @@ const FeedbackFormPage = () => {
                   </section>
               ))}
             </div>
-          </section>
+          </Feedback360Panel>
 
-          <label className="feedback-additional-comments-card">
-            <span>Additional comments</span>
+          <Feedback360Panel>
+            <Feedback360Field label="Additional comments">
             <textarea
                 disabled={!assignment.canSubmit || submitting}
                 {...additionalCommentsRegistration}
@@ -676,39 +694,41 @@ const FeedbackFormPage = () => {
                   setDraftSavedMessage('');
                 }}
             />
-            <small className={`feedback-warm-char-count ${additionalCommentsTooLong ? 'invalid' : ''}`}>{additionalCommentsLength}/{MAX_ADDITIONAL_COMMENT_LENGTH} characters · optional</small>
-          </label>
+              <Feedback360CharacterCount current={additionalCommentsLength} max={MAX_ADDITIONAL_COMMENT_LENGTH} optional invalid={additionalCommentsTooLong} />
+            </Feedback360Field>
+          </Feedback360Panel>
 
-          <section className="feedback-score-explanation-card">
-            <div>
-              <h3>Score explanation</h3>
-              <p>Scores are summarized after submission using the campaign scoring settings. The formula is intentionally not shown on the evaluator form.</p>
-            </div>
-            <div className="feedback-score-explanation-grid">
+          <Feedback360Panel>
+            <Feedback360PanelHeader
+                compact
+                title="Score explanation"
+                description="Scores are summarized after submission using the campaign scoring settings. The formula is intentionally not shown on the evaluator form."
+            />
+            <div className="f360-score-grid">
               {SCORE_EXPLANATION.map((item) => (
-                  <div key={item.range}>
-                    <strong>{item.range}</strong>
-                    <span>{item.label}</span>
+                  <div className="f360-score-cell" key={item.range}>
+                    <span>{item.range}</span>
+                    <strong>{item.label}</strong>
                     <small>{item.description}</small>
                   </div>
               ))}
             </div>
-          </section>
+          </Feedback360Panel>
 
-          <div className="feedback-form-sticky-actions feedback-form-actions-clean">
+          <div className="f360-sticky-actions">
             <div>
               <span>{autoSaveText}</span>
-              {attentionItems.length > 0 ? <small>{attentionItems.length} item{attentionItems.length === 1 ? '' : 's'} need attention before submitting</small> : isDirty && assignment.canSubmit ? <small>Unsaved changes detected</small> : <small>Ready when you are</small>}
+              {attentionQuestionCount > 0 ? <small>{attentionQuestionCount} question{attentionQuestionCount === 1 ? '' : 's'} need attention before submitting</small> : isDirty && assignment.canSubmit ? <small>Unsaved changes detected</small> : <small>Ready when you are</small>}
             </div>
-            <button className="feedback-evaluator-secondary solid" disabled={!assignment.canSubmit || actionBusy} type="button" onClick={handleSaveDraft}>
+            <Feedback360Button variant="secondary" disabled={!assignment.canSubmit || actionBusy} type="button" onClick={handleSaveDraft}>
               {draftSaving ? 'Saving draft...' : 'Save draft'}
-            </button>
-            <button className="feedback-evaluator-primary" disabled={!assignment.canSubmit || actionBusy || hasMissingRequired || additionalCommentsTooLong} type="submit">
+            </Feedback360Button>
+            <Feedback360Button disabled={!assignment.canSubmit || actionBusy || additionalCommentsTooLong} type="submit">
               {submitting ? 'Submitting feedback...' : 'Submit final feedback'}
-            </button>
+            </Feedback360Button>
           </div>
         </form>
-      </div>
+      </Feedback360Shell>
   );
 };
 

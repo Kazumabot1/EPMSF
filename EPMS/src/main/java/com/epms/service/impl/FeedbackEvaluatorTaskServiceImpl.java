@@ -44,7 +44,10 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskService {
 
+    private static final String RESPONSE_RATING_WITH_COMMENT = "RATING_WITH_COMMENT";
+    private static final String SCORING_SCORED = "SCORED";
     private static final int MIN_REQUIRED_COMMENT_LENGTH = 10;
+    private static final int MAX_REQUIRED_COMMENT_LENGTH = 1000;
 
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackResponseRepository feedbackResponseRepository;
@@ -76,16 +79,13 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                     List<FeedbackAssignmentQuestion> questions = assignmentQuestionSnapshotService.findOrCreateAssignmentQuestions(assignment);
                     Map<Long, FeedbackResponseItem> existingItems = mapExistingItemsByAssignmentQuestion(response, questions);
                     int totalQuestionCount = questions.size();
-                    int requiredQuestionCount = (int) questions.stream()
-                            .filter(question -> Boolean.TRUE.equals(question.getRequired()))
-                            .count();
-                    int answeredQuestionCount = (int) existingItems.values().stream()
-                            .filter(item -> item.getRatingValue() != null)
-                            .count();
-                    int answeredRequiredQuestionCount = countCompleteRequiredQuestions(questions, existingItems);
+                    int requiredQuestionCount = totalQuestionCount;
+                    int answeredRequiredQuestionCount = countCompleteRatingCommentQuestions(questions, existingItems);
+                    int answeredQuestionCount = answeredRequiredQuestionCount;
                     int completionPercent = calculateCompletionPercent(requiredQuestionCount, answeredRequiredQuestionCount);
                     boolean submittedLocked = response != null && response.getSubmittedAt() != null;
                     boolean finalSubmissionReady = !submittedLocked
+                            && requiredQuestionCount > 0
                             && canSubmit(assignment, response)
                             && answeredRequiredQuestionCount >= requiredQuestionCount;
                     Long targetEmployeeId = assignment.getFeedbackRequest().getTargetEmployeeId();
@@ -135,16 +135,13 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         Map<Long, FeedbackResponseItem> existingItems = mapExistingItemsByAssignmentQuestion(response, questions);
 
         int totalQuestionCount = questions.size();
-        int requiredQuestionCount = (int) questions.stream()
-                .filter(question -> Boolean.TRUE.equals(question.getRequired()))
-                .count();
-        int answeredQuestionCount = (int) existingItems.values().stream()
-                .filter(item -> item.getRatingValue() != null)
-                .count();
-        int answeredRequiredQuestionCount = countCompleteRequiredQuestions(questions, existingItems);
+        int requiredQuestionCount = totalQuestionCount;
+        int answeredRequiredQuestionCount = countCompleteRatingCommentQuestions(questions, existingItems);
+        int answeredQuestionCount = answeredRequiredQuestionCount;
         int completionPercent = calculateCompletionPercent(requiredQuestionCount, answeredRequiredQuestionCount);
         boolean submittedLocked = response != null && response.getSubmittedAt() != null;
         boolean finalSubmissionReady = !submittedLocked
+                && requiredQuestionCount > 0
                 && canSubmit(assignment, response)
                 && answeredRequiredQuestionCount >= requiredQuestionCount;
 
@@ -243,17 +240,18 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         return null;
     }
 
-    private int countCompleteRequiredQuestions(
+    private int countCompleteRatingCommentQuestions(
             List<FeedbackAssignmentQuestion> questions,
             Map<Long, FeedbackResponseItem> existingItems
     ) {
         return (int) questions.stream()
-                .filter(question -> Boolean.TRUE.equals(question.getRequired()))
                 .filter(question -> {
                     FeedbackResponseItem item = existingItems.get(question.getId());
+                    int commentLength = item == null ? 0 : normalizedCommentLength(item.getComment());
                     return item != null
                             && item.getRatingValue() != null
-                            && normalizedCommentLength(item.getComment()) >= MIN_REQUIRED_COMMENT_LENGTH;
+                            && commentLength >= MIN_REQUIRED_COMMENT_LENGTH
+                            && commentLength <= MAX_REQUIRED_COMMENT_LENGTH;
                 })
                 .count();
     }
@@ -334,8 +332,9 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                 .sourceQuestionId(question.getSourceQuestion() != null ? question.getSourceQuestion().getId() : null)
                 .questionCode(question.getQuestionCode())
                 .competencyCode(question.getCompetencyCode())
-                .responseType(question.getResponseType())
-                .scoringBehavior(question.getScoringBehavior())
+                .responseType(RESPONSE_RATING_WITH_COMMENT)
+                .scoringBehavior(SCORING_SCORED)
+                .helpText(resolveQuestionHelpText(question))
                 .questionText(question.getQuestionTextSnapshot())
                 .questionOrder(question.getDisplayOrder())
                 .ratingScaleId(question.getRatingScaleId())
@@ -343,10 +342,20 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
                 .ratingScaleMax(maxRating)
                 .ratingOptions(buildRatingOptions(maxRating))
                 .weight(question.getWeight())
-                .required(Boolean.TRUE.equals(question.getRequired()))
+                .required(true)
+                .minRequiredCommentLength(MIN_REQUIRED_COMMENT_LENGTH)
+                .maxCommentLength(MAX_REQUIRED_COMMENT_LENGTH)
                 .existingRatingValue(existingItem != null ? existingItem.getRatingValue() : null)
                 .existingComment(existingItem != null ? existingItem.getComment() : null)
                 .build();
+    }
+
+    private String resolveQuestionHelpText(FeedbackAssignmentQuestion question) {
+        if (question == null || question.getQuestionVersion() == null) {
+            return null;
+        }
+        String helpText = question.getQuestionVersion().getHelpText();
+        return helpText == null || helpText.isBlank() ? null : helpText.trim();
     }
 
     private int resolveMaxRating(Integer ratingScaleId) {
@@ -390,7 +399,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         if (!isAutoSubmitCompletedDraftsOnClose(assignment)) {
             return null;
         }
-        return "This campaign auto-submits completed drafts when HR closes the campaign. Only drafts with all required ratings answered will be submitted automatically.";
+        return "This campaign auto-submits completed drafts when HR closes the campaign. Only drafts with every rating and required comment completed will be submitted automatically.";
     }
 
     private boolean isVisibleInEvaluatorWorkspace(FeedbackEvaluatorAssignment assignment) {
@@ -459,7 +468,7 @@ public class FeedbackEvaluatorTaskServiceImpl implements FeedbackEvaluatorTaskSe
         if (campaignStatus == FeedbackCampaignStatus.DRAFT) {
             return "This campaign is still in HR setup and is not open to evaluators yet.";
         }
-        if (campaignStatus == FeedbackCampaignStatus.CLOSED) {
+        if (campaignStatus == FeedbackCampaignStatus.CLOSED || campaignStatus == FeedbackCampaignStatus.PUBLISHED) {
             return "This campaign is closed. Feedback can no longer be edited or submitted.";
         }
 

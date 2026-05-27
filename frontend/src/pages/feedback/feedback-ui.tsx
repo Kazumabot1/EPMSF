@@ -10,7 +10,19 @@ export const evaluatorTypeLabels: Record<EvaluatorType, string> = {
   SELF: 'Self',
 };
 
-export const auditEntityOptions = ['CAMPAIGN', 'FORM', 'REQUEST', 'RESPONSE', 'AUDIT'];
+export const auditEntityOptions = [
+  { value: 'CAMPAIGN', label: 'Campaign' },
+  { value: 'REQUEST', label: 'Assignment' },
+  { value: 'RESPONSE', label: 'Feedback response' },
+  { value: 'SUMMARY', label: 'Published summary' },
+  { value: 'AUDIT', label: 'Audit' },
+];
+
+export const auditEntityLabel = (value?: string | null) => {
+  const normalized = String(value ?? '').toUpperCase();
+  if (normalized === 'FORM') return 'Question setup';
+  return auditEntityOptions.find((option) => option.value === normalized)?.label ?? value ?? 'Record';
+};
 
 const recentKeyPrefix = 'feedback-recent-ids:';
 

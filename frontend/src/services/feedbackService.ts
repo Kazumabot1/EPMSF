@@ -78,11 +78,11 @@ export const feedbackService = {
   },
 
   async createRequest(_payload: FeedbackRequestCreatePayload): Promise<number> {
-    throw new Error('Manual feedback request creation is not supported by the 360 backend flow. Use campaign targets and Generate Assignments instead.');
+    throw new Error('Manual 360 assignment creation is not supported by the current workflow. Use campaign targets and Generate Assignments instead.');
   },
 
   async updateDeadline(_requestId: number, _dueAt: string): Promise<number> {
-    throw new Error('Request-level deadline editing is not supported yet. The campaign end date controls the 360 submission deadline.');
+    throw new Error('Assignment-level deadline editing is not supported yet. The campaign end date controls the 360 submission deadline.');
   },
 
   async sendReminders(_requestId: number): Promise<number> {
@@ -94,7 +94,7 @@ export const feedbackService = {
       const response = await api.get<ApiEnvelope<SpringPage<FeedbackRequestListItem>>>(`${FEEDBACK_BASE}/requests/${employeeId}`);
       return response.data.data;
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to fetch employee feedback requests.'));
+      throw new Error(extractApiErrorMessage(error, 'Failed to fetch employee feedback assignments.'));
     }
   },
 

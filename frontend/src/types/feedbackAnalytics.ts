@@ -126,6 +126,8 @@ export interface FeedbackTeamSummary {
   departmentName?: string | null;
   totalDirectReports: number;
   totalDepartmentEmployees?: number;
+  totalManagedTeams?: number;
+  totalDepartmentTeams?: number;
   totalClosedResults: number;
   accessTitle?: string | null;
   accessDescription?: string | null;

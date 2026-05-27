@@ -96,7 +96,7 @@ export const feedbackAnalyticsApi = {
       const response = await api.get<ApiEnvelope<FeedbackTeamSummary>>(`${FEEDBACK_BASE}/team-summary`);
       return unwrap(response);
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, 'Failed to load team feedback summary.'));
+      throw new Error(extractApiErrorMessage(error, 'Failed to load managed employee feedback summary.'));
     }
   },
 };

@@ -56,7 +56,7 @@ const errorMessage = (error: unknown, departmentView: boolean) => {
     if (isUnauthorizedError(error)) {
         return departmentView
             ? 'You do not have permission to view department 360 summaries. Department summaries are available only to Department Heads for their own department.'
-            : 'You do not have permission to view team 360 summaries. Team summaries are available only to managers for their direct reports.';
+            : 'You do not have permission to view managed-employee 360 summaries. These summaries are available only to managers for their direct reports and employees in teams they lead or manage.';
     }
     return error instanceof Error ? error.message : 'Unable to load the 360 feedback summary.';
 };
@@ -132,14 +132,14 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
     const privacyMaskedCount = items.filter(isMasked).length;
     const lowConfidenceCount = items.filter((item) => Boolean(item.insufficientFeedback) || String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
 
-    const title = summary?.accessTitle || (departmentView ? 'Department published 360 summary' : 'Team published feedback summary');
+    const title = summary?.accessTitle || (departmentView ? 'Department published 360 summary' : 'Managed employee published 360 summary');
     const description = summary?.accessDescription || (departmentView
         ? 'Review published 360 results for employees in your department. Relationship details stay aggregated and privacy-safe.'
-        : 'Review direct-report results from published closed campaigns. Relationship details stay aggregated and privacy-safe.');
-    const emptyTitle = departmentView ? 'No published department results yet' : 'No published team results yet';
+        : 'Review published results for your direct reports and employees in teams you lead or manage. Relationship details stay aggregated and privacy-safe.');
+    const emptyTitle = departmentView ? 'No published department results yet' : 'No published managed-employee results yet';
     const emptyDescription = summary?.emptyStateMessage || (departmentView
         ? 'Department 360 results will appear here only after HR closes and publishes a campaign.'
-        : 'Direct-report 360 results will appear here only after HR closes and publishes a campaign.');
+        : 'Managed-employee 360 results will appear here only after HR closes and publishes a campaign.');
 
     return (
         <div className="feedback-results-stack">
@@ -158,7 +158,7 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
             </section>
 
             {summaryQuery.isLoading ? (
-                <div className="feedback-results-empty">Loading {departmentView ? 'department' : 'team'} summary...</div>
+                <div className="feedback-results-empty">Loading {departmentView ? 'department' : 'managed employee'} summary...</div>
             ) : summaryQuery.error ? (
                 <div className="feedback-results-empty feedback-result-empty-state feedback-result-access-denied">
                     <strong>{isUnauthorizedError(summaryQuery.error) ? 'Access restricted' : 'Unable to load summary'}</strong>
@@ -167,7 +167,7 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
             ) : actualScopeMismatch ? (
                 <div className="feedback-results-empty feedback-result-empty-state feedback-result-access-denied">
                     <strong>Summary access mismatch</strong>
-                    <p>This page expected a {expectedScope === 'DEPARTMENT' ? 'Department Head department' : 'Manager direct-report'} view, but the server returned a different 360 summary scope. Please reopen the correct sidebar item.</p>
+                    <p>This page expected a {expectedScope === 'DEPARTMENT' ? 'Department Head department' : 'Manager managed-employee'} view, but the server returned a different 360 summary scope. Please reopen the correct sidebar item.</p>
                 </div>
             ) : !summary || items.length === 0 ? (
                 <div className="feedback-results-empty feedback-result-empty-state">
@@ -179,12 +179,12 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
                     <section className="feedback-results-card">
                         <div className="feedback-results-card-header">
                             <div>
-                                <p className="feedback-results-kicker">{departmentView ? 'Department overview' : 'Team overview'}</p>
+                                <p className="feedback-results-kicker">{departmentView ? 'Department overview' : 'Managed employee overview'}</p>
                                 <h2>Published results summary</h2>
                                 <p className="feedback-result-muted">
                                     {departmentView
                                         ? 'Use this view for department-level coaching, evaluator coverage review, and development planning.'
-                                        : 'Use this view for coaching conversations and development planning.'}
+                                        : 'Use this view for coaching conversations, managed-employee follow-up, and optional team-level context.'}
                                 </p>
                             </div>
                             <label className="feedback-result-filter-field">
@@ -201,12 +201,16 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
 
                         <div className="feedback-results-summary-grid">
                             <div className="feedback-results-metric">
-                                <span>{departmentView ? 'Department employees' : 'Direct reports'}</span>
+                                <span>{departmentView ? 'Department employees' : 'Managed employees'}</span>
                                 <strong>{departmentView ? summary.totalDepartmentEmployees ?? 0 : summary.totalDirectReports}</strong>
                             </div>
                             <div className="feedback-results-metric">
-                                <span>{departmentView ? 'Average department score' : 'Average team score'}</span>
+                                <span>{departmentView ? 'Average department score' : 'Average managed score'}</span>
                                 <strong>{formatScore(Number.isFinite(averageTeamScore) ? averageTeamScore : null)}</strong>
+                            </div>
+                            <div className="feedback-results-metric">
+                                <span>{departmentView ? 'Teams in department' : 'Teams managed'}</span>
+                                <strong>{departmentView ? summary.totalDepartmentTeams ?? 0 : summary.totalManagedTeams ?? 0}</strong>
                             </div>
                             <div className="feedback-results-metric">
                                 <span>Low confidence</span>
@@ -221,7 +225,7 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
                         <p>
                             {summary.privacyNotice || (departmentView
                                 ? 'Department Head access is a department-level view, not a separate evaluator relationship. Peer and direct-report anonymity rules still apply.'
-                                : 'Managers can review only published direct-report summaries. Peer and direct-report anonymity rules still apply.')}
+                                : 'Managers can review only published summaries for direct reports and employees in teams they lead or manage. Peer and direct-report anonymity rules still apply.')}
                         </p>
                     </section>
 
@@ -244,7 +248,7 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
                         <div className="feedback-results-card-header">
                             <div>
                                 <p className="feedback-results-kicker">Result table</p>
-                                <h2>{departmentView ? 'Department published summaries' : 'Direct-report published summaries'}</h2>
+                                <h2>{departmentView ? 'Department published summaries' : 'Managed employee published summaries'}</h2>
                             </div>
                         </div>
                         <div className="feedback-results-table-wrap">

@@ -57,7 +57,8 @@ export interface FeedbackAssignmentQuestionDetail {
   sourceQuestionId?: number | null;
   questionCode?: string | null;
   competencyCode?: string | null;
-  responseType?: 'RATING' | 'RATING_WITH_COMMENT' | 'TEXT' | 'YES_NO' | 'MULTI_SELECT' | string;
+  responseType?: 'RATING_WITH_COMMENT' | 'RATING' | string;
+  helpText?: string | null;
   questionText: string;
   questionOrder: number;
   ratingScaleId: number | null;
@@ -66,6 +67,8 @@ export interface FeedbackAssignmentQuestionDetail {
   ratingOptions?: FeedbackRatingOption[];
   weight: number | null;
   required: boolean;
+  minRequiredCommentLength?: number | null;
+  maxCommentLength?: number | null;
   existingRatingValue: number | null;
   existingComment: string | null;
 }

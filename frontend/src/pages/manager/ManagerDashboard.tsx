@@ -805,7 +805,7 @@ const ManagerDashboard = () => {
             id: "focus-feedback",
             label: "Feedback",
             value: pendingFeedbackCount
-                ? `${pendingFeedbackCount} pending request${pendingFeedbackCount > 1 ? "s" : ""}`
+                ? `${pendingFeedbackCount} pending assignment${pendingFeedbackCount > 1 ? "s" : ""}`
                 : "No pending feedback",
             description:
                 "360 feedback tasks, continuous feedback, and coaching signals.",

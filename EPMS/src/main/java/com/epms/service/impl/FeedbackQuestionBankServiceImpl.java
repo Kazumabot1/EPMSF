@@ -406,6 +406,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                     .competencyCode(bank.getCompetencyCode())
                     .responseType(responseType)
                     .scoringBehavior(SCORING_SCORED)
+                    .helpText(firstNonBlank(version.getHelpText()))
                     .questionText(firstNonBlank(version.getQuestionText(), bank.getDefaultText()))
                     .questionOrder(rule.getDisplayOrder() == null ? questionsByBankId.size() + 1 : rule.getDisplayOrder())
                     .ratingScaleId(null)

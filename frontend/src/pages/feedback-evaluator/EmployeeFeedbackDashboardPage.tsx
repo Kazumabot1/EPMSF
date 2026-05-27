@@ -1,5 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
 import { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useMyFeedbackTasks } from '../../hooks/useFeedbackEvaluator';
 import { feedbackService } from '../../services/feedbackService';
@@ -7,11 +7,39 @@ import { feedbackAnalyticsApi } from '../../api/feedbackAnalyticsApi';
 import type { FeedbackEvaluatorTask, FeedbackRelationshipType } from '../../types/feedbackEvaluator';
 import type { FeedbackReceivedItem } from '../../types/feedback';
 import type { FeedbackResultItem } from '../../types/feedbackAnalytics';
-import './feedback-evaluator.css';
+import {
+    Feedback360Avatar,
+    Feedback360Banner,
+    Feedback360ButtonLink,
+    Feedback360CardGrid,
+    Feedback360EmptyState,
+    Feedback360Hero,
+    Feedback360Icon,
+    Feedback360InlineList,
+    Feedback360MetricCard,
+    Feedback360MetricGrid,
+    Feedback360Panel,
+    Feedback360PanelHeader,
+    Feedback360ProgressBar,
+    Feedback360Select,
+    Feedback360Shell,
+    Feedback360StatusPill,
+    Feedback360Toolbar,
+    Feedback360VisuallyGrouped,
+    Feedback360Input,
+    cx,
+} from '../../components/feedback360/Feedback360Ui';
 
 type WorkspaceKind = 'employee' | 'manager' | 'departmentHead';
 type TaskStatusFilter = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'SUBMITTED';
 type RelationshipFilter = 'ALL' | FeedbackRelationshipType;
+
+type TaskBucket = {
+    key: string;
+    title: string;
+    description: string;
+    tasks: FeedbackEvaluatorTask[];
+};
 
 type FeedbackReceivedQuestionItem = {
     questionId: number;
@@ -73,19 +101,11 @@ const relationshipLabel = (type: FeedbackRelationshipType | string | null | unde
         case 'SUBORDINATE':
             return plural ? 'Direct reports' : 'Direct report';
         case 'SELF':
-            return plural ? 'Self review' : 'Self review';
+            return plural ? 'Self reviews' : 'Self review';
         default:
             return type ? type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()) : 'Evaluator';
     }
 };
-
-const initials = (name?: string | null) =>
-    (name || 'Employee')
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('') || 'E';
 
 const formatDate = (value?: string | null) => {
     if (!value) return 'No deadline';
@@ -109,14 +129,6 @@ const isOverdue = (task: FeedbackEvaluatorTask) => {
     return new Date(task.dueAt).getTime() < Date.now();
 };
 
-const isDueSoon = (task: FeedbackEvaluatorTask) => {
-    if (!task.dueAt || task.status === 'SUBMITTED' || task.status === 'CANCELLED' || !task.canSubmit) return false;
-    const due = new Date(task.dueAt).getTime();
-    if (Number.isNaN(due)) return false;
-    const days = (due - Date.now()) / MS_PER_DAY;
-    return days >= 0 && days <= 7;
-};
-
 const statusLabel = (task: FeedbackEvaluatorTask) => {
     if (isOverdue(task)) return 'Overdue';
     switch (task.status) {
@@ -130,6 +142,21 @@ const statusLabel = (task: FeedbackEvaluatorTask) => {
             return 'Declined';
         default:
             return 'Not started';
+    }
+};
+
+const statusTone = (task: FeedbackEvaluatorTask) => {
+    if (isOverdue(task)) return 'danger' as const;
+    switch (task.status) {
+        case 'SUBMITTED':
+            return 'success' as const;
+        case 'IN_PROGRESS':
+            return 'purple' as const;
+        case 'CANCELLED':
+        case 'DECLINED':
+            return 'warning' as const;
+        default:
+            return 'info' as const;
     }
 };
 
@@ -149,8 +176,8 @@ const progressCopy = (task: FeedbackEvaluatorTask) => {
 const taskActionLabel = (task: FeedbackEvaluatorTask) => {
     if (task.status === 'SUBMITTED') return 'View feedback';
     if (!task.canSubmit) return 'View';
-    if (task.status === 'IN_PROGRESS') return 'Continue';
-    return 'Start';
+    if (task.status === 'IN_PROGRESS') return 'Continue draft';
+    return 'Start feedback';
 };
 
 const scoreText = (score?: number | null) => (typeof score === 'number' ? `${score.toFixed(1)}%` : 'No score');
@@ -288,7 +315,7 @@ const resolveWorkspace = (pathname: string): { kind: WorkspaceKind; homePath: st
             homePath: '/manager/feedback',
             canSeeAboutMe: true,
             title: '360 Feedback',
-            description: 'A focused place to complete feedback and reflect on published growth results.',
+            description: 'Complete your feedback assignments and review your own published growth results. Managed employee summaries stay in the manager summary area.',
         };
     }
     if (pathname.startsWith('/department-head/')) {
@@ -297,7 +324,7 @@ const resolveWorkspace = (pathname: string): { kind: WorkspaceKind; homePath: st
             homePath: '/department-head/feedback',
             canSeeAboutMe: false,
             title: '360 Feedback',
-            description: 'Complete the feedback requests assigned to you with care and clarity.',
+            description: 'Complete the 360 feedback assignments personally assigned to you. Department summaries stay in the department summary area.',
         };
     }
     return {
@@ -305,7 +332,7 @@ const resolveWorkspace = (pathname: string): { kind: WorkspaceKind; homePath: st
         homePath: '/employee/feedback',
         canSeeAboutMe: true,
         title: '360 Feedback',
-        description: 'A private space to share thoughtful feedback and review your growth insights.',
+        description: 'A private space to share thoughtful feedback and review your published growth insights.',
     };
 };
 
@@ -316,23 +343,6 @@ const buildSearchText = (task: FeedbackEvaluatorTask) => [
     task.status,
     task.campaignStatus,
 ].filter(Boolean).join(' ').toLowerCase();
-
-const SectionIcon = ({ type }: { type: string }) => {
-    switch (type) {
-        case 'start':
-            return <svg className={`feedback-v3-svg-icon section-icon ${type}`} viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor" stroke="none" /></svg>;
-        case 'clock':
-            return <svg className={`feedback-v3-svg-icon section-icon ${type}`} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 7.75v4.5l3 1.75" /><path d="M17.5 6.5 19 5" /></svg>;
-        case 'draft':
-            return <svg className={`feedback-v3-svg-icon section-icon ${type}`} viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5h6.5L17 9v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 18V5.5Z" /><path d="M13.5 5.5V9H17" /><path d="m10 14.75 4.9-4.9 1.25 1.25-4.9 4.9-2.15.9.9-2.15Z" fill="currentColor" stroke="none" /></svg>;
-        case 'check':
-            return <svg className={`feedback-v3-svg-icon section-icon ${type}`} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="m8.6 12.2 2.25 2.25 4.55-4.8" /></svg>;
-        case 'spark':
-            return <svg className="feedback-v3-svg-icon section-icon spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.5l-1.9-5.7-5.6-1.9L10.1 9 12 3.5Z" fill="currentColor" stroke="none" /></svg>;
-        default:
-            return <svg className="feedback-v3-svg-icon section-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>;
-    }
-};
 
 const EmployeeFeedbackDashboardPage = () => {
     const location = useLocation();
@@ -361,21 +371,17 @@ const EmployeeFeedbackDashboardPage = () => {
 
     const taskCampaignOptions = useMemo(() => {
         const campaigns = new Map<number, string>();
-        tasks.forEach((task) => {
-            campaigns.set(task.campaignId, task.campaignName || `Campaign #${task.campaignId}`);
-        });
-        return Array.from(campaigns.entries())
-            .map(([id, name]) => ({ id, name }))
-            .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
+        tasks.forEach((task) => campaigns.set(task.campaignId, task.campaignName || `Campaign #${task.campaignId}`));
+        return Array.from(campaigns.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
     }, [tasks]);
 
     const taskStats = useMemo(() => {
-        const open = tasks.filter((task) => task.status !== 'SUBMITTED' && task.status !== 'CANCELLED' && task.status !== 'DECLINED').length;
-        const drafts = tasks.filter((task) => task.status === 'IN_PROGRESS').length;
-        const completed = tasks.filter((task) => task.status === 'SUBMITTED').length;
-        const dueSoon = tasks.filter((task) => isDueSoon(task) && !isOverdue(task)).length;
-        return { open, dueSoon, drafts, completed };
-    }, [tasks]);
+        const toComplete = tasks.filter((task) => task.status === 'PENDING').length;
+        const inProgress = tasks.filter((task) => task.status === 'IN_PROGRESS').length;
+        const submitted = tasks.filter((task) => task.status === 'SUBMITTED').length;
+        const publishedResults = new Set(ownResults.map((item) => item.campaignId)).size;
+        return { toComplete, inProgress, submitted, publishedResults };
+    }, [ownResults, tasks]);
 
     const filteredTasks = useMemo(() => {
         const search = taskSearch.trim().toLowerCase();
@@ -396,6 +402,27 @@ const EmployeeFeedbackDashboardPage = () => {
     }), [filteredTasks]);
 
     const primaryTask = useMemo(() => sortedTasks.find((task) => task.status !== 'SUBMITTED' && task.canSubmit) ?? sortedTasks[0], [sortedTasks]);
+
+    const taskBuckets = useMemo<TaskBucket[]>(() => [
+        {
+            key: 'to-complete',
+            title: 'To complete',
+            description: 'Not started yet. Open the assignment and complete each rating with a comment.',
+            tasks: sortedTasks.filter((task) => task.status === 'PENDING'),
+        },
+        {
+            key: 'in-progress',
+            title: 'In progress',
+            description: 'Drafts you already started and can still edit while the campaign is open.',
+            tasks: sortedTasks.filter((task) => task.status === 'IN_PROGRESS'),
+        },
+        {
+            key: 'submitted',
+            title: 'Submitted',
+            description: 'Final feedback that is locked and available only as read-only.',
+            tasks: sortedTasks.filter((task) => task.status === 'SUBMITTED'),
+        },
+    ], [sortedTasks]);
 
     const displayResults = useMemo<ResultItem[]>(() => ownResults.map((item) => {
         const relationship = resultRelationship(item);
@@ -430,28 +457,39 @@ const EmployeeFeedbackDashboardPage = () => {
 
     const renderTaskCard = (task: FeedbackEvaluatorTask) => {
         const progress = taskProgress(task);
-        const open = task.status !== 'SUBMITTED' && task.status !== 'CANCELLED' && task.status !== 'DECLINED';
         return (
-            <article className={`feedback-warm-task-card ${open ? 'open' : 'complete'} ${isOverdue(task) ? 'overdue' : ''}`} key={task.assignmentId}>
-                <div className="feedback-warm-avatar">{initials(task.targetEmployeeName)}</div>
-                <div className="feedback-warm-task-main">
-                    <div className="feedback-warm-task-top">
-                        <span>{relationshipLabel(task.relationshipType)}</span>
-                        <b>{statusLabel(task)}</b>
-                    </div>
+            <Feedback360VisuallyGrouped className={cx('f360-task-card', isOverdue(task) && 'f360-overdue')} key={task.assignmentId}>
+                <Feedback360Avatar name={task.targetEmployeeName} />
+                <div>
+                    <Feedback360InlineList>
+                        <Feedback360StatusPill tone="brand">{relationshipLabel(task.relationshipType)}</Feedback360StatusPill>
+                        <Feedback360StatusPill tone={statusTone(task)}>{statusLabel(task)}</Feedback360StatusPill>
+                    </Feedback360InlineList>
                     <h3>{task.targetEmployeeName}</h3>
                     <p>{task.campaignName}</p>
-                    <div className="feedback-warm-task-progress" aria-label={progressCopy(task)}>
-                        <i style={{ width: `${progress}%` }} />
-                    </div>
+                    <Feedback360ProgressBar value={progress} label={progressCopy(task)} />
                     <small>{progressCopy(task)} · {daysUntil(task.dueAt)}</small>
                 </div>
-                <Link className="feedback-warm-task-action" to={`${workspace.homePath}/assignments/${task.assignmentId}`}>
-                    {taskActionLabel(task)}
-                </Link>
-            </article>
+                <div className="f360-task-action">
+                    <Feedback360ButtonLink to={`${workspace.homePath}/assignments/${task.assignmentId}`} variant={task.status === 'SUBMITTED' ? 'secondary' : 'primary'}>
+                        {taskActionLabel(task)}
+                    </Feedback360ButtonLink>
+                </div>
+            </Feedback360VisuallyGrouped>
         );
     };
+
+    const renderTaskBucket = (bucket: TaskBucket) => (
+        <Feedback360Panel key={bucket.key}>
+            <Feedback360PanelHeader
+                compact
+                eyebrow={`${bucket.tasks.length} assignment${bucket.tasks.length === 1 ? '' : 's'}`}
+                title={bucket.title}
+                description={bucket.description}
+            />
+            <Feedback360CardGrid>{bucket.tasks.map(renderTaskCard)}</Feedback360CardGrid>
+        </Feedback360Panel>
+    );
 
     const renderSelfVsOthers = (summary: FeedbackResultItem | undefined, campaign: CampaignGroup) => {
         const rows = RELATIONSHIP_ORDER.map((relationship) => {
@@ -464,61 +502,55 @@ const EmployeeFeedbackDashboardPage = () => {
         });
 
         return (
-            <section className="feedback-warm-result-section">
-                <div className="feedback-warm-section-title">
-                    <h3>Self vs others</h3>
-                    <p>See how your self-view compares with feedback from other groups.</p>
-                </div>
-                <div className="feedback-warm-comparison-grid">
+            <Feedback360Panel>
+                <Feedback360PanelHeader compact title="Self vs others" description="See how your self-view compares with feedback from other groups." />
+                <div className="f360-score-grid">
                     {rows.map((row) => (
-                        <div key={row.relationship}>
+                        <div className="f360-score-cell" key={row.relationship}>
                             <span>{row.label}</span>
                             <strong>{row.allowed && row.score != null ? scoreText(row.score) : 'Not enough feedback'}</strong>
                         </div>
                     ))}
                 </div>
-            </section>
+            </Feedback360Panel>
         );
     };
 
     const renderCompetencyBreakdown = (competencies: CompetencyResult[]) => {
         if (competencies.length === 0) {
-            return <p className="feedback-warm-muted-card">Competency breakdown is not available for this published result.</p>;
+            return <Feedback360EmptyState title="Competency breakdown is not available." description="This published result does not include enough mapped competency data." />;
         }
         const strongest = competencies.slice(0, 3);
         const development = competencies.length > 3 ? [...competencies].sort((a, b) => a.averageScore - b.averageScore || a.name.localeCompare(b.name)).slice(0, 3) : [];
 
         return (
             <>
-                <section className="feedback-warm-result-section">
-                    <div className="feedback-warm-section-title">
-                        <h3>Competency breakdown</h3>
-                        <p>Average score by competency from the published feedback set.</p>
-                    </div>
-                    <div className="feedback-warm-competency-list">
+                <Feedback360Panel>
+                    <Feedback360PanelHeader compact title="Competency breakdown" description="Average score by competency from the published feedback set." />
+                    <div className="f360-section-grid">
                         {competencies.map((competency) => (
-                            <div className="feedback-warm-competency-row" key={competency.key}>
+                            <div className="f360-competency-row" key={competency.key}>
                                 <div>
                                     <strong>{competency.name}</strong>
                                     <span>{competency.responseCount} rating{competency.responseCount === 1 ? '' : 's'}</span>
                                 </div>
                                 <div>
                                     <b>{scoreText(competency.averageScore)}</b>
-                                    <i style={{ width: `${Math.max(0, Math.min(100, competency.averageScore))}%` }} />
+                                    <Feedback360ProgressBar value={competency.averageScore} />
                                 </div>
                             </div>
                         ))}
                     </div>
-                </section>
-                <div className="feedback-warm-strength-grid">
-                    <section className="feedback-warm-result-section compact">
-                        <h3>Strengths</h3>
+                </Feedback360Panel>
+                <div className="f360-strength-grid">
+                    <Feedback360Panel>
+                        <Feedback360PanelHeader compact title="Strengths" />
                         <ul>{strongest.map((competency) => <li key={`strength-${competency.key}`}>{competency.name}</li>)}</ul>
-                    </section>
-                    <section className="feedback-warm-result-section compact">
-                        <h3>Development areas</h3>
+                    </Feedback360Panel>
+                    <Feedback360Panel>
+                        <Feedback360PanelHeader compact title="Development areas" />
                         {development.length > 0 ? <ul>{development.map((competency) => <li key={`development-${competency.key}`}>{competency.name}</li>)}</ul> : <p>Not enough competency data to identify development areas.</p>}
-                    </section>
+                    </Feedback360Panel>
                 </div>
             </>
         );
@@ -527,18 +559,15 @@ const EmployeeFeedbackDashboardPage = () => {
     const renderWrittenComments = (campaign: CampaignGroup) => {
         const groups = buildQuestionCommentGroups(campaign.items);
         return (
-            <section className="feedback-warm-result-section">
-                <div className="feedback-warm-section-title">
-                    <h3>Written comments</h3>
-                    <p>Comments are grouped by question and evaluator group. Evaluator names are never shown.</p>
-                </div>
+            <Feedback360Panel>
+                <Feedback360PanelHeader compact title="Written comments" description="Comments are grouped by question and evaluator group. Evaluator names are never shown." />
                 {groups.length === 0 ? (
-                    <p className="feedback-warm-muted-card">No written comments are available for this published result.</p>
+                    <Feedback360EmptyState title="No written comments are available." description="HR may have hidden comments or the campaign may not include comment publishing." />
                 ) : (
-                    <div className="feedback-warm-question-comment-stack">
+                    <div className="f360-section-grid">
                         {groups.map((group) => (
-                            <article className="feedback-warm-question-comment-card" key={group.key}>
-                                <span>{group.sectionTitle || 'Question'}</span>
+                            <article className="f360-question-comment-card" key={group.key}>
+                                <span>{group.sectionTitle || 'Competency'}</span>
                                 <strong>{group.questionText}</strong>
                                 <div>
                                     {group.relationships.map((relationship) => (
@@ -552,19 +581,21 @@ const EmployeeFeedbackDashboardPage = () => {
                         ))}
                     </div>
                 )}
-            </section>
+            </Feedback360Panel>
         );
     };
 
     const renderScoreExplanation = () => (
-        <section className="feedback-warm-score-explanation">
-            <strong>Score explanation</strong>
-            <div><span>86–100</span><em>Outstanding</em></div>
-            <div><span>71–85</span><em>Good</em></div>
-            <div><span>60–70</span><em>Meets requirement</em></div>
-            <div><span>40–59</span><em>Needs improvement</em></div>
-            <div><span>0–39</span><em>Unsatisfactory</em></div>
-        </section>
+        <Feedback360Panel>
+            <Feedback360PanelHeader compact title="Score explanation" />
+            <div className="f360-score-grid">
+                <div className="f360-score-cell"><span>86–100</span><strong>Outstanding</strong></div>
+                <div className="f360-score-cell"><span>71–85</span><strong>Good</strong></div>
+                <div className="f360-score-cell"><span>60–70</span><strong>Meets requirement</strong></div>
+                <div className="f360-score-cell"><span>40–59</span><strong>Needs improvement</strong></div>
+                <div className="f360-score-cell"><span>0–39</span><strong>Unsatisfactory</strong></div>
+            </div>
+        </Feedback360Panel>
     );
 
     const renderCampaign = (campaign: CampaignGroup) => {
@@ -575,19 +606,19 @@ const EmployeeFeedbackDashboardPage = () => {
         const score = summary?.averageScore ?? averageScore(campaign.items.map((item) => item.item.overallScore));
         const scoreCategory = bandText(score, summary?.scoreCategory);
         return (
-            <article className={`feedback-warm-result-card ${expanded ? 'expanded' : ''}`} key={campaign.key}>
-                <button type="button" className="feedback-warm-result-head" onClick={() => toggleCampaign(campaign.key)} aria-expanded={expanded}>
-                    <span><SectionIcon type="spark" /></span>
+            <Feedback360VisuallyGrouped key={campaign.key}>
+                <button type="button" className="f360-result-head" onClick={() => toggleCampaign(campaign.key)} aria-expanded={expanded}>
+                    <span className="f360-result-icon"><Feedback360Icon type="spark" /></span>
                     <div>
                         <h3>{campaign.campaignName}</h3>
                         <p>Published 360 feedback result</p>
                     </div>
-                    <strong>{flags.includeOverallScore ? scoreText(score) : 'Published'}</strong>
-                    <em>{expanded ? 'Hide' : 'View'}</em>
+                    <strong className="f360-result-score">{flags.includeOverallScore ? scoreText(score) : 'Published'}</strong>
+                    <Feedback360StatusPill tone={expanded ? 'brand' : 'neutral'}>{expanded ? 'Hide' : 'View'}</Feedback360StatusPill>
                 </button>
                 {expanded ? (
-                    <div className="feedback-warm-result-body">
-                        <section className="feedback-warm-result-document-header">
+                    <div className="f360-result-body">
+                        <section className="f360-document-header">
                             <p>ACE Data Systems Ltd.,</p>
                             <h2>360° Feedback Result</h2>
                             <div>
@@ -597,7 +628,7 @@ const EmployeeFeedbackDashboardPage = () => {
                         </section>
 
                         {flags.includeOverallScore ? (
-                            <section className="feedback-warm-overall-result">
+                            <section className="f360-overall-score">
                                 <span>Overall result</span>
                                 <strong>{scoreText(score)}</strong>
                                 <em>{scoreCategory}</em>
@@ -606,102 +637,101 @@ const EmployeeFeedbackDashboardPage = () => {
 
                         {flags.includeSelfVsOthers ? renderSelfVsOthers(summary, campaign) : null}
                         {flags.includeCompetencyBreakdown ? renderCompetencyBreakdown(competencies) : null}
-                        {flags.includeComments ? renderWrittenComments(campaign) : <p className="feedback-warm-muted-card">Written comments were not included by HR.</p>}
+                        {flags.includeComments ? renderWrittenComments(campaign) : <Feedback360EmptyState title="Written comments were not included by HR." />}
                         {flags.includeScoreExplanation ? renderScoreExplanation() : null}
                     </div>
                 ) : null}
-            </article>
+            </Feedback360VisuallyGrouped>
         );
     };
 
+    const openAssignmentCount = taskStats.toComplete + taskStats.inProgress;
+
     return (
-        <div className="feedback-warm-page">
-            <section className="feedback-warm-hero">
-                <div>
-                    <span>Private growth space</span>
-                    <h1>{workspace.title}</h1>
-                    <p>{workspace.description}</p>
-                </div>
-                <aside>
-                    <span>{taskStats.open > 0 ? 'Next step' : 'All caught up'}</span>
-                    <strong>{primaryTask && primaryTask.status !== 'SUBMITTED' ? `${relationshipLabel(primaryTask.relationshipType)} for ${primaryTask.targetEmployeeName}` : 'No open feedback requests'}</strong>
-                    <p>{primaryTask && primaryTask.status !== 'SUBMITTED' ? `${progressCopy(primaryTask)} · ${daysUntil(primaryTask.dueAt)}` : 'New requests will appear here when HR launches a campaign.'}</p>
-                    {primaryTask && primaryTask.status !== 'SUBMITTED' ? (
-                        <Link className="feedback-warm-primary-link" to={`${workspace.homePath}/assignments/${primaryTask.assignmentId}`}>Continue feedback</Link>
-                    ) : null}
-                </aside>
-            </section>
+        <Feedback360Shell>
+            <Feedback360Hero
+                eyebrow="360 feedback workspace"
+                title={workspace.title}
+                description={workspace.description}
+                aside={(
+                    <>
+                        <span>{openAssignmentCount > 0 ? 'Next assignment' : 'All caught up'}</span>
+                        <strong>{primaryTask && primaryTask.status !== 'SUBMITTED' ? `${relationshipLabel(primaryTask.relationshipType)} for ${primaryTask.targetEmployeeName}` : 'No open feedback assignments'}</strong>
+                        <p>{primaryTask && primaryTask.status !== 'SUBMITTED' ? `${progressCopy(primaryTask)} · ${daysUntil(primaryTask.dueAt)}` : 'New assignments will appear here when HR launches a campaign.'}</p>
+                        {primaryTask && primaryTask.status !== 'SUBMITTED' ? (
+                            <Feedback360ButtonLink to={`${workspace.homePath}/assignments/${primaryTask.assignmentId}`}>Continue feedback</Feedback360ButtonLink>
+                        ) : null}
+                    </>
+                )}
+            />
 
-            <section className="feedback-warm-stat-grid" aria-label="360 feedback summary">
-                <button type="button" onClick={() => setTaskStatusFilter('ALL')}><span>{taskStats.open}</span><strong>Open requests</strong></button>
-                <button type="button" onClick={() => setTaskStatusFilter('ALL')}><span>{taskStats.dueSoon}</span><strong>Due soon</strong></button>
-                <button type="button" onClick={() => setTaskStatusFilter('IN_PROGRESS')}><span>{taskStats.drafts}</span><strong>Drafts saved</strong></button>
-                <button type="button" onClick={() => setTaskStatusFilter('SUBMITTED')}><span>{taskStats.completed}</span><strong>Completed</strong></button>
-            </section>
+            <Feedback360MetricGrid>
+                <Feedback360MetricCard value={taskStats.toComplete} label="To complete" tone="info" onClick={() => setTaskStatusFilter('PENDING')} />
+                <Feedback360MetricCard value={taskStats.inProgress} label="In progress" tone="purple" onClick={() => setTaskStatusFilter('IN_PROGRESS')} />
+                <Feedback360MetricCard value={taskStats.submitted} label="Submitted" tone="success" onClick={() => setTaskStatusFilter('SUBMITTED')} />
+                <Feedback360MetricCard value={taskStats.publishedResults} label="Published result available" tone="brand" onClick={() => setTaskStatusFilter('ALL')} />
+            </Feedback360MetricGrid>
 
-            <section className="feedback-warm-section-card">
-                <div className="feedback-warm-section-heading">
-                    <div>
-                        <span>Share with care</span>
-                        <h2>Feedback to give</h2>
-                        <p>Take your time. Clear examples help people grow.</p>
-                    </div>
-                    <div className="feedback-warm-filter-bar">
-                        <input type="search" placeholder="Search employee or campaign" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} />
-                        <select value={taskCampaignFilter} onChange={(event) => setTaskCampaignFilter(event.target.value)}>
-                            <option value="ALL">All campaigns</option>
-                            {taskCampaignOptions.map((campaign) => <option key={`task-campaign-${campaign.id}`} value={String(campaign.id)}>{campaign.name}</option>)}
-                        </select>
-                        <select value={taskRelationshipFilter} onChange={(event) => setTaskRelationshipFilter(event.target.value as RelationshipFilter)}>
-                            <option value="ALL">All relationships</option>
-                            <option value="MANAGER">Manager</option>
-                            <option value="PEER">Peer</option>
-                            <option value="SUBORDINATE">Direct report</option>
-                            <option value="SELF">Self</option>
-                        </select>
-                        <select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)}>
-                            <option value="ALL">All statuses</option>
-                            <option value="PENDING">Not started</option>
-                            <option value="IN_PROGRESS">Draft saved</option>
-                            <option value="SUBMITTED">Completed</option>
-                        </select>
-                    </div>
-                </div>
+            <Feedback360Panel>
+                <Feedback360PanelHeader
+                    eyebrow="My assignments"
+                    title="Feedback to complete"
+                    description="These are only the 360 feedback assignments personally assigned to you. Every question uses rating 1–5 with a required supporting comment."
+                    actions={(
+                        <Feedback360Toolbar>
+                            <Feedback360Input type="search" placeholder="Search employee or campaign" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} />
+                            <Feedback360Select value={taskCampaignFilter} onChange={(event) => setTaskCampaignFilter(event.target.value)}>
+                                <option value="ALL">All campaigns</option>
+                                {taskCampaignOptions.map((campaign) => <option key={`task-campaign-${campaign.id}`} value={String(campaign.id)}>{campaign.name}</option>)}
+                            </Feedback360Select>
+                            <Feedback360Select value={taskRelationshipFilter} onChange={(event) => setTaskRelationshipFilter(event.target.value as RelationshipFilter)}>
+                                <option value="ALL">All relationships</option>
+                                <option value="MANAGER">Manager</option>
+                                <option value="PEER">Peer</option>
+                                <option value="SUBORDINATE">Direct report</option>
+                                <option value="SELF">Self</option>
+                            </Feedback360Select>
+                            <Feedback360Select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)}>
+                                <option value="ALL">All statuses</option>
+                                <option value="PENDING">Not started</option>
+                                <option value="IN_PROGRESS">Draft saved</option>
+                                <option value="SUBMITTED">Completed</option>
+                            </Feedback360Select>
+                        </Feedback360Toolbar>
+                    )}
+                />
 
-                {tasksQuery.isLoading ? <div className="feedback-warm-empty-card">Loading assigned feedback...</div> : null}
-                {tasksQuery.error instanceof Error ? <div className="feedback-evaluator-banner error">{tasksQuery.error.message}</div> : null}
+                {tasksQuery.isLoading ? <Feedback360EmptyState title="Loading assigned feedback..." /> : null}
+                {tasksQuery.error instanceof Error ? <Feedback360Banner tone="danger">{tasksQuery.error.message}</Feedback360Banner> : null}
                 {!tasksQuery.isLoading && !tasksQuery.error && sortedTasks.length === 0 ? (
-                    <div className="feedback-warm-empty-card">
-                        <strong>Nothing here right now.</strong>
-                        <p>Your feedback requests will appear here when there is something to complete.</p>
-                    </div>
+                    <Feedback360EmptyState title="No feedback assignments right now." description="Your feedback assignments will appear here when there is something to complete." />
                 ) : null}
-                {!tasksQuery.isLoading && !tasksQuery.error && sortedTasks.length > 0 ? (
-                    <div className="feedback-warm-task-grid">{sortedTasks.map(renderTaskCard)}</div>
-                ) : null}
-            </section>
+            </Feedback360Panel>
+
+            {!tasksQuery.isLoading && !tasksQuery.error && sortedTasks.length > 0 ? (
+                <div>{taskBuckets.filter((bucket) => bucket.tasks.length > 0).map(renderTaskBucket)}</div>
+            ) : null}
 
             {workspace.canSeeAboutMe ? (
-                <section className="feedback-warm-section-card">
-                    <div className="feedback-warm-section-heading simple">
-                        <div>
-                            <span>Growth insights</span>
-                            <h2>My feedback results</h2>
-                            <p>Your published 360 feedback results will appear here after HR releases them.</p>
-                        </div>
-                    </div>
-                    {dashboardQuery.isLoading || resultSummaryQuery.isLoading ? <div className="feedback-warm-empty-card">Loading published feedback...</div> : null}
-                    {dashboardQuery.error instanceof Error ? <div className="feedback-evaluator-banner error">{dashboardQuery.error.message}</div> : null}
-                    {resultSummaryQuery.error instanceof Error ? <div className="feedback-evaluator-banner error">{resultSummaryQuery.error.message}</div> : null}
+                <Feedback360Panel>
+                    <Feedback360PanelHeader
+                        compact
+                        eyebrow="Published result available"
+                        title="My published 360 results"
+                        description="Published results are separate from assignments you need to complete. Some feedback may be hidden when the confidentiality threshold is not met."
+                    />
+                    {dashboardQuery.isLoading || resultSummaryQuery.isLoading ? <Feedback360EmptyState title="Loading published feedback..." /> : null}
+                    {dashboardQuery.error instanceof Error ? <Feedback360Banner tone="danger">{dashboardQuery.error.message}</Feedback360Banner> : null}
+                    {resultSummaryQuery.error instanceof Error ? <Feedback360Banner tone="danger">{resultSummaryQuery.error.message}</Feedback360Banner> : null}
                     {!dashboardQuery.isLoading && !resultSummaryQuery.isLoading && !dashboardQuery.error && !resultSummaryQuery.error && campaignGroups.length === 0 ? (
-                        <div className="feedback-warm-empty-card"><strong>No published results yet.</strong><p>Your feedback results will appear here when HR publishes them.</p></div>
+                        <Feedback360EmptyState title="No published results yet." description="Your feedback results will appear here when HR publishes them." />
                     ) : null}
                     {!dashboardQuery.isLoading && !resultSummaryQuery.isLoading && !dashboardQuery.error && !resultSummaryQuery.error && campaignGroups.length > 0 ? (
-                        <div className="feedback-warm-result-list">{campaignGroups.map(renderCampaign)}</div>
+                        <div className="f360-section-grid">{campaignGroups.map(renderCampaign)}</div>
                     ) : null}
-                </section>
+                </Feedback360Panel>
             ) : null}
-        </div>
+        </Feedback360Shell>
     );
 };
 

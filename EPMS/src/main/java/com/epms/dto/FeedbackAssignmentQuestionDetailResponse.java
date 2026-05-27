@@ -19,6 +19,7 @@ public class FeedbackAssignmentQuestionDetailResponse {
     String competencyCode;
     String responseType;
     String scoringBehavior;
+    String helpText;
     String questionText;
     Integer questionOrder;
     Integer ratingScaleId;

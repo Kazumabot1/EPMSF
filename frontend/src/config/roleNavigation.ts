@@ -354,7 +354,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-chat-dots',
       children: [
         { label: 'My Assignments', path: '/manager/feedback', icon: 'bi-chat-dots', end: true },
-        { label: 'Team Summary', path: '/manager/feedback/summary', icon: 'bi-people' },
+        { label: 'Managed Employee Summary', path: '/manager/feedback/summary', icon: 'bi-people' },
       ],
     },
     {

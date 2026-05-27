@@ -483,13 +483,14 @@ const EmployeeManagement = () => {
 
                                 <button
                                     type="button"
-                                    className="epms-emp-icon-btn epms-emp-icon-btn--danger"
-                                    title="Deactivate"
-                                    disabled={!active}
+                                    className={`epms-emp-icon-btn ${
+                                        active ? 'epms-emp-icon-btn--danger' : 'epms-emp-icon-btn--success'
+                                    }`}
+                                    title={active ? 'Deactivate' : 'Activate'}
                                     onClick={() => openDeactivate(emp)}
                                 >
-                                  <i className="bi bi-person-x" aria-hidden />
-                                  <span className="sr-only">Deactivate</span>
+                                  <i className={`bi ${active ? 'bi-person-x' : 'bi-person-check'}`} aria-hidden />
+                                  <span className="sr-only">{active ? 'Deactivate' : 'Activate'}</span>
                                 </button>
                               </div>
                             </td>
@@ -601,12 +602,13 @@ const EmployeeManagement = () => {
 
                           <button
                               type="button"
-                              className="epms-emp-icon-btn epms-emp-icon-btn--danger"
-                              disabled={!active}
+                              className={`epms-emp-icon-btn ${
+                                  active ? 'epms-emp-icon-btn--danger' : 'epms-emp-icon-btn--success'
+                              }`}
                               onClick={() => openDeactivate(emp)}
-                              title="Deactivate"
+                              title={active ? 'Deactivate' : 'Activate'}
                           >
-                            <i className="bi bi-person-x" />
+                            <i className={`bi ${active ? 'bi-person-x' : 'bi-person-check'}`} />
                           </button>
                         </div>
                       </div>
