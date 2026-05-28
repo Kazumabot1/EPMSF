@@ -22,6 +22,9 @@ public interface PipRepository extends JpaRepository<Pip, Integer> {
     boolean existsByEmployeeUserIdAndStatusTrue(Integer employeeUserId);
 
     @EntityGraph(attributePaths = {"phases"})
+    List<Pip> findByEmployeeUserIdOrderByCreatedAtDesc(Integer employeeUserId);
+
+    @EntityGraph(attributePaths = {"phases"})
     Optional<Pip> findById(Integer id);
 
     @EntityGraph(attributePaths = {"phases"})

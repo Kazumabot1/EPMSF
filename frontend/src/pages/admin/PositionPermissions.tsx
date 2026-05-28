@@ -155,12 +155,12 @@ const hrPermissionSections: PermissionSection[] = [
 
 const legacyPermissionSections: PermissionSection[] = [
   {
-    title: 'Team Management',
-    description: 'Controls Department Head team access and team assignment eligibility.',
+    title: 'Team Access',
+    description: 'Controls Department Head team access only. Team assignment eligibility is managed separately for Manager and Employee positions.',
     parent: {
       key: 'teamPermission',
       label: 'Teams',
-      helper: 'Enable team-related access for this position.',
+      helper: 'Show or hide team access for this position.',
     },
     children: [
       {
@@ -271,70 +271,80 @@ const legacyPermissionSections: PermissionSection[] = [
 const allowedByRole: Record<string, PermissionField[]> = {
   HR: [
     'teamPermission',
+
     'organizationPermission',
     'departmentCrud',
     'departmentComparisonView',
     'employeeCrud',
+
     'assessmentPermission',
     'assessmentScoresView',
     'assessmentFormCreate',
+
     'appraisalPermission',
     'feedback360Permission',
     'oneOnOnePermission',
     'pipViewAll',
+
     'positionPermission',
     'kpiPermission',
     'departmentKpiPermission',
   ],
+
   DEPARTMENTHEAD: [
+    /*
+     * Department Head controls teams inside own department.
+     * Department Head is NOT assignable as Team Leader / PM / Member.
+     */
     'teamPermission',
     'teamCreate',
     'teamHistory',
-    'teamAssignAsLeader',
-    'teamAssignAsPm',
-    'teamAssignAsMember',
 
     'continuousFeedbackView',
     'continuousFeedbackGive',
 
     'departmentKpiPermission',
-
     'appraisalPermission',
-
     'oneOnOnePermission',
-
     'pipViewAll',
   ],
-MANAGER: [
-  'teamAssignAsLeader',
-  'teamAssignAsPm',
-  'teamAssignAsMember',
 
-  'appraisalPermission',
+  MANAGER: [
+    /*
+     * Manager does not need Teams sidebar permission here.
+     * These are only assignment eligibility controls.
+     */
+    'teamAssignAsLeader',
+    'teamAssignAsPm',
+    'teamAssignAsMember',
 
-  'continuousFeedbackView',
-  'continuousFeedbackGive',
+    'appraisalPermission',
+    'continuousFeedbackView',
+    'continuousFeedbackGive',
+    'oneOnOnePermission',
+    'pipViewAll',
+  ],
 
-  'oneOnOnePermission',
-
-  'pipViewAll',
-],
   EMPLOYEE: [
-    'teamPermission',
+    /*
+     * Employee does not need Teams sidebar permission.
+     * These are only assignment eligibility controls.
+     */
     'teamAssignAsLeader',
     'teamAssignAsMember',
-    'oneOnOnePermission',
-    'appraisalPermission',
-    'kpiPermission',
+
     'selfAssessmentView',
     'selfAssessmentInput',
     'selfAssessmentSign',
+
     'feedback360Permission',
     'continuousFeedbackView',
     'continuousFeedbackGive',
     'feedbackSend',
   ],
+
   ADMIN: [...POSITION_PERMISSION_FIELDS],
+
   CEO: [
     'appraisalPermission',
     'departmentComparisonView',
@@ -982,9 +992,9 @@ const PositionPermissions: React.FC = () => {
                         style={{ marginBottom: 16 }}
                       >
                         <div>
-                          <h3>Team Assignment Eligibility</h3>
-                          <p>Only valid options for this position role can be selected.</p>
-                        </div>
+                        <h3>Team Assignment Eligibility</h3>
+                        <p>Controls whether this position can be selected as Team Leader, Project Manager, or Team Member during team creation.</p>
+                                                </div>
                       </div>
 
                       <div

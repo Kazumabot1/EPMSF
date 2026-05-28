@@ -400,6 +400,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       children: [
         { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
         { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check', end: true },
+      {
+        label: 'Changes Approval',
+        path: '/executive/approval/changes',
+        icon: 'bi-arrow-left-right',
+        end: true,
+      },
       ],
     },
     {

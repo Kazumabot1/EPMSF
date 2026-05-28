@@ -101,6 +101,20 @@ public class SecurityConfig {
             "HEAD_OF_DEPARTMENT"
     );
 
+    private static final Set<String> WORKFORCE_CHANGE_REVIEW_ROLES = Set.of(
+            "HR",
+            "HUMAN_RESOURCE",
+            "HUMAN_RESOURCES",
+            "HR_MANAGER",
+            "HR_ADMIN",
+            "PEOPLE",
+            "PEOPLE_OPS",
+            "TALENT",
+            "ADMIN",
+            "CEO",
+            "EXECUTIVE"
+    );
+
     private static final Set<String> ADMIN_DASHBOARDS = Set.of(
             "ADMIN_DASHBOARD"
     );
@@ -141,6 +155,13 @@ public class SecurityConfig {
             "DEPARTMENT_HEAD_DASHBOARD",
             "DEPARTMENTHEAD_DASHBOARD",
             "DEPT_HEAD_DASHBOARD"
+    );
+
+    private static final Set<String> WORKFORCE_CHANGE_REVIEW_DASHBOARDS = Set.of(
+            "HR_DASHBOARD",
+            "ADMIN_DASHBOARD",
+            "EXECUTIVE_DASHBOARD",
+            "CEO_DASHBOARD"
     );
 
     @Bean
@@ -208,6 +229,38 @@ public class SecurityConfig {
                         )
 
                         /*
+                         * Workforce Changes.
+                         * Keep these above broad HR/CEO/common API rules.
+                         */
+                        .requestMatchers(
+                                "/api/employee-change-requests/employees/*/profile"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(
+                                        authentication.get(),
+                                        WORKFORCE_CHANGE_REVIEW_ROLES,
+                                        WORKFORCE_CHANGE_REVIEW_DASHBOARDS
+                                )
+                        )
+
+                        .requestMatchers(
+                                "/api/employee-change-requests/ceo/pending",
+                                "/api/employee-change-requests/ceo/*",
+                                "/api/employee-change-requests/ceo/*/approve",
+                                "/api/employee-change-requests/ceo/*/reject"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), EXECUTIVE_ROLES, EXECUTIVE_DASHBOARDS)
+                        )
+
+                        .requestMatchers(
+                                "/api/employee-change-requests/hr",
+                                "/api/employee-change-requests/position-change",
+                                "/api/employee-change-requests/department-change",
+                                "/api/employee-change-requests/*"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
+                        )
+
+                        /*
                          * HR position-permission protected API groups.
                          * These rules must stay above the broad HR/common matcher rules.
                          */
@@ -233,14 +286,14 @@ public class SecurityConfig {
                                 hasHrPermissionOrNonHrRole(authentication.get(), "departmentCrud")
                         )
 
-                        /*  .requestMatchers(
-                                  "/api/employees",
-                                  "/api/employees/**",
-                                  "/api/hr/employee-accounts",
-                                  "/api/hr/employee-accounts/**"
-                          ).access((authentication, context) ->
-                                  hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                          )*/
+                      /*  .requestMatchers(
+                                "/api/employees",
+                                "/api/employees/**",
+                                "/api/hr/employee-accounts",
+                                "/api/hr/employee-accounts/**"
+                        ).access((authentication, context) ->
+                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
+                        )*/
                         .requestMatchers(HttpMethod.GET, "/api/employees")
                         .access((authentication, context) ->
                                 hasHrDashboardOrNonHrRole(authentication.get())
@@ -290,8 +343,6 @@ public class SecurityConfig {
                                 "/api/hr/appraisal/cycles/**",
                                 "/api/appraisal/cycles",
                                 "/api/appraisal/cycles/**",
-                                "/api/hr/appraisal/cycles",
-                                "/api/hr/appraisal/cycles/**",
                                 "/api/hr/appraisal/score-bands",
                                 "/api/hr/appraisal/score-bands/**",
                                 "/api/appraisal/workflow",
@@ -305,6 +356,10 @@ public class SecurityConfig {
                                 )
                         )
 
+                        /*
+                         * HR 360 setup remains permission-controlled.
+                         * Manager/DH/Employee feedback access is controlled by assignment/service rules.
+                         */
                         .requestMatchers(
                                 "/api/v1/feedback",
                                 "/api/v1/feedback/**"
@@ -335,10 +390,7 @@ public class SecurityConfig {
                                 "/api/pip-updates",
                                 "/api/pip-updates/**"
                         ).access((authentication, context) ->
-                                hasPositionPermissionForAuthenticatedUser(
-                                        authentication.get(),
-                                        "pipViewAll"
-                                )
+                                hasPipApiPermission(authentication.get())
                         )
 
                         .requestMatchers(
@@ -376,7 +428,6 @@ public class SecurityConfig {
                         )
 
                         .requestMatchers(
-                                "/api/hr/kpi-templates/**",
                                 "/api/hr/kpi-template-cycles",
                                 "/api/hr/kpi-template-cycles/**",
                                 "/api/hr/department-kpi-templates",
@@ -395,7 +446,7 @@ public class SecurityConfig {
                         )
 
                         /*
-                         * Default/common HR APIs that do not depend on the new sidebar permissions.
+                         * Default/common HR APIs that do not depend on sidebar permissions.
                          */
                         .requestMatchers(
                                 "/api/dashboard",
@@ -569,6 +620,30 @@ public class SecurityConfig {
         );
     }
 
+    private AuthorizationDecision hasPipApiPermission(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))
+                || Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
+                || Boolean.TRUE.equals(isCurrentAuthenticationDepartmentHead(authentication))) {
+            return new AuthorizationDecision(
+                    positionPermissionService.currentUserHasPermission("pipViewAll")
+            );
+        }
+
+        /*
+         * Employee own PIP visibility stays authenticated.
+         * Service-level ownership checks still decide which records can be opened.
+         */
+        return new AuthorizationDecision(true);
+    }
+
     private AuthorizationDecision hasEmployeeAssessmentScoreTablePermission(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return new AuthorizationDecision(false);
@@ -674,12 +749,6 @@ public class SecurityConfig {
         return new AuthorizationDecision(true);
     }
 
-    /*
-     * Used for APIs that may be accessed by HR or other roles.
-     * If current user is HR, enforce HR position permission.
-     * If current user is not HR/Admin, allow the request and let service-level
-     * ownership/department checks decide.
-     */
     private AuthorizationDecision hasHrPermissionOrNonHrRole(
             Authentication authentication,
             String permissionField
@@ -730,6 +799,18 @@ public class SecurityConfig {
         );
     }
 
+    private boolean isCurrentAuthenticationManager(Authentication authentication) {
+        return Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, MANAGER_ROLES, MANAGER_DASHBOARDS).isGranted()
+        );
+    }
+
+    private boolean isCurrentAuthenticationDepartmentHead(Authentication authentication) {
+        return Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS).isGranted()
+        );
+    }
+
     private boolean isCurrentAuthenticationHr(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return false;
@@ -774,56 +855,6 @@ public class SecurityConfig {
         }
 
         return false;
-    }
-
-    private AuthorizationDecision isHrOrAdmin(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        Object principal = authentication.getPrincipal();
-
-        if (principal == null || "anonymousUser".equals(principal)) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (principal instanceof UserPrincipal userPrincipal) {
-            String dashboard = normalizeAuthorityName(userPrincipal.getDashboard());
-
-            if ("HR_DASHBOARD".equals(dashboard) || "ADMIN_DASHBOARD".equals(dashboard)) {
-                return new AuthorizationDecision(true);
-            }
-
-            if (userPrincipal.getRoles() != null) {
-                for (String role : userPrincipal.getRoles()) {
-                    String normalizedRole = normalizeAuthorityName(role);
-
-                    if ("ADMIN".equals(normalizedRole) || isHrLike(normalizedRole)) {
-                        return new AuthorizationDecision(true);
-                    }
-                }
-            }
-
-            String normalizedPosition = normalizeAuthorityName(userPrincipal.getPosition());
-
-            if (isHrLike(normalizedPosition)) {
-                return new AuthorizationDecision(true);
-            }
-        }
-
-        for (GrantedAuthority authority : authentication.getAuthorities()) {
-            if (authority == null) {
-                continue;
-            }
-
-            String normalizedAuthority = normalizeAuthorityName(authority.getAuthority());
-
-            if ("ADMIN".equals(normalizedAuthority) || isHrLike(normalizedAuthority)) {
-                return new AuthorizationDecision(true);
-            }
-        }
-
-        return new AuthorizationDecision(false);
     }
 
     private AuthorizationDecision hasRoleDashboardOrPosition(

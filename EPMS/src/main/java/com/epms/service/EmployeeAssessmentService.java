@@ -853,8 +853,11 @@ public class EmployeeAssessmentService {
 
         if (isDepartmentHeadRole(roles)
                 && departmentId != null
-                && currentUserDepartmentIds(principal).contains(departmentId)
-                && positionPermissionService.currentUserHasPermission("selfAssessmentView")) {
+                && currentUserDepartmentIds(principal).contains(departmentId)) {
+            /*
+             * Department Head self-assessment detail view is default read-only access.
+             * No position permission is required here.
+             */
             return;
         }
 
