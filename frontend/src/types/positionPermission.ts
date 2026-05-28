@@ -1,4 +1,17 @@
 export interface PositionPermission {
+  // Derived aliases used by route guards/sidebar. They are calculated from granular permissions.
+  teamPermission: boolean;
+  organizationPermission: boolean;
+  assessmentPermission: boolean;
+  appraisalPermission: boolean;
+  feedback360Permission: boolean;
+  oneOnOnePermission: boolean;
+  positionPermission: boolean;
+  kpiPermission: boolean;
+  departmentKpiPermission: boolean;
+  assessmentScoresView: boolean;
+  assessmentFormCreate: boolean;
+
   oneOnOneCreate: boolean;
   oneOnOneDeptSelection: boolean;
   oneOnOneTeamSelection: boolean;

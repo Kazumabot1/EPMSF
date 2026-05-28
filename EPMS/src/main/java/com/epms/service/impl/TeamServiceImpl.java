@@ -744,11 +744,11 @@ public class TeamServiceImpl implements TeamService {
         }
 
         if (currentUserIsDepartmentHead()
-                && positionPermissionService.currentUserHasPermission("teamCreate")) {
+                && positionPermissionService.currentUserHasPermission("teamEdit")) {
             return;
         }
 
-        throw new AccessDeniedException("Only Department Heads with Create Team permission can edit teams.");
+        throw new AccessDeniedException("Only Department Heads with Edit Team permission can edit teams.");
     }
 
     private void assertCurrentUserCanDeleteTeams() {
@@ -1185,20 +1185,20 @@ public class TeamServiceImpl implements TeamService {
         List<TeamResponseDto.MemberInfo> members = team.getTeamMembers() == null
                 ? List.of()
                 : team.getTeamMembers()
-                  .stream()
-                  .filter(Objects::nonNull)
-                  .filter(member -> member.getEndedDate() == null)
-                  .filter(member -> member.getMemberUser() != null)
-                  .sorted(Comparator.comparing(
-                          member -> displayUser(member.getMemberUser()),
-                          String.CASE_INSENSITIVE_ORDER
-                  ))
-                  .map(member -> new TeamResponseDto.MemberInfo(
-                          member.getMemberUser().getId(),
-                          displayUser(member.getMemberUser()),
-                          member.getStartedDate()
-                  ))
-                  .toList();
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(member -> member.getEndedDate() == null)
+                .filter(member -> member.getMemberUser() != null)
+                .sorted(Comparator.comparing(
+                        member -> displayUser(member.getMemberUser()),
+                        String.CASE_INSENSITIVE_ORDER
+                ))
+                .map(member -> new TeamResponseDto.MemberInfo(
+                        member.getMemberUser().getId(),
+                        displayUser(member.getMemberUser()),
+                        member.getStartedDate()
+                ))
+                .toList();
 
         dto.setMembers(members);
 

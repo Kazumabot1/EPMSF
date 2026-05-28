@@ -13,6 +13,22 @@ public class PositionPermissionDto {
     private Integer positionId;
     private String positionTitle;
 
+    /*
+     * Derived permission aliases used by frontend route guards and SecurityConfig.
+     * These are not stored as separate DB columns; service calculates them from granular fields.
+     */
+    private Boolean teamPermission;
+    private Boolean organizationPermission;
+    private Boolean assessmentPermission;
+    private Boolean appraisalPermission;
+    private Boolean feedback360Permission;
+    private Boolean oneOnOnePermission;
+    private Boolean positionPermission;
+    private Boolean kpiPermission;
+    private Boolean departmentKpiPermission;
+    private Boolean assessmentScoresView;
+    private Boolean assessmentFormCreate;
+
     private Boolean oneOnOneCreate;
     private Boolean oneOnOneDeptSelection;
     private Boolean oneOnOneTeamSelection;

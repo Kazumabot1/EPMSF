@@ -153,10 +153,8 @@ const TeamManagement: React.FC = () => {
       .getMyPermissions()
       .then((permissions) => {
         if (!cancelled) {
-          const canCreate = Boolean(permissions.teamCreate);
-
-          setCanCreateTeam(canCreate);
-          setCanEditTeam(canCreate);
+          setCanCreateTeam(Boolean(permissions.teamCreate));
+          setCanEditTeam(Boolean(permissions.teamEdit));
           setCanHistoryTeam(Boolean(permissions.teamHistory));
         }
       })

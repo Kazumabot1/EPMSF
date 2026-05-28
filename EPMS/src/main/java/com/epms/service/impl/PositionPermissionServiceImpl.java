@@ -202,7 +202,52 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
     }
 
     private boolean hasPermission(PositionPermission pp, String field) {
+        if (pp == null || field == null || field.isBlank()) {
+            return false;
+        }
+
         return switch (field) {
+            /* Derived group aliases used by frontend route guards and SecurityConfig. */
+            case "teamPermission" -> safe(pp.getTeamView())
+                    || safe(pp.getTeamCreate())
+                    || safe(pp.getTeamEdit())
+                    || safe(pp.getTeamHistory())
+                    || safe(pp.getTeamAssignAsLeader())
+                    || safe(pp.getTeamAssignAsPm())
+                    || safe(pp.getTeamAssignAsMember());
+            case "organizationPermission" -> safe(pp.getDepartmentCrud())
+                    || safe(pp.getDepartmentComparisonView())
+                    || safe(pp.getEmployeeCrud())
+                    || safe(pp.getEmployeeExcelImport());
+            case "assessmentPermission" -> safe(pp.getSelfAssessmentView())
+                    || safe(pp.getSelfAssessmentInput())
+                    || safe(pp.getSelfAssessmentLock())
+                    || safe(pp.getSelfAssessmentSign());
+            case "assessmentScoresView" -> safe(pp.getSelfAssessmentView())
+                    || safe(pp.getSelfAssessmentLock())
+                    || safe(pp.getSelfAssessmentSign());
+            case "assessmentFormCreate" -> safe(pp.getSelfAssessmentLock());
+            case "appraisalPermission" -> safe(pp.getAppraisalReview())
+                    || safe(pp.getAppraisalApprove())
+                    || safe(pp.getAppraisalView())
+                    || safe(pp.getAppraisalScoreInput())
+                    || safe(pp.getAppraisalSign());
+            case "kpiPermission" -> safe(pp.getKpiCreate())
+                    || safe(pp.getKpiEdit())
+                    || safe(pp.getKpiScore())
+                    || safe(pp.getKpiView())
+                    || safe(pp.getKpiInput());
+            case "departmentKpiPermission" -> safe(pp.getKpiCreate())
+                    || safe(pp.getKpiEdit())
+                    || safe(pp.getKpiScore())
+                    || safe(pp.getKpiView());
+            case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate())
+                    || safe(pp.getOneOnOneDeptSelection())
+                    || safe(pp.getOneOnOneTeamSelection());
+            case "feedback360Permission" -> safe(pp.getFeedbackFormCreate())
+                    || safe(pp.getFeedbackSend());
+            case "positionPermission" -> safe(pp.getPositionCrud());
+
             case "oneOnOneCreate" -> safe(pp.getOneOnOneCreate());
             case "oneOnOneDeptSelection" -> safe(pp.getOneOnOneDeptSelection());
             case "oneOnOneTeamSelection" -> safe(pp.getOneOnOneTeamSelection());
@@ -259,6 +304,18 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
         pp.normalizeNullBooleans();
 
         return PositionPermissionDto.builder()
+                .teamPermission(hasPermission(pp, "teamPermission"))
+                .organizationPermission(hasPermission(pp, "organizationPermission"))
+                .assessmentPermission(hasPermission(pp, "assessmentPermission"))
+                .appraisalPermission(hasPermission(pp, "appraisalPermission"))
+                .feedback360Permission(hasPermission(pp, "feedback360Permission"))
+                .oneOnOnePermission(hasPermission(pp, "oneOnOnePermission"))
+                .positionPermission(hasPermission(pp, "positionPermission"))
+                .kpiPermission(hasPermission(pp, "kpiPermission"))
+                .departmentKpiPermission(hasPermission(pp, "departmentKpiPermission"))
+                .assessmentScoresView(hasPermission(pp, "assessmentScoresView"))
+                .assessmentFormCreate(hasPermission(pp, "assessmentFormCreate"))
+
                 .oneOnOneCreate(safe(pp.getOneOnOneCreate()))
                 .oneOnOneDeptSelection(safe(pp.getOneOnOneDeptSelection()))
                 .oneOnOneTeamSelection(safe(pp.getOneOnOneTeamSelection()))

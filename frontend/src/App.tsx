@@ -295,9 +295,13 @@ function App() {
                   <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
                 </Route>
 
-                <Route element={<PositionPermissionRoute permission="teamPermission" fallbackPath="/department-head/dashboard" />}>
-                  <Route path="/department-head/teams" element={<TeamManagement />} />
+                <Route path="/department-head/teams" element={<TeamManagement />} />
+
+                <Route element={<PositionPermissionRoute permission="teamCreate" fallbackPath="/department-head/teams" />}>
                   <Route path="/department-head/teams/create" element={<TeamCreate />} />
+                </Route>
+
+                <Route element={<PositionPermissionRoute permission="teamHistory" fallbackPath="/department-head/teams" />}>
                   <Route path="/department-head/team-history" element={<TeamHistoryPage />} />
                 </Route>
               </Route>
@@ -316,8 +320,11 @@ function App() {
                   <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
                 </Route>
 
-                <Route element={<PositionPermissionRoute permission="teamPermission" fallbackPath="/dashboard" />}>
+                <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/dashboard" />}>
                   <Route path="/hr/team" element={<TeamManagement />} />
+                </Route>
+
+                <Route element={<PositionPermissionRoute permission="teamHistory" fallbackPath="/dashboard" />}>
                   <Route path="/hr/team/history" element={<TeamHistoryPage />} />
                 </Route>
 

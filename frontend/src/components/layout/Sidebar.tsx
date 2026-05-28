@@ -34,9 +34,15 @@ const normalizeRoleName = (role?: string | null) =>
 const allow = (permissions: PositionPermission, key: keyof PositionPermission) => {
   switch (key) {
     case 'teamPermission':
-    case 'teamView':
-    case 'teamHistory':
       return Boolean(permissions.teamPermission);
+    case 'teamView':
+      return Boolean(permissions.teamView);
+    case 'teamCreate':
+      return Boolean(permissions.teamCreate);
+    case 'teamEdit':
+      return Boolean(permissions.teamEdit);
+    case 'teamHistory':
+      return Boolean(permissions.teamHistory);
 
     case 'departmentCrud':
     case 'departmentComparisonView':
@@ -243,19 +249,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
       { to: '/hr/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
 
-      allow(positionPermissions, 'teamPermission') && {
-        to: '/hr/team',
+      (allow(positionPermissions, 'teamView') || allow(positionPermissions, 'teamHistory')) && {
+        to: allow(positionPermissions, 'teamView') ? '/hr/team' : '/hr/team/history',
         label: 'Teams',
         icon: 'bi bi-people-fill',
-        children: [
-          { to: '/hr/team', label: 'View Teams', icon: 'bi bi-eye', end: true },
-          {
+        children: compactItems([
+          allow(positionPermissions, 'teamView') && { to: '/hr/team', label: 'View Teams', icon: 'bi bi-eye', end: true },
+          allow(positionPermissions, 'teamHistory') && {
             to: '/hr/team/history',
             label: 'Team History',
             icon: 'bi bi-clock-history',
             end: true,
           },
-        ],
+        ]),
       },
 
       organizationChildren.length > 0 && {
@@ -730,28 +736,28 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-building-check',
       },
 
-      allow(positionPermissions, 'teamPermission') && {
+      {
         to: '/department-head/teams',
         label: 'Teams',
         icon: 'bi bi-people-fill',
-        children: [
+        children: compactItems([
           {
             to: '/department-head/teams',
             label: 'View Teams',
             icon: 'bi bi-eye',
             end: true,
           },
-          {
+          allow(positionPermissions, 'teamCreate') && {
             to: '/department-head/teams/create',
             label: 'Create Team',
             icon: 'bi bi-plus-square',
           },
-          {
+          allow(positionPermissions, 'teamHistory') && {
             to: '/department-head/team-history',
             label: 'Team History',
             icon: 'bi bi-clock-history',
           },
-        ],
+        ]),
       },
 
       {

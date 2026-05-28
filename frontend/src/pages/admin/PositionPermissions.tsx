@@ -122,7 +122,7 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
   ],
   DEPARTMENTHEAD: [
-    'teamCreate', 'teamHistory',
+    'teamView', 'teamCreate', 'teamEdit', 'teamHistory',
     'oneOnOneCreate', 'oneOnOneDeptSelection',
     'pipCreate', 'pipViewAll',
     'appraisalReview', 'appraisalView', 'appraisalSign',
