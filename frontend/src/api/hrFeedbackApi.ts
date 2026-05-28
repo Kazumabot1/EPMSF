@@ -209,6 +209,7 @@ export interface DynamicPreviewQuestion {
     responseType: string;
     scoringBehavior?: string | null;
     questionText: string;
+    helpText?: string | null;
     questionOrder: number;
     ratingScaleId?: number | null;
     ratingScaleMin?: number | null;

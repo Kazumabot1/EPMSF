@@ -953,13 +953,13 @@ export default function QuestionRulesTab() {
         <div className="hfdq-page hfdq-rule-set-page">
             <div className="hfdq-page-head">
                 <div>
-                    <p className="hfdq-breadcrumb"><i className="bi bi-house" /> 360 Feedback / Question Rules</p>
-                    <h2>Question Rules</h2>
-                    <p>Build reusable rule sets that decide which active questions apply by level, evaluator role, department, and position.</p>
+                    <p className="hfdq-breadcrumb"><i className="bi bi-house" /> 360 Feedback / Rule Sets</p>
+                    <h2>Rule Sets</h2>
+                    <p>Decide which competency questions appear for each employee level, evaluator relationship, department, and position.</p>
                 </div>
                 <div className="hfdq-actions">
                     <button className="hfd-btn hfd-btn-secondary" onClick={loadAll} disabled={loading || busy}><i className="bi bi-arrow-clockwise" /> Refresh</button>
-                    <button className="hfd-btn hfd-btn-primary" onClick={openBuilder}><i className="bi bi-plus-lg" /> Create Rule Set</button>
+                    <button className="hfd-btn hfd-btn-primary" onClick={openBuilder}><i className="bi bi-plus-lg" /> New Rule Set</button>
                 </div>
             </div>
 
@@ -971,10 +971,10 @@ export default function QuestionRulesTab() {
             )}
 
             <div className="hfdq-stats-grid">
-                <RuleMetric label="Rule Sets" value={stats.ruleSets} note="Grouped HR workspace" tone="blue" />
-                <RuleMetric label="Active Rows" value={stats.activeRules} note="Generated active rows" tone="purple" />
-                <RuleMetric label="Covered Cells" value={stats.coveredCombos} note="Level/role cells" tone="green" />
-                <RuleMetric label="Conflicts" value={stats.conflicts} note={stats.conflicts ? 'Review overlaps' : 'No conflicts'} tone="orange" />
+                <RuleMetric label="Rule Sets" value={stats.ruleSets} note="Saved groups" tone="blue" />
+                <RuleMetric label="Active Rules" value={stats.activeRules} note="Used by preview" tone="purple" />
+                <RuleMetric label="Covered Cells" value={stats.coveredCombos} note="Level + relationship" tone="green" />
+                <RuleMetric label="Conflicts" value={stats.conflicts} note={stats.conflicts ? 'Needs review' : 'No conflicts'} tone="orange" />
             </div>
 
             {conflictIds.size > 0 && (
@@ -1012,7 +1012,7 @@ export default function QuestionRulesTab() {
                                 <span>Rule Sets</span>
                                 <strong>{filteredGroups.length} groups</strong>
                             </div>
-                            <small>Rule Sets define which questions appear for each evaluator role and target employee group.</small>
+                            <small>Rule Sets define which rating questions appear for each evaluator relationship and target employee group.</small>
                         </div>
 
                         {loading ? (
@@ -1048,7 +1048,7 @@ export default function QuestionRulesTab() {
                                             {expandedRuleSetKeys.has(group.key) && (
                                                 <div className="hfdq-rule-set-details">
                                                     <div>
-                                                        <strong>Questions</strong>
+                                                        <strong>Competency questions</strong>
                                                         {group.questions.map(question => <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>)}
                                                     </div>
                                                     <div>
@@ -1087,7 +1087,7 @@ export default function QuestionRulesTab() {
                         <div className="hfdq-rule-section-head compact hfdq-matrix-headbar">
                             <div>
                                 <span>Coverage Matrix</span>
-                                <strong>Questions by level and role</strong>
+                                <strong>Questions by level and relationship</strong>
                             </div>
                         </div>
                         {visibleMatrixHealthItems.length > 0 && (
