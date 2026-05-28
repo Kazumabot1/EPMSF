@@ -27,10 +27,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class TeamAccessService {
+
+    private static final Set<String> MANAGER_ROLES = Set.of(
+            "MANAGER",
+            "PROJECT_MANAGER",
+            "TEAM_MANAGER"
+    );
+
+    private static final Set<String> DEPARTMENT_HEAD_ROLES = Set.of(
+            "DEPARTMENT_HEAD",
+            "DEPARTMENTHEAD",
+            "DEPT_HEAD",
+            "HEAD_OF_DEPARTMENT"
+    );
+
+    private static final Set<String> MANAGER_DASHBOARDS = Set.of("MANAGER_DASHBOARD");
+
+    private static final Set<String> DEPARTMENT_HEAD_DASHBOARDS = Set.of(
+            "DEPARTMENT_HEAD_DASHBOARD",
+            "DEPARTMENTHEAD_DASHBOARD",
+            "DEPT_HEAD_DASHBOARD"
+    );
 
     private final TeamRepository teamRepository;
     private final EmployeeRepository employeeRepository;
@@ -41,9 +63,8 @@ public class TeamAccessService {
     @Transactional(readOnly = true)
     public OneOnOneAccessContextResponseDto getOneOnOneContext() {
         UserPrincipal current = SecurityUtils.currentUser();
-        boolean canCreate = positionPermissionService.currentUserHasPermission("oneOnOneCreate");
-        boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
-        boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
+        boolean canCreate = positionPermissionService.currentUserHasPermission("oneOnOneCreate")
+                || isManagerOrDepartmentHead(current);
 
         if (!canCreate) {
             return OneOnOneAccessContextResponseDto.builder()
@@ -56,6 +77,39 @@ public class TeamAccessService {
                     .build();
         }
 
+        Department defaultDepartment = resolveDefaultDepartment(current).orElse(null);
+        Integer defaultDepartmentId = defaultDepartment == null ? null : defaultDepartment.getId();
+        String defaultDepartmentName = defaultDepartment == null ? null : defaultDepartment.getDepartmentName();
+
+        if (isDepartmentHead(current)) {
+            return OneOnOneAccessContextResponseDto.builder()
+                    .accessMode("DEPARTMENT_HEAD_SCOPE")
+                    .departmentId(defaultDepartmentId)
+                    .departmentName(defaultDepartmentName)
+                    .canCreate(true)
+                    .canSelectDepartment(false)
+                    .canSelectTeam(true)
+                    .teamRequired(false)
+                    .canUseDepartmentEmployeeScope(true)
+                    .build();
+        }
+
+        if (isManager(current)) {
+            return OneOnOneAccessContextResponseDto.builder()
+                    .accessMode("MANAGED_TEAM_ONLY")
+                    .departmentId(defaultDepartmentId)
+                    .departmentName(defaultDepartmentName)
+                    .canCreate(true)
+                    .canSelectDepartment(false)
+                    .canSelectTeam(true)
+                    .teamRequired(true)
+                    .canUseDepartmentEmployeeScope(false)
+                    .build();
+        }
+
+        boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
+        boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
+
         if (canSelectDepartment) {
             return OneOnOneAccessContextResponseDto.builder()
                     .accessMode("DEPARTMENT_SELECTION")
@@ -67,13 +121,11 @@ public class TeamAccessService {
                     .build();
         }
 
-        Department defaultDepartment = resolveDefaultDepartment(current).orElse(null);
-
         if (canSelectAnyTeamInDefaultDepartment) {
             return OneOnOneAccessContextResponseDto.builder()
                     .accessMode("TEAM_SELECTION")
-                    .departmentId(defaultDepartment == null ? null : defaultDepartment.getId())
-                    .departmentName(defaultDepartment == null ? null : defaultDepartment.getDepartmentName())
+                    .departmentId(defaultDepartmentId)
+                    .departmentName(defaultDepartmentName)
                     .canCreate(true)
                     .canSelectDepartment(false)
                     .canSelectTeam(true)
@@ -84,8 +136,8 @@ public class TeamAccessService {
 
         return OneOnOneAccessContextResponseDto.builder()
                 .accessMode("MANAGED_TEAM_ONLY")
-                .departmentId(defaultDepartment == null ? null : defaultDepartment.getId())
-                .departmentName(defaultDepartment == null ? null : defaultDepartment.getDepartmentName())
+                .departmentId(defaultDepartmentId)
+                .departmentName(defaultDepartmentName)
                 .canCreate(true)
                 .canSelectDepartment(false)
                 .canSelectTeam(true)
@@ -97,16 +149,24 @@ public class TeamAccessService {
     @Transactional(readOnly = true)
     public List<TeamOptionResponseDto> getOneOnOneTeamOptions(Integer departmentId) {
         assertCanCreateOneOnOne();
+        UserPrincipal current = SecurityUtils.currentUser();
 
-        boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
-        boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
-
-        if (canSelectDepartment) {
+        if (isDepartmentHead(current)) {
             Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(departmentId);
             return findActiveTeamsByDepartment(allowedDepartmentId);
         }
 
-        if (canSelectAnyTeamInDefaultDepartment) {
+        if (isManager(current)) {
+            return getManagedTeams(SecurityUtils.currentUserId()).stream()
+                    .map(this::toTeamOption)
+                    .sorted(Comparator.comparing(TeamOptionResponseDto::getTeamName, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+        }
+
+        boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
+        boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
+
+        if (canSelectDepartment || canSelectAnyTeamInDefaultDepartment) {
             Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(departmentId);
             return findActiveTeamsByDepartment(allowedDepartmentId);
         }
@@ -239,6 +299,24 @@ public class TeamAccessService {
             throw new RuntimeException("Selected team is not active.");
         }
 
+        UserPrincipal current = SecurityUtils.currentUser();
+
+        if (isDepartmentHead(current)) {
+            Integer allowedDepartmentId = requireAllowedOneOnOneDepartment(requestedDepartmentId);
+            Integer teamDepartmentId = team.getDepartment() == null ? null : team.getDepartment().getId();
+            if (!Objects.equals(teamDepartmentId, allowedDepartmentId)) {
+                throw new UnauthorizedActionException("Selected team is outside your department.");
+            }
+            return team;
+        }
+
+        if (isManager(current)) {
+            if (!isManagedByUser(team, SecurityUtils.currentUserId())) {
+                throw new UnauthorizedActionException("You can access only teams you lead or manage.");
+            }
+            return team;
+        }
+
         boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
         boolean canSelectAnyTeamInDefaultDepartment = positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
 
@@ -262,6 +340,16 @@ public class TeamAccessService {
 
     private Integer requireAllowedOneOnOneDepartment(Integer requestedDepartmentId) {
         UserPrincipal current = SecurityUtils.currentUser();
+
+        if (isDepartmentHead(current) || isManager(current)) {
+            Department defaultDepartment = resolveDefaultDepartment(current)
+                    .orElseThrow(() -> new RuntimeException("Your account has no default department for one-on-one meetings."));
+            if (requestedDepartmentId != null && !Objects.equals(requestedDepartmentId, defaultDepartment.getId())) {
+                throw new UnauthorizedActionException("You can create one-on-one meetings only in your department.");
+            }
+            return defaultDepartment.getId();
+        }
+
         boolean canSelectDepartment = positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection");
 
         if (canSelectDepartment) {
@@ -282,15 +370,82 @@ public class TeamAccessService {
     }
 
     private boolean canUseDepartmentEmployeeScope() {
+        UserPrincipal current = SecurityUtils.currentUser();
+        if (isDepartmentHead(current)) {
+            return true;
+        }
+        if (isManager(current)) {
+            return false;
+        }
         return positionPermissionService.currentUserHasPermission("oneOnOneDeptSelection")
                 || positionPermissionService.currentUserHasPermission("oneOnOneTeamSelection");
     }
 
     private void assertCanCreateOneOnOne() {
-        boolean canCreate = positionPermissionService.currentUserHasPermission("oneOnOneCreate");
+        boolean canCreate = positionPermissionService.currentUserHasPermission("oneOnOneCreate")
+                || isManagerOrDepartmentHead(SecurityUtils.currentUser());
         if (!canCreate) {
             throw new UnauthorizedActionException("Your position does not have permission to create one-on-one meetings.");
         }
+    }
+
+    private boolean isManagerOrDepartmentHead(UserPrincipal principal) {
+        return isDepartmentHead(principal) || isManager(principal);
+    }
+
+    private boolean isDepartmentHead(UserPrincipal principal) {
+        if (principal == null) {
+            return false;
+        }
+
+        String dashboard = normalizeRoleToken(principal.getDashboard());
+        if (DEPARTMENT_HEAD_DASHBOARDS.contains(dashboard)) {
+            return true;
+        }
+
+        if (principal.getRoles() != null) {
+            for (String role : principal.getRoles()) {
+                if (DEPARTMENT_HEAD_ROLES.contains(normalizeRoleToken(role))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isManager(UserPrincipal principal) {
+        if (principal == null || isDepartmentHead(principal)) {
+            return false;
+        }
+
+        String dashboard = normalizeRoleToken(principal.getDashboard());
+        if (MANAGER_DASHBOARDS.contains(dashboard)) {
+            return true;
+        }
+
+        if (principal.getRoles() != null) {
+            for (String role : principal.getRoles()) {
+                if (MANAGER_ROLES.contains(normalizeRoleToken(role))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private String normalizeRoleToken(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
     }
 
     private Optional<Department> resolveDefaultDepartment(UserPrincipal current) {

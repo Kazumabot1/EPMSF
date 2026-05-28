@@ -167,7 +167,21 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycleRepository.save(cycle);
         cycleRepository.flush();
         if (active) {
-            employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+            List<KpiTemplateCycleForm> links = cycleFormRepository.findWithFormsByCycleId(id);
+            if (links.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
+            }
+            try {
+                employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+            } catch (ResponseStatusException ex) {
+                throw ex;
+            } catch (RuntimeException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Failed to activate KPI cycle. Check cycle dates and period configuration.",
+                        ex
+                );
+            }
         } else {
             employeeKpiWorkflowService.startCycleClosingGrace(id);
         }

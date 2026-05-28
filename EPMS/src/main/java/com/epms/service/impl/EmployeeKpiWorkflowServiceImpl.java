@@ -1492,15 +1492,34 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             return List.of();
         }
 
-        List<EmployeeKpiForm> forms = employeeKpiFormRepository.findDetailedByEmployeeAndStatus(
-                user.getEmployeeId(),
-                EmployeeKpiStatus.FINALIZED
+        Integer employeeId = user.getEmployeeId();
+
+        List<EmployeeKpiForm> forms = new ArrayList<>(
+                employeeKpiFormRepository.findDetailedByEmployeeAndStatus(employeeId, EmployeeKpiStatus.FINALIZED)
         );
+
+        Set<Integer> seen = forms.stream().map(EmployeeKpiForm::getId).collect(Collectors.toCollection(LinkedHashSet::new));
+
+        List<EmployeeKpiStatus> closedStatuses = List.of(EmployeeKpiStatus.CLOSED);
+        employeeKpiFormRepository.findOpenByEmployeeIdWithDetail(employeeId, closedStatuses).stream()
+                .filter(form -> !seen.contains(form.getId()))
+                .filter(this::hasRecordedActualScores)
+                .forEach(form -> {
+                    forms.add(form);
+                    seen.add(form.getId());
+                });
 
         return forms.stream()
                 .sorted(Comparator.comparing((EmployeeKpiForm ekf) -> ekf.getKpiForm().getTitle()))
                 .map(this::toEmployeeResultDto)
                 .toList();
+    }
+
+    private boolean hasRecordedActualScores(EmployeeKpiForm form) {
+        if (form.getScores() == null || form.getScores().isEmpty()) {
+            return false;
+        }
+        return form.getScores().stream().anyMatch(score -> score.getActualValue() != null);
     }
 
     private EmployeeKpiResultDto toEmployeeResultDto(EmployeeKpiForm ekf) {

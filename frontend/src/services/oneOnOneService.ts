@@ -38,7 +38,8 @@ export interface OneOnOneAccessContext {
     | 'DEPARTMENT_AND_TEAM_SELECTION'
     | 'DEFAULT_DEPARTMENT'
     | 'TEAM_SELECTION'
-    | 'MANAGED_TEAM_ONLY';
+    | 'MANAGED_TEAM_ONLY'
+    | 'DEPARTMENT_HEAD_SCOPE';
   departmentId?: number | null;
   departmentName?: string | null;
   canCreate: boolean;

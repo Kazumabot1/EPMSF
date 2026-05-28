@@ -238,7 +238,14 @@ public class DepartmentHeadDashboardController {
         dto.setDepartmentId(department.getId());
         dto.setDepartmentName(department.getDepartmentName());
         dto.setDepartmentCode(department.getDepartmentCode());
-        dto.setHeadEmployee(department.getHeadEmployee());
+        String headEmployee = department.getHeadEmployee();
+        if (headEmployee == null || headEmployee.isBlank()) {
+            UserPrincipal current = SecurityUtils.currentUser();
+            if (current.getFullName() != null && !current.getFullName().isBlank()) {
+                headEmployee = current.getFullName().trim();
+            }
+        }
+        dto.setHeadEmployee(headEmployee);
         dto.setStatus(department.getStatus());
         dto.setCreatedBy(department.getCreatedBy());
         dto.setCreatedAt(department.getCreatedAt());

@@ -556,6 +556,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard-check',
       },
       {
+        to: '/manager/kpis',
+        label: 'My KPIs',
+        icon: 'bi bi-bullseye',
+      },
+      {
         to: '/manager/kpi-scoring',
         label: 'Team KPIs',
         icon: 'bi bi-bullseye',
@@ -691,17 +696,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
+      { to: '/executive/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       {
-        to: '/executive/approval/kpi',
-        label: 'Approval',
-        icon: 'bi bi-shield-check',
+        to: '/executive/kpi-scoring',
+        label: 'KPI Management',
+        icon: 'bi bi-bullseye',
         children: [
-          { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
+          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
+          { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-shield-check' },
           {
             to: '/executive/approval/department-kpi',
             label: 'Department KPI Approval',
             icon: 'bi bi-building-check',
-            end: true,
           },
         ],
       },
@@ -760,9 +767,32 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
 
       {
+        to: '/department-head/kpis',
+        label: 'My KPIs',
+        icon: 'bi bi-bullseye',
+      },
+      {
         to: '/department-head/department-kpis',
         label: 'Department KPIs',
         icon: 'bi bi-building-check',
+      },
+      {
+        to: '/department-head/kpi-scoring',
+        label: 'Manager KPI Scoring',
+        icon: 'bi bi-ui-checks-grid',
+        children: [
+          {
+            to: '/department-head/kpi-scoring',
+            label: 'Score Managers',
+            icon: 'bi bi-clipboard2-check',
+            end: true,
+          },
+          {
+            to: '/department-head/kpi/history',
+            label: 'KPI History',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
 
       {

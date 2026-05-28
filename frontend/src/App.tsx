@@ -14,6 +14,7 @@ import OneOnOneActionItems from './components/OneOnOneActionItems';
 
 import ProtectedRoute from './routes/ProtectedRoute';
 import PositionPermissionRoute from './routes/PositionPermissionRoute';
+import OneOnOneRouteGate from './routes/OneOnOneRouteGate';
 import AppLayout from './layouts/AppLayout';
 
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
@@ -145,9 +146,9 @@ function App() {
               />
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={['HR']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['HR', 'Manager', 'DepartmentHead']} />}>
               <Route element={<AppLayout />}>
-                <Route element={<PositionPermissionRoute permission="oneOnOnePermission" fallbackPath="/dashboard" />}>
+                <Route element={<OneOnOneRouteGate />}>
                   <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
                   <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
                 </Route>
@@ -158,8 +159,6 @@ function App() {
               <Route element={<AppLayout />}>
                 <Route path="/continuous-feedback" element={<ContinuousFeedbackPage />} />
                 <Route path="/pip/create" element={<PipCreatePage />} />
-                <Route path="/one-on-one-meetings" element={<OneOnOneMeetings />} />
-                <Route path="/one-on-one-action-items" element={<OneOnOneActionItems />} />
               </Route>
             </Route>
 

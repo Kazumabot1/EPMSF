@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import ProfileNameCell from '../../components/ProfileNameCell';
 import {
   createDepartmentHeadTeam,
@@ -205,6 +206,7 @@ const Icon = ({ name, className = 'h-5 w-5' }: { name: IconName; className?: str
 
 const DepartmentHeadDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [dashboard, setDashboard] = useState<DepartmentHeadDashboardData | null>(null);
   const [departmentName, setDepartmentName] = useState('');
@@ -512,7 +514,11 @@ const DepartmentHeadDashboard = () => {
 
               <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:w-[560px]">
                 <ContextPill icon="building" label="Department Code" value={dashboard?.departmentCode || 'Not set'} />
-                <ContextPill icon="user" label="Department Head" value={dashboard?.headEmployee || 'Not assigned'} />
+                <ContextPill
+                    icon="user"
+                    label="Department Head"
+                    value={dashboard?.headEmployee?.trim() || user?.fullName?.trim() || 'Not assigned'}
+                />
                 <ContextPill icon="people" label="Employees" value={`${formatNumber(activeEmployees)} active`} />
                 <ContextPill icon="clipboard" label="Review Queue" value={`${formatNumber(reviewQueueCount)} pending`} />
               </div>

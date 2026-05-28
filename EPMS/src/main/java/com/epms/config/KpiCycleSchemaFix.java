@@ -35,8 +35,12 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
                 return;
             }
             alignEarlyCloseColumns(conn);
+            alignDepartmentKpiEarlyCloseColumns(conn);
+            alignDepartmentKpiCycleStatusEnum(conn);
             alignCycleDurationColumns(conn);
             alignCyclePeriodTemplateColumn(conn);
+            alignCyclePeriodStatusEnum(conn);
+            alignCyclePeriodUniqueKey(conn);
             alignCycleStatusEnum(conn);
             alignEmployeeKpiStatusEnum(conn);
         } catch (SQLException e) {
@@ -99,6 +103,102 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             try (Statement stmt = conn.createStatement()) {
                 stmt.executeUpdate("ALTER TABLE kpi_template_cycle_period ADD COLUMN kpi_form_id INT NULL");
                 log.info("Added kpi_template_cycle_period.kpi_form_id column.");
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "UPDATE kpi_template_cycle_period p "
+                            + "JOIN kpi_template_cycle_form cf ON cf.cycle_id = p.cycle_id "
+                            + "SET p.kpi_form_id = cf.kpi_form_id "
+                            + "WHERE p.kpi_form_id IS NULL "
+                            + "AND (SELECT COUNT(*) FROM kpi_template_cycle_form cf_count WHERE cf_count.cycle_id = p.cycle_id) = 1"
+            );
+        } catch (SQLException e) {
+            log.debug("kpi_template_cycle_period kpi_form_id backfill skipped: {}", e.getMessage());
+        }
+    }
+
+    private void alignCyclePeriodStatusEnum(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle_period") || !columnExists(conn, "kpi_template_cycle_period", "status")) {
+            return;
+        }
+        String columnType = columnType(conn, "kpi_template_cycle_period", "status");
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'scheduled'")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "ALTER TABLE kpi_template_cycle_period "
+                            + "MODIFY COLUMN status ENUM('SCHEDULED','OPEN','CLOSING','CLOSED') NOT NULL DEFAULT 'OPEN'"
+            );
+            log.info("Aligned kpi_template_cycle_period.status enum.");
+        }
+    }
+
+    private void alignCyclePeriodUniqueKey(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kpi_template_cycle_period")
+                || !columnExists(conn, "kpi_template_cycle_period", "kpi_form_id")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE kpi_template_cycle_period DROP INDEX uk_kpi_cycle_period_number");
+        } catch (SQLException ignored) {
+            // index may already be replaced
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "ALTER TABLE kpi_template_cycle_period "
+                            + "ADD CONSTRAINT uk_kpi_cycle_period_number UNIQUE (cycle_id, kpi_form_id, period_number)"
+            );
+            log.info("Aligned kpi_template_cycle_period unique key.");
+        } catch (SQLException e) {
+            log.debug("kpi_template_cycle_period unique key alignment skipped: {}", e.getMessage());
+        }
+    }
+
+    private void alignDepartmentKpiEarlyCloseColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_cycle")) {
+            return;
+        }
+        addDepartmentColumnIfMissing(conn, "duration_years", "INT NOT NULL DEFAULT 1");
+        addDepartmentColumnIfMissing(conn, "closing_requested_at", "DATETIME(6) NULL");
+        addDepartmentColumnIfMissing(conn, "grace_ends_at", "DATETIME(6) NULL");
+        addDepartmentColumnIfMissing(conn, "closed_at", "DATETIME(6) NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_reason", "VARCHAR(1000) NULL");
+        addDepartmentColumnIfMissing(conn, "grace_extension", "VARCHAR(30) NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_requested_at", "DATETIME(6) NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_requested_by", "INT NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_reviewed_at", "DATETIME(6) NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_reviewed_by", "INT NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_review_decision", "VARCHAR(30) NULL");
+        addDepartmentColumnIfMissing(conn, "early_close_review_reason", "VARCHAR(1000) NULL");
+    }
+
+    private void addDepartmentColumnIfMissing(Connection conn, String columnName, String definition) throws SQLException {
+        if (columnExists(conn, "department_kpi_cycle", columnName)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE department_kpi_cycle ADD COLUMN " + columnName + " " + definition);
+            log.info("Added department_kpi_cycle.{} column.", columnName);
+        }
+    }
+
+    private void alignDepartmentKpiCycleStatusEnum(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_cycle") || !columnExists(conn, "department_kpi_cycle", "status")) {
+            return;
+        }
+        String columnType = columnType(conn, "department_kpi_cycle", "status");
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
+            return;
+        }
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).startsWith("enum")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                        "ALTER TABLE department_kpi_cycle "
+                                + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
+                );
+                log.info("Aligned department_kpi_cycle.status enum.");
             }
         }
     }

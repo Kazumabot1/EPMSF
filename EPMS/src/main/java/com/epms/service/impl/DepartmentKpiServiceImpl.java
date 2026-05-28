@@ -15,9 +15,12 @@ import com.epms.entity.KpiItem;
 import com.epms.entity.KpiUnit;
 import com.epms.entity.User;
 import com.epms.entity.enums.DepartmentKpiResultStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiGraceExtension;
 import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
+import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.repository.DepartmentKpiCyclePeriodRepository;
 import com.epms.repository.DepartmentKpiCycleRepository;
 import com.epms.repository.DepartmentKpiCycleTemplateRepository;
@@ -53,6 +56,8 @@ import java.util.stream.Collectors;
 public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     private static final Set<Integer> ALLOWED_DURATION_MONTHS = Set.of(3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+
+    private static final int DEFAULT_CLOSING_GRACE_DAYS = 7;
 
     private final DepartmentKpiTemplateRepository templateRepository;
     private final DepartmentKpiCycleRepository cycleRepository;
@@ -197,30 +202,42 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
     @Override
     @Transactional
-    public DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, boolean active) {
+    public DepartmentKpiCycleResponseDto updateCycleStatus(Integer id, KpiTemplateCycleStatusRequestDTO request) {
         DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        boolean active = Boolean.TRUE.equals(request.getActive());
 
         if (active) {
             if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
                 return getCycle(id);
             }
+            if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
+            }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+            cycle.setClosingRequestedAt(null);
+            cycle.setGraceEndsAt(null);
+            cycle.setClosedAt(null);
             cycle.setUpdatedByUser(currentUser());
             DepartmentKpiCyclePeriod period = ensureLatestPeriod(cycle);
             createResultsForCyclePeriod(cycle, period);
         } else {
-            if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
+            if (cycle.getStatus() != KpiTemplateCycleStatus.ACTIVE) {
+                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
+                    return getCycle(id);
+                }
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only active cycles can be deactivated.");
+            }
+            if (isBeforeOfficialEndDate(cycle)) {
+                requestEarlyClose(cycle, request);
+                cycleRepository.saveAndFlush(cycle);
                 return getCycle(id);
             }
-            cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
+            startCycleClosingGrace(cycle, LocalDateTime.now().plusDays(DEFAULT_CLOSING_GRACE_DAYS));
             cycle.setUpdatedByUser(currentUser());
-            cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
-                    .ifPresent(period -> {
-                        period.setStatus(KpiTemplateCyclePeriodStatus.CLOSED);
-                        cyclePeriodRepository.save(period);
-                    });
-            closeOpenResultsForCycle(cycle);
+            cycleRepository.saveAndFlush(cycle);
+            return getCycle(id);
         }
 
         cycleRepository.saveAndFlush(cycle);
@@ -228,18 +245,53 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<DepartmentKpiCycleResponseDto> listPendingEarlyCloseRequests() {
-        return List.of();
+        return cycleRepository
+                .findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus.PENDING_APPROVAL)
+                .stream()
+                .map(this::toCycleDto)
+                .toList();
     }
 
     @Override
+    @Transactional
     public DepartmentKpiCycleResponseDto approveEarlyClose(Integer id, String reviewReason) {
-        return null;
+        DepartmentKpiCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        LocalDateTime now = LocalDateTime.now();
+        KpiGraceExtension extension = cycle.getGraceExtension();
+        if (extension == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
+        }
+
+        cycle.setEarlyCloseReviewedAt(now);
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.APPROVED);
+        cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.saveAndFlush(cycle);
+
+        startCycleClosingGrace(cycle, extension.addTo(now));
+        return getCycle(id);
     }
 
     @Override
+    @Transactional
     public DepartmentKpiCycleResponseDto rejectEarlyClose(Integer id, String reviewReason) {
-        return null;
+        DepartmentKpiCycle cycle = requirePendingApproval(id);
+        User reviewer = currentUser();
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+        cycle.setEarlyCloseReviewedAt(LocalDateTime.now());
+        cycle.setEarlyCloseReviewedByUser(reviewer);
+        cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
+        cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
+        cycle.setClosingRequestedAt(null);
+        cycle.setGraceEndsAt(null);
+        cycle.setClosedAt(null);
+        cycle.setUpdatedByUser(reviewer);
+        cycleRepository.saveAndFlush(cycle);
+        return getCycle(id);
     }
 
     @Override
@@ -256,6 +308,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
 
         List<DepartmentKpiResult> results = resultRepository.findByTemplateAndPeriod(templateId, cyclePeriodId);
         for (DepartmentKpiResult result : results) {
+            if (result.getCycle() != null) {
+                expireGraceIfNeeded(result.getCycle());
+            }
             reconcileScores(template, result);
         }
         resultRepository.flush();
@@ -270,6 +325,11 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     public DepartmentKpiResultDto updateScores(Integer resultId, UpdateDepartmentKpiScoresRequest request) {
         DepartmentKpiResult result = resultRepository.findDetailById(resultId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
+
+        if (result.getCycle() != null) {
+            expireGraceIfNeeded(result.getCycle());
+        }
+        assertEditableDuringGrace(result);
 
         if (result.getStatus() == DepartmentKpiResultStatus.FINALIZED || result.getStatus() == DepartmentKpiResultStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Scores cannot be changed after finalization.");
@@ -342,6 +402,10 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
     public DepartmentKpiResultDto finalizeResult(Integer resultId) {
         DepartmentKpiResult result = resultRepository.findDetailById(resultId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI result not found."));
+        if (result.getCycle() != null) {
+            expireGraceIfNeeded(result.getCycle());
+        }
+        assertEditableDuringGrace(result);
         finalizeOne(result, LocalDateTime.now());
         DepartmentKpiResult saved = resultRepository.saveAndFlush(result);
         return toResultDto(saved);
@@ -677,6 +741,113 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         }
     }
 
+    private DepartmentKpiCycle requirePendingApproval(Integer id) {
+        DepartmentKpiCycle cycle = cycleRepository.findDetailById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department KPI cycle not found."));
+        if (cycle.getStatus() != KpiTemplateCycleStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No pending Department KPI early close request exists for this cycle.");
+        }
+        return cycle;
+    }
+
+    private void requestEarlyClose(DepartmentKpiCycle cycle, KpiTemplateCycleStatusRequestDTO request) {
+        String reason = normalizeText(request.getReason(), 1000);
+        if (reason == null || reason.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reason is required to request early cycle closure.");
+        }
+        if (request.getGraceExtension() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is required.");
+        }
+        cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        cycle.setEarlyCloseReason(reason);
+        cycle.setGraceExtension(request.getGraceExtension());
+        cycle.setEarlyCloseRequestedAt(LocalDateTime.now());
+        cycle.setEarlyCloseRequestedByUser(currentUser());
+        cycle.setEarlyCloseReviewedAt(null);
+        cycle.setEarlyCloseReviewedByUser(null);
+        cycle.setEarlyCloseReviewDecision(null);
+        cycle.setEarlyCloseReviewReason(null);
+        cycle.setUpdatedByUser(cycle.getEarlyCloseRequestedByUser());
+    }
+
+    private boolean isBeforeOfficialEndDate(DepartmentKpiCycle cycle) {
+        LocalDate officialEnd = cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .map(DepartmentKpiCyclePeriod::getEndDate)
+                .orElse(cycle.getEndDate());
+        return officialEnd != null && LocalDate.now().isBefore(officialEnd);
+    }
+
+    private void startCycleClosingGrace(DepartmentKpiCycle cycle, LocalDateTime graceEnds) {
+        LocalDateTime now = LocalDateTime.now();
+        cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
+        cycle.setClosingRequestedAt(now);
+        cycle.setGraceEndsAt(graceEnds);
+        cycle.setUpdatedByUser(currentUser());
+        cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .ifPresent(period -> {
+                    if (period.getStatus() != KpiTemplateCyclePeriodStatus.CLOSED) {
+                        period.setStatus(KpiTemplateCyclePeriodStatus.CLOSING);
+                        cyclePeriodRepository.save(period);
+                    }
+                });
+        cycleRepository.save(cycle);
+    }
+
+    private void expireGraceIfNeeded(DepartmentKpiCycle cycle) {
+        if (cycle == null || cycle.getId() == null || cycle.getStatus() != KpiTemplateCycleStatus.CLOSING) {
+            return;
+        }
+        LocalDateTime graceEnds = cycle.getGraceEndsAt();
+        if (graceEnds == null || LocalDateTime.now().isBefore(graceEnds)) {
+            return;
+        }
+        cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
+        cycle.setClosedAt(LocalDateTime.now());
+        cycle.setUpdatedByUser(currentUser());
+        cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .ifPresent(period -> {
+                    period.setStatus(KpiTemplateCyclePeriodStatus.CLOSED);
+                    cyclePeriodRepository.save(period);
+                });
+        closeOpenResultsForCycle(cycle);
+        cycleRepository.saveAndFlush(cycle);
+    }
+
+    private void assertEditableDuringGrace(DepartmentKpiResult result) {
+        DepartmentKpiCycle cycle = result.getCycle();
+        if (cycle == null || cycle.getStatus() != KpiTemplateCycleStatus.CLOSING) {
+            return;
+        }
+        LocalDateTime graceEnds = cycle.getGraceEndsAt();
+        if (graceEnds != null && LocalDateTime.now().isAfter(graceEnds)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "The Department KPI grace period has ended. Scores can no longer be edited."
+            );
+        }
+    }
+
+    private String normalizeText(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return normalized.length() > maxLength ? normalized.substring(0, maxLength) : normalized;
+    }
+
+    private String displayUser(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+            return user.getFullName();
+        }
+        return user.getEmail();
+    }
+
     private void closeOpenResultsForCycle(DepartmentKpiCycle cycle) {
         if (cycle == null || cycle.getId() == null) {
             return;
@@ -748,6 +919,19 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         dto.setDurationMonths(cycle.getDurationMonths());
         dto.setDurationLabel(durationLabel(cycle.getDurationMonths()));
         dto.setStatus(cycle.getStatus());
+        dto.setClosingRequestedAt(cycle.getClosingRequestedAt());
+        dto.setGraceEndsAt(cycle.getGraceEndsAt());
+        dto.setClosedAt(cycle.getClosedAt());
+        dto.setEarlyCloseReason(cycle.getEarlyCloseReason());
+        dto.setGraceExtension(cycle.getGraceExtension());
+        dto.setEarlyCloseRequestedAt(cycle.getEarlyCloseRequestedAt());
+        dto.setEarlyCloseRequestedByUserId(cycle.getEarlyCloseRequestedByUser() == null ? null : cycle.getEarlyCloseRequestedByUser().getId());
+        dto.setEarlyCloseRequestedByName(displayUser(cycle.getEarlyCloseRequestedByUser()));
+        dto.setEarlyCloseReviewedAt(cycle.getEarlyCloseReviewedAt());
+        dto.setEarlyCloseReviewedByUserId(cycle.getEarlyCloseReviewedByUser() == null ? null : cycle.getEarlyCloseReviewedByUser().getId());
+        dto.setEarlyCloseReviewedByName(displayUser(cycle.getEarlyCloseReviewedByUser()));
+        dto.setEarlyCloseReviewDecision(cycle.getEarlyCloseReviewDecision());
+        dto.setEarlyCloseReviewReason(cycle.getEarlyCloseReviewReason());
         dto.setCreatedAt(cycle.getCreatedAt());
         dto.setUpdatedAt(cycle.getUpdatedAt());
 
