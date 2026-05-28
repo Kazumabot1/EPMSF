@@ -36,8 +36,8 @@ export function useCampaignSetupSteps({
     const setupSteps = useMemo<CampaignSetupStep[]>(() => [
         {
             key: 'foundation',
-            label: 'Foundation',
-            note: 'Campaign info and policy',
+            label: 'Campaign Details',
+            note: 'Info, window, and policy',
             status: selectedCampaign ? 'Saved' : 'Start here',
             icon: 'bi-pencil-square',
             unlocked: true,
@@ -45,7 +45,7 @@ export function useCampaignSetupSteps({
         },
         {
             key: 'targets',
-            label: 'Targets',
+            label: 'Recipients',
             note: 'Select employees',
             status: selectedCampaign ? `${selectedTargetCount} selected` : 'Save draft first',
             icon: 'bi-people',
@@ -54,16 +54,16 @@ export function useCampaignSetupSteps({
         },
         {
             key: 'evaluators',
-            label: 'Evaluators',
-            note: 'Generate review network',
-            status: savedTargetCount > 0 ? (savedAssignmentCount > 0 ? `${savedAssignmentCount} generated` : 'Ready to configure') : 'Save targets first',
+            label: 'Evaluator & Weight Rules',
+            note: 'Weights and reviewers',
+            status: savedTargetCount > 0 ? (savedAssignmentCount > 0 ? `${savedAssignmentCount} generated` : 'Ready to configure') : 'Save recipients first',
             icon: 'bi-diagram-3',
             unlocked: savedTargetCount > 0 && !hasUnsavedTargetChanges && !hasUnavailableSelection,
             done: savedAssignmentCount > 0,
         },
         {
             key: 'questions',
-            label: 'Question Review',
+            label: 'Question Snapshot',
             note: 'Campaign question set',
             status: savedAssignmentCount > 0 ? (questionReviewReady ? `${includedQuestionCount} saved` : 'Ready to review') : 'Generate evaluators first',
             icon: 'bi-ui-checks-grid',

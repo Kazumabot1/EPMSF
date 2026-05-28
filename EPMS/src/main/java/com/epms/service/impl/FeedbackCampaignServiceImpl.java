@@ -265,10 +265,11 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
 
     private void applyCampaignPolicy(FeedbackCampaign campaign, FeedbackCampaignCreateRequest request) {
-        campaign.setManagerFeedbackAnonymous(Boolean.TRUE.equals(request.getManagerFeedbackAnonymous()));
+        // Manager and self feedback are direct relationship records, so they are not configurable anonymity policies.
+        campaign.setManagerFeedbackAnonymous(false);
         campaign.setPeerFeedbackAnonymous(!Boolean.FALSE.equals(request.getPeerFeedbackAnonymous()));
         campaign.setSubordinateFeedbackAnonymous(!Boolean.FALSE.equals(request.getSubordinateFeedbackAnonymous()));
-        campaign.setSelfFeedbackAnonymous(Boolean.TRUE.equals(request.getSelfFeedbackAnonymous()));
+        campaign.setSelfFeedbackAnonymous(false);
         campaign.setRedistributeMissingRelationshipWeight(!Boolean.FALSE.equals(request.getRedistributeMissingRelationshipWeight()));
     }
 
@@ -495,6 +496,14 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
         if (startAt == null || endAt == null) {
             throw new BusinessValidationException("Campaign start and end date/time are required.");
+        }
+
+        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        if (startAt.isBefore(now)) {
+            throw new BusinessValidationException("Campaign start date/time cannot be in the past.");
+        }
+        if (endAt.isBefore(now)) {
+            throw new BusinessValidationException("Campaign end date/time cannot be in the past.");
         }
         if (!startAt.isBefore(endAt)) {
             throw new BusinessValidationException("Campaign start date/time must be earlier than the end date/time.");

@@ -165,7 +165,8 @@ const FeedbackLayoutPage = () => {
   const selfContainedQuestionPage =
       activeModule === 'questions' ||
       activeModule === 'question-rules' ||
-      activeModule === 'dynamic-preview';
+      activeModule === 'dynamic-preview' ||
+      activeModule === 'campaigns';
 
   const targetsDirty = !sameIds(savedTargetIds, draftTargetIds);
 

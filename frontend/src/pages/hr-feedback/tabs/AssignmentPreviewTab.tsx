@@ -30,6 +30,7 @@ const initials = (name: string) =>
 const sourceLabel = (source: string) => source.replaceAll('_', ' ').toLowerCase().replace(/(^|\s)\S/g, char => char.toUpperCase());
 
 const methodLabel = (method: string) => {
+  if (method === 'AUTO_RANKED') return 'Ranked suggestion';
   if (method === 'AUTO_RANDOM') return 'Auto random';
   if (method === 'AUTO_RELATIONSHIP') return 'Auto relationship';
   return 'Manual override';

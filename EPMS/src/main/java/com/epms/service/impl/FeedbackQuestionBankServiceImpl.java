@@ -11,6 +11,7 @@ import com.epms.entity.FeedbackQuestionApplicabilityRule;
 import com.epms.entity.FeedbackQuestionBank;
 import com.epms.entity.FeedbackQuestionRuleSet;
 import com.epms.entity.FeedbackQuestionVersion;
+import com.epms.entity.PositionLevel;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.FeedbackCompetencyRepository;
@@ -18,6 +19,7 @@ import com.epms.repository.FeedbackQuestionApplicabilityRuleRepository;
 import com.epms.repository.FeedbackQuestionBankRepository;
 import com.epms.repository.FeedbackQuestionRuleSetRepository;
 import com.epms.repository.FeedbackQuestionVersionRepository;
+import com.epms.repository.PositionLevelRepository;
 import com.epms.service.FeedbackQuestionBankService;
 import com.epms.service.QuestionQualityValidationService;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +78,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     private final FeedbackQuestionApplicabilityRuleRepository ruleRepository;
     private final FeedbackQuestionRuleSetRepository ruleSetRepository;
     private final FeedbackCompetencyRepository competencyRepository;
+    private final PositionLevelRepository positionLevelRepository;
     private final QuestionQualityValidationService qualityValidationService;
 
     @Override
@@ -184,11 +187,10 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     public List<FeedbackQuestionRuleResponse> createRule(FeedbackQuestionRuleUpsertRequest request) {
         List<String> relationshipTypes = resolveRelationshipTypes(request);
         List<Long> questionBankIds = resolveQuestionBankIds(request);
-        Integer minRank = request.getTargetLevelMinRank() == null ? 1 : request.getTargetLevelMinRank();
-        Integer maxRank = request.getTargetLevelMaxRank() == null ? 9 : request.getTargetLevelMaxRank();
-        if (minRank > maxRank) {
-            throw new BadRequestException("Minimum level rank cannot be greater than maximum level rank.");
-        }
+        LevelRankRange availableLevels = resolveAvailableRuleLevelRange();
+        Integer minRank = request.getTargetLevelMinRank() == null ? availableLevels.minRank() : request.getTargetLevelMinRank();
+        Integer maxRank = request.getTargetLevelMaxRank() == null ? availableLevels.maxRank() : request.getTargetLevelMaxRank();
+        validateRuleLevelRange(minRank, maxRank, availableLevels);
 
         String desiredStatus = normalizeRuleSetStatus(request.getRuleSetStatus(), request.getActive(), true);
         validateRuleSetGovernance(
@@ -247,11 +249,10 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
 
         List<String> relationshipTypes = resolveRelationshipTypes(request);
         List<Long> questionBankIds = resolveQuestionBankIds(request);
-        Integer minRank = request.getTargetLevelMinRank() == null ? 1 : request.getTargetLevelMinRank();
-        Integer maxRank = request.getTargetLevelMaxRank() == null ? 9 : request.getTargetLevelMaxRank();
-        if (minRank > maxRank) {
-            throw new BadRequestException("Minimum level rank cannot be greater than maximum level rank.");
-        }
+        LevelRankRange availableLevels = resolveAvailableRuleLevelRange();
+        Integer minRank = request.getTargetLevelMinRank() == null ? availableLevels.minRank() : request.getTargetLevelMinRank();
+        Integer maxRank = request.getTargetLevelMaxRank() == null ? availableLevels.maxRank() : request.getTargetLevelMaxRank();
+        validateRuleLevelRange(minRank, maxRank, availableLevels);
 
         String desiredStatus = normalizeRuleSetStatus(request.getRuleSetStatus(), request.getActive(), false);
         validateRuleSetGovernance(
@@ -406,7 +407,6 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                     .competencyCode(bank.getCompetencyCode())
                     .responseType(responseType)
                     .scoringBehavior(SCORING_SCORED)
-                    .helpText(firstNonBlank(version.getHelpText()))
                     .questionText(firstNonBlank(version.getQuestionText(), bank.getDefaultText()))
                     .questionOrder(rule.getDisplayOrder() == null ? questionsByBankId.size() + 1 : rule.getDisplayOrder())
                     .ratingScaleId(null)
@@ -713,6 +713,50 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
             return "POSITION_ADD_ON";
         }
         return "DEPARTMENT_POSITION_ADD_ON";
+    }
+
+    private record LevelRankRange(int minRank, int maxRank) {}
+
+    private LevelRankRange resolveAvailableRuleLevelRange() {
+        List<Integer> ranks = positionLevelRepository.findAll().stream()
+                .filter(level -> level != null && !Boolean.FALSE.equals(level.getActive()))
+                .map(PositionLevel::getLevelCode)
+                .map(this::parsePositionLevelRank)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        if (ranks.isEmpty()) {
+            return new LevelRankRange(1, 9);
+        }
+        return new LevelRankRange(ranks.get(0), ranks.get(ranks.size() - 1));
+    }
+
+    private Integer parsePositionLevelRank(String levelCode) {
+        if (levelCode == null || levelCode.isBlank()) {
+            return null;
+        }
+        Matcher matcher = Pattern.compile("(\\d+)").matcher(levelCode);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private void validateRuleLevelRange(Integer minRank, Integer maxRank, LevelRankRange availableLevels) {
+        if (minRank == null || maxRank == null) {
+            throw new BadRequestException("Select a valid employee level range.");
+        }
+        if (minRank > maxRank) {
+            throw new BadRequestException("From level cannot be greater than To level.");
+        }
+        if (minRank < availableLevels.minRank() || maxRank > availableLevels.maxRank()) {
+            throw new BadRequestException("Selected level range is no longer available. Refresh the page and choose active position levels again.");
+        }
     }
 
     private void validateRuleSetGovernance(

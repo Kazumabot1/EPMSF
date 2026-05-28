@@ -7,7 +7,6 @@ import { EvaluatorAssignmentsStep } from './campaign-setup/components/EvaluatorA
 import { QuestionReviewStep } from './campaign-setup/components/QuestionReviewStep';
 import { CampaignSetupHeader } from './campaign-setup/components/CampaignSetupHeader';
 import { CampaignSetupStepper } from './campaign-setup/components/CampaignSetupStepper';
-import { CampaignSetupStats } from './campaign-setup/components/CampaignSetupStats';
 import { CampaignRecordsTable } from './campaign-setup/components/CampaignRecordsTable';
 import { useCampaignSetupLoaders } from './campaign-setup/hooks/useCampaignSetupLoaders';
 import { useCampaignInfoActions } from './campaign-setup/hooks/useCampaignInfoActions';
@@ -46,12 +45,8 @@ import type {
 } from './campaign-setup/types/campaignSetupTypes';
 import {
   DESCRIPTION_LIMIT,
-  INSTRUCTIONS_LIMIT,
-  INSTRUCTION_TEMPLATE,
-  TIME_OPTIONS,
   defaultForm,
   relationshipOptions,
-  RELATIONSHIP_ORDER,
   statusDescriptions,
   statusLabels,
 } from './campaign-setup/utils/campaignSetupConstants';
@@ -60,7 +55,6 @@ import {
   assignmentSourceLabel,
   assignmentStatusLabel,
   completionLabel,
-  formatTimeLabel,
   formatWindow,
   initials,
   personSubtitle,
@@ -114,6 +108,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   const [parentDepartmentId] = useState<number | ''>('');
   const [teamId] = useState<number | ''>('');
   const [positionFilter, setPositionFilter] = useState('');
+  const [levelFilter, setLevelFilter] = useState('');
   const [readiness, setReadiness] = useState<ReadinessFilter>('AVAILABLE');
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [loadingTargets, setLoadingTargets] = useState(false);
@@ -147,7 +142,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   );
 
   const currentUser = useMemo(() => authStorage.getUser() as { fullName?: string; email?: string; employeeCode?: string; position?: string } | null, []);
-  const localTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time', []);
 
   const {
     savedTargetIds,
@@ -155,11 +149,16 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     hasUnsavedTargetChanges,
     selectedTargets,
     positionOptions,
+    levelOptions,
     candidateRows,
+    filteredSelectableCandidateIds,
+    filteredCandidateCount,
     availableCandidateCount,
     reviewCandidateCount,
+    blockedCandidateCount,
     selectedReadyCount,
     selectedReviewCount,
+    selectedUnavailableCount,
     hasUnavailableSelection,
     selectedDepartmentCount,
     selectedDepartmentSummary,
@@ -168,6 +167,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     selectedTargetIds,
     candidates,
     positionFilter,
+    levelFilter,
   });
 
   const previewWarningCount = assignmentPreview.requests.filter(item => item.warnings.length > 0).length;
@@ -189,13 +189,16 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     activeEvaluatorTarget,
     activePreviewItem,
     evaluatorCandidates,
+    manualCandidateNotice,
     manualEvaluatorEligibilityError,
     activeAssignmentsByRelationship,
+    activeTargetSummary,
     manualForm,
     setManualForm,
   } = useCampaignEvaluatorViewModel({
     assignmentPreview,
     employees,
+    candidates,
     selectedTargets,
     savedTargets: targetsResponse.targets,
     savedTargetIds,
@@ -510,11 +513,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             statusLabels={statusLabels}
         />
 
-        <CampaignSetupStats
-            campaigns={campaigns}
-            selectedCampaign={selectedCampaign}
-            targetsResponse={targetsResponse}
-        />
 
         {activeStepKey === 'foundation' && <CampaignInfoStep
             selectedCampaign={selectedCampaign}
@@ -527,16 +525,11 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             savedAssignmentCount={savedAssignmentCount}
             handleSave={handleSave}
             currentUser={currentUser}
-            localTimeZone={localTimeZone}
             errors={errors}
             form={form}
             canEditSelected={canEditSelected}
             setForm={setForm}
-            TIME_OPTIONS={TIME_OPTIONS}
-            formatTimeLabel={formatTimeLabel}
             DESCRIPTION_LIMIT={DESCRIPTION_LIMIT}
-            INSTRUCTIONS_LIMIT={INSTRUCTIONS_LIMIT}
-            INSTRUCTION_TEMPLATE={INSTRUCTION_TEMPLATE}
             deleting={deleting}
             handleDeleteDraft={handleDeleteDraft}
             setErrors={setErrors}
@@ -551,6 +544,10 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             selectedDepartmentCount={selectedDepartmentCount}
             availableCandidateCount={availableCandidateCount}
             reviewCandidateCount={reviewCandidateCount}
+            blockedCandidateCount={blockedCandidateCount}
+            filteredCandidateCount={filteredCandidateCount}
+            filteredSelectableCandidateIds={filteredSelectableCandidateIds}
+            selectedUnavailableCount={selectedUnavailableCount}
             targetSearch={targetSearch}
             setTargetSearch={setTargetSearch}
             currentDepartmentId={currentDepartmentId}
@@ -559,6 +556,9 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             positionFilter={positionFilter}
             setPositionFilter={setPositionFilter}
             positionOptions={positionOptions}
+            levelFilter={levelFilter}
+            setLevelFilter={setLevelFilter}
+            levelOptions={levelOptions}
             readiness={readiness}
             setReadiness={setReadiness}
             loadingCandidates={loadingCandidates}
@@ -593,11 +593,12 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             hasDraftEvaluatorChanges={hasDraftEvaluatorChanges}
             hasSavedEvaluatorAssignments={hasSavedEvaluatorAssignments}
             selectedCampaign={selectedCampaign}
+            evaluatorConfig={normalizedEvaluatorConfig}
+            setEvaluatorConfig={setEvaluatorConfig}
             peerReviewerCount={peerReviewerCount}
             setPeerReviewerCount={setPeerReviewerCount}
             canEditEvaluators={canEditEvaluators}
             relationshipWeightTotal={relationshipWeightTotal}
-            RELATIONSHIP_ORDER={RELATIONSHIP_ORDER}
             scoringConfig={scoringConfig}
             updateRelationshipWeight={updateRelationshipWeight}
             setScoringConfig={setScoringConfig}
@@ -632,7 +633,9 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             evaluatorSearch={evaluatorSearch}
             setEvaluatorSearch={setEvaluatorSearch}
             evaluatorCandidates={evaluatorCandidates}
+            manualCandidateNotice={manualCandidateNotice}
             manualEvaluatorEligibilityError={manualEvaluatorEligibilityError}
+            activeTargetSummary={activeTargetSummary}
             addingEvaluator={addingEvaluator}
             addEvaluator={addEvaluator}
         />}
@@ -711,16 +714,18 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
         )}
 
 
-        <CampaignRecordsTable
-            campaigns={campaigns}
-            loadingCampaigns={loadingCampaigns}
-            statusClass={statusClass}
-            statusLabels={statusLabels}
-            statusDescriptions={statusDescriptions}
-            completionLabel={completionLabel}
-            formatWindow={formatWindow}
-            onOpenCampaign={handleSelectCampaign}
-        />
+        {activeStepKey === 'foundation' && (
+            <CampaignRecordsTable
+                campaigns={campaigns}
+                loadingCampaigns={loadingCampaigns}
+                statusClass={statusClass}
+                statusLabels={statusLabels}
+                statusDescriptions={statusDescriptions}
+                completionLabel={completionLabel}
+                formatWindow={formatWindow}
+                onOpenCampaign={handleSelectCampaign}
+            />
+        )}
       </div>
   );
 }

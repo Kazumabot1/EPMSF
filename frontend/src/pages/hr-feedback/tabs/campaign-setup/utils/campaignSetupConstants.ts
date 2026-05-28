@@ -1,18 +1,8 @@
 import type { FeedbackCampaignStatus } from '../../../../../types/feedbackCampaign';
 import type { CampaignInfoForm, RelationshipOption } from '../types/campaignSetupTypes';
 
-const padTime = (value: number) => String(value).padStart(2, '0');
-
 export const DEFAULT_CAMPAIGN_TYPE = '360 Feedback';
 export const DESCRIPTION_LIMIT = 2000;
-export const INSTRUCTIONS_LIMIT = 4000;
-export const INSTRUCTION_TEMPLATE = 'Rate recent, observable work behavior. Use specific examples where possible, keep comments constructive, and avoid personal or unrelated remarks.';
-
-export const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
-    const hours = Math.floor(index / 2);
-    const minutes = index % 2 === 0 ? 0 : 30;
-    return `${padTime(hours)}:${padTime(minutes)}`;
-});
 
 export const statusLabels: Record<FeedbackCampaignStatus, string> = {
     DRAFT: 'Draft',

@@ -9,7 +9,7 @@ import type {
 } from '../../../../../types/feedbackCampaign';
 import type { DraftEvaluatorAddition } from '../types/campaignSetupTypes';
 import { assignmentKey } from '../utils/campaignSetupFormatters';
-import { manualEvaluatorEligibilityMessage } from '../utils/manualEvaluatorValidation';
+import { manualEvaluatorEligibilityMessage, type ManualEvaluatorCandidate } from '../utils/manualEvaluatorValidation';
 
 const EMPTY_ASSIGNMENT_DETAILS: FeedbackAssignmentDetailItem[] = [];
 
@@ -23,6 +23,7 @@ const defaultManualForm: ManualAssignmentInput = {
 type UseCampaignEvaluatorViewModelParams = {
     assignmentPreview: FeedbackAssignmentGenerationResponse;
     employees: FeedbackTargetEmployee[];
+    candidates: FeedbackTargetCandidate[];
     selectedTargets: FeedbackTargetCandidate[];
     savedTargets: FeedbackTargetCandidate[];
     savedTargetIds: number[];
@@ -31,9 +32,17 @@ type UseCampaignEvaluatorViewModelParams = {
     evaluatorSearch: string;
 };
 
+const relationshipOrder: FeedbackRelationshipType[] = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'];
+
+const formatDepartmentPosition = (employee: ManualEvaluatorCandidate) => [
+    employee.currentDepartment ?? 'Department not set',
+    employee.positionTitle ?? employee.positionName,
+].filter(Boolean).join(' · ');
+
 export function useCampaignEvaluatorViewModel({
                                                   assignmentPreview,
                                                   employees,
+                                                  candidates,
                                                   selectedTargets,
                                                   savedTargets,
                                                   savedTargetIds,
@@ -48,10 +57,37 @@ export function useCampaignEvaluatorViewModel({
     const employeeMap = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
     const previewItemByTarget = useMemo(() => new Map(assignmentPreview.requests.map(item => [item.targetEmployeeId, item])), [assignmentPreview.requests]);
 
+    const targetHintByEmployeeId = useMemo(() => {
+        const map = new Map<number, FeedbackTargetCandidate>();
+        for (const target of candidates) map.set(target.employeeId, target);
+        for (const target of savedTargets) map.set(target.employeeId, target);
+        for (const target of selectedTargets) map.set(target.employeeId, target);
+        return map;
+    }, [candidates, savedTargets, selectedTargets]);
+
+    const enrichedEmployeeMap = useMemo(() => {
+        const map = new Map<number, ManualEvaluatorCandidate>();
+        for (const employee of employees) {
+            const hint = targetHintByEmployeeId.get(employee.id);
+            map.set(employee.id, {
+                ...employee,
+                currentDepartmentId: employee.currentDepartmentId ?? hint?.currentDepartmentId ?? null,
+                currentDepartment: employee.currentDepartment ?? hint?.currentDepartmentName ?? null,
+                positionTitle: employee.positionTitle ?? hint?.positionName ?? null,
+                positionLevelCode: employee.positionLevelCode ?? hint?.levelCode ?? null,
+                managerEmployeeId: hint?.managerEmployeeId ?? null,
+                employeeName: hint?.employeeName ?? employee.fullName,
+                levelCode: hint?.levelCode ?? employee.positionLevelCode ?? null,
+                positionName: hint?.positionName ?? employee.positionTitle ?? null,
+            });
+        }
+        return map;
+    }, [employees, targetHintByEmployeeId]);
+
     const draftAdditionDetails = useMemo<FeedbackAssignmentDetailItem[]>(() => draftManualAdditions
         .filter(item => !draftRemovedEvaluatorKeys.has(`${item.targetEmployeeId}:${item.evaluatorEmployeeId}:${item.relationshipType}`))
         .map(item => {
-            const evaluator = employeeMap.get(item.evaluatorEmployeeId);
+            const evaluator = enrichedEmployeeMap.get(item.evaluatorEmployeeId);
             const target = selectedTargets.find(targetItem => targetItem.employeeId === item.targetEmployeeId)
                 ?? savedTargets.find(targetItem => targetItem.employeeId === item.targetEmployeeId);
             return {
@@ -65,7 +101,7 @@ export function useCampaignEvaluatorViewModel({
                 evaluatorEmployeeEmail: null,
                 evaluatorDepartmentId: evaluator?.currentDepartmentId ?? null,
                 evaluatorPositionId: null,
-                evaluatorPositionName: null,
+                evaluatorPositionName: evaluator?.positionTitle ?? evaluator?.positionName ?? null,
                 manualReason: item.reason ?? null,
                 selectionReason: item.reason ?? null,
                 confidence: 'HR_CONFIRMED',
@@ -75,7 +111,7 @@ export function useCampaignEvaluatorViewModel({
                 status: 'PENDING',
                 anonymous: Boolean(item.anonymous),
             };
-        }), [draftManualAdditions, draftRemovedEvaluatorKeys, employeeMap, savedTargets, selectedTargets]);
+        }), [draftManualAdditions, draftRemovedEvaluatorKeys, enrichedEmployeeMap, savedTargets, selectedTargets]);
 
     const displayedAssignmentDetails = useMemo(() => [
         ...assignmentDetails.filter(item => !draftRemovedEvaluatorKeys.has(assignmentKey(item))),
@@ -93,7 +129,6 @@ export function useCampaignEvaluatorViewModel({
         }
         for (const value of grouped.values()) {
             value.sort((left, right) => {
-                const relationshipOrder = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'];
                 const typeOrder = relationshipOrder.indexOf(left.relationshipType) - relationshipOrder.indexOf(right.relationshipType);
                 if (typeOrder !== 0) return typeOrder;
                 return (left.evaluatorEmployeeName ?? '').localeCompare(right.evaluatorEmployeeName ?? '');
@@ -119,37 +154,70 @@ export function useCampaignEvaluatorViewModel({
         [activeEvaluatorAssignments],
     );
 
-    const evaluatorCandidates = useMemo(() => {
+    const manualRelationshipCandidateSource = useMemo(() => {
+        if (!activeEvaluatorTargetId || !activeEvaluatorTarget) return [] as ManualEvaluatorCandidate[];
         const query = evaluatorSearch.trim().toLowerCase();
-        return employees
-            .filter(employee => {
-                if (!activeEvaluatorTargetId) return false;
-                if (employee.id === activeEvaluatorTargetId) return false;
-                if (!query) return true;
-                return [
-                    employee.fullName,
-                    employee.currentDepartment ?? '',
-                    employee.positionTitle ?? '',
-                    employee.positionLevelCode ?? '',
-                    String(employee.id),
-                ].some(value => value.toLowerCase().includes(query));
-            })
+        const all = Array.from(enrichedEmployeeMap.values()).filter(employee => employee.id !== activeEvaluatorTargetId);
+
+        const relationshipType = manualForm.relationshipType;
+        let source = all;
+        if (relationshipType === 'MANAGER') {
+            source = activeEvaluatorTarget.managerEmployeeId
+                ? all.filter(employee => employee.id === activeEvaluatorTarget.managerEmployeeId)
+                : [];
+        } else if (relationshipType === 'SUBORDINATE') {
+            source = all.filter(employee => Number(employee.managerEmployeeId ?? 0) === Number(activeEvaluatorTarget.employeeId));
+        }
+
+        const withEligibility = source
             .map(employee => ({
                 ...employee,
                 eligibilityMessage: manualEvaluatorEligibilityMessage(
                     employee,
                     activeEvaluatorTarget,
-                    manualForm.relationshipType,
+                    relationshipType,
                     assignedEvaluatorIdsForActiveTarget,
                 ),
             }))
-            .sort((left, right) => Number(Boolean(left.eligibilityMessage)) - Number(Boolean(right.eligibilityMessage)))
-            .slice(0, 12);
-    }, [activeEvaluatorTarget, activeEvaluatorTargetId, assignedEvaluatorIdsForActiveTarget, employees, evaluatorSearch, manualForm.relationshipType]);
+            .filter(employee => !employee.eligibilityMessage);
+
+        const searched = query
+            ? withEligibility.filter(employee => [
+                employee.fullName,
+                employee.currentDepartment ?? '',
+                employee.positionTitle ?? '',
+                employee.positionLevelCode ?? '',
+                String(employee.id),
+            ].some(value => value.toLowerCase().includes(query)))
+            : withEligibility;
+
+        return searched
+            .sort((left, right) => {
+                const departmentCompare = String(left.currentDepartment ?? '').localeCompare(String(right.currentDepartment ?? ''));
+                if (departmentCompare !== 0) return departmentCompare;
+                return left.fullName.localeCompare(right.fullName);
+            })
+            .slice(0, 20);
+    }, [activeEvaluatorTarget, activeEvaluatorTargetId, assignedEvaluatorIdsForActiveTarget, enrichedEmployeeMap, evaluatorSearch, manualForm.relationshipType]);
+
+    const manualCandidateNotice = useMemo(() => {
+        if (!activeEvaluatorTarget) return 'Select a recipient before adding an evaluator.';
+        if (manualForm.relationshipType === 'MANAGER') {
+            return activeEvaluatorTarget.managerEmployeeId
+                ? 'Only the recorded Reports To manager is available for Manager review.'
+                : 'This recipient has no Reports To manager recorded.';
+        }
+        if (manualForm.relationshipType === 'SUBORDINATE') {
+            return 'Only employees whose Reports To value points to this recipient are available.';
+        }
+        return 'Peer candidates are limited to the same department, same organization layer, and same or adjacent level.';
+    }, [activeEvaluatorTarget, manualForm.relationshipType]);
+
+    const evaluatorCandidates = manualRelationshipCandidateSource;
 
     const selectedManualEvaluator = useMemo(
-        () => employeeMap.get(manualForm.evaluatorEmployeeId) ?? null,
-        [employeeMap, manualForm.evaluatorEmployeeId],
+        () => enrichedEmployeeMap.get(manualForm.evaluatorEmployeeId) ?? null,
+        [enrichedEmployeeMap, manualForm.evaluatorEmployeeId],
     );
 
     const manualEvaluatorEligibilityError = useMemo(
@@ -173,6 +241,11 @@ export function useCampaignEvaluatorViewModel({
         }
         return grouped;
     }, [activeEvaluatorAssignments]);
+
+    const activeTargetSummary = useMemo(() => {
+        if (!activeEvaluatorTarget) return '';
+        return `${activeEvaluatorTarget.employeeName} · ${activeEvaluatorTarget.positionName ?? 'Position not set'} · ${activeEvaluatorTarget.currentDepartmentName ?? 'Department not set'}`;
+    }, [activeEvaluatorTarget]);
 
     useEffect(() => {
         const firstTargetId = evaluatorTargets[0]?.employeeId ?? 0;
@@ -225,10 +298,13 @@ export function useCampaignEvaluatorViewModel({
         activePreviewItem,
         assignedEvaluatorIdsForActiveTarget,
         evaluatorCandidates,
+        manualCandidateNotice,
         selectedManualEvaluator,
         manualEvaluatorEligibilityError,
         activeAssignmentsByRelationship,
+        activeTargetSummary,
         manualForm,
         setManualForm,
+        formatDepartmentPosition,
     };
 }

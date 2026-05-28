@@ -50,7 +50,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService {
 
-    private static final Set<String> AUTO_PEER_LEVEL_CODES = Set.of("L05", "L06", "L07");
+    private static final Set<String> HR_ADMIN_ROLE_NAMES = Set.of(
+            "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
+    );
+    private static final Set<String> EXECUTIVE_ROLE_NAMES = Set.of("CEO", "EXECUTIVE");
 
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
@@ -127,6 +130,10 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         List<FeedbackEvaluatorAssignment> assignmentsToSave = new ArrayList<>();
         List<FeedbackAssignmentPreviewItemResponse> previewItems = new ArrayList<>();
         int plannedAssignments = 0;
+        Map<Long, Integer> evaluatorLoadByEmployeeId = existingManualAssignments.stream()
+                .map(FeedbackEvaluatorAssignment::getEvaluatorEmployeeId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Function.identity(), employeeId -> 1, Integer::sum));
 
         for (FeedbackRequest request : requests) {
             List<String> targetWarnings = new ArrayList<>();
@@ -167,6 +174,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                             FeedbackRelationshipType.MANAGER, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
                         managerAssignments++;
                         autoAssignmentsForTarget++;
+                        incrementEvaluatorLoad(evaluatorLoadByEmployeeId, managerEmployeeId);
                     }
                 } else {
                     targetWarnings.add("No active direct manager found. Department Head is assigned as Manager only when the employee directly reports to them.");
@@ -178,6 +186,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                         FeedbackRelationshipType.SELF, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
                     selfAssignments++;
                     autoAssignmentsForTarget++;
+                    incrementEvaluatorLoad(evaluatorLoadByEmployeeId, request.getTargetEmployeeId());
                 }
             }
 
@@ -206,6 +215,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                             FeedbackRelationshipType.SUBORDINATE, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
                         subordinateAssignments++;
                         autoAssignmentsForTarget++;
+                        incrementEvaluatorLoad(evaluatorLoadByEmployeeId, subordinateEmployeeId);
                     }
                 }
             }
@@ -239,18 +249,18 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
             peerPool = filterEligiblePeerPool(
                     peerPool,
+                    targetUser,
                     request.getTargetEmployeeId(),
                     managerEmployeeId,
                     subordinateEmployeeIds,
                     assignedEvaluatorEmployeeIds,
-                    workingDepartmentId,
                     targetWarnings
             );
 
             int requestedPeerMinCount = requestedPeerMinCount(config);
             int requestedPeerMaxCount = requestedPeerMaxCount(config);
             List<Long> selectedPeers = isPeerSelectionEnabled(config)
-                    ? selectPeers(peerPool, requestedPeerMaxCount, campaignId, request.getTargetEmployeeId())
+                    ? selectPeers(peerPool, requestedPeerMaxCount, campaignId, targetUser, targetTeamIds, evaluatorLoadByEmployeeId)
                     : List.of();
             if (isPeerSelectionEnabled(config) && selectedPeers.size() < requestedPeerMinCount) {
                 targetWarnings.add("Only " + selectedPeers.size()
@@ -259,9 +269,10 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             }
             for (Long peerEmployeeId : selectedPeers) {
                 if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, peerEmployeeId,
-                        FeedbackRelationshipType.PEER, EvaluatorSelectionMethod.AUTO_RANDOM, persist)) {
+                        FeedbackRelationshipType.PEER, EvaluatorSelectionMethod.AUTO_RANKED, persist)) {
                     peerAssignments++;
                     autoAssignmentsForTarget++;
+                    incrementEvaluatorLoad(evaluatorLoadByEmployeeId, peerEmployeeId);
                 }
             }
 
@@ -493,17 +504,41 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             throw new BusinessValidationException("Only SELF assignments can use the target employee as evaluator.");
         }
 
-        // Manual MANAGER and SUBORDINATE overrides are intentionally allowed with a required HR reason.
-        // This keeps the workflow usable when reporting hierarchy data is incomplete or temporarily wrong.
-        if (relationshipType == FeedbackRelationshipType.PEER) {
-            if (!hasAutoPeerLevel(evaluator) || hasManagerLikePositionTitle(evaluator)) {
-                throw new BusinessValidationException("This employee is not eligible as a peer for this recipient. Choose an eligible same-level individual contributor, or use Manager / Direct Report when that relationship is correct.");
+        if (relationshipType == FeedbackRelationshipType.MANAGER) {
+            if (target.getManagerId() == null || !Objects.equals(target.getManagerId(), evaluator.getId())) {
+                throw new BusinessValidationException("Manager review must use the recipient's recorded Reports To manager.");
             }
+            return;
+        }
+
+        if (relationshipType == FeedbackRelationshipType.SUBORDINATE) {
+            if (!Objects.equals(evaluator.getManagerId(), target.getId())) {
+                throw new BusinessValidationException("Direct Report review must use an employee who reports to the selected recipient.");
+            }
+            return;
+        }
+
+        if (relationshipType == FeedbackRelationshipType.PEER) {
             if (Objects.equals(target.getManagerId(), evaluator.getId())) {
                 throw new BusinessValidationException("The recipient's manager cannot be added as a peer evaluator.");
             }
             if (Objects.equals(evaluator.getManagerId(), target.getId())) {
                 throw new BusinessValidationException("A direct report cannot be added as a peer evaluator.");
+            }
+            if (hasHrAdminRole(evaluator)) {
+                throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
+            }
+            if (isExecutivePeerMismatch(resolvePeerLayer(target), evaluator)) {
+                throw new BusinessValidationException("Executive users are not peer evaluators for this recipient layer.");
+            }
+            if (!sameDepartment(target, evaluator)) {
+                throw new BusinessValidationException("Peer reviewers must be from the same department by default.");
+            }
+            if (!isPeerLayerCompatible(target, evaluator)) {
+                throw new BusinessValidationException("This employee is not a close organizational peer for the selected recipient. Choose someone at the same organization layer.");
+            }
+            if (levelDistance(target, evaluator) > 1) {
+                throw new BusinessValidationException("Choose a peer from the same or adjacent level.");
             }
         }
     }
@@ -609,7 +644,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                             .evaluatorPositionId(assignment.getEvaluatorPositionId())
                             .evaluatorPositionName(assignment.getEvaluatorPositionName())
                             .manualReason(assignment.getManualReason())
-                            .selectionReason(resolveSelectionReason(assignment))
+                            .selectionReason(resolveSelectionReason(assignment, usersByEmployeeId))
                             .confidence(resolveAssignmentConfidence(assignment))
                             .warnings(resolveAssignmentDetailWarnings(assignment, usersByEmployeeId))
                             .relationshipType(assignment.getRelationshipType())
@@ -621,7 +656,10 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 .toList();
     }
 
-    private String resolveSelectionReason(FeedbackEvaluatorAssignment assignment) {
+    private String resolveSelectionReason(
+            FeedbackEvaluatorAssignment assignment,
+            Map<Integer, User> usersByEmployeeId
+    ) {
         if (assignment == null || assignment.getSelectionMethod() == null) {
             return null;
         }
@@ -631,7 +669,9 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                     : "HR manual override: " + assignment.getManualReason();
         }
         if (assignment.getRelationshipType() == FeedbackRelationshipType.PEER) {
-            return "Randomly selected from the validated eligible peer pool after excluding self, manager, direct reports, department heads, manager-like roles, HR/admin users, inactive users, and existing manual assignments.";
+            User target = usersByEmployeeId.get(assignment.getFeedbackRequest().getTargetEmployeeId().intValue());
+            User evaluator = usersByEmployeeId.get(assignment.getEvaluatorEmployeeId().intValue());
+            return buildPeerSelectionReason(target, evaluator);
         }
         return "Automatically resolved from available organization relationship data.";
     }
@@ -644,7 +684,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             return "HR_CONFIRMED";
         }
         if (assignment.getRelationshipType() == FeedbackRelationshipType.PEER) {
-            return "MEDIUM";
+            return assignment.getSelectionMethod() == EvaluatorSelectionMethod.AUTO_RANKED ? "HIGH" : "MEDIUM";
         }
         return "HIGH";
     }
@@ -664,8 +704,8 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             detailWarnings.add("Manual override. Keep the reason for audit review.");
         }
         if (assignment.getRelationshipType() == FeedbackRelationshipType.PEER
-                && assignment.getSelectionMethod() == EvaluatorSelectionMethod.AUTO_RANDOM) {
-            detailWarnings.add("Auto-random peer selected from eligible pool only.");
+                && assignment.getSelectionMethod() == EvaluatorSelectionMethod.AUTO_RANKED) {
+            detailWarnings.add("Suggested peer selected by ranked work-context matching.");
         }
         Long evaluatorEmployeeId = assignment.getEvaluatorEmployeeId();
         if (evaluatorEmployeeId != null) {
@@ -882,14 +922,15 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
     private LinkedHashSet<Long> filterEligiblePeerPool(
             Set<Long> rawPeerPool,
+            User targetUser,
             Long targetEmployeeId,
             Long managerEmployeeId,
             Set<Long> subordinateEmployeeIds,
             Set<Long> alreadyAssignedEmployeeIds,
-            Integer workingDepartmentId,
             List<String> targetWarnings
     ) {
         LinkedHashSet<Long> filtered = new LinkedHashSet<>(rawPeerPool == null ? Set.of() : rawPeerPool);
+        int originalSize = filtered.size();
         filtered.remove(null);
         filtered.remove(targetEmployeeId);
         if (managerEmployeeId != null) {
@@ -902,47 +943,23 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             alreadyAssignedEmployeeIds.forEach(filtered::remove);
         }
 
-        int beforeGovernance = filtered.size();
-        Set<Long> governanceExcludedEmployeeIds = findAutoPeerGovernanceExclusionEmployeeIds(workingDepartmentId);
-        filtered.removeAll(governanceExcludedEmployeeIds);
-
+        PeerLayer targetLayer = resolvePeerLayer(targetUser);
         LinkedHashSet<Long> eligible = filtered.stream()
                 .filter(employeeId -> {
                     User candidate = findActiveUserForEmployeeId(employeeId);
-                    return candidate != null && hasAutoPeerLevel(candidate) && !hasManagerLikePositionTitle(candidate);
+                    return candidate != null
+                            && !hasHrAdminRole(candidate)
+                            && sameDepartment(targetUser, candidate)
+                            && isPeerLayerCompatible(targetUser, candidate)
+                            && !isExecutivePeerMismatch(targetLayer, candidate)
+                            && levelDistance(targetUser, candidate) <= 1;
                 })
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        if (targetWarnings != null && beforeGovernance > eligible.size()) {
-            targetWarnings.add("Some peer candidates were excluded because they are department heads, managers, HR/admin users, inactive users, or manager-like positions.");
+        if (targetWarnings != null && originalSize > eligible.size()) {
+            targetWarnings.add("Some peer candidates were excluded because they were inactive, HR/Admin users, direct managers, direct reports, outside the recipient department, or not at the same organization layer.");
         }
         return eligible;
-    }
-
-    private Set<Long> findAutoPeerGovernanceExclusionEmployeeIds(Integer workingDepartmentId) {
-        LinkedHashSet<Long> employeeIds = new LinkedHashSet<>();
-        if (workingDepartmentId != null) {
-            userRepository.findActiveDepartmentHeadsByDepartmentId(workingDepartmentId).stream()
-                    .map(User::getEmployeeId)
-                    .filter(Objects::nonNull)
-                    .map(Integer::longValue)
-                    .forEach(employeeIds::add);
-            userRepository.findActiveManagersByDepartmentId(workingDepartmentId).stream()
-                    .map(User::getEmployeeId)
-                    .filter(Objects::nonNull)
-                    .map(Integer::longValue)
-                    .forEach(employeeIds::add);
-        }
-        userRepository.findActiveUsersByNormalizedRoleNames(List.of(
-                        "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN",
-                        "CEO", "EXECUTIVE", "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD",
-                        "HEAD_OF_DEPARTMENT", "MANAGER", "PROJECT_MANAGER", "TEAM_MANAGER"
-                )).stream()
-                .map(User::getEmployeeId)
-                .filter(Objects::nonNull)
-                .map(Integer::longValue)
-                .forEach(employeeIds::add);
-        return employeeIds;
     }
 
     private boolean hasActiveUserForEmployeeId(Long employeeId) {
@@ -958,50 +975,248 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 .orElse(null);
     }
 
-    private boolean hasAutoPeerLevel(User user) {
-        if (user == null || user.getPosition() == null || user.getPosition().getLevel() == null) {
+    private enum PeerLayer {
+        INDIVIDUAL_CONTRIBUTOR,
+        LEAD_OR_SUPERVISOR,
+        MANAGER,
+        DEPARTMENT_HEAD,
+        EXECUTIVE
+    }
+
+    private PeerLayer resolvePeerLayer(User user) {
+        if (user == null) {
+            return PeerLayer.INDIVIDUAL_CONTRIBUTOR;
+        }
+        Set<String> roles = normalizedRoleNames(user);
+        String title = user.getPosition() == null ? "" : normalizeLabel(user.getPosition().getPositionTitle());
+        if (!Collections.disjoint(roles, EXECUTIVE_ROLE_NAMES) || containsAny(title, "CEO", "CHIEF", "EXECUTIVE", "DIRECTOR")) {
+            return PeerLayer.EXECUTIVE;
+        }
+        if (roles.stream().anyMatch(role -> role.contains("DEPARTMENT_HEAD") || role.contains("DEPT_HEAD") || role.contains("HEAD_OF_DEPARTMENT"))
+                || containsAny(title, "DEPARTMENT_HEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT", "HEAD")) {
+            return PeerLayer.DEPARTMENT_HEAD;
+        }
+        if (roles.stream().anyMatch(role -> role.contains("MANAGER")) || containsAny(title, "MANAGER")) {
+            return PeerLayer.MANAGER;
+        }
+        if (containsAny(title, "LEAD", "SUPERVISOR")) {
+            return PeerLayer.LEAD_OR_SUPERVISOR;
+        }
+        return PeerLayer.INDIVIDUAL_CONTRIBUTOR;
+    }
+
+    private boolean isPeerLayerCompatible(User target, User candidate) {
+        if (target == null || candidate == null) {
             return false;
         }
-        String levelCode = user.getPosition().getLevel().getLevelCode();
-        if (levelCode == null || levelCode.isBlank()) {
-            return false;
+        PeerLayer targetLayer = resolvePeerLayer(target);
+        PeerLayer candidateLayer = resolvePeerLayer(candidate);
+        if (targetLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR) {
+            return candidateLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR
+                    || candidateLayer == PeerLayer.LEAD_OR_SUPERVISOR;
         }
-        return AUTO_PEER_LEVEL_CODES.contains(levelCode.trim().toUpperCase(Locale.ROOT).replace(" ", ""));
+        if (targetLayer == PeerLayer.LEAD_OR_SUPERVISOR) {
+            return candidateLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR
+                    || candidateLayer == PeerLayer.LEAD_OR_SUPERVISOR;
+        }
+        if (targetLayer == PeerLayer.MANAGER) {
+            return candidateLayer == PeerLayer.MANAGER;
+        }
+        if (targetLayer == PeerLayer.DEPARTMENT_HEAD) {
+            return candidateLayer == PeerLayer.DEPARTMENT_HEAD;
+        }
+        return candidateLayer == PeerLayer.EXECUTIVE;
+    }
+
+    private boolean isExecutivePeerMismatch(PeerLayer targetLayer, User candidate) {
+        return targetLayer != PeerLayer.EXECUTIVE && !Collections.disjoint(normalizedRoleNames(candidate), EXECUTIVE_ROLE_NAMES);
+    }
+
+    private boolean sameDepartment(User target, User candidate) {
+        return target != null
+                && candidate != null
+                && target.getDepartmentId() != null
+                && Objects.equals(target.getDepartmentId(), candidate.getDepartmentId());
+    }
+
+
+    private boolean hasHrAdminRole(User user) {
+        return !Collections.disjoint(normalizedRoleNames(user), HR_ADMIN_ROLE_NAMES);
+    }
+
+    private Set<String> normalizedRoleNames(User user) {
+        if (user == null || user.getId() == null) {
+            return Set.of();
+        }
+        return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
+                .map(this::normalizeLabel)
+                .collect(Collectors.toSet());
     }
 
     private boolean hasManagerLikePositionTitle(User user) {
         if (user == null || user.getPosition() == null || user.getPosition().getPositionTitle() == null) {
             return false;
         }
+        PeerLayer layer = resolvePeerLayer(user);
+        return layer == PeerLayer.LEAD_OR_SUPERVISOR
+                || layer == PeerLayer.MANAGER
+                || layer == PeerLayer.DEPARTMENT_HEAD
+                || layer == PeerLayer.EXECUTIVE;
+    }
+
+    private int levelRank(User user) {
+        if (user == null || user.getPosition() == null || user.getPosition().getLevel() == null) {
+            return 0;
+        }
+        String code = normalizeLabel(user.getPosition().getLevel().getLevelCode());
+        String digits = code.replaceAll("\\D+", "");
+        if (digits.isBlank()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private int levelDistance(User target, User candidate) {
+        int targetRank = levelRank(target);
+        int candidateRank = levelRank(candidate);
+        if (targetRank == 0 || candidateRank == 0) {
+            return 99;
+        }
+        return Math.abs(targetRank - candidateRank);
+    }
+
+    private boolean sameManager(User left, User right) {
+        return left != null
+                && right != null
+                && left.getManagerId() != null
+                && Objects.equals(left.getManagerId(), right.getManagerId());
+    }
+
+    private boolean sharesActiveTeam(User target, User candidate, Set<Integer> targetTeamIds) {
+        if (target == null || candidate == null || targetTeamIds == null || targetTeamIds.isEmpty()) {
+            return false;
+        }
+        return !Collections.disjoint(targetTeamIds, findActiveTeamIds(candidate));
+    }
+
+    private int peerScore(User target, User candidate, Set<Integer> targetTeamIds, Map<Long, Integer> evaluatorLoadByEmployeeId) {
+        int score = 0;
+        if (sharesActiveTeam(target, candidate, targetTeamIds)) score += 45;
+        if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), candidate.getDepartmentId())) score += 35;
+        if (sameManager(target, candidate)) score += 25;
+        int distance = levelDistance(target, candidate);
+        if (distance == 0) score += 20;
+        else if (distance == 1) score += 12;
+        else if (distance == 2) score += 5;
+        if (resolvePeerLayer(target) == resolvePeerLayer(candidate)) score += 15;
+        if (samePositionFamily(target, candidate)) score += 8;
+        Long candidateEmployeeId = candidate.getEmployeeId() == null ? null : candidate.getEmployeeId().longValue();
+        score -= Math.min(24, (evaluatorLoadByEmployeeId == null ? 0 : evaluatorLoadByEmployeeId.getOrDefault(candidateEmployeeId, 0)) * 6);
+        return score;
+    }
+
+    private boolean samePositionFamily(User target, User candidate) {
+        String targetFamily = positionFamily(target);
+        String candidateFamily = positionFamily(candidate);
+        return !targetFamily.isBlank() && targetFamily.equals(candidateFamily);
+    }
+
+    private String positionFamily(User user) {
+        if (user == null || user.getPosition() == null || user.getPosition().getPositionTitle() == null) {
+            return "";
+        }
         String normalized = normalizeLabel(user.getPosition().getPositionTitle());
-        return normalized.contains("MANAGER")
-                || normalized.contains("DEPARTMENT_HEAD")
-                || normalized.contains("HEAD")
-                || normalized.contains("DIRECTOR")
-                || normalized.contains("CHIEF")
-                || normalized.contains("EXECUTIVE")
-                || normalized.contains("CEO")
-                || normalized.contains("CTO")
-                || normalized.contains("CFO")
-                || normalized.contains("COO")
-                || normalized.contains("SUPERVISOR")
-                || normalized.contains("LEAD")
-                || normalized.contains("HR")
-                || normalized.contains("ADMIN");
+        return normalized
+                .replace("SENIOR_", "")
+                .replace("JUNIOR_", "")
+                .replace("ASSOCIATE_", "")
+                .replace("_MANAGER", "")
+                .replace("MANAGER", "")
+                .replace("_LEAD", "")
+                .replace("LEAD", "")
+                .replace("_SUPERVISOR", "")
+                .replace("SUPERVISOR", "");
     }
 
-    private String normalizeLabel(String value) {
-        return value == null ? "" : value.trim().toUpperCase().replaceAll("[^A-Z0-9]+", "_");
-    }
-
-    private List<Long> selectPeers(Set<Long> peerPool, int peerCount, Long campaignId, Long targetEmployeeId) {
+    private List<Long> selectPeers(
+            Set<Long> peerPool,
+            int peerCount,
+            Long campaignId,
+            User targetUser,
+            Set<Integer> targetTeamIds,
+            Map<Long, Integer> evaluatorLoadByEmployeeId
+    ) {
         if (peerPool.isEmpty() || peerCount <= 0) {
             return List.of();
         }
-        List<Long> candidates = new ArrayList<>(peerPool);
-        long seed = Objects.hash(campaignId, targetEmployeeId, "PEER_AUTO_RANDOM");
-        Collections.shuffle(candidates, new Random(seed));
-        return candidates.stream().limit(peerCount).toList();
+        return peerPool.stream()
+                .map(this::findActiveUserForEmployeeId)
+                .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparingInt((User candidate) -> peerScore(targetUser, candidate, targetTeamIds, evaluatorLoadByEmployeeId)).reversed()
+                        .thenComparingInt(candidate -> evaluatorLoadByEmployeeId.getOrDefault(candidate.getEmployeeId() == null ? null : candidate.getEmployeeId().longValue(), 0))
+                        .thenComparing(candidate -> candidate.getFullName() == null ? "" : candidate.getFullName(), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(User::getId))
+                .limit(peerCount)
+                .map(User::getEmployeeId)
+                .filter(Objects::nonNull)
+                .map(Integer::longValue)
+                .toList();
+    }
+
+    private void incrementEvaluatorLoad(Map<Long, Integer> evaluatorLoadByEmployeeId, Long evaluatorEmployeeId) {
+        if (evaluatorLoadByEmployeeId != null && evaluatorEmployeeId != null) {
+            evaluatorLoadByEmployeeId.merge(evaluatorEmployeeId, 1, Integer::sum);
+        }
+    }
+
+    private String buildPeerSelectionReason(User target, User evaluator) {
+        if (target == null || evaluator == null) {
+            return "Suggested peer based on the best available work-context match.";
+        }
+        List<String> reasons = new ArrayList<>();
+        if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), evaluator.getDepartmentId())) {
+            reasons.add("same department");
+        }
+        if (sameManager(target, evaluator)) {
+            reasons.add("same reporting group");
+        }
+        int distance = levelDistance(target, evaluator);
+        if (distance == 0) {
+            reasons.add("same level");
+        } else if (distance == 1) {
+            reasons.add("nearby level");
+        }
+        if (resolvePeerLayer(target) == resolvePeerLayer(evaluator)) {
+            reasons.add("similar organization layer");
+        }
+        if (samePositionFamily(target, evaluator)) {
+            reasons.add("similar position family");
+        }
+        if (reasons.isEmpty()) {
+            return "Suggested peer based on the closest available eligible work-context match.";
+        }
+        return "Suggested peer based on " + String.join(", ", reasons) + ".";
+    }
+
+    private boolean containsAny(String value, String... tokens) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (value.contains(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeLabel(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_");
     }
 
     private Set<Long> findDepartmentPeerEmployeeIds(User targetUser, Integer workingDepartmentId) {

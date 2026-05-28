@@ -23,13 +23,13 @@ public class EvaluatorConfigDTO {
     private Integer peerMinCount = 2;
 
     @Positive(message = "Maximum peer count must be greater than zero.")
-    private Integer peerMaxCount = 5;
+    private Integer peerMaxCount = 3;
 
     @Min(value = 0, message = "Minimum subordinate count cannot be negative.")
     private Integer subordinateMinCount = 0;
 
     @Min(value = 0, message = "Maximum subordinate count cannot be negative.")
-    private Integer subordinateMaxCount = 5;
+    private Integer subordinateMaxCount = 3;
 
     /**
      * True means insufficient peer/subordinate counts produce warnings but do not

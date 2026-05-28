@@ -10,6 +10,16 @@ type UseCampaignTargetViewModelParams = {
     selectedTargetIds: number[];
     candidates: FeedbackTargetCandidate[];
     positionFilter: string;
+    levelFilter: string;
+};
+
+const sortLevelCodes = (left: string, right: string) => {
+    const leftRank = Number.parseInt(left.replace(/\D+/g, ''), 10);
+    const rightRank = Number.parseInt(right.replace(/\D+/g, ''), 10);
+    if (Number.isFinite(leftRank) && Number.isFinite(rightRank) && leftRank !== rightRank) {
+        return leftRank - rightRank;
+    }
+    return left.localeCompare(right);
 };
 
 export function useCampaignTargetViewModel({
@@ -17,6 +27,7 @@ export function useCampaignTargetViewModel({
                                                selectedTargetIds,
                                                candidates,
                                                positionFilter,
+                                               levelFilter,
                                            }: UseCampaignTargetViewModelParams) {
     const savedTargetIds = useMemo(
         () => normalizeList(targetsResponse.targets.map(target => target.employeeId)),
@@ -33,13 +44,32 @@ export function useCampaignTargetViewModel({
         candidateById.get(employeeId) ?? savedTargetById.get(employeeId)
     )).filter((item): item is FeedbackTargetCandidate => Boolean(item)), [candidateById, savedTargetById, targetIdsNormalized]);
 
-    const positionOptions = useMemo(() => Array.from(new Set(candidates.map(candidate => candidate.positionName).filter((value): value is string => Boolean(value)))).sort(), [candidates]);
-    const candidateRows = useMemo(() => candidates
-        .filter(candidate => !positionFilter || candidate.positionName === positionFilter)
-        .slice(0, 80), [candidates, positionFilter]);
+    const positionOptions = useMemo(() => Array.from(new Set(candidates
+        .filter(candidate => !levelFilter || candidate.levelCode === levelFilter)
+        .map(candidate => candidate.positionName)
+        .filter((value): value is string => Boolean(value))))
+        .sort(), [candidates, levelFilter]);
 
-    const availableCandidateCount = useMemo(() => candidates.filter(candidate => candidate.eligible && candidate.warnings.length === 0).length, [candidates]);
-    const reviewCandidateCount = useMemo(() => candidates.filter(candidate => candidate.eligible && candidate.warnings.length > 0).length, [candidates]);
+    const levelOptions = useMemo(() => Array.from(new Set(candidates
+        .filter(candidate => !positionFilter || candidate.positionName === positionFilter)
+        .map(candidate => candidate.levelCode)
+        .filter((value): value is string => Boolean(value))))
+        .sort(sortLevelCodes), [candidates, positionFilter]);
+
+    const filteredCandidates = useMemo(() => candidates.filter(candidate => (
+        (!positionFilter || candidate.positionName === positionFilter)
+        && (!levelFilter || candidate.levelCode === levelFilter)
+    )), [candidates, levelFilter, positionFilter]);
+
+    const candidateRows = useMemo(() => filteredCandidates.slice(0, 120), [filteredCandidates]);
+    const filteredSelectableCandidateIds = useMemo(
+        () => normalizeList(filteredCandidates.filter(candidate => candidate.eligible).map(candidate => candidate.employeeId)),
+        [filteredCandidates],
+    );
+
+    const availableCandidateCount = useMemo(() => filteredCandidates.filter(candidate => candidate.eligible && candidate.warnings.length === 0).length, [filteredCandidates]);
+    const reviewCandidateCount = useMemo(() => filteredCandidates.filter(candidate => candidate.eligible && candidate.warnings.length > 0).length, [filteredCandidates]);
+    const blockedCandidateCount = useMemo(() => filteredCandidates.filter(candidate => !candidate.eligible).length, [filteredCandidates]);
     const selectedReadyCount = useMemo(() => selectedTargets.filter(target => target.eligible && target.warnings.length === 0).length, [selectedTargets]);
     const selectedReviewCount = useMemo(() => selectedTargets.filter(target => target.eligible && target.warnings.length > 0).length, [selectedTargets]);
     const selectedUnavailableCount = useMemo(() => selectedTargets.filter(target => !target.eligible).length, [selectedTargets]);
@@ -60,9 +90,14 @@ export function useCampaignTargetViewModel({
         hasUnsavedTargetChanges,
         selectedTargets,
         positionOptions,
+        levelOptions,
+        filteredCandidates,
         candidateRows,
+        filteredSelectableCandidateIds,
+        filteredCandidateCount: filteredCandidates.length,
         availableCandidateCount,
         reviewCandidateCount,
+        blockedCandidateCount,
         selectedReadyCount,
         selectedReviewCount,
         selectedUnavailableCount,
