@@ -51,6 +51,29 @@ const isDepartmentHeadUser = (user: any) => {
   });
 };
 
+const isHrUser = (user: any) => {
+  const dashboard = String(user?.dashboard ?? '').toUpperCase();
+
+  if (dashboard === 'HR_DASHBOARD') {
+    return true;
+  }
+
+  return (user?.roles ?? []).some((role: string) => {
+    const normalized = normalizeRole(role);
+    return (
+      normalized === 'HR' ||
+      normalized === 'HUMANRESOURCE' ||
+      normalized === 'HUMAN_RESOURCE' ||
+      normalized === 'HUMANRESOURCES' ||
+      normalized === 'HUMAN_RESOURCES' ||
+      normalized === 'HRMANAGER' ||
+      normalized === 'HR_MANAGER' ||
+      normalized === 'HRADMIN' ||
+      normalized === 'HR_ADMIN'
+    );
+  });
+};
+
 const getApiErrorMessage = (err: any) => {
   return (
     err?.response?.data?.message ||
@@ -84,6 +107,7 @@ const TeamManagement: React.FC = () => {
 
   const isDepartmentHead = isDepartmentHeadUser(user);
   const isEmployee = isEmployeeUser(user);
+  const isHr = isHrUser(user);
 
   const [teams, setTeams] = useState<TeamResponse[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -153,23 +177,23 @@ const TeamManagement: React.FC = () => {
       .getMyPermissions()
       .then((permissions) => {
         if (!cancelled) {
-          setCanCreateTeam(Boolean(permissions.teamCreate));
-          setCanEditTeam(Boolean(permissions.teamEdit));
-          setCanHistoryTeam(Boolean(permissions.teamHistory));
+          setCanCreateTeam(!isHr && Boolean(permissions.teamCreate));
+          setCanEditTeam(!isHr && Boolean(permissions.teamEdit));
+          setCanHistoryTeam(isHr || Boolean(permissions.teamHistory));
         }
       })
       .catch(() => {
         if (!cancelled) {
           setCanCreateTeam(false);
           setCanEditTeam(false);
-          setCanHistoryTeam(false);
+          setCanHistoryTeam(isHr);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isHr]);
 
   const filteredTeams = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();

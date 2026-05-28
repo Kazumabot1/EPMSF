@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { roleNavigation } from '../../config/roleNavigation';
 import type { NavItem, UserRole } from '../../config/roleNavigation';
@@ -18,9 +18,31 @@ const EmployeeSidebar = ({
                            onToggleCollapse,
                          }: EmployeeSidebarProps) => {
   const location = useLocation();
-  const navigation = roleNavigation[role] ?? roleNavigation.Employee;
+  const baseNavigation = roleNavigation[role] ?? roleNavigation.Employee;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [hasMyTeams, setHasMyTeams] = useState(false);
+
+  const navigation = useMemo(() => {
+    if (!hasMyTeams || baseNavigation.some((item) => item.path === '/my-team')) {
+      return baseNavigation;
+    }
+
+    const myTeamItem: NavItem = {
+      label: 'My Team',
+      path: '/my-team',
+      icon: 'bi-diagram-3',
+    };
+
+    const dashboardIndex = baseNavigation.findIndex((item) => item.path.toLowerCase().includes('dashboard'));
+    const insertIndex = dashboardIndex >= 0 ? dashboardIndex + 1 : 1;
+
+    return [
+      ...baseNavigation.slice(0, insertIndex),
+      myTeamItem,
+      ...baseNavigation.slice(insertIndex),
+    ];
+  }, [baseNavigation, hasMyTeams]);
 
   const hasActiveChild = (item: NavItem) =>
       item.children?.some(
@@ -48,6 +70,33 @@ const EmployeeSidebar = ({
       return next;
     });
   }, [location.pathname, navigation]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api.get('/teams/my-teams')
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        const payload = response.data as { data?: unknown } | unknown;
+        const list = payload && typeof payload === 'object' && 'data' in payload
+          ? (payload as { data?: unknown }).data
+          : payload;
+
+        setHasMyTeams(Array.isArray(list) && list.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHasMyTeams(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role, location.pathname]);
 
   const loadUnreadCount = useCallback(async () => {
     try {

@@ -456,24 +456,31 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional(readOnly = true)
     public List<TeamResponseDto> getMyTeams() {
-        positionPermissionService.assertCurrentUserHasPermission("teamView");
-
+        /*
+         * This endpoint is the personal "My Team" workspace.
+         * It must not require the HR/Department team-view permission, because normal employees,
+         * team leaders, and project managers still need to see the active team they belong to.
+         * Security is safe because the query only returns teams connected to the current user.
+         */
         Integer currentUserId = SecurityUtils.currentUserId();
         if (currentUserId == null) {
             return List.of();
         }
 
         LinkedHashSet<Team> result = new LinkedHashSet<>();
-        result.addAll(teamRepository.findByTeamLeaderId(currentUserId));
-        result.addAll(teamRepository.findByProjectManagerId(currentUserId));
+        result.addAll(teamRepository.findByTeamLeaderIdAndStatusIgnoreCase(currentUserId, "Active"));
+        result.addAll(teamRepository.findByProjectManagerIdAndStatusIgnoreCase(currentUserId, "Active"));
 
         for (TeamMember membership : teamMemberRepository.findByMemberUserIdAndEndedDateIsNull(currentUserId)) {
-            if (membership.getTeam() != null) {
-                result.add(membership.getTeam());
+            Team team = membership.getTeam();
+            if (team != null && team.isActiveTeam()) {
+                result.add(team);
             }
         }
 
         return result.stream()
+                .filter(Objects::nonNull)
+                .filter(Team::isActiveTeam)
                 .map(this::toDto)
                 .toList();
     }

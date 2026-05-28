@@ -99,6 +99,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const [positionPermissions, setPositionPermissions] = useState<PositionPermission>(
       emptyPositionPermission(),
   );
+  const [hasMyTeams, setHasMyTeams] = useState(false);
 
   const dashboard = user?.dashboard ?? '';
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
@@ -183,6 +184,33 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    api.get('/teams/my-teams')
+        .then((response) => {
+          if (cancelled) {
+            return;
+          }
+
+          const payload = response.data as { data?: unknown } | unknown;
+          const list = payload && typeof payload === 'object' && 'data' in payload
+              ? (payload as { data?: unknown }).data
+              : payload;
+
+          setHasMyTeams(Array.isArray(list) && list.length > 0);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setHasMyTeams(false);
+          }
+        });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, location.pathname]);
+
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
         ? [
@@ -249,19 +277,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
       { to: '/hr/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
 
-      (allow(positionPermissions, 'teamView') || allow(positionPermissions, 'teamHistory')) && {
-        to: allow(positionPermissions, 'teamView') ? '/hr/team' : '/hr/team/history',
+      {
+        to: '/hr/team',
         label: 'Teams',
         icon: 'bi bi-people-fill',
-        children: compactItems([
-          allow(positionPermissions, 'teamView') && { to: '/hr/team', label: 'View Teams', icon: 'bi bi-eye', end: true },
-          allow(positionPermissions, 'teamHistory') && {
+        children: [
+          { to: '/hr/team', label: 'View Teams', icon: 'bi bi-eye', end: true },
+          {
             to: '/hr/team/history',
             label: 'Team History',
             icon: 'bi bi-clock-history',
             end: true,
           },
-        ]),
+        ],
       },
 
       organizationChildren.length > 0 && {
@@ -483,9 +511,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-    const employeeNavItems: NavItem[] = [
+    const employeeNavItems: NavItem[] = compactItems([
       { to: '/employee/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
+      hasMyTeams && { to: '/my-team', label: 'My Team', icon: 'bi bi-diagram-3' },
       { to: '/employee/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
@@ -498,7 +527,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         children: [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }],
       },
       { to: '/employee/notifications', label: 'Notifications', icon: 'bi bi-bell' },
-    ];
+    ]);
 
     const managerNavItems: NavItem[] = compactItems([
       {
@@ -510,6 +539,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         to: '/profile',
         label: 'Profile',
         icon: 'bi bi-person',
+      },
+      hasMyTeams && {
+        to: '/my-team',
+        label: 'My Team',
+        icon: 'bi bi-diagram-3',
       },
       {
         to: '/manager/self-assessment',
@@ -707,6 +741,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'Profile',
         icon: 'bi bi-person',
       },
+      hasMyTeams && {
+        to: '/my-team',
+        label: 'My Team',
+        icon: 'bi bi-diagram-3',
+      },
       {
         to: '/department-head/self-assessment-forms',
         label: 'View Self-assessment Form',
@@ -887,6 +926,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     isEmployee,
     canCreatePip,
     positionPermissions,
+    hasMyTeams,
   ]);
   const loadUnreadCount = useCallback(async () => {
     try {

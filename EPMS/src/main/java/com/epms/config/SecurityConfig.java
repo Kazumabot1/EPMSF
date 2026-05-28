@@ -244,9 +244,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET,
                                 "/api/teams/my-teams"
-                        ).access((authentication, context) ->
-                                hasTeamPositionPermission(authentication.get(), "teamView")
-                        )
+                        ).authenticated()
 
                         .requestMatchers(HttpMethod.POST,
                                 "/api/teams/my-department",
@@ -639,6 +637,16 @@ public class SecurityConfig {
         }
 
         if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted())) {
+            return new AuthorizationDecision(true);
+        }
+
+        /*
+         * HR owns the organization-wide team view workspace. HR can view teams and team history
+         * even when a merged position-permission row is missing teamView/teamHistory.
+         * Create/edit still remains Department Head permission-controlled.
+         */
+        if (("teamView".equals(permissionField) || "teamHistory".equals(permissionField))
+                && Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, HR_ROLES, HR_DASHBOARDS).isGranted())) {
             return new AuthorizationDecision(true);
         }
 
