@@ -361,59 +361,6 @@ const CeoDashboard = () => {
 
         <button
           type="button"
-          onClick={() => navigate('/executive/kpi-scoring')}
-          style={{
-            border: '1px solid #fde68a',
-            background: '#fff',
-            borderRadius: 18,
-            padding: '1.2rem',
-            textAlign: 'left',
-            cursor: 'pointer',
-            boxShadow: '0 12px 30px rgba(15,23,42,.06)',
-          }}
-        >
-          <span
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 14,
-              display: 'grid',
-              placeItems: 'center',
-              background: '#fffbeb',
-              color: '#d97706',
-              fontSize: 20,
-              marginBottom: 10,
-            }}
-          >
-            <i className="bi bi-clipboard2-check" />
-          </span>
-
-          <strong
-            style={{
-              display: 'block',
-              color: '#1e293b',
-              fontSize: '1rem',
-              fontWeight: 900,
-              marginBottom: 6,
-            }}
-          >
-            KPI Scoring
-          </strong>
-
-          <small
-            style={{
-              display: 'block',
-              color: '#64748b',
-              fontWeight: 650,
-              lineHeight: 1.5,
-            }}
-          >
-            Open the executive KPI scoring workspace and review historical KPI cycles.
-          </small>
-        </button>
-
-        <button
-          type="button"
           onClick={() => navigate('/executive/approval/department-kpi')}
           style={{
             border: '1px solid #bfdbfe',

@@ -691,7 +691,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-      { to: '/executive/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       {
         to: '/executive/approval/kpi',
         label: 'Approval',
@@ -704,15 +703,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             icon: 'bi bi-building-check',
             end: true,
           },
-        ],
-      },
-      {
-        to: '/executive/kpi-scoring',
-        label: 'KPI Review',
-        icon: 'bi bi-clipboard2-check',
-        children: [
-          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-clipboard2-check', end: true },
-          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
       {

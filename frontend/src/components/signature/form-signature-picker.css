@@ -1,0 +1,93 @@
+.form-signature-picker {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.form-signature-picker-creator {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.form-signature-picker-creator-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.form-signature-picker-creator-head strong {
+  font-size: 0.82rem;
+  color: #0f172a;
+}
+
+.form-signature-picker-link {
+  border: none;
+  background: none;
+  color: #4f46e5;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.form-signature-picker-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.form-signature-picker-input {
+  width: 100%;
+  margin-top: 0.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.form-signature-picker-tabs {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.form-signature-picker-tabs button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-signature-picker-tabs button.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+.form-signature-picker-save {
+  border: none;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+}
+
+.form-signature-picker-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.appraisal-success-text {
+  color: #15803d;
+  font-size: 0.78rem;
+}

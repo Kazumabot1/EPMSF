@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
-import { signatureService } from '../../services/signatureService';
+import FormSignaturePicker, { type FormSignatureValue } from '../../components/signature/FormSignaturePicker';
 import type { AssessmentScoreBand, AssessmentScoreRow, EmployeeAssessment } from '../../types/employeeAssessment';
-import type { Signature } from '../../types/signature';
+import '../../components/signature/form-signature-picker.css';
 import { formatDisplayDate, formatDisplayDateTime } from '../../utils/appraisalDateFormat';
 import './assessment-score-table.css';
 
@@ -48,13 +48,6 @@ const statusLabel = (status?: string | null) => {
   }
 };
 
-const signatureSrc = (signature?: Signature | null) => {
-  if (!signature?.imageData || !signature?.imageType) return null;
-  return signature.imageData.startsWith('data:')
-    ? signature.imageData
-    : `data:${signature.imageType};base64,${signature.imageData}`;
-};
-
 const assessmentSignatureSrc = (imageData?: string | null, imageType?: string | null) => {
   if (!imageData || !imageType) return null;
   return imageData.startsWith('data:') ? imageData : `data:${imageType};base64,${imageData}`;
@@ -75,9 +68,11 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [approving, setApproving] = useState(false);
   const [hrComment, setHrComment] = useState('');
-  const [signatures, setSignatures] = useState<Signature[]>([]);
-  const [selectedSignatureId, setSelectedSignatureId] = useState<number>(0);
-  const [signatureLoading, setSignatureLoading] = useState(false);
+  const [hrSignature, setHrSignature] = useState<FormSignatureValue>({
+    signatureId: 0,
+    imageData: null,
+    imageType: null,
+  });
 
   const loadRecords = async () => {
     setStatus('loading');
@@ -98,23 +93,8 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
     }
   };
 
-  const loadSignatures = async () => {
-    setSignatureLoading(true);
-    try {
-      const items = await signatureService.list();
-      setSignatures(items);
-      const defaultSignature = items.find((item) => item.isDefault) ?? items[0];
-      setSelectedSignatureId(defaultSignature?.id ?? 0);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'HR signatures could not be loaded.');
-    } finally {
-      setSignatureLoading(false);
-    }
-  };
-
   useEffect(() => {
     void loadRecords();
-    void loadSignatures();
   }, []);
 
   const filteredRecords = useMemo(() => {
@@ -221,9 +201,8 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
 
   const approveSelectedAssessment = async () => {
     if (!selectedAssessment?.id) return;
-    const signature = signatures.find((item) => item.id === selectedSignatureId);
-    if (!signature) {
-      setMessage('Please select an HR signature before approving.');
+    if (!hrSignature.signatureId || !hrSignature.imageData || !hrSignature.imageType) {
+      setMessage('Please create or select your HR signature before approving.');
       return;
     }
 
@@ -232,10 +211,9 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
     try {
       const approved = await employeeAssessmentService.hrApprove(selectedAssessment.id, {
         comment: hrComment.trim(),
-        signatureId: signature.id,
-        signatureName: signature.name,
-        signatureImageData: signature.imageData,
-        signatureImageType: signature.imageType,
+        signatureId: hrSignature.signatureId,
+        signatureImageData: hrSignature.imageData,
+        signatureImageType: hrSignature.imageType,
       });
       setSelectedAssessment(approved);
       setRecordMode('view');
@@ -253,7 +231,7 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
     ? [...selectedAssessment.scoreBands].sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
     : defaultScoreBands();
 
-  const selectedSignature = signatures.find((item) => item.id === selectedSignatureId) ?? null;
+  const hrSignaturePreviewSrc = assessmentSignatureSrc(hrSignature.imageData, hrSignature.imageType);
 
   return (
     <div className="assessment-score-page">
@@ -417,7 +395,11 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
                 />
                 <SignatureBlock
                   label="HR Signature / Date"
-                  imageSrc={recordMode === 'approve' ? signatureSrc(selectedSignature) : assessmentSignatureSrc(selectedAssessment.hrSignatureImageData, selectedAssessment.hrSignatureImageType)}
+                  imageSrc={
+                    recordMode === 'approve'
+                      ? hrSignaturePreviewSrc
+                      : assessmentSignatureSrc(selectedAssessment.hrSignatureImageData, selectedAssessment.hrSignatureImageType)
+                  }
                   date={selectedAssessment.hrSignedAt}
                 />
               </div>
@@ -434,23 +416,20 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
                       placeholder="Enter HR final comment before approval."
                     />
                   </label>
-                  <label className="assessment-hr-field">
-                    <span>HR Signature</span>
-                    <select
-                      value={selectedSignatureId}
-                      onChange={(event) => setSelectedSignatureId(Number(event.target.value))}
-                      disabled={signatureLoading}
-                    >
-                      <option value={0}>{signatureLoading ? 'Loading signatures...' : 'Select HR signature'}</option>
-                      {signatures.map((signature) => (
-                        <option key={signature.id} value={signature.id}>
-                          {signature.name}{signature.isDefault ? ' (Default)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="assessment-hr-field">
+                    <FormSignaturePicker
+                      label="HR Signature"
+                      value={hrSignature}
+                      onChange={setHrSignature}
+                      disabled={approving}
+                    />
+                  </div>
                   <div className="assessment-score-actions assessment-hr-actions">
-                    <button type="button" onClick={approveSelectedAssessment} disabled={approving || !selectedSignatureId}>
+                    <button
+                      type="button"
+                      onClick={approveSelectedAssessment}
+                      disabled={approving || !hrSignature.signatureId}
+                    >
                       {approving ? 'Approving...' : 'Approve Form'}
                     </button>
                     <button type="button" onClick={closeRecord}>Cancel</button>
