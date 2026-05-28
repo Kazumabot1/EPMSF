@@ -11,6 +11,7 @@ import {
   fetchMyDepartmentCandidateProjectManagers,
   fetchMyDepartmentCandidateUsers,
   formatCandidateLabel,
+  getCandidateTeamWarning,
   type CandidateUser,
   type Department,
   type TeamRequest,
@@ -244,27 +245,32 @@ const TeamCreate: React.FC = () => {
     return projectManagers.find((pm) => pm.id === selectedProjectManagerIdNumber) ?? null;
   }, [projectManagers, selectedProjectManagerIdNumber]);
 
-  const memberRows = useMemo(() => {
-    return members.map((member) => {
-      const isLeader = selectedLeaderIdNumber === member.id;
-      const isProjectManager = selectedProjectManagerIdNumber === member.id;
-      const alreadyInTeam = member.available === false || member.isAvailable === false;
+  const roleCandidateIds = useMemo(() => {
+    return new Set([
+      ...leaders.map((leader) => leader.id),
+      ...projectManagers.map((pm) => pm.id),
+    ]);
+  }, [leaders, projectManagers]);
 
-      return {
-        ...member,
-        disabled: isLeader || isProjectManager || alreadyInTeam,
-        disabledReason: isLeader
-          ? 'Selected as Team Leader'
-          : isProjectManager
-            ? 'Selected as Project Manager'
-            : alreadyInTeam
-              ? member.currentTeamName
-                ? `Already in ${member.currentTeamName}`
-                : 'Already in another team'
-              : '',
-      };
-    });
-  }, [members, selectedLeaderIdNumber, selectedProjectManagerIdNumber]);
+  useEffect(() => {
+    setSelectedMemberIds((prev) => prev.filter((id) => !roleCandidateIds.has(id)));
+  }, [roleCandidateIds]);
+
+  const memberRows = useMemo(() => {
+    return members
+      .filter((member) => !roleCandidateIds.has(member.id))
+      .filter((member) => member.id !== selectedLeaderIdNumber)
+      .filter((member) => member.id !== selectedProjectManagerIdNumber)
+      .map((member) => {
+        const alreadyInTeam = member.available === false || member.isAvailable === false;
+
+        return {
+          ...member,
+          disabled: alreadyInTeam,
+          disabledReason: alreadyInTeam ? getCandidateTeamWarning(member) : '',
+        };
+      });
+  }, [members, roleCandidateIds, selectedLeaderIdNumber, selectedProjectManagerIdNumber]);
 
   const toggleMember = (memberId: number) => {
     setSelectedMemberIds((prev) => {
@@ -303,6 +309,20 @@ const TeamCreate: React.FC = () => {
 
     if (selectedMemberIds.includes(Number(teamLeaderId))) {
       return 'Team Leader cannot be selected as a normal member.';
+    }
+
+    if (selectedMemberIds.some((id) => roleCandidateIds.has(id))) {
+      return 'Team Leader and Project Manager candidates cannot be selected as normal members.';
+    }
+
+    const unavailableMember = members.find(
+      (member) =>
+        selectedMemberIds.includes(member.id) &&
+        (member.available === false || member.isAvailable === false)
+    );
+
+    if (unavailableMember) {
+      return `${unavailableMember.name} is ${getCandidateTeamWarning(unavailableMember).toLowerCase()}.`;
     }
 
     return '';
@@ -443,16 +463,10 @@ const TeamCreate: React.FC = () => {
 
             {leaders.map((leader) => {
               const unavailable = leader.available === false || leader.isAvailable === false;
-              const suffix = unavailable
-                ? ` (Already Team Leader in ${
-                    leader.currentTeamName || leader.currentTeamNames || 'another active team'
-                  })`
-                : '';
 
               return (
                 <option key={leader.id} value={leader.id} disabled={unavailable}>
-                  {leader.name}
-                  {suffix}
+                  {formatCandidateLabel(leader)}
                 </option>
               );
             })}
