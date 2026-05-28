@@ -574,7 +574,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'appraisalPermission') && {
+      {
         to: '/manager/appraisals',
         label: 'Appraisal Review',
         icon: 'bi bi-clipboard-data',
@@ -604,13 +604,13 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'continuousFeedbackView') && {
+      {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
 
-      allow(positionPermissions, 'oneOnOnePermission') && {
+      {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -628,7 +628,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'pipViewAll') && {
+      {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
@@ -757,7 +757,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard-data',
       },
 
-      allow(positionPermissions, 'continuousFeedbackView') && {
+      {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
@@ -769,7 +769,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-chat-square-dots',
       },
 
-      allow(positionPermissions, 'departmentKpiPermission') && {
+      {
         to: '/department-head/department-kpis',
         label: 'Department KPIs',
         icon: 'bi bi-building-check',
@@ -837,7 +837,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'appraisalPermission') && {
+      {
         to: '/department-head/appraisals/review',
         label: 'Appraisals',
         icon: 'bi bi-clipboard-check',
@@ -856,7 +856,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'oneOnOnePermission') && {
+      {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -875,19 +875,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
 
       {
-        to: '/notifications',
-        label: 'Notifications',
-        icon: 'bi bi-bell',
-        children: [
-          {
-            to: '/notifications',
-            label: 'System Notification',
-            icon: 'bi bi-bell',
-          },
-        ],
-      },
-
-      allow(positionPermissions, 'pipViewAll') && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
@@ -901,6 +888,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             to: '/pip/past-plans',
             label: 'Past Plans',
             icon: 'bi bi-clock-history',
+          },
+        ],
+      },
+
+      {
+        to: '/notifications',
+        label: 'Notifications',
+        icon: 'bi bi-bell',
+        children: [
+          {
+            to: '/notifications',
+            label: 'System Notification',
+            icon: 'bi bi-bell',
           },
         ],
       },

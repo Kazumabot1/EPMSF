@@ -398,9 +398,7 @@ public class SecurityConfig {
                                 "/api/appraisal/cycles",
                                 "/api/appraisal/cycles/**",
                                 "/api/hr/appraisal/score-bands",
-                                "/api/hr/appraisal/score-bands/**",
-                                "/api/appraisal/workflow",
-                                "/api/appraisal/workflow/**"
+                                "/api/hr/appraisal/score-bands/**"
                         ).access((authentication, context) ->
                                 hasAnyRoleAndPositionPermission(
                                         authentication.get(),
@@ -408,6 +406,25 @@ public class SecurityConfig {
                                         HR_DASHBOARDS,
                                         "appraisalPermission"
                                 )
+                        )
+
+                        /*
+                         * Filled appraisal workflow (Manager -> Dept Head -> HR -> Employee).
+                         * HR setup stays permission-controlled above; workflow endpoints are role-scoped
+                         * with method-level @PreAuthorize on individual operations.
+                         */
+                        .requestMatchers(
+                                "/api/appraisal/workflow",
+                                "/api/appraisal/workflow/**"
+                        ).access((authentication, context) ->
+                                hasAppraisalWorkflowAccess(authentication.get())
+                        )
+
+                        .requestMatchers(
+                                "/api/continuous-feedback",
+                                "/api/continuous-feedback/**"
+                        ).access((authentication, context) ->
+                                hasContinuousFeedbackAccess(authentication.get())
                         )
 
                         /*
@@ -430,10 +447,7 @@ public class SecurityConfig {
                                 "/api/one-on-one-action-items",
                                 "/api/one-on-one-action-items/**"
                         ).access((authentication, context) ->
-                                hasPositionPermissionForAuthenticatedUser(
-                                        authentication.get(),
-                                        "oneOnOnePermission"
-                                )
+                                hasOneOnOneApiAccess(authentication.get())
                         )
 
                         .requestMatchers(
@@ -642,17 +656,6 @@ public class SecurityConfig {
                                 )
                         )
 
-                        .requestMatchers(
-                                "/api/appraisal/workflow",
-                                "/api/appraisal/workflow/**",
-                                "/api/pip",
-                                "/api/pip/**",
-                                "/api/pips",
-                                "/api/pips/**",
-                                "/api/v1/feedback",
-                                "/api/v1/feedback/**"
-                        ).authenticated()
-
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -721,12 +724,13 @@ public class SecurityConfig {
             return new AuthorizationDecision(true);
         }
 
-        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))
-                || Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            return new AuthorizationDecision(currentPositionHasPermission("pipViewAll"));
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
                 || Boolean.TRUE.equals(isCurrentAuthenticationDepartmentHead(authentication))) {
-            return new AuthorizationDecision(
-                    positionPermissionService.currentUserHasPermission("pipViewAll")
-            );
+            return new AuthorizationDecision(true);
         }
 
         /*
@@ -734,6 +738,103 @@ public class SecurityConfig {
          * Service-level ownership checks still decide which records can be opened.
          */
         return new AuthorizationDecision(true);
+    }
+
+    private AuthorizationDecision hasAppraisalWorkflowAccess(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            if (Boolean.TRUE.equals(
+                    hasRoleDashboardOrPosition(authentication, MANAGER_ROLES, MANAGER_DASHBOARDS).isGranted()
+            ) || Boolean.TRUE.equals(
+                    hasRoleDashboardOrPosition(authentication, DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS).isGranted()
+            )) {
+                return new AuthorizationDecision(true);
+            }
+
+            return new AuthorizationDecision(currentPositionHasPermission("appraisalPermission"));
+        }
+
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, MANAGER_ROLES, MANAGER_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        return new AuthorizationDecision(
+                Boolean.TRUE.equals(
+                        hasRoleDashboardOrPosition(
+                                authentication,
+                                Set.of("EMPLOYEE"),
+                                Set.of("EMPLOYEE_DASHBOARD")
+                        ).isGranted()
+                )
+        );
+    }
+
+    private AuthorizationDecision hasOneOnOneApiAccess(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            return new AuthorizationDecision(currentPositionHasPermission("oneOnOnePermission"));
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
+                || Boolean.TRUE.equals(isCurrentAuthenticationDepartmentHead(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        return new AuthorizationDecision(currentPositionHasPermission("oneOnOnePermission"));
+    }
+
+    private AuthorizationDecision hasContinuousFeedbackAccess(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            return new AuthorizationDecision(
+                    currentPositionHasPermission("continuousFeedbackView")
+                            || currentPositionHasPermission("continuousFeedbackGive")
+            );
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
+                || Boolean.TRUE.equals(isCurrentAuthenticationDepartmentHead(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        return new AuthorizationDecision(
+                Boolean.TRUE.equals(
+                        hasRoleDashboardOrPosition(
+                                authentication,
+                                Set.of("EMPLOYEE"),
+                                Set.of("EMPLOYEE_DASHBOARD")
+                        ).isGranted()
+                )
+        );
     }
 
     private AuthorizationDecision hasEmployeeAssessmentScoreTablePermission(Authentication authentication) {

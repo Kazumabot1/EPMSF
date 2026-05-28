@@ -603,7 +603,15 @@ const DepartmentHeadDashboard = () => {
                     value="No open cycle"
                     detail="Department appraisal forms and manager submission status."
                     status="Idle"
-                    onClick={() => navigate('/department-head/appraisals')}
+                    onClick={() => navigate('/department-head/appraisals/review')}
+                />
+                <FocusRow
+                    icon="building"
+                    title="Department KPIs"
+                    value="View results"
+                    detail="Finalized department KPI scores for your department."
+                    status="Available"
+                    onClick={() => navigate('/department-head/department-kpis')}
                 />
                 <FocusRow
                     icon="barChart"
