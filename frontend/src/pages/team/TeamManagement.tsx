@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { positionPermissionService } from '../../services/positionPermissionService';
 import {
+  deleteTeam,
   fetchDepartments,
   fetchMyDepartmentTeams,
   fetchMyTeams,
@@ -50,6 +51,29 @@ const isDepartmentHeadUser = (user: any) => {
   });
 };
 
+const isHrUser = (user: any) => {
+  const dashboard = String(user?.dashboard ?? '').toUpperCase();
+
+  if (dashboard === 'HR_DASHBOARD') {
+    return true;
+  }
+
+  return (user?.roles ?? []).some((role: string) => {
+    const normalized = normalizeRole(role);
+    return (
+      normalized === 'HR' ||
+      normalized === 'HUMANRESOURCE' ||
+      normalized === 'HUMAN_RESOURCE' ||
+      normalized === 'HUMANRESOURCES' ||
+      normalized === 'HUMAN_RESOURCES' ||
+      normalized === 'HRMANAGER' ||
+      normalized === 'HR_MANAGER' ||
+      normalized === 'HRADMIN' ||
+      normalized === 'HR_ADMIN'
+    );
+  });
+};
+
 const getApiErrorMessage = (err: any) => {
   return (
     err?.response?.data?.message ||
@@ -77,15 +101,13 @@ const formatDate = (value?: string | null) => {
   });
 };
 
-const isActiveTeam = (team: TeamResponse) =>
-  String(team.status ?? '').toLowerCase() === 'active';
-
 const TeamManagement: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const isDepartmentHead = isDepartmentHeadUser(user);
   const isEmployee = isEmployeeUser(user);
+  const isHr = isHrUser(user);
 
   const [teams, setTeams] = useState<TeamResponse[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -95,7 +117,8 @@ const TeamManagement: React.FC = () => {
   const [error, setError] = useState('');
 
   const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
-  const [viewingTeam, setViewingTeam] = useState<TeamResponse | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<TeamResponse | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [canCreateTeam, setCanCreateTeam] = useState(false);
   const [canEditTeam, setCanEditTeam] = useState(false);
@@ -154,25 +177,23 @@ const TeamManagement: React.FC = () => {
       .getMyPermissions()
       .then((permissions) => {
         if (!cancelled) {
-          const canCreate = Boolean(permissions.teamCreate);
-
-          setCanCreateTeam(canCreate);
-          setCanEditTeam(canCreate);
-          setCanHistoryTeam(Boolean(permissions.teamHistory));
+          setCanCreateTeam(!isHr && Boolean(permissions.teamCreate));
+          setCanEditTeam(!isHr && Boolean(permissions.teamEdit));
+          setCanHistoryTeam(isHr || Boolean(permissions.teamHistory));
         }
       })
       .catch(() => {
         if (!cancelled) {
           setCanCreateTeam(false);
           setCanEditTeam(false);
-          setCanHistoryTeam(false);
+          setCanHistoryTeam(isHr);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isHr]);
 
   const filteredTeams = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
@@ -196,14 +217,32 @@ const TeamManagement: React.FC = () => {
   }, [teams, search, selectedDepartmentId, isDepartmentHead, isEmployee]);
 
   const activeCount = useMemo(
-    () => teams.filter((team) => String(team.status ?? '').toLowerCase() === 'active').length,
+    () => teams.filter((team) => team.status?.toLowerCase() === 'active').length,
     [teams],
   );
 
   const inactiveCount = useMemo(
-    () => teams.filter((team) => String(team.status ?? '').toLowerCase() === 'inactive').length,
+    () => teams.filter((team) => team.status?.toLowerCase() === 'inactive').length,
     [teams],
   );
+
+  const handleDelete = async () => {
+    if (!showDeleteConfirm) {
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      await deleteTeam(showDeleteConfirm.id);
+      setShowDeleteConfirm(null);
+      await loadTeams();
+    } catch (err: any) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="team-page">
@@ -211,10 +250,7 @@ const TeamManagement: React.FC = () => {
         <div>
           <p className="team-eyebrow">Team Organization</p>
           <h1>Team Management</h1>
-          <p>
-            Manage active teams. Team status is automatic: removing all members closes the
-            team as a history record.
-          </p>
+          <p>Manage teams, leaders, project managers, members, and team status.</p>
         </div>
 
         {!isEmployee && (
@@ -308,107 +344,86 @@ const TeamManagement: React.FC = () => {
               </thead>
 
               <tbody>
-                {filteredTeams.map((team, index) => {
-                  const active = isActiveTeam(team);
+                {filteredTeams.map((team, index) => (
+                  <tr key={team.id}>
+                    <td>{index + 1}</td>
 
-                  return (
-                    <tr key={team.id}>
-                      <td>{index + 1}</td>
+                    <td>
+                      <div className="team-name-cell">
+                        <strong>{team.teamName}</strong>
+                        {team.teamGoal && <small>{team.teamGoal}</small>}
+                      </div>
+                    </td>
 
-                      <td>
-                        <div className="team-name-cell">
-                          <strong>{team.teamName}</strong>
-                          {team.teamGoal && <small>{team.teamGoal}</small>}
-                        </div>
-                      </td>
+                    <td>{team.departmentName || '—'}</td>
 
-                      <td>{team.departmentName || '—'}</td>
+                    <td>
+                      {team.teamLeaderName ? (
+                        <ProfileNameCell
+                          person={{
+                            userId: team.teamLeaderId,
+                            fullName: team.teamLeaderName,
+                            departmentName: team.departmentName,
+                          }}
+                          subtitle={team.departmentName || 'Team Leader'}
+                        />
+                      ) : (
+                        '—'
+                      )}
+                    </td>
 
-                      <td>
-                        {team.teamLeaderName ? (
-                          <ProfileNameCell
-                            person={{
-                              userId: team.teamLeaderId,
-                              fullName: team.teamLeaderName,
-                              departmentName: team.departmentName,
-                            }}
-                            subtitle={team.departmentName || 'Team Leader'}
-                          />
-                        ) : (
-                          '—'
-                        )}
-                      </td>
+                    <td>
+                      {team.projectManagerName ? (
+                        <ProfileNameCell
+                          person={{
+                            userId: team.projectManagerId,
+                            fullName: team.projectManagerName,
+                            departmentName: team.departmentName,
+                          }}
+                          subtitle={
+                            team.projectManagerTeams
+                              ? `Also PM in ${team.projectManagerTeams}`
+                              : 'Project Manager'
+                          }
+                        />
+                      ) : (
+                        '—'
+                      )}
+                    </td>
 
-                      <td>
-                        {team.projectManagerName ? (
-                          <ProfileNameCell
-                            person={{
-                              userId: team.projectManagerId,
-                              fullName: team.projectManagerName,
-                              departmentName: team.departmentName,
-                            }}
-                            subtitle={
-                              team.projectManagerTeams
-                                ? `Also PM in ${team.projectManagerTeams}`
-                                : 'Project Manager'
-                            }
-                          />
-                        ) : (
-                          '—'
-                        )}
-                      </td>
+                    <td>{team.members?.length ?? 0}</td>
 
-                      <td>
-                        <button
-                          type="button"
-                          className="team-link-button"
-                          onClick={() => setViewingTeam(team)}
-                        >
-                          {team.members?.length ?? 0} member
-                          {(team.members?.length ?? 0) === 1 ? '' : 's'}
-                        </button>
-                      </td>
+                    <td>
+                      <span
+                        className={`team-status ${
+                          team.status?.toLowerCase() === 'active'
+                            ? 'is-active'
+                            : 'is-inactive'
+                        }`}
+                      >
+                        {team.status || '—'}
+                      </span>
+                    </td>
 
-                      <td>
-                        <span
-                          className={`team-status ${
-                            active ? 'is-active' : 'is-inactive'
-                          }`}
-                        >
-                          {team.status || '—'}
-                        </span>
-                      </td>
+                    <td>{formatDate(team.createdDate)}</td>
 
-                      <td>{formatDate(team.createdDate)}</td>
-
-                      <td>
+                    <td>
+                      {canShowEditTeam ? (
                         <div className="team-row-actions">
                           <button
                             type="button"
                             className="team-action-btn"
-                            onClick={() => setViewingTeam(team)}
+                            onClick={() => setEditingTeam(team)}
                           >
-                            View
+                            Edit
                           </button>
-
-                          {canShowEditTeam && active && (
-                            <button
-                              type="button"
-                              className="team-action-btn"
-                              onClick={() => setEditingTeam(team)}
-                            >
-                              Edit
-                            </button>
-                          )}
-
-                          {canShowEditTeam && !active && (
-                            <span className="team-status is-inactive">History Only</span>
-                          )}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      ) : (
+                        <span className="team-muted">View only</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -424,84 +439,52 @@ const TeamManagement: React.FC = () => {
         onSaved={loadTeams}
       />
 
-      {viewingTeam && (
-        <div className="team-modal-overlay" onClick={() => setViewingTeam(null)}>
+      {showDeleteConfirm && (
+        <div className="team-modal-overlay" onClick={() => setShowDeleteConfirm(null)}>
           <div
-            className="team-modal team-details-modal"
+            className="team-modal team-modal-small"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="team-modal-header">
               <div>
-                <p className="team-eyebrow">Team Composition</p>
-                <h2>{viewingTeam.teamName}</h2>
-                <p>{viewingTeam.departmentName || 'No department assigned'}</p>
+                <p className="team-eyebrow">Confirm Delete</p>
+                <h2>Delete Team</h2>
               </div>
 
               <button
                 type="button"
                 className="team-modal-close"
-                onClick={() => setViewingTeam(null)}
+                onClick={() => setShowDeleteConfirm(null)}
               >
                 ×
               </button>
             </div>
 
             <div className="team-modal-body">
-              <div className="team-details-grid">
-                <div className="team-details-card">
-                  <span>Team Leader</span>
-                  <strong>{viewingTeam.teamLeaderName || '—'}</strong>
-                </div>
-                <div className="team-details-card">
-                  <span>Project Manager</span>
-                  <strong>{viewingTeam.projectManagerName || '—'}</strong>
-                </div>
-                <div className="team-details-card">
-                  <span>Status</span>
-                  <strong>{viewingTeam.status || '—'}</strong>
-                </div>
-                <div className="team-details-card">
-                  <span>Members</span>
-                  <strong>{viewingTeam.members?.length ?? 0}</strong>
-                </div>
+              <p>
+                Are you sure you want to delete{' '}
+                <strong>{showDeleteConfirm.teamName}</strong>?
+              </p>
+
+              <div className="team-modal-footer">
+                <button
+                  type="button"
+                  className="team-btn team-btn-secondary"
+                  onClick={() => setShowDeleteConfirm(null)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="team-btn team-btn-danger"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
               </div>
-
-              {viewingTeam.teamGoal && (
-                <div className="team-details-section">
-                  <h3>Team Goal</h3>
-                  <p>{viewingTeam.teamGoal}</p>
-                </div>
-              )}
-
-              <div className="team-details-section">
-                <h3>Members</h3>
-                {viewingTeam.members?.length ? (
-                  <div className="team-member-list">
-                    {viewingTeam.members.map((member) => (
-                      <div
-                        key={member.userId ?? member.employeeId ?? member.userName}
-                        className="team-member-row"
-                      >
-                        <div>
-                          <strong>
-                            {member.userName || member.employeeName || 'Unnamed member'}
-                          </strong>
-                          <span>User ID: {member.userId ?? member.employeeId ?? '—'}</span>
-                        </div>
-                        <small>Joined {formatDate(member.startedDate)}</small>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="team-muted">No active members in this team.</p>
-                )}
-              </div>
-
-              {!isActiveTeam(viewingTeam) && (
-                <div className="team-info-banner">
-                  This team is closed and kept as a read-only history record.
-                </div>
-              )}
             </div>
           </div>
         </div>

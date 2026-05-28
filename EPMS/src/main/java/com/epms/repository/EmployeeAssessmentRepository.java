@@ -2,24 +2,13 @@ package com.epms.repository;
 
 import com.epms.entity.EmployeeAssessment;
 import com.epms.entity.enums.AssessmentStatus;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface EmployeeAssessmentRepository extends JpaRepository<EmployeeAssessment, Long> {
-
-    @EntityGraph(attributePaths = {"answers"})
-    @Query("""
-            select distinct assessment
-            from EmployeeAssessment assessment
-            where assessment.id = :id
-            """)
-    Optional<EmployeeAssessment> findWithAnswersById(@Param("id") Long id);
 
     Optional<EmployeeAssessment> findFirstByUserIdAndStatusOrderByUpdatedAtDesc(
             Integer userId,

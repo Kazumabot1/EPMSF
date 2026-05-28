@@ -110,9 +110,7 @@ const OneOnOneMeetings: React.FC = () => {
   const hiddenDateRef = useRef<HTMLInputElement>(null);
 
   const canCreate = context?.canCreate !== false;
-  const isDepartmentHeadScope = context?.accessMode === 'DEPARTMENT_SCOPE';
-  const isDirectReportScope = context?.accessMode === 'DIRECT_REPORTS';
-  const canSelectDepartment = Boolean(context?.canSelectDepartment) && !isDepartmentHeadScope && !isDirectReportScope;
+  const canSelectDepartment = Boolean(context?.canSelectDepartment);
   const canSelectTeam = Boolean(context?.canSelectTeam);
   const teamRequired = Boolean(context?.teamRequired);
   const canUseDepartmentEmployeeScope = Boolean(context?.canUseDepartmentEmployeeScope);
@@ -510,15 +508,11 @@ const OneOnOneMeetings: React.FC = () => {
         <p>
           {canSelectDepartment
             ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
-            : isDepartmentHeadScope
-              ? 'Your assigned department is fixed. Select an employee from your department only.'
-              : isDirectReportScope
-                ? 'Select only employees assigned to you as direct reports.'
-                : teamRequired
-                  ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
-                  : hasDefaultDepartment
-                    ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
-                    : 'Create one-on-one meetings with employees.'}
+            : teamRequired
+              ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
+              : hasDefaultDepartment
+                ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
+                : 'Create one-on-one meetings with employees.'}
         </p>
       </div>
 
@@ -544,31 +538,23 @@ const OneOnOneMeetings: React.FC = () => {
               <h3>
                 {canSelectDepartment
                   ? 'Department selection enabled'
-                  : isDepartmentHeadScope
-                    ? 'Assigned department scope'
-                    : isDirectReportScope
-                      ? 'Direct report scope'
-                      : teamRequired
-                        ? 'Managed team scope'
-                        : 'Default department applied'}
+                  : teamRequired
+                    ? 'Managed team scope'
+                    : 'Default department applied'}
               </h3>
               <p>
                 {canSelectDepartment
                   ? 'Choose an allowed department. Team is optional and only narrows the employee list.'
-                  : isDepartmentHeadScope
-                    ? `Department Head scope is locked to ${context?.departmentName || 'your assigned department'}.`
-                    : isDirectReportScope
-                      ? 'Managers can schedule meetings only with employees assigned to them.'
-                      : teamRequired
-                        ? 'Select one of the teams you lead or manage before choosing an employee.'
-                        : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
+                  : teamRequired
+                    ? 'Select one of the teams you lead or manage before choosing an employee.'
+                    : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
               </p>
             </div>
           </div>
 
           <div className="oom-two-col">
             <div className="oom-field">
-              <label className="oom-label">{canSelectDepartment ? 'Department' : 'Assigned Department'}</label>
+              <label className="oom-label">Department</label>
 
               {canSelectDepartment ? (
                 <select

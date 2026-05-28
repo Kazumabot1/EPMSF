@@ -35,6 +35,7 @@ public class DepartmentKpiResultDto {
     private LocalDateTime finalizationReviewedAt;
     private Integer finalizationReviewedByUserId;
     private String finalizationReviewedByName;
+
     @Builder.Default
     private List<Line> lines = new ArrayList<>();
 

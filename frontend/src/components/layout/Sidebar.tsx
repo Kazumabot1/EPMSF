@@ -31,27 +31,18 @@ const normalizeRoleName = (role?: string | null) =>
         .replace(/[\s-]+/g, '_')
         .toUpperCase();
 
-const readPermission = (permissions: PositionPermission, key: string) => {
-  const raw = permissions as unknown as Record<string, unknown>;
-
-  return Boolean(raw[key]);
-};
-
 const allow = (permissions: PositionPermission, key: keyof PositionPermission) => {
   switch (key) {
     case 'teamPermission':
+      return Boolean(permissions.teamPermission);
     case 'teamView':
+      return Boolean(permissions.teamView);
+    case 'teamCreate':
+      return Boolean(permissions.teamCreate);
+    case 'teamEdit':
+      return Boolean(permissions.teamEdit);
     case 'teamHistory':
-      return (
-        readPermission(permissions, 'teamPermission') ||
-        readPermission(permissions, 'teamView') ||
-        readPermission(permissions, 'teamCreate') ||
-        readPermission(permissions, 'teamHistory') ||
-        readPermission(permissions, 'team_permission') ||
-        readPermission(permissions, 'team_view') ||
-        readPermission(permissions, 'team_create') ||
-        readPermission(permissions, 'team_history')
-      );
+      return Boolean(permissions.teamHistory);
 
     case 'departmentCrud':
     case 'departmentComparisonView':
@@ -108,6 +99,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const [positionPermissions, setPositionPermissions] = useState<PositionPermission>(
       emptyPositionPermission(),
   );
+  const [hasMyTeams, setHasMyTeams] = useState(false);
 
   const dashboard = user?.dashboard ?? '';
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
@@ -192,10 +184,37 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    api.get('/teams/my-teams')
+        .then((response) => {
+          if (cancelled) {
+            return;
+          }
+
+          const payload = response.data as { data?: unknown } | unknown;
+          const list = payload && typeof payload === 'object' && 'data' in payload
+              ? (payload as { data?: unknown }).data
+              : payload;
+
+          setHasMyTeams(Array.isArray(list) && list.length > 0);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setHasMyTeams(false);
+          }
+        });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, location.pathname]);
+
   const navItems: NavItem[] = useMemo(() => {
     const pipChildren: NavItem[] = canCreatePip
-      ? [
-          { to: '/pip/create', label: 'Create PIP', icon: 'bi bi-plus-square' },
+        ? [
+          { to: '/pip/create', label: 'Create', icon: 'bi bi-plus-square' },
           { to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' },
         ]
         : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
@@ -246,27 +265,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-columns-gap',
         end: true,
       },
-
       allow(positionPermissions, 'employeeCrud') && {
         to: '/hr/employee',
         label: 'Employee',
         icon: 'bi bi-people',
         end: true,
       },
-
-   allow(positionPermissions, 'employeeCrud') && {
-      to: '/hr/workforce-changes',
-      label: 'Workforce Changes',
-      icon: 'bi bi-arrow-left-right',
-      end: true,
-    },
     ]);
 
     const hrNavItems: NavItem[] = compactItems([
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
       { to: '/hr/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
 
-      allow(positionPermissions, 'teamPermission') && {
+      {
         to: '/hr/team',
         label: 'Teams',
         icon: 'bi bi-people-fill',
@@ -406,6 +417,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
           { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
+          { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
+          { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
           { to: '/hr/feedback/audit', label: 'Audit Log', icon: 'bi bi-shield-check' },
@@ -498,9 +511,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-    const employeeNavItems: NavItem[] = [
+    const employeeNavItems: NavItem[] = compactItems([
       { to: '/employee/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
+      hasMyTeams && { to: '/my-team', label: 'My Team', icon: 'bi bi-diagram-3' },
       { to: '/employee/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
@@ -513,7 +527,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         children: [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }],
       },
       { to: '/employee/notifications', label: 'Notifications', icon: 'bi bi-bell' },
-    ];
+    ]);
 
     const managerNavItems: NavItem[] = compactItems([
       {
@@ -525,6 +539,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         to: '/profile',
         label: 'Profile',
         icon: 'bi bi-person',
+      },
+      hasMyTeams && {
+        to: '/my-team',
+        label: 'My Team',
+        icon: 'bi bi-diagram-3',
       },
       {
         to: '/manager/self-assessment',
@@ -722,6 +741,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'Profile',
         icon: 'bi bi-person',
       },
+      hasMyTeams && {
+        to: '/my-team',
+        label: 'My Team',
+        icon: 'bi bi-diagram-3',
+      },
       {
         to: '/department-head/self-assessment-forms',
         label: 'View Self-assessment Form',
@@ -751,28 +775,28 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-building-check',
       },
 
-      allow(positionPermissions, 'teamPermission') && {
+      {
         to: '/department-head/teams',
         label: 'Teams',
         icon: 'bi bi-people-fill',
-        children: [
+        children: compactItems([
           {
             to: '/department-head/teams',
             label: 'View Teams',
             icon: 'bi bi-eye',
             end: true,
           },
-          {
+          allow(positionPermissions, 'teamCreate') && {
             to: '/department-head/teams/create',
             label: 'Create Team',
             icon: 'bi bi-plus-square',
           },
-          {
+          allow(positionPermissions, 'teamHistory') && {
             to: '/department-head/team-history',
             label: 'Team History',
             icon: 'bi bi-clock-history',
           },
-        ],
+        ]),
       },
 
       {
@@ -890,15 +914,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     if (isExecutive) return executiveNavItems;
     if (isManager) return managerNavItems;
     if (isEmployee) return employeeNavItems;
-    if (variant === 'admin') return adminNavItems;
-    if (variant === 'hr') return hrNavItems;
-    if (isAdmin) return adminNavItems;
-    if (isHr) return hrNavItems;
-    if (isDepartmentHead) return departmentHeadNavItems;
-    if (isManager) return managerNavItems;
-    if (isEmployee) return employeeNavItems;
 
-    return employeeNavItems;
+    return hrNavItems;
   }, [
     variant,
     isAdmin,
@@ -909,8 +926,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     isEmployee,
     canCreatePip,
     positionPermissions,
+    hasMyTeams,
   ]);
-
   const loadUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/notifications/unread-count');
@@ -1013,46 +1030,45 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const renderSubmenuItem = (child: NavItem, depth = 0) => {
     const childExpanded = expanded.has(child.to);
     const childActive = child.end
-      ? location.pathname === child.to
-      : location.pathname === child.to ||
-        location.pathname.startsWith(`${child.to}/`) ||
-        hasActiveChild(child);
+        ? location.pathname === child.to
+        : location.pathname === child.to || location.pathname.startsWith(`${child.to}/`) || hasActiveChild(child);
 
     if (child.children?.length) {
       return (
-        <div key={child.to} className="hr-submenu-group">
-          <button
-            type="button"
-            className={`hr-submenu-link hr-submenu-toggle ${childActive ? 'active' : ''}`}
-            style={{ marginLeft: depth * 12 }}
-            onClick={() => toggleParent(child)}
-          >
-            <i className={child.icon} />
-            <span>{child.label}</span>
-            <i className={`bi ${childExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} hr-submenu-caret`} />
-          </button>
-
-          {childExpanded && (
-            <div className="hr-submenu hr-submenu-nested">
-              {child.children.map((grandchild) => renderSubmenuItem(grandchild, depth + 1))}
-            </div>
-          )}
-        </div>
+          <div key={child.to} className="hr-submenu-group">
+            <button
+                type="button"
+                className={`hr-submenu-link hr-submenu-toggle ${childActive ? 'active' : ''}`}
+                style={{ marginLeft: depth * 12 }}
+                onClick={() => toggleParent(child)}
+            >
+              <i className={child.icon} />
+              <span>{child.label}</span>
+              <i className={`bi ${childExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} hr-submenu-caret`} />
+            </button>
+            {childExpanded && (
+                <div className="hr-submenu hr-submenu-nested">
+                  {child.children.map((grandchild) => renderSubmenuItem(grandchild, depth + 1))}
+                </div>
+            )}
+          </div>
       );
     }
 
     return (
-      <NavLink
-        key={child.to}
-        to={child.to}
-        end={child.end}
-        className={({ isActive }) => `hr-submenu-link ${isActive ? 'active' : ''}`}
-        style={{ marginLeft: depth * 12 }}
-      >
-        <i className={child.icon} />
-        <span>{child.label}</span>
-        {child.to.includes('notifications') && notificationBadge}
-      </NavLink>
+        <NavLink
+            key={child.to}
+            to={child.to}
+            end={child.end}
+            className={({ isActive }) =>
+                `hr-submenu-link ${isActive ? 'active' : ''}`
+            }
+            style={{ marginLeft: depth * 12 }}
+        >
+          <i className={child.icon} />
+          <span>{child.label}</span>
+          {child.to.includes('notifications') && notificationBadge}
+        </NavLink>
     );
   };
 

@@ -12,7 +12,6 @@ import {
   filterKpiFormsForCycleSelection,
   formatKpiFormCycleOptionLabel,
   kpiStatusBadgeClass,
-  todayDateInputValue,
   type KpiCycleDurationYears,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
@@ -29,25 +28,6 @@ const FieldLabel = ({ children }: { children: ReactNode }) => (
 
 type CycleEditorLocationState = {
   preselectFormId?: number;
-};
-
-const hasGracePeriodEnded = (cycle: KpiTemplateCycleResponse) => {
-  if (!cycle.graceEndsAt) return false;
-  const graceEnd = new Date(cycle.graceEndsAt);
-  if (Number.isNaN(graceEnd.getTime())) return false;
-  return graceEnd <= new Date();
-};
-
-const getCycleEditDisabledReason = (cycle: KpiTemplateCycleResponse) => {
-  if (cycle.status === 'ACTIVE') return 'Active cycles cannot be edited.';
-  if (cycle.status === 'PENDING_APPROVAL') return 'Cycles pending CEO approval cannot be edited.';
-  if (cycle.status === 'CLOSING' && cycle.earlyCloseReviewDecision === 'APPROVED') {
-    return 'CEO approved closure; this cycle can no longer be edited.';
-  }
-  if (cycle.status === 'CLOSING' && hasGracePeriodEnded(cycle)) {
-    return 'Grace period has ended; this cycle can no longer be edited.';
-  }
-  return null;
 };
 
 const KpiTemplateCycleEditorPage = () => {
@@ -83,9 +63,8 @@ const KpiTemplateCycleEditorPage = () => {
 
         if (isEdit && !Number.isNaN(cycleId)) {
           const cycle = await kpiTemplateCycleService.getById(cycleId);
-          const editDisabledReason = getCycleEditDisabledReason(cycle);
-          if (editDisabledReason) {
-            toast.error(editDisabledReason);
+          if (cycle.status === 'ACTIVE') {
+            toast.error('Active cycles cannot be edited.');
             navigate('/hr/kpi-template-cycle');
             return;
           }
@@ -132,7 +111,6 @@ const KpiTemplateCycleEditorPage = () => {
       ),
     [templates, selectedFormIds, unavailableFormIds],
   );
-  const minimumStartDate = useMemo(() => todayDateInputValue(), []);
 
   const handleDurationChange = (value: KpiCycleDurationYears) => {
     setDurationYears(value);
@@ -153,7 +131,6 @@ const KpiTemplateCycleEditorPage = () => {
   const validate = (): string | null => {
     if (!cycleName.trim()) return 'Cycle name is required.';
     if (!startDate || !endDate) return 'Start date is required.';
-    if (startDate < minimumStartDate) return 'Start date cannot be in the past.';
     if (selectedFormIds.length === 0) return 'Select at least one KPI form.';
     const selectedTemplates = templates.filter((template) => selectedFormIds.includes(template.id));
     const inactiveTemplate = selectedTemplates.find((template) => template.status !== 'ACTIVE');
@@ -259,7 +236,6 @@ const KpiTemplateCycleEditorPage = () => {
                 required
                 type="date"
                 value={startDate}
-                min={minimumStartDate}
                 onChange={(event) => handleStartDateChange(event.target.value)}
                 className={fieldClass}
               />

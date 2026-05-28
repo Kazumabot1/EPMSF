@@ -15,18 +15,6 @@ type ApiEnvelope<T> = {
 const POSITION_PERMISSION_ENDPOINT = '/position-permissions';
 
 export const POSITION_PERMISSION_FIELDS: Array<keyof PositionPermission> = [
-    'teamPermission',
-    'organizationPermission',
-    'assessmentPermission',
-    'assessmentScoresView',
-    'assessmentFormCreate',
-    'appraisalPermission',
-    'feedback360Permission',
-    'oneOnOnePermission',
-    'positionPermission',
-    'kpiPermission',
-    'departmentKpiPermission',
-
   'oneOnOneCreate',
   'oneOnOneDeptSelection',
   'oneOnOneTeamSelection',
@@ -109,18 +97,17 @@ const extractApiErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 export const emptyPositionPermission = (): PositionPermission => ({
-
-    teamPermission: false,
-    organizationPermission: false,
-    assessmentPermission: false,
-    assessmentScoresView: false,
-    assessmentFormCreate: false,
-    appraisalPermission: false,
-    feedback360Permission: false,
-    oneOnOnePermission: false,
-    positionPermission: false,
-    kpiPermission: false,
-    departmentKpiPermission: false,
+  teamPermission: false,
+  organizationPermission: false,
+  assessmentPermission: false,
+  appraisalPermission: false,
+  feedback360Permission: false,
+  oneOnOnePermission: false,
+  positionPermission: false,
+  kpiPermission: false,
+  departmentKpiPermission: false,
+  assessmentScoresView: false,
+  assessmentFormCreate: false,
 
   oneOnOneCreate: false,
   oneOnOneDeptSelection: false,
@@ -174,6 +161,60 @@ export const sanitizePositionPermission = (payload: unknown): PositionPermission
   POSITION_PERMISSION_FIELDS.forEach((field) => {
     clean[field] = Boolean(source[field]);
   });
+
+  clean.teamPermission = Boolean(
+    source.teamPermission ||
+      clean.teamView ||
+      clean.teamCreate ||
+      clean.teamEdit ||
+      clean.teamHistory ||
+      clean.teamAssignAsLeader ||
+      clean.teamAssignAsPm ||
+      clean.teamAssignAsMember,
+  );
+
+  clean.organizationPermission = Boolean(
+    source.organizationPermission ||
+      clean.departmentCrud ||
+      clean.departmentComparisonView ||
+      clean.employeeCrud ||
+      clean.employeeExcelImport,
+  );
+
+  clean.assessmentScoresView = Boolean(
+    source.assessmentScoresView || clean.selfAssessmentView || clean.selfAssessmentLock || clean.selfAssessmentSign,
+  );
+  clean.assessmentFormCreate = Boolean(source.assessmentFormCreate || clean.selfAssessmentLock);
+  clean.assessmentPermission = Boolean(
+    source.assessmentPermission ||
+      clean.selfAssessmentView ||
+      clean.selfAssessmentInput ||
+      clean.selfAssessmentLock ||
+      clean.selfAssessmentSign ||
+      clean.assessmentScoresView ||
+      clean.assessmentFormCreate,
+  );
+
+  clean.appraisalPermission = Boolean(
+    source.appraisalPermission ||
+      clean.appraisalReview ||
+      clean.appraisalApprove ||
+      clean.appraisalView ||
+      clean.appraisalScoreInput ||
+      clean.appraisalSign,
+  );
+
+  clean.kpiPermission = Boolean(
+    source.kpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView || clean.kpiInput,
+  );
+  clean.departmentKpiPermission = Boolean(
+    source.departmentKpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView,
+  );
+  clean.oneOnOnePermission = Boolean(
+    source.oneOnOnePermission || clean.oneOnOneCreate || clean.oneOnOneDeptSelection || clean.oneOnOneTeamSelection,
+  );
+  clean.feedback360Permission = Boolean(source.feedback360Permission || clean.feedbackFormCreate || clean.feedbackSend);
+  clean.positionPermission = Boolean(source.positionPermission || clean.positionCrud);
 
   return clean;
 };

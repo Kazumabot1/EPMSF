@@ -19,7 +19,6 @@ import com.epms.repository.KpiTemplateCyclePeriodRepository;
 import com.epms.repository.KpiTemplateCycleRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
-import com.epms.service.AuditLogService;
 import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.KpiTemplateCycleService;
 import lombok.RequiredArgsConstructor;
@@ -28,10 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Month;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,8 +53,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
-    private final Clock clock;
-    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -80,7 +75,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         applyForms(cycle, dto.getKpiFormIds());
         KpiTemplateCycle saved = cycleRepository.save(cycle);
         cycleRepository.flush();
-        audit(author.getId(), "CREATE", "KPI_TEMPLATE_CYCLE", saved.getId(), null, null, "title: " + saved.getCycleName(), null);
         return getById(saved.getId());
     }
 
@@ -91,14 +85,15 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
 
-        ensureCycleEditable(cycle);
+        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
+        }
         String editReason = normalizeText(dto.getEditReason(), 1000);
         if (editReason == null || editReason.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Edit reason is required.");
         }
         cycle.setLastEditReason(editReason);
 
-        String oldCycleName = cycle.getCycleName();
         cycle.setCycleName(dto.getCycleName().trim());
         cycle.setStartDate(dto.getStartDate());
         Integer durationYears = normalizedDurationYears(dto);
@@ -112,7 +107,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         applyForms(cycle, dto.getKpiFormIds());
 
         cycleRepository.save(cycle);
-        audit(currentUserId(), "UPDATE", "KPI_TEMPLATE_CYCLE", cycle.getId(), "cycleName", oldCycleName, cycle.getCycleName(), editReason);
         return getById(id);
     }
 
@@ -139,7 +133,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
         boolean active = Boolean.TRUE.equals(request.getActive());
-        KpiTemplateCycleStatus oldStatus = cycle.getStatus();
 
         if (active) {
             if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
@@ -172,16 +165,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
 
         cycle.setUpdatedByUser(currentUser());
         cycleRepository.save(cycle);
-        audit(
-                currentUserId(),
-                active ? "ACTIVATE" : "CLOSE",
-                "KPI_TEMPLATE_CYCLE",
-                cycle.getId(),
-                "status",
-                oldStatus == null ? null : oldStatus.name(),
-                cycle.getStatus() == null ? null : cycle.getStatus().name(),
-                request == null ? null : request.getReason()
-        );
         cycleRepository.flush();
         if (active) {
             employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
@@ -271,30 +254,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycle.setUpdatedByUser(cycle.getEarlyCloseRequestedByUser());
     }
 
-    private void ensureCycleEditable(KpiTemplateCycle cycle) {
-        if (cycle.getStatus() == KpiTemplateCycleStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Active cycles cannot be edited.");
-        }
-        if (cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cycles pending CEO approval cannot be edited.");
-        }
-        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
-                && cycle.getEarlyCloseReviewDecision() == KpiEarlyCloseReviewDecision.APPROVED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "CEO approved closure; this cycle can no longer be edited."
-            );
-        }
-        if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
-                && cycle.getGraceEndsAt() != null
-                && !cycle.getGraceEndsAt().isAfter(LocalDateTime.now())) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Grace period has ended; this cycle can no longer be edited."
-            );
-        }
-    }
-
     private boolean isBeforeOfficialEndDate(KpiTemplateCycle cycle) {
         LocalDate officialEnd = cyclePeriodRepository
                 .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
@@ -312,9 +271,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         }
         if (dto.getStartDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date is required.");
-        }
-        if (dto.getStartDate().isBefore(LocalDate.now(clock))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be in the past.");
         }
         Integer durationYears = normalizedDurationYears(dto);
         if (!ALLOWED_DURATION_YEARS.contains(durationYears)) {
@@ -387,10 +343,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     }
 
     private LocalDate calculateEndDate(LocalDate startDate, int durationYears) {
-        if (startDate.getMonth() == Month.FEBRUARY && startDate.getDayOfMonth() == 29
-                && !startDate.plusYears(durationYears).isLeapYear()) {
-            return startDate.plusYears(durationYears);
-        }
         return startDate.plusYears(durationYears).minusDays(1);
     }
 
@@ -522,28 +474,5 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private User currentUser() {
         return userRepository.findById(SecurityUtils.currentUserId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
-    }
-
-    private Integer currentUserId() {
-        try {
-            return SecurityUtils.currentUserId();
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private void audit(
-            Integer userId,
-            String action,
-            String entityType,
-            Integer entityId,
-            String changedColumn,
-            String oldValue,
-            String newValue,
-            String reason
-    ) {
-        if (auditLogService != null) {
-            auditLogService.log(userId, action, entityType, entityId, changedColumn, oldValue, newValue, reason);
-        }
     }
 }

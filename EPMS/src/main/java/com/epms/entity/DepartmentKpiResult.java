@@ -73,7 +73,7 @@ public class DepartmentKpiResult {
     private LocalDateTime finalizationRequestedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "finalization_requested_by_user_id", referencedColumnName = "id")
+    @JoinColumn(name = "finalization_requested_by", referencedColumnName = "id")
     @EqualsAndHashCode.Exclude
     private User finalizationRequestedByUser;
 
@@ -88,7 +88,7 @@ public class DepartmentKpiResult {
     private LocalDateTime finalizationReviewedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "finalization_reviewed_by_user_id", referencedColumnName = "id")
+    @JoinColumn(name = "finalization_reviewed_by", referencedColumnName = "id")
     @EqualsAndHashCode.Exclude
     private User finalizationReviewedByUser;
 

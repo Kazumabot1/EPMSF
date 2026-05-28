@@ -265,11 +265,65 @@ public class SecurityConfig {
                          * These rules must stay above the broad HR/common matcher rules.
                          */
 
-                        .requestMatchers(
+                        /*
+                         * Team APIs are split by action and scope.
+                         * Important: specific /my-department, /my-teams, candidate, and history routes
+                         * must stay above the broad /api/teams/** matcher so Department Heads can view
+                         * their own department teams while create/edit/history remain permission controlled.
+                         */
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/teams/my-department/candidates/users",
+                                "/api/teams/my-department/candidates/members",
+                                "/api/teams/my-department/candidates/project-managers",
+                                "/api/teams/candidates/users/**",
+                                "/api/teams/candidates/members/**",
+                                "/api/teams/candidates/project-managers/**"
+                        ).access((authentication, context) ->
+                                hasTeamPositionPermission(authentication.get(), "teamCreate")
+                        )
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/teams/my-department/*/history",
+                                "/api/teams/*/history"
+                        ).access((authentication, context) ->
+                                hasTeamPositionPermission(authentication.get(), "teamHistory")
+                        )
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/teams/my-department"
+                        ).access((authentication, context) ->
+                                hasMyDepartmentTeamViewAccess(authentication.get())
+                        )
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/teams/my-teams"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/teams/my-department",
+                                "/api/teams"
+                        ).access((authentication, context) ->
+                                hasTeamPositionPermission(authentication.get(), "teamCreate")
+                        )
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/teams/my-department/**",
+                                "/api/teams/**"
+                        ).access((authentication, context) ->
+                                hasTeamPositionPermission(authentication.get(), "teamEdit")
+                        )
+
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/teams/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
+                        )
+
+                        .requestMatchers(HttpMethod.GET,
                                 "/api/teams",
                                 "/api/teams/**"
                         ).access((authentication, context) ->
-                                hasTeamApiPermission(authentication.get())
+                                hasTeamPositionPermission(authentication.get(), "teamView")
                         )
 
                         .requestMatchers(HttpMethod.GET,
@@ -606,7 +660,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    private AuthorizationDecision hasTeamApiPermission(Authentication authentication) {
+    private AuthorizationDecision hasMyDepartmentTeamViewAccess(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return new AuthorizationDecision(false);
         }
@@ -615,9 +669,47 @@ public class SecurityConfig {
             return new AuthorizationDecision(true);
         }
 
-        return new AuthorizationDecision(
-                positionPermissionService.currentUserHasPermission("teamPermission")
-        );
+        /*
+         * Department Head team view is a scoped department workspace feature.
+         * TeamService.getMyDepartmentTeams() restricts the result to the current user's department.
+         */
+        if (Boolean.TRUE.equals(
+                hasRoleDashboardOrPosition(authentication, DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS).isGranted()
+        )) {
+            return new AuthorizationDecision(true);
+        }
+
+        return new AuthorizationDecision(currentPositionHasPermission("teamView"));
+    }
+
+    private AuthorizationDecision hasTeamPositionPermission(Authentication authentication, String permissionField) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted())) {
+            return new AuthorizationDecision(true);
+        }
+
+        /*
+         * HR owns the organization-wide team view workspace. HR can view teams and team history
+         * even when a merged position-permission row is missing teamView/teamHistory.
+         * Create/edit still remains Department Head permission-controlled.
+         */
+        if (("teamView".equals(permissionField) || "teamHistory".equals(permissionField))
+                && Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, HR_ROLES, HR_DASHBOARDS).isGranted())) {
+            return new AuthorizationDecision(true);
+        }
+
+        return new AuthorizationDecision(currentPositionHasPermission(permissionField));
+    }
+
+    private boolean currentPositionHasPermission(String permissionField) {
+        try {
+            return positionPermissionService.currentUserHasPermission(permissionField);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private AuthorizationDecision hasPipApiPermission(Authentication authentication) {

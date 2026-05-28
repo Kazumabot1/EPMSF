@@ -7,7 +7,12 @@ import com.epms.service.DepartmentKpiService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -16,60 +21,51 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DepartmentKpiApprovalController {
 
-    private final DepartmentKpiService departmentKpiService;
+    private final DepartmentKpiService service;
 
-    @GetMapping
-    public ResponseEntity<List<DepartmentKpiCycleResponseDto>> listPending() {
-        return ResponseEntity.ok(departmentKpiService.listPendingEarlyCloseRequests());
+    @GetMapping("/cycles")
+    public ResponseEntity<List<DepartmentKpiCycleResponseDto>> listPendingEarlyCloseRequests() {
+        return ResponseEntity.ok(service.listPendingEarlyCloseRequests());
     }
 
-    @GetMapping("/finalization-requests")
+    @PostMapping("/cycles/{id}/approve")
+    public ResponseEntity<DepartmentKpiCycleResponseDto> approveEarlyClose(
+            @PathVariable Integer id,
+            @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
+    ) {
+        String reviewReason = request == null ? null : request.getReviewReason();
+        return ResponseEntity.ok(service.approveEarlyClose(id, reviewReason));
+    }
+
+    @PostMapping("/cycles/{id}/reject")
+    public ResponseEntity<DepartmentKpiCycleResponseDto> rejectEarlyClose(
+            @PathVariable Integer id,
+            @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
+    ) {
+        String reviewReason = request == null ? null : request.getReviewReason();
+        return ResponseEntity.ok(service.rejectEarlyClose(id, reviewReason));
+    }
+
+    @GetMapping("/finalizations")
     public ResponseEntity<List<DepartmentKpiResultDto>> listPendingFinalizationRequests() {
-        return ResponseEntity.ok(departmentKpiService.listPendingFinalizationRequests());
+        return ResponseEntity.ok(service.listPendingFinalizationRequests());
     }
 
-    @PostMapping("/finalization-requests/{resultId}/approve")
+    @PostMapping("/finalizations/{resultId}/approve")
     public ResponseEntity<DepartmentKpiResultDto> approveFinalization(
             @PathVariable Integer resultId,
             @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
     ) {
-        return ResponseEntity.ok(departmentKpiService.approveFinalization(
-                resultId,
-                request == null ? null : request.getReviewReason()
-        ));
+        String reviewReason = request == null ? null : request.getReviewReason();
+        return ResponseEntity.ok(service.approveFinalization(resultId, reviewReason));
     }
 
-    @PostMapping("/finalization-requests/{resultId}/reject")
+    @PostMapping("/finalizations/{resultId}/reject")
     public ResponseEntity<DepartmentKpiResultDto> rejectFinalization(
             @PathVariable Integer resultId,
             @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
     ) {
-        return ResponseEntity.ok(departmentKpiService.rejectFinalization(
-                resultId,
-                request == null ? null : request.getReviewReason()
-        ));
-    }
-
-    @PostMapping("/{id}/approve")
-    public ResponseEntity<DepartmentKpiCycleResponseDto> approve(
-            @PathVariable Integer id,
-            @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
-    ) {
-        return ResponseEntity.ok(departmentKpiService.approveEarlyClose(
-                id,
-                request == null ? null : request.getReviewReason()
-        ));
-    }
-
-    @PostMapping("/{id}/reject")
-    public ResponseEntity<DepartmentKpiCycleResponseDto> reject(
-            @PathVariable Integer id,
-            @Valid @RequestBody(required = false) KpiEarlyCloseReviewRequestDTO request
-    ) {
-        return ResponseEntity.ok(departmentKpiService.rejectEarlyClose(
-                id,
-                request == null ? null : request.getReviewReason()
-        ));
+        String reviewReason = request == null ? null : request.getReviewReason();
+        return ResponseEntity.ok(service.rejectFinalization(resultId, reviewReason));
     }
 }
-

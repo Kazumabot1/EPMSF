@@ -16,8 +16,6 @@ import { handleKpiTemplateSaveError } from './kpiTemplateConflict';
 import {
   buildKpiPositionDropdownOptions,
   countAvailableKpiPositions,
-  DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
-  type KpiTemplateDurationMonths,
 } from './kpiTemplateUi';
 import {
   findExistingTemplateForPosition,
@@ -53,7 +51,6 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   const [title, setTitle] = useState('');
   const [, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [positionId, setPositionId] = useState<number | null>(null);
-  const [positionDurationMonths, setPositionDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
   const [positions, setPositions] = useState<PositionResponse[]>([]);
   const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
   const [existingTemplate, setExistingTemplate] = useState<ExistingKpiForPosition | null>(null);
@@ -78,7 +75,6 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
     setTitle(fields.title);
     setStatus(fields.status);
     setPositionId(fields.positionId);
-    setPositionDurationMonths(fields.positionDurationMonths);
     setRows(fields.rows);
     setRemovedItemReasons({});
   }, []);
@@ -87,7 +83,6 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
     setTitle('');
     setStatus('DRAFT');
     setPositionId(null);
-    setPositionDurationMonths(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
     setRows([newKpiTemplateRow()]);
     setRemovedItemReasons({});
   }, []);
@@ -180,9 +175,6 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   const buildPayload = (submitStatus: KpiFormStatus): KpiTemplateRequest => ({
     title: title.trim(),
     status: submitStatus,
-    startDate: null,
-    endDate: null,
-    positionDurationMonths,
     positionIds: positionId != null ? [positionId] : [],
     items: rows.map((row, index) => ({
       kpiLabel: row.kpiItemId !== null ? null : row.kpiLabel.trim() || null,

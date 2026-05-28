@@ -1,8 +1,8 @@
 package com.epms.dto;
 
-import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiGraceExtension;
+import com.epms.entity.enums.KpiTemplateCycleStatus;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -42,6 +42,7 @@ public class DepartmentKpiCycleResponseDto {
     private String earlyCloseReviewReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
     @Builder.Default
     private List<TemplateSummary> templates = new ArrayList<>();
 

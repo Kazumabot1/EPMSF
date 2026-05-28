@@ -16,13 +16,10 @@ import com.epms.entity.AssessmentFormSectionDefinition;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.AssessmentFormDefinitionRepository;
-import com.epms.security.SecurityUtils;
-import com.epms.service.AuditLogService;
 import com.epms.service.AssessmentFormDefinitionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.epms.service.PositionPermissionService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -39,9 +36,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     private static final String HIDDEN_SECTION_TITLE = "Assessment Subjects";
     private static final String TARGET_ROLE_EMPLOYEE = "Employee";
 
-    private final PositionPermissionService positionPermissionService;
     private final AssessmentFormDefinitionRepository repository;
-    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -65,7 +60,6 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     @Override
     public AssessmentFormResponse create(AssessmentFormPayload payload) {
         validateCreatePayload(payload);
-        assertCanManageAssessmentForms();
 
         String formName = payload.getFormName().trim();
 
@@ -76,20 +70,16 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         AssessmentFormDefinition form = new AssessmentFormDefinition();
         applyCreatePayload(form, payload);
 
-        AssessmentFormDefinition saved = repository.save(form);
-        auditLogService.log(currentUserId(), "CREATE", "ASSESSMENT_FORM", saved.getId(), null, null, "title: " + saved.getFormName(), null);
-        return toResponse(saved);
+        return toResponse(repository.save(form));
     }
 
     @Override
     public AssessmentFormResponse update(Integer id, AssessmentFormPayload payload) {
-        assertCanManageAssessmentForms();
         throw new BadRequestException("Assessment forms are locked after creation. Create a new form instead of editing an existing one.");
     }
 
     @Override
     public AssessmentFormResponse updateActivation(Integer id, AssessmentFormActivationPayload payload) {
-        assertCanManageAssessmentForms();
         expireEndedActiveForms();
 
         if (payload == null || payload.getActive() == null) {
@@ -104,35 +94,14 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
             setInactive(form);
         }
 
-        AssessmentFormDefinition saved = repository.save(form);
-        auditLogService.log(
-                currentUserId(),
-                Boolean.TRUE.equals(payload.getActive()) ? "ACTIVATE" : "DEACTIVATE",
-                "ASSESSMENT_FORM",
-                saved.getId(),
-                "active",
-                null,
-                String.valueOf(Boolean.TRUE.equals(saved.getActive())) + " | title: " + saved.getFormName(),
-                null
-        );
-        return toResponse(saved);
+        return toResponse(repository.save(form));
     }
 
     @Override
     public void deactivate(Integer id) {
-        assertCanManageAssessmentForms();
         AssessmentFormDefinition form = getEntity(id);
         setInactive(form);
-        AssessmentFormDefinition saved = repository.save(form);
-        auditLogService.log(currentUserId(), "DEACTIVATE", "ASSESSMENT_FORM", saved.getId(), "active", "true", "false | title: " + saved.getFormName(), null);
-    }
-
-    private Integer currentUserId() {
-        try {
-            return SecurityUtils.currentUserId();
-        } catch (Exception ignored) {
-            return null;
-        }
+        repository.save(form);
     }
 
     private void expireEndedActiveForms() {
@@ -152,12 +121,6 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
         if (changed) {
             repository.saveAll(forms);
-        }
-    }
-
-    private void assertCanManageAssessmentForms() {
-        if (!positionPermissionService.currentUserHasPermission("assessmentFormCreate")) {
-            throw new BadRequestException("Your position does not have permission to create or activate self-assessment forms.");
         }
     }
 

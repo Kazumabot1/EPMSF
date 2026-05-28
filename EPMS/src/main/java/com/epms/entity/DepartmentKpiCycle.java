@@ -1,8 +1,8 @@
 package com.epms.entity;
 
-import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiGraceExtension;
+import com.epms.entity.enums.KpiTemplateCycleStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -59,9 +59,6 @@ public class DepartmentKpiCycle {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "last_edit_reason", length = 1000)
-    private String lastEditReason;
-
     @Column(name = "closing_requested_at")
     private LocalDateTime closingRequestedAt;
 
@@ -101,6 +98,9 @@ public class DepartmentKpiCycle {
     @Column(name = "early_close_review_reason", length = 1000)
     private String earlyCloseReviewReason;
 
+    @Column(name = "last_edit_reason", length = 1000)
+    private String lastEditReason;
+
     @Builder.Default
     @OneToMany(mappedBy = "cycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude
@@ -122,7 +122,5 @@ public class DepartmentKpiCycle {
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
-        if (durationYears == null) durationYears = durationMonths == null ? 1 : Math.max(1, (int) Math.ceil(durationMonths / 12.0));
-        if (durationMonths == null) durationMonths = durationYears * 12;
     }
 }

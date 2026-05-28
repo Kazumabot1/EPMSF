@@ -124,6 +124,7 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/notification-settings" element={<NotificationSettings />} />
+              <Route path="/my-team" element={<MyTeamPage />} />
               <Route path="/employee/notifications" element={<Notifications />} />
               <Route path="/employee/notification-settings" element={<NotificationSettings />} />
               <Route path="/my-kpis" element={<EmployeeKpiResultsPage />} />
@@ -185,7 +186,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['Employee']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/employee/dashboard" element={<EmployeeMyDashboard />} />
-                <Route path="/employee/my-team" element={<MyTeamPage />} />
+                <Route path="/employee/my-team" element={<Navigate to="/my-team" replace />} />
                 <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/employee/dashboard" />}>
                   <Route path="/employee/team-management" element={<TeamManagement />} />
                 </Route>
@@ -212,7 +213,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['Manager']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/manager/dashboard" element={<ManagerDashboard />} />
-                <Route path="/manager/my-team" element={<MyTeamPage />} />
+                <Route path="/manager/my-team" element={<Navigate to="/my-team" replace />} />
                 <Route path="/manager/kpis" element={<EmployeeKpiResultsPage />} />
                 <Route path="/manager/self-assessment" element={<Navigate to="/manager/assessment-review" replace />} />
                 <Route path="/manager/assessment-review" element={<ManagerAssessmentReviewPage />} />
@@ -270,6 +271,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
+                <Route path="/department-head/my-team" element={<Navigate to="/my-team" replace />} />
                 <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
                 <Route path="/department-head/self-assessment" element={<Navigate to="/department-head/self-assessment-forms" replace />} />
                 <Route path="/department-head/self-assessment-forms" element={<DepartmentHeadSelfAssessmentViewPage />} />
@@ -300,9 +302,13 @@ function App() {
                   <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
                 </Route>
 
-                <Route element={<PositionPermissionRoute permission="teamPermission" fallbackPath="/department-head/dashboard" />}>
-                  <Route path="/department-head/teams" element={<TeamManagement />} />
+                <Route path="/department-head/teams" element={<TeamManagement />} />
+
+                <Route element={<PositionPermissionRoute permission="teamCreate" fallbackPath="/department-head/teams" />}>
                   <Route path="/department-head/teams/create" element={<TeamCreate />} />
+                </Route>
+
+                <Route element={<PositionPermissionRoute permission="teamHistory" fallbackPath="/department-head/teams" />}>
                   <Route path="/department-head/team-history" element={<TeamHistoryPage />} />
                 </Route>
               </Route>
@@ -323,10 +329,8 @@ function App() {
 
     </Route>
 
-                <Route element={<PositionPermissionRoute permission="teamPermission" fallbackPath="/dashboard" />}>
-                  <Route path="/hr/team" element={<TeamManagement />} />
-                  <Route path="/hr/team/history" element={<TeamHistoryPage />} />
-                </Route>
+                <Route path="/hr/team" element={<TeamManagement />} />
+                <Route path="/hr/team/history" element={<TeamHistoryPage />} />
 
                 <Route
                     path="/hr/team/create"

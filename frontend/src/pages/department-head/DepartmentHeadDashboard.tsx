@@ -12,8 +12,6 @@ import {
   type EmployeeResponse,
   type TeamResponse,
 } from '../../services/departmentHeadService';
-import { positionPermissionService } from '../../services/positionPermissionService';
-
 
 type IconName =
     | 'activity'
@@ -229,35 +227,6 @@ const DepartmentHeadDashboard = () => {
   const [memberUserIds, setMemberUserIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState('');
-  const [canCreateTeam, setCanCreateTeam] = useState(false);
-  const [teamPermissionLoaded, setTeamPermissionLoaded] = useState(false);
-
-
-  useEffect(() => {
-    let cancelled = false;
-
-    positionPermissionService
-      .getMyPermissions()
-      .then((permissions) => {
-        if (!cancelled) {
-          setCanCreateTeam(Boolean(permissions.teamPermission && permissions.teamCreate));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCanCreateTeam(false);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setTeamPermissionLoaded(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const activeEmployees = useMemo(
       () => employees.filter((employee) => employee.active !== false).length,
@@ -302,53 +271,36 @@ const DepartmentHeadDashboard = () => {
   );
 
   const topTeam = teamRows[0];
-const teamManagementAvailable = teamPermissionLoaded && canCreateTeam;  const totalAssignedMembers = teams.reduce((sum, team) => sum + getTeamMemberCount(team), 0);
+  const teamManagementAvailable = !teamPermissionMessage;
+  const totalAssignedMembers = teams.reduce((sum, team) => sum + getTeamMemberCount(team), 0);
   const departmentDisplay = departmentName || dashboard?.departmentName || 'Your Department';
 
-const loadTeamCandidates = async () => {
-  if (!teamPermissionLoaded || !canCreateTeam) {
-    setLeaders([]);
-    setMembers([]);
-    return;
-  }
+  const loadTeamCandidates = async () => {
+    try {
+      setCandidateLoading(true);
+      setTeamPermissionMessage('');
 
-  try {
-    setCandidateLoading(true);
-    setTeamPermissionMessage('');
+      const [leaderData, memberData] = await Promise.all([
+        fetchDepartmentHeadCandidateUsers(),
+        fetchDepartmentHeadCandidateMembers(),
+      ]);
 
-    const [leaderData, memberData] = await Promise.all([
-      fetchDepartmentHeadCandidateUsers(),
-      fetchDepartmentHeadCandidateMembers(),
-    ]);
-
-    setLeaders(leaderData ?? []);
-    setMembers(memberData ?? []);
-  } catch (error) {
-    console.error(error);
-    setLeaders([]);
-    setMembers([]);
-    setTeamPermissionMessage(
-      getApiErrorMessage(
-        error,
-        'Team management is not available for your position. You can still view department summary, review workflows, and reports.',
-      ),
-    );
-  } finally {
-    setCandidateLoading(false);
-  }
-};
-
-useEffect(() => {
-  if (teamPermissionLoaded && canCreateTeam) {
-    void loadTeamCandidates();
-  }
-
-  if (teamPermissionLoaded && !canCreateTeam) {
-    setLeaders([]);
-    setMembers([]);
-    setTeamPermissionMessage('');
-  }
-}, [teamPermissionLoaded, canCreateTeam]);
+      setLeaders(leaderData ?? []);
+      setMembers(memberData ?? []);
+    } catch (error) {
+      console.error(error);
+      setLeaders([]);
+      setMembers([]);
+      setTeamPermissionMessage(
+          getApiErrorMessage(
+              error,
+              'Team management is not available for your position. You can still view department summary, review workflows, and reports.',
+          ),
+      );
+    } finally {
+      setCandidateLoading(false);
+    }
+  };
 
   const loadPage = async () => {
     try {
@@ -366,6 +318,8 @@ useEffect(() => {
     } finally {
       setLoading(false);
     }
+
+    void loadTeamCandidates();
   };
 
   useEffect(() => {
