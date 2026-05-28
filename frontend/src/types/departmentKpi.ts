@@ -1,7 +1,7 @@
 import type { KpiFormStatus, KpiTemplateItem } from './kpiTemplate';
-import type { KpiTemplateCycleStatus } from './kpiTemplateCycle';
+import type { KpiEarlyCloseReviewDecision, KpiGraceExtension, KpiTemplateCycleStatus } from './kpiTemplateCycle';
 
-export type DepartmentKpiResultStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'FINALIZED' | 'CLOSED';
+export type DepartmentKpiResultStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_APPROVAL' | 'FINALIZED' | 'CLOSED';
 
 export interface DepartmentKpiTemplateDepartment {
   id: number;
@@ -42,12 +42,26 @@ export interface DepartmentKpiCycle {
   startDate: string;
   endDate: string;
   durationMonths: number;
+  durationYears?: number | null;
   durationLabel: string;
   status: KpiTemplateCycleStatus;
   currentPeriodId: number | null;
   currentPeriodNumber: number | null;
   currentPeriodStartDate: string | null;
   currentPeriodEndDate: string | null;
+  closingRequestedAt?: string | null;
+  graceEndsAt?: string | null;
+  closedAt?: string | null;
+  earlyCloseReason?: string | null;
+  graceExtension?: KpiGraceExtension | null;
+  earlyCloseRequestedAt?: string | null;
+  earlyCloseRequestedByUserId?: number | null;
+  earlyCloseRequestedByName?: string | null;
+  earlyCloseReviewedAt?: string | null;
+  earlyCloseReviewedByUserId?: number | null;
+  earlyCloseReviewedByName?: string | null;
+  earlyCloseReviewDecision?: KpiEarlyCloseReviewDecision | null;
+  earlyCloseReviewReason?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   templates: DepartmentKpiCycleTemplateSummary[];
@@ -94,6 +108,15 @@ export interface DepartmentKpiResult {
   totalScore: number | null;
   totalWeightedScore: number | null;
   finalizedAt?: string | null;
+  finalizationRequestReason?: string | null;
+  finalizationRequestedAt?: string | null;
+  finalizationRequestedByUserId?: number | null;
+  finalizationRequestedByName?: string | null;
+  finalizationReviewDecision?: KpiEarlyCloseReviewDecision | null;
+  finalizationReviewReason?: string | null;
+  finalizationReviewedAt?: string | null;
+  finalizationReviewedByUserId?: number | null;
+  finalizationReviewedByName?: string | null;
   periodStartDate?: string | null;
   periodEndDate?: string | null;
   lines: DepartmentKpiResultLine[];
