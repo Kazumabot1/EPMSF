@@ -41,9 +41,9 @@ export const buildQuestionCompetencies = (questions: FeedbackCampaignQuestionGro
 };
 
 export const isReviewQuestionScored = (question: FeedbackCampaignQuestionGroup['questions'][number]) => {
-    const responseType = String(question.responseType ?? '').toUpperCase();
-    const scoringBehavior = String(question.scoringBehavior ?? '').toUpperCase();
-    return scoringBehavior === 'SCORED' && (responseType === 'RATING' || responseType === 'RATING_WITH_COMMENT');
+    const responseType = String(question.responseType ?? '').toUpperCase().replace(/[-\s]+/g, '_');
+    const scoringBehavior = String(question.scoringBehavior ?? '').toUpperCase().replace(/[-\s]+/g, '_');
+    return scoringBehavior === 'SCORED' && responseType === 'RATING_WITH_COMMENT' && question.required === true;
 };
 
 export const writeQuestionDragData = (event: DragEvent<HTMLElement>, payload: QuestionDragPayload) => {

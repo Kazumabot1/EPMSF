@@ -14,6 +14,8 @@ public class FeedbackCampaignQuestionItemResponse {
     private Long questionBankId;
     private Long questionVersionId;
     private Long sourceRuleId;
+    private String sourceRuleName;
+    private String sourceRuleScope;
     private String questionCode;
     private String competencyCode;
     private String competencyName;

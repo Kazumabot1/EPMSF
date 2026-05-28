@@ -262,7 +262,7 @@ public class FeedbackCampaignScoringConfigServiceImpl implements FeedbackCampaig
         if (targetsMissingWeightedRole <= 0) return List.of();
         String message = targetsMissingWeightedRole + " target(s) do not have every weighted evaluator role.";
         if (Boolean.TRUE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
-            return List.of(message + " Missing relationship weight will redistribute across that target's available submitted roles.");
+            return List.of(message + " Unavailable relationship weight will redistribute across that target's available evaluator groups.");
         }
         return List.of(message + " Enable redistribution or adjust evaluator generation before activation.");
     }

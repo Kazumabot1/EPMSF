@@ -1,21 +1,22 @@
-import type { Dispatch, DragEvent, SetStateAction } from 'react';
-import { feedbackCampaignApi } from '../../../../../api/feedbackCampaignApi';
+import type { Dispatch, SetStateAction } from "react";
+import { feedbackCampaignApi } from "../../../../../api/feedbackCampaignApi";
 import type {
     FeedbackCampaign,
-    FeedbackCampaignQuestionGroup,
     FeedbackCampaignQuestionReview,
     FeedbackCampaignScoringConfig,
     FeedbackRelationshipType,
-} from '../../../../../types/feedbackCampaign';
-import type { CampaignInfoForm, SetupStepKey } from '../types/campaignSetupTypes';
-import { allocateEqualPercentages, formatPercent, roundPercent } from '../utils/campaignSetupCollections';
-import { RELATIONSHIP_ORDER } from '../utils/campaignSetupConstants';
+} from "../../../../../types/feedbackCampaign";
+import type {
+    CampaignInfoForm,
+    SetupStepKey,
+} from "../types/campaignSetupTypes";
 import {
-    getQuestionSectionCode,
-    isReviewQuestionScored,
-    readQuestionDragData,
-    sortQuestionItems,
-} from '../utils/campaignSetupQuestionUtils';
+    allocateEqualPercentages,
+    formatPercent,
+    roundPercent,
+} from "../utils/campaignSetupCollections";
+import { RELATIONSHIP_ORDER } from "../utils/campaignSetupConstants";
+import { isReviewQuestionScored } from "../utils/campaignSetupQuestionUtils";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -23,7 +24,7 @@ type CampaignQuestionReviewActionsParams = {
     selectedCampaign: FeedbackCampaign | null;
     savedAssignmentCount: number;
     questionReview: FeedbackCampaignQuestionReview;
-    competencyWeights: FeedbackCampaignQuestionReview['competencyWeights'];
+    competencyWeights: FeedbackCampaignQuestionReview["competencyWeights"];
     competencyWeightsReady: boolean;
     competencyWeightTotal: number;
     relationshipWeightTotal: number;
@@ -67,123 +68,55 @@ export function useCampaignQuestionReviewActions({
     const resolveQuestionReview = async () => {
         if (!selectedCampaign) return;
         if (savedAssignmentCount === 0) {
-            setError('Generate evaluator assignments before resolving campaign questions.');
+            setError(
+                "Save evaluator assignments before preparing the question snapshot.",
+            );
             return;
         }
         setResolvingQuestionReview(true);
-        setError('');
-        setSuccess('');
+        setError("");
+        setSuccess("");
         try {
-            const data = await feedbackCampaignApi.resolveQuestionReview(selectedCampaign.id);
+            const data = await feedbackCampaignApi.resolveQuestionReview(
+                selectedCampaign.id,
+            );
             setQuestionReview(data);
-            setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? '');
-            setSuccess('Questions refreshed from active rules.');
+            setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? "");
+            setSuccess("Question snapshot refreshed from active Rule Sets.");
             await loadScoringConfig(selectedCampaign.id);
             await loadActivationState(selectedCampaign.id);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Questions could not be prepared.');
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Question snapshot could not be prepared.",
+            );
         } finally {
             setResolvingQuestionReview(false);
         }
     };
 
-    const updateQuestionGroup = (
-        groupKey: string,
-        updater: (questions: FeedbackCampaignQuestionGroup['questions']) => FeedbackCampaignQuestionGroup['questions'],
+    const updateRelationshipWeight = (
+        relationshipType: FeedbackRelationshipType,
+        value: number,
     ) => {
-        setQuestionReview(current => {
-            const groups = current.groups.map(group => {
-                if (group.groupKey !== groupKey) return group;
-                const questions = updater(group.questions);
-                const questionCount = questions.length;
-                const includedQuestionCount = questions.filter(question => question.included).length;
-                const scoredQuestionCount = questions.filter(isReviewQuestionScored).length;
-                const includedScoredQuestionCount = questions.filter(question => question.included && isReviewQuestionScored(question)).length;
-                return { ...group, questions, questionCount, includedQuestionCount, scoredQuestionCount, includedScoredQuestionCount };
-            });
-            return {
-                ...current,
-                saved: false,
-                questionCount: groups.reduce((total, group) => total + group.questionCount, 0),
-                includedQuestionCount: groups.reduce((total, group) => total + group.includedQuestionCount, 0),
-                scoredQuestionCount: groups.reduce((total, group) => total + group.scoredQuestionCount, 0),
-                includedScoredQuestionCount: groups.reduce((total, group) => total + group.includedScoredQuestionCount, 0),
-                groups,
-            };
-        });
-    };
-
-    const toggleQuestionIncluded = (groupKey: string, questionCode: string) => {
-        updateQuestionGroup(groupKey, (questions: FeedbackCampaignQuestionGroup['questions']) =>
-            questions.map(question => question.questionCode === questionCode ? { ...question, included: !question.included } : question),
-        );
-    };
-
-    const moveCompetency = (groupKey: string, fromSectionCode: string, toSectionCode: string) => {
-        if (fromSectionCode === toSectionCode) return;
-        updateQuestionGroup(groupKey, (questions: FeedbackCampaignQuestionGroup['questions']) => {
-            const sections = Array.from(new Map(sortQuestionItems(questions).map(question => [getQuestionSectionCode(question), question])).keys());
-            const fromIndex = sections.indexOf(fromSectionCode);
-            const toIndex = sections.indexOf(toSectionCode);
-            if (fromIndex < 0 || toIndex < 0) return questions;
-            const nextSections = [...sections];
-            const [moved] = nextSections.splice(fromIndex, 1);
-            nextSections.splice(toIndex, 0, moved);
-            const sectionOrder = new Map(nextSections.map((section, index) => [section, (index + 1) * 10]));
-            return questions.map(question => {
-                const currentSectionCode = getQuestionSectionCode(question);
-                return { ...question, sectionOrder: sectionOrder.get(currentSectionCode) ?? question.sectionOrder };
-            });
-        });
-    };
-
-    const moveQuestion = (groupKey: string, sectionCode: string, fromQuestionCode: string, toQuestionCode: string) => {
-        if (fromQuestionCode === toQuestionCode) return;
-        updateQuestionGroup(groupKey, (questions: FeedbackCampaignQuestionGroup['questions']) => {
-            const scoped = sortQuestionItems(questions.filter(question => (getQuestionSectionCode(question)) === sectionCode));
-            const fromIndex = scoped.findIndex(question => question.questionCode === fromQuestionCode);
-            const toIndex = scoped.findIndex(question => question.questionCode === toQuestionCode);
-            if (fromIndex < 0 || toIndex < 0) return questions;
-            const ordered = [...scoped];
-            const [moved] = ordered.splice(fromIndex, 1);
-            ordered.splice(toIndex, 0, moved);
-            const displayOrder = new Map(ordered.map((question, index) => [question.questionCode, (index + 1) * 10]));
-            return questions.map(question => {
-                const nextDisplayOrder = displayOrder.get(question.questionCode);
-                return typeof nextDisplayOrder === 'number'
-                    ? { ...question, displayOrder: nextDisplayOrder }
-                    : question;
-            });
-        });
-    };
-
-    const handleCompetencyDrop = (event: DragEvent<HTMLElement>, groupKey: string, toSectionCode: string) => {
-        event.preventDefault();
-        const payload = readQuestionDragData(event);
-        if (payload?.kind === 'competency' && payload.groupKey === groupKey) {
-            moveCompetency(groupKey, payload.sectionCode, toSectionCode);
-        }
-    };
-
-    const handleQuestionDrop = (event: DragEvent<HTMLElement>, groupKey: string, sectionCode: string, toQuestionCode: string) => {
-        event.preventDefault();
-        const payload = readQuestionDragData(event);
-        if (payload?.kind === 'question' && payload.groupKey === groupKey && payload.sectionCode === sectionCode) {
-            moveQuestion(groupKey, sectionCode, payload.questionCode, toQuestionCode);
-        }
-    };
-
-    const updateRelationshipWeight = (relationshipType: FeedbackRelationshipType, value: number) => {
-        const normalized = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
-        setScoringConfig(current => ({
+        const normalized = Number.isFinite(value)
+            ? Math.max(0, Math.min(100, value))
+            : 0;
+        setScoringConfig((current) => ({
             ...current,
             relationshipWeightsReady: false,
-            relationshipWeights: RELATIONSHIP_ORDER.map(type => {
-                const existing = current.relationshipWeights.find(item => item.relationshipType === type);
+            relationshipWeights: RELATIONSHIP_ORDER.map((type) => {
+                const existing = current.relationshipWeights.find(
+                    (item) => item.relationshipType === type,
+                );
                 return {
                     relationshipType: type,
                     label: existing?.label ?? type,
-                    weightPercent: type === relationshipType ? normalized : Number(existing?.weightPercent ?? 0),
+                    weightPercent:
+                        type === relationshipType
+                            ? normalized
+                            : Number(existing?.weightPercent ?? 0),
                     assignmentCount: existing?.assignmentCount ?? 0,
                     targetCountWithRole: existing?.targetCountWithRole ?? 0,
                     currentlyAvailable: Boolean(existing?.currentlyAvailable),
@@ -194,65 +127,79 @@ export function useCampaignQuestionReviewActions({
 
     const saveScoringConfig = async () => {
         if (!selectedCampaign) return;
-        if (selectedCampaign.status !== 'DRAFT') {
-            setError('Scoring weights can be changed only while the campaign is DRAFT.');
+        if (selectedCampaign.status !== "DRAFT") {
+            setError(
+                "Scoring weights can be changed only while the campaign is DRAFT.",
+            );
             return;
         }
         if (Math.round(relationshipWeightTotal * 100) / 100 !== 100) {
-            setError(`Evaluator relationship weights must total 100%. Current total is ${relationshipWeightTotal}%.`);
+            setError(
+                `Evaluator relationship weights must total 100%. Current total is ${relationshipWeightTotal}%.`,
+            );
             return;
         }
         setSavingScoringConfig(true);
-        setError('');
-        setSuccess('');
+        setError("");
+        setSuccess("");
         try {
-            const data = await feedbackCampaignApi.updateScoringConfig(selectedCampaign.id, {
-                redistributeMissingRelationshipWeight: scoringConfig.redistributeMissingRelationshipWeight,
-                relationshipWeights: RELATIONSHIP_ORDER.map(type => ({
-                    relationshipType: type,
-                    weightPercent: Number(scoringConfig.relationshipWeights.find(item => item.relationshipType === type)?.weightPercent ?? 0),
-                })),
-            });
+            const data = await feedbackCampaignApi.updateScoringConfig(
+                selectedCampaign.id,
+                {
+                    redistributeMissingRelationshipWeight:
+                    scoringConfig.redistributeMissingRelationshipWeight,
+                    relationshipWeights: RELATIONSHIP_ORDER.map((type) => ({
+                        relationshipType: type,
+                        weightPercent: Number(
+                            scoringConfig.relationshipWeights.find(
+                                (item) => item.relationshipType === type,
+                            )?.weightPercent ?? 0,
+                        ),
+                    })),
+                },
+            );
             setScoringConfig(data);
-            setForm(current => ({ ...current, redistributeMissingRelationshipWeight: data.redistributeMissingRelationshipWeight }));
-            setSuccess('Campaign relationship weights saved. Missing role weights will be handled according to the redistribution setting.');
+            setForm((current) => ({
+                ...current,
+                redistributeMissingRelationshipWeight:
+                data.redistributeMissingRelationshipWeight,
+            }));
+            setSuccess("Evaluator relationship weights saved.");
             await loadActivationState(selectedCampaign.id);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Scoring configuration could not be saved.');
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Scoring configuration could not be saved.",
+            );
         } finally {
             setSavingScoringConfig(false);
         }
     };
 
     const updateCompetencyWeight = (competencyCode: string, value: number) => {
-        const normalized = roundPercent(Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0)));
-        setQuestionReview(current => ({
+        const normalized = roundPercent(
+            Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0)),
+        );
+        setQuestionReview((current) => ({
             ...current,
+            saved: false,
             competencyWeightsReady: false,
-            competencyWeights: (current.competencyWeights ?? []).map(item => (
-                item.competencyCode === competencyCode ? { ...item, weightPercent: normalized, saved: false } : item
-            )),
-        }));
-    };
-
-    const balanceCompetencyWeightsByQuestions = () => {
-        setQuestionReview(current => ({
-            ...current,
-            competencyWeightsReady: false,
-            competencyWeights: (current.competencyWeights ?? []).map(item => ({
-                ...item,
-                weightPercent: roundPercent(Number(item.defaultWeightPercent ?? 0)),
-                saved: false,
-            })),
+            competencyWeights: (current.competencyWeights ?? []).map((item) =>
+                item.competencyCode === competencyCode
+                    ? { ...item, weightPercent: normalized, saved: false }
+                    : item,
+            ),
         }));
     };
 
     const equalizeCompetencyWeights = () => {
-        setQuestionReview(current => {
+        setQuestionReview((current) => {
             const weights = current.competencyWeights ?? [];
             const percentages = allocateEqualPercentages(weights.length);
             return {
                 ...current,
+                saved: false,
                 competencyWeightsReady: false,
                 competencyWeights: weights.map((item, index) => ({
                     ...item,
@@ -265,56 +212,90 @@ export function useCampaignQuestionReviewActions({
 
     const saveQuestionReview = async () => {
         if (!selectedCampaign) return;
-        if (selectedCampaign.status !== 'DRAFT') {
-            setError('Campaign questions can be changed only while the campaign is DRAFT.');
+        if (selectedCampaign.status !== "DRAFT") {
+            setError(
+                "Question snapshot can be saved only while the campaign is DRAFT.",
+            );
             return;
         }
-        const selections = questionReview.groups.flatMap(group => group.questions.map(question => ({
-            selectionId: question.selectionId ?? null,
-            relationshipType: group.relationshipType,
-            targetLevelCode: group.targetLevelCode,
-            questionCode: question.questionCode,
-            included: Boolean(question.included),
-            required: Boolean(question.required),
-            sectionOrder: question.sectionOrder ?? null,
-            displayOrder: question.displayOrder ?? null,
-        })));
+        const selections = questionReview.groups.flatMap((group) =>
+            group.questions.map((question) => ({
+                selectionId: question.selectionId ?? null,
+                relationshipType: group.relationshipType,
+                targetLevelCode: group.targetLevelCode,
+                targetDepartmentId: group.targetDepartmentId ?? null,
+                targetPositionId: group.targetPositionId ?? null,
+                questionCode: question.questionCode,
+                included: true,
+                required: true,
+                sectionOrder: question.sectionOrder ?? null,
+                displayOrder: question.displayOrder ?? null,
+            })),
+        );
         if (selections.length === 0) {
-            setError('Resolve campaign questions before saving.');
+            setError("Refresh the question snapshot before saving.");
             return;
         }
-        const emptyGroups = questionReview.groups.filter(group => group.questions.filter(question => question.included).length === 0);
+        const emptyGroups = questionReview.groups.filter(
+            (group) => group.questions.filter(isReviewQuestionScored).length === 0,
+        );
         if (emptyGroups.length > 0) {
-            setError('Each form needs at least one included question.');
+            setError(
+                "Each form variant needs at least one rating question with a required comment.",
+            );
+            return;
+        }
+        const invalidQuestionCodes = Array.from(
+            new Set(
+                questionReview.groups.flatMap((group) =>
+                    group.questions
+                        .filter((question) => !isReviewQuestionScored(question))
+                        .map((question) => String(question.questionCode ?? "UNKNOWN")),
+                ),
+            ),
+        );
+        if (invalidQuestionCodes.length > 0) {
+            setError(
+                `Only rating questions with required comments can be used. ${invalidQuestionCodes.length} invalid question${invalidQuestionCodes.length === 1 ? "" : "s"} found: ${invalidQuestionCodes.slice(0, 8).join(", ")}${invalidQuestionCodes.length > 8 ? ", ..." : ""}`,
+            );
             return;
         }
         if (competencyWeights.length === 0) {
-            setError('Scoring weights are required before saving.');
+            setError("Competency weights are required before saving the snapshot.");
             return;
         }
         if (!competencyWeightsReady) {
-            setError(`Competency weights must total 100%. Current total is ${formatPercent(competencyWeightTotal)}%.`);
+            setError(
+                `Competency weights must total 100%. Current total is ${formatPercent(competencyWeightTotal)}%.`,
+            );
             return;
         }
         setSavingQuestionReview(true);
-        setError('');
-        setSuccess('');
+        setError("");
+        setSuccess("");
         try {
-            const data = await feedbackCampaignApi.saveQuestionReview(selectedCampaign.id, {
-                selections,
-                competencyWeights: competencyWeights.map(item => ({
-                    competencyCode: item.competencyCode,
-                    weightPercent: Number(item.weightPercent ?? 0),
-                })),
-            });
+            const data = await feedbackCampaignApi.saveQuestionReview(
+                selectedCampaign.id,
+                {
+                    selections,
+                    competencyWeights: competencyWeights.map((item) => ({
+                        competencyCode: item.competencyCode,
+                        weightPercent: Number(item.weightPercent ?? 0),
+                    })),
+                },
+            );
             setQuestionReview(data);
-            setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? '');
-            setSuccess('Question review saved.');
-            setActiveStepKey('launch');
+            setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? "");
+            setSuccess("Question snapshot saved.");
+            setActiveStepKey("launch");
             await loadScoringConfig(selectedCampaign.id);
             await loadActivationState(selectedCampaign.id);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Question review could not be saved.');
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Question snapshot could not be saved.",
+            );
         } finally {
             setSavingQuestionReview(false);
         }
@@ -322,13 +303,9 @@ export function useCampaignQuestionReviewActions({
 
     return {
         resolveQuestionReview,
-        toggleQuestionIncluded,
-        handleCompetencyDrop,
-        handleQuestionDrop,
         updateRelationshipWeight,
         saveScoringConfig,
         updateCompetencyWeight,
-        balanceCompetencyWeightsByQuestions,
         equalizeCompetencyWeights,
         saveQuestionReview,
     };

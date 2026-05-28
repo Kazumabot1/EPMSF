@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "feedback_campaign_question_selections", uniqueConstraints = {
         @UniqueConstraint(name = "uk_campaign_question_selection", columnNames = {
-                "campaign_id", "relationship_type", "target_level_code", "question_code"
+                "campaign_id", "relationship_type", "target_level_code", "target_department_id", "target_position_id", "question_code"
         })
 })
 @Getter

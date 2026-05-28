@@ -76,10 +76,6 @@ import {
   emptyTargetsResponse,
 } from './campaign-setup/utils/campaignSetupEmptyState';
 import { cleanEvaluatorNote } from './campaign-setup/utils/campaignSetupMessages';
-import {
-  buildQuestionCompetencies,
-  writeQuestionDragData,
-} from './campaign-setup/utils/campaignSetupQuestionUtils';
 
 interface Props {
   onCampaignCreated: (campaign: FeedbackCampaign) => void;
@@ -214,20 +210,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     competencyWeightTotal,
     competencyWeightDelta,
     competencyWeightsReady,
-    selectedQuestionGroup,
-    selectedQuestionCompetencies,
-    isQuestionCompetencyExpanded,
-    toggleQuestionCompetency,
-    isQuestionPreviewExpanded,
-    toggleQuestionPreview,
-    selectedQuestionIncludedCompetencyCount,
-    selectedQuestionIncludedQuestionCount,
-    selectedQuestionTotalCompetencyCount,
-    selectedQuestionTotalQuestionCount,
-    activeQuestionFormTitle,
     questionSaveDisabled,
     questionReviewReady,
-    activationWarnings,
     canValidateSetup,
     canActivate,
     campaignLaunched,
@@ -236,12 +220,9 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     launchBannerMessage,
     launchTargetCount,
     launchAssignmentCount,
-    questionsPerFormLabel,
-    competencyCountLabel,
     roleAssignmentSummary,
     privacySummary,
     launchChecklist,
-    launchQuestionFormSummaries,
   } = useCampaignQuestionLaunchViewModel({
     questionReview,
     selectedQuestionGroupKey,
@@ -424,13 +405,9 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
 
   const {
     resolveQuestionReview,
-    toggleQuestionIncluded,
-    handleCompetencyDrop,
-    handleQuestionDrop,
     updateRelationshipWeight,
     saveScoringConfig,
     updateCompetencyWeight,
-    balanceCompetencyWeightsByQuestions,
     equalizeCompetencyWeights,
     saveQuestionReview,
   } = useCampaignQuestionReviewActions({
@@ -461,7 +438,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     activateSelectedCampaign,
   } = useCampaignLifecycleActions({
     selectedCampaign,
-    activationWarnings,
     setActivatingCampaign,
     setError,
     setSuccess,
@@ -652,31 +628,14 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             saveQuestionReview={saveQuestionReview}
             savingQuestionReview={savingQuestionReview}
             loadingQuestionReview={loadingQuestionReview}
-            balanceCompetencyWeightsByQuestions={balanceCompetencyWeightsByQuestions}
             equalizeCompetencyWeights={equalizeCompetencyWeights}
             updateCompetencyWeight={updateCompetencyWeight}
             resolvingQuestionReview={resolvingQuestionReview}
             resolveQuestionReview={resolveQuestionReview}
             questionReview={questionReview}
             questionGroups={questionGroups}
-            buildQuestionCompetencies={buildQuestionCompetencies}
-            selectedQuestionGroup={selectedQuestionGroup}
+            selectedQuestionGroupKey={selectedQuestionGroupKey}
             setSelectedQuestionGroupKey={setSelectedQuestionGroupKey}
-            relationshipLabel={relationshipLabel}
-            activeQuestionFormTitle={activeQuestionFormTitle}
-            selectedQuestionIncludedQuestionCount={selectedQuestionIncludedQuestionCount}
-            selectedQuestionTotalQuestionCount={selectedQuestionTotalQuestionCount}
-            selectedQuestionIncludedCompetencyCount={selectedQuestionIncludedCompetencyCount}
-            selectedQuestionTotalCompetencyCount={selectedQuestionTotalCompetencyCount}
-            selectedQuestionCompetencies={selectedQuestionCompetencies}
-            isQuestionCompetencyExpanded={isQuestionCompetencyExpanded}
-            handleCompetencyDrop={handleCompetencyDrop}
-            writeQuestionDragData={writeQuestionDragData}
-            toggleQuestionCompetency={toggleQuestionCompetency}
-            isQuestionPreviewExpanded={isQuestionPreviewExpanded}
-            handleQuestionDrop={handleQuestionDrop}
-            toggleQuestionPreview={toggleQuestionPreview}
-            toggleQuestionIncluded={toggleQuestionIncluded}
         />}
         {activeStepKey === 'launch' && (
             <LaunchReadinessSection
@@ -686,7 +645,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                 launchReady={launchReady}
                 launchTargetCount={launchTargetCount}
                 launchAssignmentCount={launchAssignmentCount}
-                questionFormCount={questionGroups.length}
+                questionSetCount={questionGroups.length}
                 loadingActivation={loadingActivation}
                 launchBannerTitle={launchBannerTitle}
                 launchBannerMessage={launchBannerMessage}
@@ -696,9 +655,6 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                 privacySummary={privacySummary}
                 targetWarningCount={targetsResponse.warningCount}
                 roleAssignmentSummary={roleAssignmentSummary}
-                questionsPerFormLabel={questionsPerFormLabel}
-                competencyCountLabel={competencyCountLabel}
-                questionFormSummaries={launchQuestionFormSummaries}
                 scoringConfig={scoringConfig}
                 competencyWeightsReady={competencyWeightsReady}
                 competencyWeightTotal={competencyWeightTotal}
@@ -707,7 +663,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
                 activatingCampaign={activatingCampaign}
                 formatPercent={formatPercent}
                 onRefreshCheck={() => selectedCampaign && void loadActivationState(selectedCampaign.id)}
-                onBackToQuestionReview={() => setActiveStepKey('questions')}
+                onGoToStep={(step) => setActiveStepKey(step)}
                 onValidateSetup={() => void validateSelectedCampaignSetup()}
                 onLaunchCampaign={() => void activateSelectedCampaign()}
             />

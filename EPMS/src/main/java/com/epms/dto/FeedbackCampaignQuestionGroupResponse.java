@@ -17,6 +17,11 @@ public class FeedbackCampaignQuestionGroupResponse {
     private String relationshipLabel;
     private String targetLevelCode;
     private Integer targetLevelRank;
+    private Long targetDepartmentId;
+    private String targetDepartmentName;
+    private Long targetPositionId;
+    private String targetPositionName;
+    private String formVariantLabel;
     private Integer targetCount;
     private Integer assignmentCount;
     private Integer questionCount;

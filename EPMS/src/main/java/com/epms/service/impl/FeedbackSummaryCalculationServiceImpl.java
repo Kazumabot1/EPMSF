@@ -106,9 +106,9 @@ public class FeedbackSummaryCalculationServiceImpl implements FeedbackSummaryCal
             return "Feedback score uses submitted responses and configured evaluator relationship weights, but confidence is low because too few evaluators submitted.";
         }
         if (Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
-            return "Feedback score applies configured evaluator relationship weights. Missing relationship roles are not redistributed.";
+            return "Feedback score applies configured evaluator relationship weights. Unavailable relationship weight is not redistributed.";
         }
-        return "Feedback score applies configured evaluator relationship weights and redistributes missing submitted relationship roles across available roles.";
+        return "Feedback score applies configured evaluator relationship weights and redistributes unavailable relationship weight across available evaluator groups.";
     }
 
     private boolean isInsufficientFeedback(long assignedCount, long submittedCount, List<FeedbackResponse> responses) {

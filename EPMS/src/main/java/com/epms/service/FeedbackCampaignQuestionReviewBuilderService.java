@@ -36,12 +36,14 @@ public interface FeedbackCampaignQuestionReviewBuilderService {
 
     List<QuestionSelectionDraft> buildQuestionSelectionDrafts(List<QuestionGroup> groups);
 
-    String decisionKey(String relationshipType, String targetLevelCode, String questionCode);
+    String decisionKey(String relationshipType, String targetLevelCode, Long targetDepartmentId, Long targetPositionId, String questionCode);
 
     record ResolvedQuestionReview(List<QuestionGroup> groups, List<String> warnings) {}
 
     record QuestionCandidate(
             Long sourceRuleId,
+            String sourceRuleName,
+            String sourceRuleScope,
             FeedbackQuestionVersion version,
             Long questionBankId,
             String questionCode,
@@ -67,6 +69,11 @@ public interface FeedbackCampaignQuestionReviewBuilderService {
             String relationshipLabel,
             String targetLevelCode,
             Integer targetLevelRank,
+            Long targetDepartmentId,
+            String targetDepartmentName,
+            Long targetPositionId,
+            String targetPositionName,
+            String formVariantLabel,
             Integer targetCount,
             Integer assignmentCount,
             List<QuestionCandidate> questions,

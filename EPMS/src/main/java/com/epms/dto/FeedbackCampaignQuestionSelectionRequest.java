@@ -17,6 +17,9 @@ public class FeedbackCampaignQuestionSelectionRequest {
     @NotBlank(message = "Target level is required")
     private String targetLevelCode;
 
+    private Long targetDepartmentId;
+    private Long targetPositionId;
+
     @NotBlank(message = "Question code is required")
     private String questionCode;
 

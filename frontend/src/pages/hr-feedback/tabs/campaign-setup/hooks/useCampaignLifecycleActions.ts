@@ -6,7 +6,6 @@ type Setter<T> = Dispatch<SetStateAction<T>>;
 
 type CampaignLifecycleActionsParams = {
     selectedCampaign: FeedbackCampaign | null;
-    activationWarnings: number;
     setActivatingCampaign: Setter<boolean>;
     setError: Setter<string>;
     setSuccess: Setter<string>;
@@ -19,7 +18,6 @@ type CampaignLifecycleActionsParams = {
 
 export function useCampaignLifecycleActions({
                                                 selectedCampaign,
-                                                activationWarnings,
                                                 setActivatingCampaign,
                                                 setError,
                                                 setSuccess,
@@ -38,11 +36,6 @@ export function useCampaignLifecycleActions({
 
     const validateSelectedCampaignSetup = async () => {
         if (!selectedCampaign) return;
-        const warningText = activationWarnings > 0
-            ? `\n\nThere are ${activationWarnings} warning(s). Validation is allowed, but HR should review them first.`
-            : '';
-        const confirmed = window.confirm(`Validate setup for "${selectedCampaign.name}"?\n\nThis will lock campaign setup and move it to Ready to activate. You can launch after validation.${warningText}`);
-        if (!confirmed) return;
         setActivatingCampaign(true);
         setError('');
         setSuccess('');
@@ -61,11 +54,6 @@ export function useCampaignLifecycleActions({
 
     const activateSelectedCampaign = async () => {
         if (!selectedCampaign) return;
-        const warningText = activationWarnings > 0
-            ? `\n\nThere are ${activationWarnings} warning(s). Activation is allowed, but HR should review them first.`
-            : '';
-        const confirmed = window.confirm(`Activate "${selectedCampaign.name}"?\n\nThis will generate final feedback question snapshots, notify evaluators, and move the campaign to ACTIVE.${warningText}`);
-        if (!confirmed) return;
         setActivatingCampaign(true);
         setError('');
         setSuccess('');

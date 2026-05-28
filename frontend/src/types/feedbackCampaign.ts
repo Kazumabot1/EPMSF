@@ -438,6 +438,8 @@ export interface FeedbackCampaignQuestionItem {
   questionBankId?: number | null;
   questionVersionId?: number | null;
   sourceRuleId?: number | null;
+  sourceRuleName?: string | null;
+  sourceRuleScope?: string | null;
   questionCode: string;
   competencyCode?: string | null;
   competencyName?: string | null;
@@ -460,6 +462,11 @@ export interface FeedbackCampaignQuestionGroup {
   relationshipLabel: string;
   targetLevelCode: string;
   targetLevelRank?: number | null;
+  targetDepartmentId?: number | null;
+  targetDepartmentName?: string | null;
+  targetPositionId?: number | null;
+  targetPositionName?: string | null;
+  formVariantLabel?: string | null;
   targetCount: number;
   assignmentCount: number;
   questionCount: number;
@@ -510,6 +517,8 @@ export interface FeedbackCampaignQuestionSelectionInput {
   selectionId?: number | null;
   relationshipType: string;
   targetLevelCode: string;
+  targetDepartmentId?: number | null;
+  targetPositionId?: number | null;
   questionCode: string;
   included: boolean;
   required: boolean;
