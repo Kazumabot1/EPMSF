@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { roleNavigation } from '../../config/roleNavigation';
 import type { NavItem, UserRole } from '../../config/roleNavigation';
@@ -18,20 +18,9 @@ const EmployeeSidebar = ({
                            onToggleCollapse,
                          }: EmployeeSidebarProps) => {
   const location = useLocation();
-  const baseNavigation = roleNavigation[role] ?? roleNavigation.Employee;
+  const navigation = roleNavigation[role] ?? roleNavigation.Employee;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
-  const [hasMyTeam, setHasMyTeam] = useState(false);
-
-  const navigation = useMemo(() => {
-    return baseNavigation.filter((item) => {
-      if (!item.requiresMyTeam) {
-        return true;
-      }
-
-      return hasMyTeam;
-    });
-  }, [baseNavigation, hasMyTeam]);
 
   const hasActiveChild = (item: NavItem) =>
       item.children?.some(
@@ -59,32 +48,6 @@ const EmployeeSidebar = ({
       return next;
     });
   }, [location.pathname, navigation]);
-
-
-  const loadMyTeamAvailability = useCallback(async () => {
-    if (role !== 'Employee' && role !== 'Manager') {
-      setHasMyTeam(false);
-      return;
-    }
-
-    try {
-      const response = await api.get('/my-team');
-      const body = response.data as { data?: unknown } | unknown;
-      const teams = Array.isArray((body as { data?: unknown })?.data)
-        ? ((body as { data: unknown[] }).data)
-        : Array.isArray(body)
-          ? (body as unknown[])
-          : [];
-
-      setHasMyTeam(teams.length > 0);
-    } catch {
-      setHasMyTeam(false);
-    }
-  }, [role]);
-
-  useEffect(() => {
-    void loadMyTeamAvailability();
-  }, [loadMyTeamAvailability, location.pathname]);
 
   const loadUnreadCount = useCallback(async () => {
     try {

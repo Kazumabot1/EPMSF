@@ -2,7 +2,6 @@ package com.epms.config;
 
 import com.epms.security.JwtAuthenticationFilter;
 import com.epms.security.UserPrincipal;
-import com.epms.service.PositionPermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,7 +35,6 @@ import java.util.stream.Collectors;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final PositionPermissionService positionPermissionService;
 
     private static final Set<String> ADMIN_ROLES = Set.of("ADMIN");
 
@@ -186,10 +184,29 @@ public class SecurityConfig {
                                 "/api/signatures/**"
                         ).authenticated()
 
+                        .requestMatchers(
+                                "/api/appraisal-forms",
+                                "/api/appraisal-forms/**"
+                        ).access((authentication, context) -> isHrOrAdmin(authentication.get()))
+
                         .requestMatchers(HttpMethod.GET,
+                                "/api/departments",
+                                "/api/departments/**",
+                                "/api/employees/active-by-department/**",
                                 "/api/roles",
-                                "/api/roles/**",
-                                "/api/employees/active-by-department/**"
+                                "/api/roles/**"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                "/api/employees",
+                                "/api/employees/**"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                "/api/one-on-one-meetings",
+                                "/api/one-on-one-meetings/**",
+                                "/api/one-on-one-action-items",
+                                "/api/one-on-one-action-items/**"
                         ).authenticated()
 
                         .requestMatchers(
@@ -207,148 +224,28 @@ public class SecurityConfig {
                                 hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )
 
-                        /*
-                         * HR position-permission protected API groups.
-                         * These rules must stay above the broad HR/common matcher rules.
-                         */
-
                         .requestMatchers(
                                 "/api/teams",
                                 "/api/teams/**"
-                        ).access((authentication, context) ->
-                                hasTeamApiPermission(authentication.get())
-                        )
+                        ).authenticated()
 
                         .requestMatchers(
-                                "/api/departments",
-                                "/api/departments/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "departmentCrud")
-                        )
-
-                      /*  .requestMatchers(
-                                "/api/employees",
-                                "/api/employees/**",
+                                "/api/dashboard",
+                                "/api/dashboard/**",
                                 "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                        )*/
-                        .requestMatchers(HttpMethod.GET, "/api/employees")
-                        .access((authentication, context) ->
-                                hasHrDashboardOrNonHrRole(authentication.get())
-                        )
-
-                        .requestMatchers(
-                                "/api/employees",
-                                "/api/employees/**",
-                                "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                        )
-
-                        .requestMatchers(
-                                "/api/appraisal-forms",
-                                "/api/appraisal-forms/**",
+                                "/api/hr/employee-accounts/**",
                                 "/api/assessment-forms",
-                                "/api/assessment-forms/**"
-                        ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "assessmentFormCreate"
-                                )
-                        )
-
-                        .requestMatchers(
-                                "/api/self-assessment-score-table",
-                                "/api/self-assessment-score-table/**"
-                        ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "assessmentScoresView"
-                                )
-                        )
-
-                        .requestMatchers(
-                                "/api/hr/appraisal/templates",
-                                "/api/hr/appraisal/templates/**",
+                                "/api/assessment-forms/**",
                                 "/api/appraisal/templates",
                                 "/api/appraisal/templates/**",
-                                "/api/hr/appraisal/cycles",
-                                "/api/hr/appraisal/cycles/**",
+                                "/api/hr/appraisal/templates",
+                                "/api/hr/appraisal/templates/**",
                                 "/api/appraisal/cycles",
                                 "/api/appraisal/cycles/**",
                                 "/api/hr/appraisal/cycles",
                                 "/api/hr/appraisal/cycles/**",
                                 "/api/hr/appraisal/score-bands",
                                 "/api/hr/appraisal/score-bands/**",
-                                "/api/appraisal/workflow",
-                                "/api/appraisal/workflow/**"
-                        ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "appraisalPermission"
-                                )
-                        )
-
-                        .requestMatchers(
-                                "/api/v1/feedback",
-                                "/api/v1/feedback/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(
-                                        authentication.get(),
-                                        "feedback360Permission"
-                                )
-                        )
-
-                        .requestMatchers(
-                                "/api/one-on-one-meetings",
-                                "/api/one-on-one-meetings/**",
-                                "/api/one-on-one-action-items",
-                                "/api/one-on-one-action-items/**"
-                        ).access((authentication, context) ->
-                                hasPositionPermissionForAuthenticatedUser(
-                                        authentication.get(),
-                                        "oneOnOnePermission"
-                                )
-                        )
-
-                        .requestMatchers(
-                                "/api/pip",
-                                "/api/pip/**",
-                                "/api/pips",
-                                "/api/pips/**",
-                                "/api/pip-updates",
-                                "/api/pip-updates/**"
-                        ).access((authentication, context) ->
-                                hasPositionPermissionForAuthenticatedUser(
-                                        authentication.get(),
-                                        "pipViewAll"
-                                )
-                        )
-
-                        .requestMatchers(
-                                "/api/positions",
-                                "/api/positions/**",
-                                "/api/position-levels",
-                                "/api/position-levels/**"
-                        ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "positionPermission"
-                                )
-                        )
-
-                        .requestMatchers(
                                 "/api/kpis",
                                 "/api/kpis/**",
                                 "/api/kpi-units",
@@ -358,17 +255,6 @@ public class SecurityConfig {
                                 "/api/kpi-items",
                                 "/api/kpi-items/**",
                                 "/api/hr/kpi-templates",
-                                "/api/hr/kpi-templates/**"
-                        ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "kpiPermission"
-                                )
-                        )
-
-                        .requestMatchers(
                                 "/api/hr/kpi-templates/**",
                                 "/api/hr/kpi-template-cycles",
                                 "/api/hr/kpi-template-cycles/**",
@@ -377,24 +263,17 @@ public class SecurityConfig {
                                 "/api/hr/department-kpi-cycles",
                                 "/api/hr/department-kpi-cycles/**",
                                 "/api/hr/department-kpi-workflow",
-                                "/api/hr/department-kpi-workflow/**"
-                        ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "departmentKpiPermission"
-                                )
-                        )
-
-                        /*
-                         * Default/common HR APIs that do not depend on the new sidebar permissions.
-                         */
-                        .requestMatchers(
-                                "/api/dashboard",
-                                "/api/dashboard/**",
+                                "/api/hr/department-kpi-workflow/**",
+                                "/api/positions",
+                                "/api/positions/**",
+                                "/api/position-levels",
+                                "/api/position-levels/**",
+                                "/api/departments",
+                                "/api/departments/**",
                                 "/api/notification-templates",
-                                "/api/notification-templates/**"
+                                "/api/notification-templates/**",
+                                "/api/pip-updates",
+                                "/api/pip-updates/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
                         )
@@ -485,9 +364,13 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/employee-assessments/score-table")
                         .access((authentication, context) ->
-                                hasEmployeeAssessmentScoreTablePermission(authentication.get())
+                                hasRoleDashboardOrPosition(authentication.get(), SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS)
                         )
 
+                   /*     .requestMatchers(HttpMethod.GET, "/api/employee-assessments/*")
+                        .access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS)
+                        )*/
                         .requestMatchers(HttpMethod.GET, "/api/employee-assessments/*").authenticated()
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/manager-remark")
@@ -512,22 +395,12 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/hr-approve")
                         .access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "assessmentScoresView"
-                                )
+                                hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
                         )
 
                         .requestMatchers(HttpMethod.POST, "/api/employee-assessments/*/hr-decline")
                         .access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "assessmentScoresView"
-                                )
+                                hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
                         )
 
                         .requestMatchers(
@@ -546,185 +419,6 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    private AuthorizationDecision hasTeamApiPermission(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted())) {
-            return new AuthorizationDecision(true);
-        }
-
-        return new AuthorizationDecision(
-                positionPermissionService.currentUserHasPermission("teamPermission")
-        );
-    }
-
-    private AuthorizationDecision hasEmployeeAssessmentScoreTablePermission(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
-            return new AuthorizationDecision(true);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
-            return new AuthorizationDecision(
-                    positionPermissionService.currentUserHasPermission("assessmentScoresView")
-            );
-        }
-
-        return hasRoleDashboardOrPosition(authentication, SCORE_TABLE_ROLES, SCORE_TABLE_DASHBOARDS);
-    }
-
-    private AuthorizationDecision hasAnyRoleAndPositionPermission(
-            Authentication authentication,
-            Set<String> allowedRoles,
-            Set<String> allowedDashboards,
-            String permissionField
-    ) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
-            return new AuthorizationDecision(true);
-        }
-
-        AuthorizationDecision roleDecision = hasRoleDashboardOrPosition(
-                authentication,
-                allowedRoles,
-                allowedDashboards
-        );
-
-        if (!Boolean.TRUE.equals(roleDecision.isGranted())) {
-            return new AuthorizationDecision(false);
-        }
-
-        return new AuthorizationDecision(
-                positionPermissionService.currentUserHasPermission(permissionField)
-        );
-    }
-
-    private AuthorizationDecision hasHrDashboardOrNonHrRole(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
-            return new AuthorizationDecision(true);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
-            return hasRoleDashboardOrPosition(authentication, HR_ROLES, HR_DASHBOARDS);
-        }
-
-        return new AuthorizationDecision(true);
-    }
-
-    /*
-     * Used for APIs that may be accessed by HR or other roles.
-     * If current user is HR, enforce HR position permission.
-     * If current user is not HR/Admin, allow the request and let service-level
-     * ownership/department checks decide.
-     */
-    private AuthorizationDecision hasHrPermissionOrNonHrRole(
-            Authentication authentication,
-            String permissionField
-    ) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
-            return new AuthorizationDecision(true);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
-            return new AuthorizationDecision(
-                    positionPermissionService.currentUserHasPermission(permissionField)
-            );
-        }
-
-        return new AuthorizationDecision(true);
-    }
-
-    private AuthorizationDecision hasPositionPermissionForAuthenticatedUser(
-            Authentication authentication,
-            String permissionField
-    ) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return new AuthorizationDecision(false);
-        }
-
-        Object principal = authentication.getPrincipal();
-
-        if (principal == null || "anonymousUser".equals(principal)) {
-            return new AuthorizationDecision(false);
-        }
-
-        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
-            return new AuthorizationDecision(true);
-        }
-
-        return new AuthorizationDecision(
-                positionPermissionService.currentUserHasPermission(permissionField)
-        );
-    }
-
-    private boolean isCurrentAuthenticationAdmin(Authentication authentication) {
-        return Boolean.TRUE.equals(
-                hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted()
-        );
-    }
-
-    private boolean isCurrentAuthenticationHr(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return false;
-        }
-
-        Object principal = authentication.getPrincipal();
-
-        if (principal instanceof UserPrincipal userPrincipal) {
-            String dashboard = normalizeAuthorityName(userPrincipal.getDashboard());
-
-            if ("HR_DASHBOARD".equals(dashboard)) {
-                return true;
-            }
-
-            if (userPrincipal.getRoles() != null) {
-                for (String role : userPrincipal.getRoles()) {
-                    String normalizedRole = normalizeAuthorityName(role);
-
-                    if (isHrLike(normalizedRole)) {
-                        return true;
-                    }
-                }
-            }
-
-            String normalizedPosition = normalizeAuthorityName(userPrincipal.getPosition());
-
-            if (isHrLike(normalizedPosition)) {
-                return true;
-            }
-        }
-
-        for (GrantedAuthority authority : authentication.getAuthorities()) {
-            if (authority == null) {
-                continue;
-            }
-
-            String normalizedAuthority = normalizeAuthorityName(authority.getAuthority());
-
-            if (isHrLike(normalizedAuthority)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private AuthorizationDecision isHrOrAdmin(Authentication authentication) {

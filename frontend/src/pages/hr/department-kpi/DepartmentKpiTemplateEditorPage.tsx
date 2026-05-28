@@ -15,7 +15,6 @@ import type { KpiFormStatus, KpiTemplateRowDraft } from '../../../types/kpiTempl
 import type { KpiUnit } from '../../../types/kpiUnit';
 
 const fieldClass = 'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm';
-const TEMPLATE_DURATIONS = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 const DepartmentKpiTemplateEditorPage = () => {
   const { id } = useParams();
@@ -24,7 +23,6 @@ const DepartmentKpiTemplateEditorPage = () => {
   const templateId = isEdit ? Number(id) : NaN;
 
   const [title, setTitle] = useState('');
-  const [durationMonths, setDurationMonths] = useState(3);
   const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [departmentIds, setDepartmentIds] = useState<number[]>([]);
   const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newKpiTemplateRow()]);
@@ -34,7 +32,6 @@ const DepartmentKpiTemplateEditorPage = () => {
   const [items, setItems] = useState<KpiItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [departmentMenuOpen, setDepartmentMenuOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -53,7 +50,6 @@ const DepartmentKpiTemplateEditorPage = () => {
         if (isEdit && !Number.isNaN(templateId)) {
           const template = await departmentKpiTemplateService.get(templateId);
           setTitle(template.title);
-          setDurationMonths(template.durationMonths ?? 3);
           setStatus(template.status);
           setDepartmentIds(template.departments.map((d) => d.id));
           setRows(template.items.length > 0 ? template.items.map((line) => ({
@@ -79,27 +75,9 @@ const DepartmentKpiTemplateEditorPage = () => {
   }, [isEdit, templateId]);
 
   const totalWeight = useMemo(() => rows.reduce((sum, row) => sum + (row.weight ?? 0), 0), [rows]);
-  const selectedDepartmentLabel = useMemo(() => {
-    const selectedNames = departments
-      .filter((department) => departmentIds.includes(department.id))
-      .map((department) => department.departmentName);
-
-    if (selectedNames.length === 0) return 'Select departments';
-    if (selectedNames.length <= 2) return selectedNames.join(', ');
-    return `${selectedNames.slice(0, 2).join(', ')} +${selectedNames.length - 2} more`;
-  }, [departmentIds, departments]);
-
-  const toggleDepartment = (departmentId: number) => {
-    setDepartmentIds((prev) => (
-      prev.includes(departmentId)
-        ? prev.filter((id) => id !== departmentId)
-        : [...prev, departmentId]
-    ));
-  };
 
   const validate = () => {
     if (!title.trim()) return 'Title is required.';
-    if (!TEMPLATE_DURATIONS.includes(durationMonths)) return 'Select a valid template duration.';
     if (departmentIds.length === 0) return 'Select at least one department.';
     if (rows.length === 0) return 'Add at least one KPI row.';
     for (let i = 0; i < rows.length; i += 1) {
@@ -124,7 +102,6 @@ const DepartmentKpiTemplateEditorPage = () => {
       setSaving(true);
       const payload = {
         title: title.trim(),
-        durationMonths,
         status,
         departmentIds,
         items: rows.map((row, index) => ({
@@ -171,18 +148,10 @@ const DepartmentKpiTemplateEditorPage = () => {
 
         <form onSubmit={submit} className="space-y-6">
           <section className="kpi-tpl-card p-6">
-            <div className="grid gap-5 md:grid-cols-4">
+            <div className="grid gap-5 md:grid-cols-3">
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Title</span>
                 <input className={fieldClass} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Finance Department KPI" />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</span>
-                <select className={fieldClass} value={durationMonths} onChange={(e) => setDurationMonths(Number(e.target.value))}>
-                  {TEMPLATE_DURATIONS.map((months) => (
-                    <option key={months} value={months}>{months === 12 ? '1 year' : `${months} months`}</option>
-                  ))}
-                </select>
               </label>
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</span>
@@ -194,38 +163,22 @@ const DepartmentKpiTemplateEditorPage = () => {
                 </select>
               </label>
             </div>
-            <div className="relative mt-5 max-w-xl">
+            <div className="mt-5">
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Departments</span>
-              <button
-                type="button"
-                disabled={departments.length === 0}
-                className={`${fieldClass} mt-2 flex items-center justify-between gap-3 text-left disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500`}
-                aria-expanded={departmentMenuOpen}
-                onClick={() => setDepartmentMenuOpen((open) => !open)}
-              >
-                <span className="truncate">{departments.length === 0 ? 'No active departments available' : selectedDepartmentLabel}</span>
-                <span className="text-xs text-gray-500">{departmentMenuOpen ? '^' : 'v'}</span>
-              </button>
-              {departmentMenuOpen && departments.length > 0 && (
-                <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                  {departments.map((department) => {
-                    const checked = departmentIds.includes(department.id);
-                    return (
-                      <button
-                        key={department.id}
-                        type="button"
-                        className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm ${checked ? 'bg-violet-50 text-violet-800' : 'text-gray-700 hover:bg-gray-50'}`}
-                        onClick={() => toggleDepartment(department.id)}
-                      >
-                        <span className="truncate">{department.departmentName}</span>
-                        <span className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${checked ? 'border-violet-600 bg-violet-600 text-white' : 'border-gray-300 text-transparent'}`}>
-                          x
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {departments.map((department) => (
+                  <label key={department.id} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={departmentIds.includes(department.id)}
+                      onChange={(e) => {
+                        setDepartmentIds((prev) => e.target.checked ? [...prev, department.id] : prev.filter((id) => id !== department.id));
+                      }}
+                    />
+                    {department.departmentName}
+                  </label>
+                ))}
+              </div>
             </div>
           </section>
 

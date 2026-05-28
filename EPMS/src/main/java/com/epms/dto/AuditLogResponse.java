@@ -43,16 +43,12 @@ public class AuditLogResponse {
     private Integer id;
     private Integer userId;
     private String changedByName;
-    private String dashboardRole;
     private String action;
     private String entityType;
     private Integer entityId;
-    private String titleName;
     private String changedColumn;
     private String oldValue;
     private String newValue;
     private String reason;
-    private String summary;
-    private String targetEmployeeName;
     private Date timestamp;
 }

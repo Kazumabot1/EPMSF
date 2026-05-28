@@ -65,10 +65,10 @@ import java.util.stream.Collectors;
 public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
     private static final String DEFAULT_CAMPAIGN_TYPE = "360 Feedback";
-    private static final Set<String> TARGET_LEVEL_CODES = Set.of("L04", "L05", "L06", "L07");
+    private static final Set<String> TARGET_LEVEL_CODES = Set.of("L05", "L06", "L07");
     private static final Set<String> TARGET_EXCLUDED_ROLES = Set.of(
             "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN",
-            "CEO", "EXECUTIVE"
+            "CEO", "EXECUTIVE", "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT"
     );
 
     private static final List<FeedbackCampaignStatus> OVERLAP_BLOCKING_STATUSES = List.of(
@@ -1031,16 +1031,16 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             }
             questionReviewService.validateCampaignQuestionSelectionReady(campaign.getId());
             long emptyGroups = review.getGroups() == null ? 0 : review.getGroups().stream()
-                    .filter(group -> group.getIncludedQuestionCount() == null || group.getIncludedQuestionCount() <= 0)
-                    .count();
+                                                                .filter(group -> group.getIncludedQuestionCount() == null || group.getIncludedQuestionCount() <= 0)
+                                                                .count();
             if (emptyGroups > 0) {
                 blocking.add("Every evaluator group must keep at least one included question.");
                 checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "BLOCKED", emptyGroups + " evaluator group(s) have no included questions."));
                 return;
             }
             long noScoredGroups = review.getGroups() == null ? 0 : review.getGroups().stream()
-                    .filter(group -> group.getIncludedScoredQuestionCount() == null || group.getIncludedScoredQuestionCount() <= 0)
-                    .count();
+                                                                   .filter(group -> group.getIncludedScoredQuestionCount() == null || group.getIncludedScoredQuestionCount() <= 0)
+                                                                   .count();
             if (noScoredGroups > 0) {
                 warnings.add(noScoredGroups + " question group(s) have no scored questions.");
                 checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "WARNING", review.getIncludedQuestionCount() + " questions saved; " + noScoredGroups + " group(s) are non-scored only."));
@@ -1559,12 +1559,11 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             blockReasons.add("This employee is not available for this campaign.");
         }
         String normalizedLevelCode = normalizeLevelCode(level == null ? null : level.getLevelCode());
-        boolean departmentHeadTarget = user != null && hasDepartmentHeadRole(user);
-        if ((normalizedLevelCode == null || !TARGET_LEVEL_CODES.contains(normalizedLevelCode)) && !departmentHeadTarget) {
+        if (normalizedLevelCode == null || !TARGET_LEVEL_CODES.contains(normalizedLevelCode)) {
             blockReasons.add("This employee is outside the selected campaign audience.");
         }
         if (user != null && hasTargetExcludedRole(user)) {
-            blockReasons.add("HR, Admin, and Executive users can give feedback when assigned, but they are not included as feedback recipients.");
+            blockReasons.add("Department heads, HR, Admin, and CEO users can give feedback when assigned, but they are not included as feedback recipients.");
         }
         if (excludedTargetUserId != null && user != null && user.getId() != null
                 && Objects.equals(user.getId().longValue(), excludedTargetUserId)) {
@@ -1641,18 +1640,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
                 .map(this::normalizeRoleNameForPolicy)
                 .anyMatch(TARGET_EXCLUDED_ROLES::contains);
-    }
-
-    private boolean hasDepartmentHeadRole(User user) {
-        if (user == null || user.getId() == null) {
-            return false;
-        }
-        return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
-                .map(this::normalizeRoleNameForPolicy)
-                .anyMatch(role -> role.equals("DEPARTMENT_HEAD")
-                        || role.equals("DEPARTMENTHEAD")
-                        || role.equals("DEPT_HEAD")
-                        || role.equals("HEAD_OF_DEPARTMENT"));
     }
 
     private String normalizeRoleNameForPolicy(String role) {

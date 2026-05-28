@@ -31,7 +31,6 @@ import com.epms.service.EmployeeService;
 import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.NotificationService;
 import com.epms.service.UserAccountProvisioningService;
-import com.epms.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,7 +61,6 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
-    private final AuditLogService auditLogService;
 
     @Override
     @Transactional(readOnly = true)
@@ -265,16 +263,6 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         EmployeeResponseDto dto = getEmployeeById(saved.getId());
         mergeAccountProvisioning(dto, provision);
-        auditLogService.log(
-                safeCurrentUserId(),
-                "CREATE",
-                "EMPLOYEE",
-                saved.getId(),
-                null,
-                null,
-                "name: " + employeeName(saved),
-                null
-        );
 
         return dto;
     }
@@ -426,16 +414,6 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         employee.setActive(false);
         employeeRepository.save(employee);
-        auditLogService.log(
-                safeCurrentUserId(),
-                "DEACTIVATE",
-                "EMPLOYEE",
-                employee.getId(),
-                "active",
-                "Active",
-                "Inactive",
-                "Employee deactivated"
-        );
 
         findLinkedUserByEmployeeOrEmail(employee).ifPresent(user -> {
             user.setEmployeeId(employee.getId());
@@ -1170,16 +1148,6 @@ public class EmployeeServiceImpl implements EmployeeService {
         history.setEditedAt(new Date());
         history.setReason("Employee profile updated");
         employeeAuditHistoryRepository.save(history);
-        auditLogService.log(
-                editorId,
-                "UPDATE",
-                "EMPLOYEE",
-                employee.getId(),
-                fieldName,
-                oldValue,
-                newValue,
-                history.getReason()
-        );
     }
 
     private Integer safeCurrentUserId() {

@@ -12,7 +12,6 @@ import com.epms.repository.EmployeeRepository;
 import com.epms.repository.OneOnOneMeetingRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
-import com.epms.service.AuditLogService;
 import com.epms.service.NotificationService;
 import com.epms.service.OneOnOneMeetingService;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,6 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
     private final EmployeeRepository employeeRepo;
     private final UserRepository userRepo;
     private final NotificationService notificationService;
-    private final AuditLogService auditLogService;
 
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("MMM dd, yyyy, hh:mm a");
@@ -74,16 +72,6 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         meeting.setFollowUpReminder24hSent(false);
 
         OneOnOneMeeting saved = meetingRepo.save(meeting);
-        auditLogService.log(
-                currentUser.getId(),
-                "CREATE",
-                "ONE_ON_ONE_MEETING",
-                saved.getId(),
-                null,
-                null,
-                "title: " + employeeName(saved.getEmployee()) + " | scheduledDate: " + formatDateTime(saved.getScheduledDate()),
-                cleanNullable(request.getNotes())
-        );
 
         sendCreationNotifications(saved, false);
 
@@ -141,16 +129,6 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         OneOnOneMeeting saved = meetingRepo.save(meeting);
-        auditLogService.log(
-                getCurrentUser().getId(),
-                "UPDATE",
-                "ONE_ON_ONE_MEETING",
-                saved.getId(),
-                "scheduledDate",
-                null,
-                "title: " + employeeName(saved.getEmployee()) + " | scheduledDate: " + formatDateTime(saved.getScheduledDate()),
-                cleanNullable(request.getNotes())
-        );
 
         if (scheduledDateChanged) {
             sendUpdatedNotifications(saved, false);
@@ -190,16 +168,6 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
                         + " at " + meetingTime + " was cancelled."
         );
 
-        auditLogService.log(
-                getCurrentUser().getId(),
-                "CANCEL",
-                "ONE_ON_ONE_MEETING",
-                meeting.getId(),
-                "status",
-                "Scheduled",
-                "Cancelled | title: " + employeeName(meeting.getEmployee()) + " | scheduledDate: " + meetingTime,
-                null
-        );
         meetingRepo.delete(meeting);
     }
 
