@@ -951,7 +951,7 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return isTeamLeaderPosition(user);
+        return isTeamLeaderPosition(user) || hasPositionPermission(user, "teamAssignAsLeader");
     }
 
     private boolean isProjectManagerCandidate(User user) {
@@ -959,7 +959,7 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return isProjectManagerPosition(user);
+        return isProjectManagerPosition(user) || hasPositionPermission(user, "teamAssignAsPm");
     }
 
     private boolean isTeamMemberCandidate(User user) {
@@ -967,7 +967,18 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return !isTeamLeaderPosition(user) && !isProjectManagerPosition(user);
+        if (isTeamLeaderPosition(user)
+                || isProjectManagerPosition(user)
+                || hasPositionPermission(user, "teamAssignAsLeader")
+                || hasPositionPermission(user, "teamAssignAsPm")) {
+            return false;
+        }
+
+        if (hasPositionPermission(user, "teamAssignAsMember")) {
+            return true;
+        }
+
+        return true;
     }
 
     private boolean hasPositionPermission(User user, String permissionField) {
@@ -1019,7 +1030,8 @@ public class TeamServiceImpl implements TeamService {
                 || hasPositionTitle(user, "DEPARTMENT_HEAD")
                 || hasPositionTitle(user, "DEPARTMENTHEAD")
                 || hasPositionTitle(user, "DEPT_HEAD")
-                || hasPositionTitle(user, "HEAD_OF_DEPARTMENT");
+                || hasPositionTitle(user, "HEAD_OF_DEPARTMENT")
+                || hasDepartmentHeadPositionTitle(user);
     }
 
     private boolean hasDashboard(User user, String dashboard) {
@@ -1064,6 +1076,8 @@ public class TeamServiceImpl implements TeamService {
     private boolean isTeamLeaderPosition(User user) {
         return hasPositionTitle(user, "TEAM_LEADER")
                 || hasPositionTitle(user, "TEAMLEADER")
+                || hasPositionTitle(user, "TEAM_LEAD")
+                || hasPositionTitle(user, "TEAMLEAD")
                 || hasRole(user, "TEAM_LEADER")
                 || hasRole(user, "TEAMLEADER");
     }
@@ -1072,6 +1086,7 @@ public class TeamServiceImpl implements TeamService {
         return hasPositionTitle(user, "MANAGER")
                 || hasPositionTitle(user, "PROJECT_MANAGER")
                 || hasPositionTitle(user, "PM")
+                || hasManagerPositionTitle(user)
                 || hasRole(user, "MANAGER")
                 || hasRole(user, "PROJECT_MANAGER")
                 || hasRole(user, "PM");
@@ -1085,7 +1100,37 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return normalizeRole(user.getPosition().getPositionTitle()).equals(normalizeRole(expectedTitle));
+        String actual = normalizeRole(user.getPosition().getPositionTitle());
+        String expected = normalizeRole(expectedTitle);
+
+        return actual.equals(expected) || actual.endsWith(expected);
+    }
+
+    private boolean hasManagerPositionTitle(User user) {
+        String title = normalizedPositionTitle(user);
+
+        return !title.isBlank()
+                && (title.endsWith("manager") || title.contains("projectmanager"));
+    }
+
+    private boolean hasDepartmentHeadPositionTitle(User user) {
+        String title = normalizedPositionTitle(user);
+
+        return !title.isBlank()
+                && (title.endsWith("head")
+                || title.contains("departmenthead")
+                || title.contains("depthead")
+                || title.contains("headofdepartment"));
+    }
+
+    private String normalizedPositionTitle(User user) {
+        if (user == null
+                || user.getPosition() == null
+                || user.getPosition().getPositionTitle() == null) {
+            return "";
+        }
+
+        return normalizeRole(user.getPosition().getPositionTitle());
     }
 
     private boolean hasRole(User user, String roleName) {
