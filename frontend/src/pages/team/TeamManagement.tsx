@@ -7,6 +7,8 @@ import {
   fetchMyDepartmentTeams,
   fetchMyTeams,
   fetchTeams,
+  updateMyDepartmentTeam,
+  updateTeam,
   type Department,
   type TeamResponse,
 } from '../../services/teamService';
@@ -117,6 +119,10 @@ const TeamManagement: React.FC = () => {
   const [error, setError] = useState('');
 
   const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
+  const [inactivatingTeam, setInactivatingTeam] = useState<TeamResponse | null>(null);
+  const [inactivateReason, setInactivateReason] = useState('');
+  const [inactivateError, setInactivateError] = useState('');
+  const [inactivating, setInactivating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<TeamResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -244,6 +250,74 @@ const TeamManagement: React.FC = () => {
     }
   };
 
+  const openInactivateModal = (team: TeamResponse) => {
+    setError('');
+    setInactivateReason('');
+    setInactivateError('');
+    setInactivatingTeam(team);
+  };
+
+  const closeInactivateModal = () => {
+    if (inactivating) {
+      return;
+    }
+
+    setInactivatingTeam(null);
+    setInactivateReason('');
+    setInactivateError('');
+  };
+
+  const handleInactivate = async () => {
+    if (!inactivatingTeam) {
+      return;
+    }
+
+    const reason = inactivateReason.trim();
+
+    if (!reason) {
+      setInactivateError('Please enter the reason for inactivating this team.');
+      return;
+    }
+
+    if (reason.split(/\s+/).length > 250) {
+      setInactivateError('Cannot exceed more than 250 words.');
+      return;
+    }
+
+    setInactivating(true);
+    setError('');
+    setInactivateError('');
+
+    try {
+      const request = {
+        teamName: inactivatingTeam.teamName,
+        departmentId: isDepartmentHead ? 0 : inactivatingTeam.departmentId,
+        teamLeaderId: inactivatingTeam.teamLeaderId,
+        projectManagerId: inactivatingTeam.projectManagerId ?? null,
+        teamGoal: inactivatingTeam.teamGoal ?? '',
+        status: 'Inactive',
+        reason,
+        memberUserIds: [],
+        memberEmployeeIds: [],
+      };
+
+      if (isDepartmentHead) {
+        await updateMyDepartmentTeam(inactivatingTeam.id, request);
+      } else {
+        await updateTeam(inactivatingTeam.id, request);
+      }
+
+      setInactivatingTeam(null);
+      setInactivateReason('');
+      setInactivateError('');
+      await loadTeams();
+    } catch (err: any) {
+      setInactivateError(getApiErrorMessage(err));
+    } finally {
+      setInactivating(false);
+    }
+  };
+
   return (
     <div className="team-page">
       <div className="team-header">
@@ -344,7 +418,10 @@ const TeamManagement: React.FC = () => {
               </thead>
 
               <tbody>
-                {filteredTeams.map((team, index) => (
+                {filteredTeams.map((team, index) => {
+                  const isActiveTeam = team.status?.toLowerCase() === 'active';
+
+                  return (
                   <tr key={team.id}>
                     <td>{index + 1}</td>
 
@@ -410,20 +487,35 @@ const TeamManagement: React.FC = () => {
                     <td>
                       {canShowEditTeam ? (
                         <div className="team-row-actions">
-                          <button
-                            type="button"
-                            className="team-action-btn"
-                            onClick={() => setEditingTeam(team)}
-                          >
-                            Edit
-                          </button>
+                          {isActiveTeam ? (
+                            <>
+                              <button
+                                type="button"
+                                className="team-action-btn"
+                                onClick={() => setEditingTeam(team)}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                className="team-action-btn team-action-btn-danger"
+                                onClick={() => openInactivateModal(team)}
+                              >
+                                Inactivate
+                              </button>
+                            </>
+                          ) : (
+                            <span className="team-muted">Inactive</span>
+                          )}
                         </div>
                       ) : (
                         <span className="team-muted">View only</span>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -438,6 +530,71 @@ const TeamManagement: React.FC = () => {
         onClose={() => setEditingTeam(null)}
         onSaved={loadTeams}
       />
+
+      {inactivatingTeam && (
+        <div className="team-modal-overlay" onClick={closeInactivateModal}>
+          <div
+            className="team-modal team-modal-small"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="team-modal-header">
+              <div>
+                <p className="team-eyebrow">Confirm Status Change</p>
+                <h2>Inactivate Team</h2>
+              </div>
+
+              <button
+                type="button"
+                className="team-modal-close"
+                onClick={closeInactivateModal}
+                disabled={inactivating}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="team-modal-body">
+              <p>
+                Inactivating <strong>{inactivatingTeam.teamName}</strong> will close all active member assignments
+                and keep this team as a history record.
+              </p>
+
+              <div className="team-field">
+                <label>Reason</label>
+                <textarea
+                  value={inactivateReason}
+                  onChange={(event) => setInactivateReason(event.target.value)}
+                  placeholder="Enter reason for inactivating this team"
+                  maxLength={1500}
+                  disabled={inactivating}
+                />
+              </div>
+
+              {inactivateError && <div className="team-error">{inactivateError}</div>}
+
+              <div className="team-modal-footer">
+                <button
+                  type="button"
+                  className="team-btn team-btn-secondary"
+                  onClick={closeInactivateModal}
+                  disabled={inactivating}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="team-btn team-btn-danger"
+                  onClick={handleInactivate}
+                  disabled={inactivating}
+                >
+                  {inactivating ? 'Inactivating...' : 'Inactivate'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <div className="team-modal-overlay" onClick={() => setShowDeleteConfirm(null)}>
