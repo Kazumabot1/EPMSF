@@ -217,9 +217,6 @@ public class AuditLogServiceImpl implements AuditLogService {
         auditLog.setOldValue(limit(oldValue, 1000));
         auditLog.setNewValue(limit(newValue, 1000));
         auditLog.setReason(limit(reason, 500));
-        if (auditLog.getTimestamp() == null) {
-            auditLog.setTimestamp(new java.util.Date());
-        }
 
         auditLogRepository.save(auditLog);
     }
@@ -245,7 +242,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     @Transactional(readOnly = true)
     public List<AuditLog> getRecent(String entityType, Integer entityId, Integer userId) {
         if (entityType != null && entityId != null && userId != null) {
-            return auditLogRepository.findByEntityTypeAndEntityIdAndUserIdOrderByTimestampDesc(
+            return auditLogRepository.findTop200ByEntityTypeAndEntityIdAndUserIdOrderByTimestampDesc(
                     entityType,
                     entityId,
                     userId
@@ -253,22 +250,22 @@ public class AuditLogServiceImpl implements AuditLogService {
         }
 
         if (entityType != null && entityId != null) {
-            return auditLogRepository.findByEntityTypeAndEntityIdOrderByTimestampDesc(entityType, entityId);
+            return auditLogRepository.findTop200ByEntityTypeAndEntityIdOrderByTimestampDesc(entityType, entityId);
         }
 
         if (entityType != null && userId != null) {
-            return auditLogRepository.findByEntityTypeAndUserIdOrderByTimestampDesc(entityType, userId);
+            return auditLogRepository.findTop200ByEntityTypeAndUserIdOrderByTimestampDesc(entityType, userId);
         }
 
         if (entityType != null) {
-            return auditLogRepository.findByEntityTypeOrderByTimestampDesc(entityType);
+            return auditLogRepository.findTop200ByEntityTypeOrderByTimestampDesc(entityType);
         }
 
         if (userId != null) {
-            return auditLogRepository.findByUserIdOrderByTimestampDesc(userId);
+            return auditLogRepository.findTop200ByUserIdOrderByTimestampDesc(userId);
         }
 
-        return auditLogRepository.findByOrderByTimestampDesc();
+        return auditLogRepository.findTop200ByOrderByTimestampDesc();
     }
 
     @Override
@@ -285,10 +282,10 @@ public class AuditLogServiceImpl implements AuditLogService {
         }
 
         if (userId != null) {
-            return auditLogRepository.findByEntityTypeInAndUserIdOrderByTimestampDesc(entityTypes, userId);
+            return auditLogRepository.findTop200ByEntityTypeInAndUserIdOrderByTimestampDesc(entityTypes, userId);
         }
 
-        return auditLogRepository.findByEntityTypeInOrderByTimestampDesc(entityTypes);
+        return auditLogRepository.findTop200ByEntityTypeInOrderByTimestampDesc(entityTypes);
     }
 
     @Override

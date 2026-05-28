@@ -31,14 +31,6 @@ public class DepartmentKpiWorkflowController {
         return ResponseEntity.ok(service.updateScores(resultId, request));
     }
 
-    @PostMapping("/results/{resultId}/finalization-request")
-    public ResponseEntity<DepartmentKpiResultDto> requestFinalization(
-            @PathVariable Integer resultId,
-            @Valid @RequestBody DepartmentKpiFinalizationRequestDto request
-    ) {
-        return ResponseEntity.ok(service.requestFinalization(resultId, request));
-    }
-
     @PostMapping("/results/{resultId}/finalize")
     public ResponseEntity<DepartmentKpiResultDto> finalizeResult(@PathVariable Integer resultId) {
         return ResponseEntity.ok(service.finalizeResult(resultId));

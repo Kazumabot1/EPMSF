@@ -29,10 +29,6 @@ public class DepartmentKpiTemplate {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    @Column(name = "duration_months", nullable = false)
-    @Builder.Default
-    private Integer durationMonths = 3;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
@@ -69,13 +65,11 @@ public class DepartmentKpiTemplate {
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (status == null) status = KpiFormStatus.DRAFT;
-        if (durationMonths == null) durationMonths = 3;
     }
 
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
-        if (durationMonths == null) durationMonths = 3;
     }
 
     public void addRow(DepartmentKpiTemplateRow row) {

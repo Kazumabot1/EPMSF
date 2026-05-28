@@ -68,7 +68,7 @@ public class UserAccountController {
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
         List<DashboardAuditResponse> rows = auditLogRepository
-                .findByEntityTypeAndEntityIdOrderByTimestampDesc(ENTITY_TYPE_USER_DASHBOARD, target.getId())
+                .findTop200ByEntityTypeAndEntityIdOrderByTimestampDesc(ENTITY_TYPE_USER_DASHBOARD, target.getId())
                 .stream()
                 .map(this::toDashboardAuditResponse)
                 .toList();

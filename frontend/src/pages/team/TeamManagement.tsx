@@ -93,7 +93,6 @@ const TeamManagement: React.FC = () => {
   const [error, setError] = useState('');
 
   const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
-  const [viewingTeam, setViewingTeam] = useState<TeamResponse | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<TeamResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -370,15 +369,7 @@ const TeamManagement: React.FC = () => {
                       )}
                     </td>
 
-                    <td>
-                      <button
-                        type="button"
-                        className="team-link-button"
-                        onClick={() => setViewingTeam(team)}
-                      >
-                        {team.members?.length ?? 0} member{(team.members?.length ?? 0) === 1 ? '' : 's'}
-                      </button>
-                    </td>
+                    <td>{team.members?.length ?? 0}</td>
 
                     <td>
                       <span
@@ -395,16 +386,8 @@ const TeamManagement: React.FC = () => {
                     <td>{formatDate(team.createdDate)}</td>
 
                     <td>
-                      <div className="team-row-actions">
-                        <button
-                          type="button"
-                          className="team-action-btn"
-                          onClick={() => setViewingTeam(team)}
-                        >
-                          View
-                        </button>
-
-                        {canShowEditTeam && (
+                      {canShowEditTeam ? (
+                        <div className="team-row-actions">
                           <button
                             type="button"
                             className="team-action-btn"
@@ -412,8 +395,10 @@ const TeamManagement: React.FC = () => {
                           >
                             Edit
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <span className="team-muted">View only</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -431,78 +416,6 @@ const TeamManagement: React.FC = () => {
         onClose={() => setEditingTeam(null)}
         onSaved={loadTeams}
       />
-
-      {viewingTeam && (
-        <div className="team-modal-overlay" onClick={() => setViewingTeam(null)}>
-          <div
-            className="team-modal team-details-modal"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="team-modal-header">
-              <div>
-                <p className="team-eyebrow">Team Composition</p>
-                <h2>{viewingTeam.teamName}</h2>
-                <p>{viewingTeam.departmentName || 'No department assigned'}</p>
-              </div>
-
-              <button
-                type="button"
-                className="team-modal-close"
-                onClick={() => setViewingTeam(null)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="team-modal-body">
-              <div className="team-details-grid">
-                <div className="team-details-card">
-                  <span>Team Leader</span>
-                  <strong>{viewingTeam.teamLeaderName || '—'}</strong>
-                </div>
-                <div className="team-details-card">
-                  <span>Project Manager</span>
-                  <strong>{viewingTeam.projectManagerName || '—'}</strong>
-                </div>
-                <div className="team-details-card">
-                  <span>Status</span>
-                  <strong>{viewingTeam.status || '—'}</strong>
-                </div>
-                <div className="team-details-card">
-                  <span>Members</span>
-                  <strong>{viewingTeam.members?.length ?? 0}</strong>
-                </div>
-              </div>
-
-              {viewingTeam.teamGoal && (
-                <div className="team-details-section">
-                  <h3>Team Goal</h3>
-                  <p>{viewingTeam.teamGoal}</p>
-                </div>
-              )}
-
-              <div className="team-details-section">
-                <h3>Members</h3>
-                {viewingTeam.members?.length ? (
-                  <div className="team-member-list">
-                    {viewingTeam.members.map((member) => (
-                      <div key={member.userId ?? member.employeeId ?? member.userName} className="team-member-row">
-                        <div>
-                          <strong>{member.userName || member.employeeName || 'Unnamed member'}</strong>
-                          <span>User ID: {member.userId ?? member.employeeId ?? '—'}</span>
-                        </div>
-                        <small>Joined {formatDate(member.startedDate)}</small>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="team-muted">No active members in this team.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showDeleteConfirm && (
         <div className="team-modal-overlay" onClick={() => setShowDeleteConfirm(null)}>

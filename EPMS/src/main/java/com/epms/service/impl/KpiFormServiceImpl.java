@@ -19,7 +19,6 @@ import com.epms.exception.KpiTemplatePositionConflictException;
 import com.epms.security.SecurityUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.epms.service.AuditLogService;
 import com.epms.service.KpiFormService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,7 +60,6 @@ public class KpiFormServiceImpl implements KpiFormService {
     private final KpiVersionHistoryRepository kpiVersionHistoryRepository;
     private final KpiTemplateVersionRowRepository kpiTemplateVersionRowRepository;
     private final ObjectMapper objectMapper;
-    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -100,7 +98,6 @@ public class KpiFormServiceImpl implements KpiFormService {
         // Ensure INSERT is flushed before the follow-up load query (avoids edge-case visibility issues).
         kpiFormRepository.flush();
         ensureVersionSnapshot(saved, 1, new ArrayList<>(saved.getItems()), KpiVersionRowStatus.INITIAL, author);
-        audit(author.getId(), "CREATE", "KPI_TEMPLATE_FORM", saved.getId(), null, null, "title: " + saved.getTitle(), null);
         return getTemplateById(saved.getId());
     }
 
@@ -127,7 +124,6 @@ public class KpiFormServiceImpl implements KpiFormService {
         KpiForm form = kpiFormRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found"));
 
-        String oldTitle = form.getTitle();
         form.setTitle(dto.getTitle().trim());
         form.setStartDate(null);
         form.setEndDate(null);
@@ -175,7 +171,6 @@ public class KpiFormServiceImpl implements KpiFormService {
         if (rowDiff.hasChanges()) {
             recordVersionCollection(form, rowDiff, dto.getItems(), editor, versionNumber);
         }
-        audit(editor.getId(), "UPDATE", "KPI_TEMPLATE_FORM", form.getId(), "title", oldTitle, form.getTitle(), rowDiff.hasChanges() ? "KPI row changes submitted" : null);
         return getTemplateById(id);
     }
 
@@ -204,22 +199,6 @@ public class KpiFormServiceImpl implements KpiFormService {
         form.setUpdatedByUser(editor);
         form.getKpiPositions().clear();
         kpiFormRepository.save(form);
-        audit(editor.getId(), "DEACTIVATE", "KPI_TEMPLATE_FORM", form.getId(), "status", null, "ARCHIVED | title: " + form.getTitle(), null);
-    }
-
-    private void audit(
-            Integer userId,
-            String action,
-            String entityType,
-            Integer entityId,
-            String changedColumn,
-            String oldValue,
-            String newValue,
-            String reason
-    ) {
-        if (auditLogService != null) {
-            auditLogService.log(userId, action, entityType, entityId, changedColumn, oldValue, newValue, reason);
-        }
     }
 
     @Override

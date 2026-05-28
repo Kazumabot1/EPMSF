@@ -8,8 +8,6 @@ import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.KpiCategoryRepository;
 import com.epms.repository.KpiItemRepository;
-import com.epms.security.SecurityUtils;
-import com.epms.service.AuditLogService;
 import com.epms.service.KpiItemService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,7 +20,6 @@ public class KpiItemServiceImpl implements KpiItemService {
 
     private final KpiItemRepository kpiItemRepository;
     private final KpiCategoryRepository kpiCategoryRepository;
-    private final AuditLogService auditLogService;
 
     @Override
     public KpiItemResponseDto createKpiItem(KpiItemRequestDto requestDto) {
@@ -33,7 +30,6 @@ public class KpiItemServiceImpl implements KpiItemService {
         kpiItem.setKpiCategory(kpiCategory);
 
         KpiItem savedKpiItem = kpiItemRepository.save(kpiItem);
-        auditLogService.log(currentUserId(), "CREATE", "KPI_ITEM", savedKpiItem.getId(), null, null, "name: " + savedKpiItem.getName(), null);
         return mapToResponseDto(savedKpiItem);
     }
 
@@ -56,28 +52,17 @@ public class KpiItemServiceImpl implements KpiItemService {
         KpiItem existingKpiItem = getKpiItemEntityById(id);
         KpiCategory kpiCategory = getKpiCategoryById(requestDto.getKpiCategoryId());
 
-        String oldName = existingKpiItem.getName();
         existingKpiItem.setName(requestDto.getName().trim());
         existingKpiItem.setKpiCategory(kpiCategory);
 
         KpiItem updatedKpiItem = kpiItemRepository.save(existingKpiItem);
-        auditLogService.log(currentUserId(), "UPDATE", "KPI_ITEM", updatedKpiItem.getId(), "name", oldName, updatedKpiItem.getName(), null);
         return mapToResponseDto(updatedKpiItem);
     }
 
     @Override
     public void deleteKpiItem(Integer id) {
         KpiItem existingKpiItem = getKpiItemEntityById(id);
-        auditLogService.log(currentUserId(), "DEACTIVATE", "KPI_ITEM", existingKpiItem.getId(), "name", existingKpiItem.getName(), null, null);
         kpiItemRepository.delete(existingKpiItem);
-    }
-
-    private Integer currentUserId() {
-        try {
-            return SecurityUtils.currentUserId();
-        } catch (Exception ignored) {
-            return null;
-        }
     }
 
     private KpiItem getKpiItemEntityById(Integer id) {

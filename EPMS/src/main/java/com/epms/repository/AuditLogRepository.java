@@ -51,25 +51,25 @@ import java.util.List;
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Integer> {
 
-    List<AuditLog> findByOrderByTimestampDesc();
+    List<AuditLog> findTop200ByOrderByTimestampDesc();
 
-    List<AuditLog> findByEntityTypeOrderByTimestampDesc(String entityType);
+    List<AuditLog> findTop200ByEntityTypeOrderByTimestampDesc(String entityType);
 
-    List<AuditLog> findByEntityTypeAndEntityIdOrderByTimestampDesc(String entityType, Integer entityId);
+    List<AuditLog> findTop200ByEntityTypeAndEntityIdOrderByTimestampDesc(String entityType, Integer entityId);
 
-    List<AuditLog> findByEntityTypeInOrderByTimestampDesc(Collection<String> entityTypes);
+    List<AuditLog> findTop200ByEntityTypeInOrderByTimestampDesc(Collection<String> entityTypes);
 
-    List<AuditLog> findByUserIdOrderByTimestampDesc(Integer userId);
+    List<AuditLog> findTop200ByUserIdOrderByTimestampDesc(Integer userId);
 
-    List<AuditLog> findByEntityTypeAndUserIdOrderByTimestampDesc(String entityType, Integer userId);
+    List<AuditLog> findTop200ByEntityTypeAndUserIdOrderByTimestampDesc(String entityType, Integer userId);
 
-    List<AuditLog> findByEntityTypeAndEntityIdAndUserIdOrderByTimestampDesc(
+    List<AuditLog> findTop200ByEntityTypeAndEntityIdAndUserIdOrderByTimestampDesc(
             String entityType,
             Integer entityId,
             Integer userId
     );
 
-    List<AuditLog> findByEntityTypeInAndUserIdOrderByTimestampDesc(
+    List<AuditLog> findTop200ByEntityTypeInAndUserIdOrderByTimestampDesc(
             Collection<String> entityTypes,
             Integer userId
     );

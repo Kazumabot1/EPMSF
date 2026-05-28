@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +19,8 @@ public class DepartmentKpiTemplateRequestDto {
     private String title;
     @Builder.Default
     private KpiFormStatus status = KpiFormStatus.DRAFT;
-    private Integer durationMonths;
+    private LocalDate startDate;
+    private LocalDate endDate;
     @NotEmpty
     @Builder.Default
     private List<Integer> departmentIds = new ArrayList<>();

@@ -4,17 +4,13 @@ import toast from 'react-hot-toast';
 import KpiRowReasonModal from '../../../components/hr/kpi-template/KpiRowReasonModal';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import {
-  calculateKpiCycleEndDate,
   collectTemplateIdsInActiveDepartmentCycles,
   filterDepartmentTemplatesForCycleSelection,
-  todayDateInputValue,
-  type KpiCycleDurationYears,
 } from '../../../components/hr/kpi-template/kpiTemplateUi';
 import { departmentKpiCycleService, departmentKpiTemplateService } from '../../../services/departmentKpiService';
 import type { DepartmentKpiCycle, DepartmentKpiCycleRequest, DepartmentKpiTemplate } from '../../../types/departmentKpi';
 
 const fieldClass = 'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm';
-const CYCLE_DURATION_YEARS = [1, 2, 3, 4, 5];
 
 const DepartmentKpiCycleEditorPage = () => {
   const { id } = useParams();
@@ -23,14 +19,13 @@ const DepartmentKpiCycleEditorPage = () => {
   const cycleId = isEdit ? Number(id) : NaN;
   const [cycleName, setCycleName] = useState('');
   const [startDate, setStartDate] = useState('');
-  const [durationYears, setDurationYears] = useState(1);
+  const [durationMonths, setDurationMonths] = useState(3);
   const [templateIds, setTemplateIds] = useState<number[]>([]);
   const [templates, setTemplates] = useState<DepartmentKpiTemplate[]>([]);
   const [cycles, setCycles] = useState<DepartmentKpiCycle[]>([]);
   const [saving, setSaving] = useState(false);
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<DepartmentKpiCycleRequest | null>(null);
-  const minimumStartDate = useMemo(() => todayDateInputValue(), []);
 
   useEffect(() => {
     const load = async () => {
@@ -50,7 +45,7 @@ const DepartmentKpiCycleEditorPage = () => {
           }
           setCycleName(cycle.cycleName);
           setStartDate(cycle.startDate);
-          setDurationYears(cycle.durationYears ?? Math.max(1, Math.min(5, Math.ceil((cycle.durationMonths ?? 12) / 12))));
+          setDurationMonths(cycle.durationMonths);
           setTemplateIds(cycle.templates.map((t) => t.id));
         }
       } catch (error) {
@@ -73,7 +68,7 @@ const DepartmentKpiCycleEditorPage = () => {
   const buildPayload = (): DepartmentKpiCycleRequest => ({
     cycleName: cycleName.trim(),
     startDate,
-    durationYears,
+    durationMonths,
     templateIds,
   });
 
@@ -99,12 +94,8 @@ const DepartmentKpiCycleEditorPage = () => {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!cycleName.trim() || !startDate || !CYCLE_DURATION_YEARS.includes(durationYears) || templateIds.length === 0) {
+    if (!cycleName.trim() || !startDate || templateIds.length === 0) {
       toast.error('Cycle name, start date, and templates are required.');
-      return;
-    }
-    if (startDate < minimumStartDate) {
-      toast.error('Start date cannot be in the past.');
       return;
     }
     const payload = buildPayload();
@@ -121,8 +112,6 @@ const DepartmentKpiCycleEditorPage = () => {
     void persistSave(pendingPayload, reason);
   };
 
-  const endDate = calculateKpiCycleEndDate(startDate, durationYears as KpiCycleDurationYears);
-
   return (
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-5xl px-4 py-8">
@@ -133,9 +122,8 @@ const DepartmentKpiCycleEditorPage = () => {
         <form onSubmit={submit} className="kpi-tpl-card space-y-5 p-6">
           <div className="grid gap-5 md:grid-cols-3">
             <label className="flex flex-col gap-2 md:col-span-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Cycle name</span><input className={fieldClass} value={cycleName} onChange={(e) => setCycleName(e.target.value)} /></label>
-            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</span><select className={fieldClass} value={durationYears} onChange={(e) => setDurationYears(Number(e.target.value))}>{CYCLE_DURATION_YEARS.map((years) => <option key={years} value={years}>{years === 1 ? '1 year' : `${years} years`}</option>)}</select></label>
-            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</span><input className={fieldClass} type="date" value={startDate} min={minimumStartDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">End date</span><input className={fieldClass} type="date" value={endDate} disabled /></label>
+            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Duration</span><select className={fieldClass} value={durationMonths} onChange={(e) => setDurationMonths(Number(e.target.value))}>{[3,4,5,6,7,8,9,10,11,12].map((m) => <option key={m} value={m}>{m === 12 ? '1 year' : `${m} months`}</option>)}</select></label>
+            <label className="flex flex-col gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</span><input className={fieldClass} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
           </div>
           <div>
             <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Templates</span>
