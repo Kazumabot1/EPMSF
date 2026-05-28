@@ -61,6 +61,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private final PositionRepository positionRepository;
     private final NotificationService notificationService;
 
+    private static final List<KpiTemplateCyclePeriodStatus> ACTIVE_PERIOD_STATUSES =
+            List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING);
+
     @Override
     @Transactional
     public UseKpiTemplateResultDto useTemplateForDepartment(Integer kpiFormId, UseKpiDepartmentRequest request) {
@@ -386,8 +389,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         for (KpiTemplateCycleForm link : links) {
             KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found."));
-            KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle, form)
-                    .orElse(null);
+            List<KpiTemplateCyclePeriod> periods = ensureAllCycleFormPeriodsGenerated(cycle, form);
+            KpiTemplateCyclePeriod period = pickActivePeriodForAssignment(periods, LocalDate.now());
             if (period == null) {
                 continue;
             }
@@ -499,35 +502,105 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         return aggregated;
     }
 
-    private Optional<KpiTemplateCyclePeriod> ensureLatestOpenPeriod(KpiTemplateCycle cycle, KpiForm form) {
-        return kpiTemplateCyclePeriodRepository
-                .findTopByCycle_IdAndKpiForm_IdAndStatusInOrderByPeriodNumberDesc(
-                        cycle.getId(),
-                        form.getId(),
-                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
-                )
-                .or(() -> createNextPeriod(cycle, form, null));
+    List<KpiTemplateCyclePeriod> ensureAllCycleFormPeriodsGenerated(KpiTemplateCycle cycle, KpiForm form) {
+        if (cycle == null || cycle.getId() == null || form == null || form.getId() == null) {
+            return List.of();
+        }
+        if (cycle.getStartDate() == null || cycle.getEndDate() == null || cycle.getStartDate().isAfter(cycle.getEndDate())) {
+            return List.of();
+        }
+
+        List<KpiTemplateCyclePeriod> existing = new ArrayList<>(
+                kpiTemplateCyclePeriodRepository.findByCycle_IdAndKpiForm_IdOrderByPeriodNumberAsc(cycle.getId(), form.getId())
+        );
+        Map<Integer, KpiTemplateCyclePeriod> byNumber = existing.stream()
+                .filter(p -> p.getPeriodNumber() != null)
+                .collect(Collectors.toMap(KpiTemplateCyclePeriod::getPeriodNumber, p -> p, (a, b) -> a, LinkedHashMap::new));
+
+        int durationMonths = positionDurationMonths(form);
+        LocalDate currentStart = cycle.getStartDate();
+        int number = 1;
+        List<KpiTemplateCyclePeriod> created = new ArrayList<>();
+
+        while (currentStart != null && !currentStart.isAfter(cycle.getEndDate())) {
+            LocalDate end = currentStart.plusMonths(durationMonths).minusDays(1);
+            if (end.isAfter(cycle.getEndDate())) {
+                end = cycle.getEndDate();
+            }
+
+            if (!byNumber.containsKey(number)) {
+                KpiTemplateCyclePeriod period = KpiTemplateCyclePeriod.builder()
+                        .cycle(cycle)
+                        .kpiForm(form)
+                        .periodNumber(number)
+                        .startDate(currentStart)
+                        .endDate(end)
+                        .status(KpiTemplateCyclePeriodStatus.SCHEDULED)
+                        .build();
+                created.add(kpiTemplateCyclePeriodRepository.save(period));
+            }
+
+            if (end.equals(cycle.getEndDate())) {
+                break;
+            }
+            currentStart = end.plusDays(1);
+            number++;
+        }
+
+        if (!created.isEmpty()) {
+            existing.addAll(created);
+            existing.sort(Comparator.comparing(p -> p.getPeriodNumber() == null ? 0 : p.getPeriodNumber()));
+        }
+
+        boolean hasActive = existing.stream().anyMatch(p -> ACTIVE_PERIOD_STATUSES.contains(p.getStatus()));
+        if (!hasActive) {
+            KpiTemplateCyclePeriod toOpen = pickActivePeriodForAssignment(existing, LocalDate.now());
+            if (toOpen != null && toOpen.getStatus() == KpiTemplateCyclePeriodStatus.SCHEDULED) {
+                toOpen.setStatus(KpiTemplateCyclePeriodStatus.OPEN);
+                kpiTemplateCyclePeriodRepository.save(toOpen);
+            }
+        }
+
+        return existing;
     }
 
-    private Optional<KpiTemplateCyclePeriod> createNextPeriod(KpiTemplateCycle cycle, KpiForm form, KpiTemplateCyclePeriod previous) {
-        int nextNumber = previous == null || previous.getPeriodNumber() == null ? 1 : previous.getPeriodNumber() + 1;
-        LocalDate start = previous == null ? cycle.getStartDate() : previous.getEndDate().plusDays(1);
-        if (start == null || cycle.getEndDate() == null || start.isAfter(cycle.getEndDate())) {
-            return Optional.empty();
+    private KpiTemplateCyclePeriod pickActivePeriodForAssignment(List<KpiTemplateCyclePeriod> periods, LocalDate today) {
+        if (periods == null || periods.isEmpty()) {
+            return null;
         }
-        LocalDate end = start.plusMonths(positionDurationMonths(form)).minusDays(1);
-        if (end.isAfter(cycle.getEndDate())) {
-            end = cycle.getEndDate();
+        // Prefer an explicitly OPEN/CLOSING period if present.
+        Optional<KpiTemplateCyclePeriod> open = periods.stream()
+                .filter(p -> p.getStatus() == KpiTemplateCyclePeriodStatus.OPEN)
+                .findFirst();
+        if (open.isPresent()) {
+            return open.get();
         }
-        KpiTemplateCyclePeriod period = KpiTemplateCyclePeriod.builder()
-                .cycle(cycle)
-                .kpiForm(form)
-                .periodNumber(nextNumber)
-                .startDate(start)
-                .endDate(end)
-                .status(KpiTemplateCyclePeriodStatus.OPEN)
-                .build();
-        return Optional.of(kpiTemplateCyclePeriodRepository.save(period));
+        Optional<KpiTemplateCyclePeriod> closing = periods.stream()
+                .filter(p -> p.getStatus() == KpiTemplateCyclePeriodStatus.CLOSING)
+                .findFirst();
+        if (closing.isPresent()) {
+            return closing.get();
+        }
+
+        if (today == null) {
+            return null;
+        }
+
+        // If activating before the cycle starts, use the first period.
+        KpiTemplateCyclePeriod first = periods.stream()
+                .filter(p -> p.getPeriodNumber() != null)
+                .min(Comparator.comparing(KpiTemplateCyclePeriod::getPeriodNumber))
+                .orElse(null);
+        if (first != null && first.getStartDate() != null && today.isBefore(first.getStartDate())) {
+            return first;
+        }
+
+        // Otherwise pick the period that contains today (scheduled/open/closing all ok).
+        return periods.stream()
+                .filter(p -> p.getStartDate() != null && p.getEndDate() != null)
+                .filter(p -> !today.isBefore(p.getStartDate()) && !today.isAfter(p.getEndDate()))
+                .findFirst()
+                .orElse(null);
     }
 
     private int positionDurationMonths(KpiForm form) {
@@ -565,9 +638,12 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
         cycle.setClosingRequestedAt(now);
         cycle.setGraceEndsAt(graceEnds);
-        List<KpiTemplateCyclePeriod> periods = ensureOpenPeriodsForCycle(cycle);
+        List<KpiTemplateCyclePeriod> periods = ensureAllPeriodsGeneratedForCycle(cycle);
         List<EmployeeKpiForm> openAssignments = new ArrayList<>();
         for (KpiTemplateCyclePeriod period : periods) {
+            if (period.getStatus() == KpiTemplateCyclePeriodStatus.CLOSED) {
+                continue;
+            }
             period.setStatus(KpiTemplateCyclePeriodStatus.CLOSING);
             period.setClosingRequestedAt(now);
             period.setGraceEndsAt(graceEnds);
@@ -595,23 +671,16 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         kpiTemplateCycleRepository.save(cycle);
     }
 
-    private List<KpiTemplateCyclePeriod> ensureOpenPeriodsForCycle(KpiTemplateCycle cycle) {
-        List<KpiTemplateCyclePeriod> existing = new ArrayList<>(kpiTemplateCyclePeriodRepository.findByCycle_IdAndStatusIn(
-                cycle.getId(),
-                List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
-        ));
-        Set<Integer> existingFormIds = existing.stream()
-                .filter(period -> period.getKpiForm() != null && period.getKpiForm().getId() != null)
-                .map(period -> period.getKpiForm().getId())
-                .collect(Collectors.toSet());
+    private List<KpiTemplateCyclePeriod> ensureAllPeriodsGeneratedForCycle(KpiTemplateCycle cycle) {
+        List<KpiTemplateCyclePeriod> all = new ArrayList<>();
         for (KpiTemplateCycleForm link : kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycle.getId())) {
             KpiForm form = link.getKpiForm();
-            if (form == null || form.getId() == null || existingFormIds.contains(form.getId())) {
+            if (form == null || form.getId() == null) {
                 continue;
             }
-            ensureLatestOpenPeriod(cycle, form).ifPresent(existing::add);
+            all.addAll(ensureAllCycleFormPeriodsGenerated(cycle, form));
         }
-        return existing;
+        return all;
     }
 
     private void notifyExecutivesForCycleGrace(KpiTemplateCycle cycle, LocalDateTime graceEnds) {
@@ -648,13 +717,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             period.setStatus(KpiTemplateCyclePeriodStatus.CLOSED);
             period.setClosedAt(now);
             kpiTemplateCyclePeriodRepository.save(period);
-            Optional<KpiTemplateCyclePeriod> nextPeriod = period.getKpiForm() == null
-                    ? Optional.empty()
-                    : createNextPeriod(cycle, period.getKpiForm(), period);
-            nextPeriod.ifPresent(kpiTemplateCyclePeriod -> useCyclePeriodForAllActiveDepartments(
-                    cycle.getId(),
-                    kpiTemplateCyclePeriod.getId()
-            ));
+            Optional<KpiTemplateCyclePeriod> nextPeriod = openNextScheduledPeriod(period);
+            nextPeriod.ifPresent(next -> useCyclePeriodForAllActiveDepartments(cycle.getId(), next.getId()));
             if (nextPeriod.isEmpty()) {
                 deactivateCycleIfComplete(cycle, now);
             }
@@ -678,6 +742,29 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         }
 
         return processed;
+    }
+
+    private Optional<KpiTemplateCyclePeriod> openNextScheduledPeriod(KpiTemplateCyclePeriod finished) {
+        if (finished == null || finished.getCycle() == null || finished.getCycle().getId() == null) {
+            return Optional.empty();
+        }
+        if (finished.getKpiForm() == null || finished.getKpiForm().getId() == null || finished.getPeriodNumber() == null) {
+            return Optional.empty();
+        }
+        Integer cycleId = finished.getCycle().getId();
+        Integer formId = finished.getKpiForm().getId();
+        int nextNumber = finished.getPeriodNumber() + 1;
+        Optional<KpiTemplateCyclePeriod> next = kpiTemplateCyclePeriodRepository
+                .findByCycle_IdAndKpiForm_IdAndPeriodNumber(cycleId, formId, nextNumber);
+        if (next.isEmpty()) {
+            return Optional.empty();
+        }
+        KpiTemplateCyclePeriod p = next.get();
+        if (p.getStatus() == KpiTemplateCyclePeriodStatus.SCHEDULED) {
+            p.setStatus(KpiTemplateCyclePeriodStatus.OPEN);
+            kpiTemplateCyclePeriodRepository.save(p);
+        }
+        return Optional.of(p);
     }
 
     private void closeCyclePeriodAfterGrace(KpiTemplateCyclePeriod period, LocalDateTime now) {
@@ -706,9 +793,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private void deactivateCycleIfComplete(KpiTemplateCycle cycle, LocalDateTime now) {
         boolean hasOpenPeriods = !kpiTemplateCyclePeriodRepository.findByCycle_IdAndStatusIn(
                 cycle.getId(),
-                List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+                List.of(KpiTemplateCyclePeriodStatus.SCHEDULED, KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
         ).isEmpty();
-        if (!hasOpenPeriods && cycle.getEndDate() != null && !LocalDate.now().isBefore(cycle.getEndDate())) {
+        if (!hasOpenPeriods) {
             cycle.setStatus(KpiTemplateCycleStatus.DEACTIVATED);
             cycle.setClosedAt(now);
             kpiTemplateCycleRepository.save(cycle);
@@ -848,7 +935,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 if (form == null || !formMatchesPosition(form.getId(), employee.getPosition().getId())) {
                     continue;
                 }
-                KpiTemplateCyclePeriod period = ensureLatestOpenPeriod(cycle, form).orElse(null);
+                List<KpiTemplateCyclePeriod> periods = ensureAllCycleFormPeriodsGenerated(cycle, form);
+                KpiTemplateCyclePeriod period = pickActivePeriodForAssignment(periods, LocalDate.now());
                 if (period == null) {
                     continue;
                 }

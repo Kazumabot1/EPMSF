@@ -21,6 +21,10 @@ public interface KpiTemplateCyclePeriodRepository extends JpaRepository<KpiTempl
             Integer kpiFormId
     );
 
+    List<KpiTemplateCyclePeriod> findByCycle_IdAndKpiForm_IdOrderByPeriodNumberAsc(Integer cycleId, Integer kpiFormId);
+
+    Optional<KpiTemplateCyclePeriod> findByCycle_IdAndKpiForm_IdAndPeriodNumber(Integer cycleId, Integer kpiFormId, Integer periodNumber);
+
     Optional<KpiTemplateCyclePeriod> findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
             Integer cycleId,
             Collection<KpiTemplateCyclePeriodStatus> statuses
@@ -36,6 +40,16 @@ public interface KpiTemplateCyclePeriodRepository extends JpaRepository<KpiTempl
             Integer cycleId,
             Collection<KpiTemplateCyclePeriodStatus> statuses
     );
+
+    @Query(
+            """
+                    SELECT p FROM KpiTemplateCyclePeriod p
+                    JOIN FETCH p.kpiForm f
+                    WHERE p.cycle.id = :cycleId
+                    ORDER BY f.id ASC, p.periodNumber ASC
+                    """
+    )
+    List<KpiTemplateCyclePeriod> findAllWithFormByCycleIdOrderByFormIdAndPeriodNumber(@Param("cycleId") Integer cycleId);
 
     @Query(
             """
