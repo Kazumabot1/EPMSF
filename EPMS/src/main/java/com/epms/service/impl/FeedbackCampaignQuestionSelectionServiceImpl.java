@@ -225,7 +225,7 @@ public class FeedbackCampaignQuestionSelectionServiceImpl implements FeedbackCam
 
     private boolean isRatingResponseType(String responseType) {
         String normalized = responseType == null ? "" : responseType.trim().toUpperCase().replace('-', '_').replace(' ', '_');
-        return RESPONSE_RATING_WITH_COMMENT.equals(normalized) || RESPONSE_RATING.equals(normalized);
+        return RESPONSE_RATING_WITH_COMMENT.equals(normalized);
     }
 
     private String normalizeCode(String value, String fallback) {

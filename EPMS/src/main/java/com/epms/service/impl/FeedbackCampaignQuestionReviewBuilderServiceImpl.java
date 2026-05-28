@@ -85,7 +85,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         if (resolved.groups().isEmpty()) {
             Map<String, List<FeedbackCampaignQuestionSelection>> byGroup = saved.stream()
                     .collect(Collectors.groupingBy(
-                            selection -> groupKey(selection.getRelationshipType(), selection.getTargetLevelCode()),
+                            selection -> groupKey(selection.getRelationshipType(), selection.getTargetLevelCode(), selection.getTargetDepartmentId(), selection.getTargetPositionId()),
                             LinkedHashMap::new,
                             Collectors.toList()
                     ));
@@ -101,7 +101,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         Map<String, FeedbackCampaignQuestionSelection> savedByQuestion = saved.stream()
                 .filter(selection -> selection.getRelationshipType() != null && selection.getTargetLevelCode() != null && selection.getQuestionCode() != null)
                 .collect(Collectors.toMap(
-                        selection -> decisionKey(selection.getRelationshipType().name(), selection.getTargetLevelCode(), selection.getQuestionCode()),
+                        selection -> decisionKey(selection.getRelationshipType().name(), selection.getTargetLevelCode(), selection.getTargetDepartmentId(), selection.getTargetPositionId(), selection.getQuestionCode()),
                         selection -> selection,
                         (first, duplicate) -> duplicate,
                         LinkedHashMap::new
@@ -115,13 +115,33 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
 
         Set<String> savedKeys = saved.stream()
                 .filter(selection -> selection.getRelationshipType() != null && selection.getTargetLevelCode() != null && selection.getQuestionCode() != null)
-                .map(selection -> decisionKey(selection.getRelationshipType().name(), selection.getTargetLevelCode(), selection.getQuestionCode()))
+                .map(selection -> decisionKey(selection.getRelationshipType().name(), selection.getTargetLevelCode(), selection.getTargetDepartmentId(), selection.getTargetPositionId(), selection.getQuestionCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        boolean savedMatchesCurrentRules = savedKeys.equals(activeKeys);
+        Set<String> savedGroupSignatures = saved.stream()
+                .filter(selection -> selection.getRelationshipType() != null && selection.getTargetLevelCode() != null)
+                .map(selection -> groupSignature(
+                        selection.getRelationshipType(),
+                        selection.getTargetLevelCode(),
+                        selection.getTargetDepartmentId(),
+                        selection.getTargetPositionId(),
+                        selection.getTargetCount(),
+                        selection.getAssignmentCount()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<String> activeGroupSignatures = resolved.groups().stream()
+                .map(group -> groupSignature(
+                        group.relationshipType(),
+                        group.targetLevelCode(),
+                        group.targetDepartmentId(),
+                        group.targetPositionId(),
+                        group.targetCount(),
+                        group.assignmentCount()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        boolean savedMatchesCurrentRules = savedKeys.equals(activeKeys) && savedGroupSignatures.equals(activeGroupSignatures);
         List<String> warnings = new ArrayList<>(resolved.warnings());
         if (!savedMatchesCurrentRules) {
-            warnings.add("Saved question review is out of date. Current active Question Rules are shown; save the review again to update this campaign.");
+            warnings.add("Question snapshot is out of date. Refresh and save it again before launch.");
         }
 
         return buildResponse(campaign, savedMatchesCurrentRules, mergedGroups, warnings, lastSavedAt);
@@ -145,12 +165,17 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         Map<String, MutableQuestionGroup> groups = new LinkedHashMap<>();
         for (FeedbackEvaluatorAssignment assignment : assignments) {
             AssignmentContext context = resolveAssignmentContext(assignment);
-            String key = groupKey(assignment.getRelationshipType(), context.targetLevelCode());
+            String key = groupKey(assignment.getRelationshipType(), context.targetLevelCode(), context.targetDepartmentId(), context.targetPositionId());
             MutableQuestionGroup group = groups.computeIfAbsent(key, unused -> new MutableQuestionGroup(
                     assignment.getRelationshipType(),
                     relationshipLabel(assignment.getRelationshipType()),
                     context.targetLevelCode(),
-                    context.targetLevelRank()
+                    context.targetLevelRank(),
+                    context.targetDepartmentId(),
+                    context.targetDepartmentName(),
+                    context.targetPositionId(),
+                    context.targetPositionName(),
+                    buildFormVariantLabel(assignment.getRelationshipType(), context)
             ));
             group.targetIds.add(assignment.getFeedbackRequest().getTargetEmployeeId());
             group.assignmentCount++;
@@ -163,8 +188,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                     LocalDate.now()
             );
             if (rules.isEmpty()) {
-                group.warnings.add("No active question rules matched " + relationshipLabel(assignment.getRelationshipType())
-                        + " for level " + context.targetLevelCode() + ".");
+                group.warnings.add("No active question rules matched " + buildFormVariantLabel(assignment.getRelationshipType(), context) + ".");
             }
             for (FeedbackQuestionApplicabilityRule rule : rules) {
                 QuestionCandidate candidate = fromRule(rule);
@@ -179,13 +203,13 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
 
         for (QuestionGroup group : resolvedGroups) {
             if (group.questions().isEmpty()) {
-                warnings.add(group.relationshipLabel() + " / " + group.targetLevelCode() + " has no matched questions.");
+                warnings.add(variantLabel(group) + " has no matched questions.");
             } else if (group.questions().stream().noneMatch(question -> isScored(question.responseType(), question.scoringBehavior()))) {
-                warnings.add(group.relationshipLabel() + " / " + group.targetLevelCode() + " has no scored questions.");
+                warnings.add(variantLabel(group) + " has no scored questions.");
             } else if (group.questions().size() > 30) {
-                warnings.add(group.relationshipLabel() + " / " + group.targetLevelCode() + " has more than 30 questions. Consider excluding lower-priority items.");
+                warnings.add(variantLabel(group) + " has more than 30 questions. Consider excluding lower-priority items.");
             } else if (group.questions().size() > 20) {
-                warnings.add(group.relationshipLabel() + " / " + group.targetLevelCode() + " has more than 20 questions.");
+                warnings.add(variantLabel(group) + " has more than 20 questions.");
             }
         }
 
@@ -206,14 +230,26 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     @Override
     public void validateEveryGroupHasIncludedQuestion(List<QuestionGroup> groups) {
         List<String> blocking = new ArrayList<>();
+        List<String> invalidQuestions = new ArrayList<>();
         for (QuestionGroup group : groups == null ? List.<QuestionGroup>of() : groups) {
-            long included = group.questions().stream().filter(QuestionCandidate::included).count();
-            if (included == 0) {
-                blocking.add(group.relationshipLabel() + " / " + group.targetLevelCode());
+            long includedScored = group.questions().stream()
+                    .filter(QuestionCandidate::included)
+                    .filter(this::isValidCampaignQuestion)
+                    .count();
+            if (includedScored == 0) {
+                blocking.add(variantLabel(group));
             }
+            group.questions().stream()
+                    .filter(QuestionCandidate::included)
+                    .filter(question -> !isValidCampaignQuestion(question))
+                    .map(question -> variantLabel(group) + " / " + question.questionCode())
+                    .forEach(invalidQuestions::add);
+        }
+        if (!invalidQuestions.isEmpty()) {
+            throw new BusinessValidationException("Only rating questions with required comments can be used in 360 feedback campaigns. Invalid question(s): " + invalidQuestions);
         }
         if (!blocking.isEmpty()) {
-            throw new BusinessValidationException("Each evaluator group must keep at least one question before activation. Empty group(s): " + blocking);
+            throw new BusinessValidationException("Each form variant must have at least one rating question with a required comment before launch. Empty form variant(s): " + blocking);
         }
     }
 
@@ -229,8 +265,8 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                         group.relationshipType(),
                         group.targetLevelCode(),
                         group.targetLevelRank(),
-                        question.targetPositionId(),
-                        question.targetDepartmentId(),
+                        group.targetPositionId(),
+                        group.targetDepartmentId(),
                         group.targetCount(),
                         group.assignmentCount(),
                         question.questionCode(),
@@ -259,7 +295,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     ) {
         List<QuestionCandidate> questions = group.questions().stream()
                 .map(question -> {
-                    String key = decisionKey(group.relationshipType().name(), group.targetLevelCode(), question.questionCode());
+                    String key = decisionKey(group.relationshipType().name(), group.targetLevelCode(), group.targetDepartmentId(), group.targetPositionId(), question.questionCode());
                     activeKeys.add(key);
                     FeedbackCampaignQuestionSelection saved = savedByQuestion.get(key);
                     return saved == null ? question : applySavedDecision(question, saved);
@@ -271,6 +307,11 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 group.relationshipLabel(),
                 group.targetLevelCode(),
                 group.targetLevelRank(),
+                group.targetDepartmentId(),
+                group.targetDepartmentName(),
+                group.targetPositionId(),
+                group.targetPositionName(),
+                group.formVariantLabel(),
                 group.targetCount(),
                 group.assignmentCount(),
                 questions,
@@ -281,6 +322,8 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     private QuestionCandidate applySavedDecision(QuestionCandidate current, FeedbackCampaignQuestionSelection saved) {
         return new QuestionCandidate(
                 current.sourceRuleId(),
+                current.sourceRuleName(),
+                current.sourceRuleScope(),
                 current.version(),
                 current.questionBankId(),
                 current.questionCode(),
@@ -308,12 +351,14 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     ) {
         List<QuestionCandidate> questions = group.questions().stream()
                 .map(question -> {
-                    FeedbackCampaignQuestionSelectionRequest decision = decisions == null ? null : decisions.get(decisionKey(group.relationshipType().name(), group.targetLevelCode(), question.questionCode()));
+                    FeedbackCampaignQuestionSelectionRequest decision = decisions == null ? null : decisions.get(decisionKey(group.relationshipType().name(), group.targetLevelCode(), group.targetDepartmentId(), group.targetPositionId(), question.questionCode()));
                     if (decision == null) {
                         return question;
                     }
                     return new QuestionCandidate(
                             question.sourceRuleId(),
+                            question.sourceRuleName(),
+                            question.sourceRuleScope(),
                             question.version(),
                             question.questionBankId(),
                             question.questionCode(),
@@ -340,6 +385,11 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 group.relationshipLabel(),
                 group.targetLevelCode(),
                 group.targetLevelRank(),
+                group.targetDepartmentId(),
+                group.targetDepartmentName(),
+                group.targetPositionId(),
+                group.targetPositionName(),
+                group.formVariantLabel(),
                 group.targetCount(),
                 group.assignmentCount(),
                 questions,
@@ -367,6 +417,8 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         FeedbackCompetency competency = findCompetency(competencyCode);
         return new QuestionCandidate(
                 rule.getId(),
+                resolveRuleSetName(rule),
+                resolveRuleScope(rule),
                 version,
                 bank == null ? null : bank.getId(),
                 normalizeCode(bank == null ? null : bank.getQuestionCode(), "BANK-Q-" + (bank == null ? rule.getId() : bank.getId())),
@@ -394,11 +446,19 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 .map(this::fromSelection)
                 .toList();
         int targetCount = first.getTargetCount() == null ? 0 : first.getTargetCount();
+        Long departmentId = first.getTargetDepartmentId();
+        Long positionId = first.getTargetPositionId();
+        String levelCode = normalizeLevel(first.getTargetLevelCode());
         return new QuestionGroup(
                 first.getRelationshipType(),
                 relationshipLabel(first.getRelationshipType()),
-                normalizeLevel(first.getTargetLevelCode()),
+                levelCode,
                 first.getTargetLevelRank() == null ? 9 : first.getTargetLevelRank(),
+                departmentId,
+                null,
+                positionId,
+                null,
+                buildFormVariantLabel(first.getRelationshipType(), levelCode, null, null),
                 targetCount,
                 first.getAssignmentCount() == null ? 0 : first.getAssignmentCount(),
                 questions,
@@ -409,6 +469,8 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     private QuestionCandidate fromSelection(FeedbackCampaignQuestionSelection selection) {
         return new QuestionCandidate(
                 selection.getSourceRuleId(),
+                selection.getSourceRuleId() == null ? "Saved snapshot" : "Rule #" + selection.getSourceRuleId(),
+                "Saved campaign snapshot",
                 selection.getQuestionVersion(),
                 selection.getQuestionBankId(),
                 selection.getQuestionCode(),
@@ -508,8 +570,16 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
             if (includedCount == 0) {
                 warnings.add("All questions are excluded. Keep at least one question for this evaluator group.");
             }
+            List<String> invalidQuestions = group.questions().stream()
+                    .filter(QuestionCandidate::included)
+                    .filter(question -> !isValidCampaignQuestion(question))
+                    .map(QuestionCandidate::questionCode)
+                    .toList();
+            if (!invalidQuestions.isEmpty()) {
+                warnings.add("Only rating questions with required comments are allowed. Invalid question(s): " + invalidQuestions);
+            }
             if (includedScoredCount == 0) {
-                warnings.add("No included scored questions for this evaluator group.");
+                warnings.add("No included rating-with-required-comment questions for this form variant.");
             }
             if (includedCount > 30) {
                 warnings.add("More than 30 included questions may make this review too long.");
@@ -519,11 +589,16 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         }
 
         return FeedbackCampaignQuestionGroupResponse.builder()
-                .groupKey(groupKey(group.relationshipType(), group.targetLevelCode()))
+                .groupKey(groupKey(group.relationshipType(), group.targetLevelCode(), group.targetDepartmentId(), group.targetPositionId()))
                 .relationshipType(group.relationshipType().name())
                 .relationshipLabel(group.relationshipLabel())
                 .targetLevelCode(group.targetLevelCode())
                 .targetLevelRank(group.targetLevelRank())
+                .targetDepartmentId(group.targetDepartmentId())
+                .targetDepartmentName(group.targetDepartmentName())
+                .targetPositionId(group.targetPositionId())
+                .targetPositionName(group.targetPositionName())
+                .formVariantLabel(variantLabel(group))
                 .targetCount(group.targetCount())
                 .assignmentCount(group.assignmentCount())
                 .questionCount(questionCount)
@@ -546,6 +621,8 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 .questionBankId(question.questionBankId())
                 .questionVersionId(question.version() == null ? null : question.version().getId())
                 .sourceRuleId(question.sourceRuleId())
+                .sourceRuleName(question.sourceRuleName())
+                .sourceRuleScope(question.sourceRuleScope())
                 .questionCode(question.questionCode())
                 .competencyCode(question.competencyCode())
                 .questionText(question.questionText())
@@ -569,7 +646,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
             return List.of();
         }
 
-        Map<String, Double> defaultWeights = calculateBalancedWeights(usageByCode);
+        Map<String, Double> defaultWeights = calculateEqualWeights(usageByCode);
         Map<String, FeedbackCampaignCompetencyWeight> savedWeights = questionSelectionService.findSavedCompetencyWeights(campaign.getId()).stream()
                 .filter(weight -> weight.getCompetencyCodeSnapshot() != null)
                 .collect(Collectors.toMap(
@@ -591,9 +668,6 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                             ? defaultWeight
                             : toDouble(savedWeight.getWeightPercent());
                     List<String> warnings = new ArrayList<>();
-                    if (usage.questionCountVariesByForm()) {
-                        warnings.add(usage.competencyName() + " has a different question count across evaluator forms.");
-                    }
                     if (weightPercent != null && weightPercent > 0 && usage.totalIncludedScoredQuestionCount() == 0) {
                         warnings.add(usage.competencyName() + " has a positive weight but no included scored questions.");
                     }
@@ -626,7 +700,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
             throw new BusinessValidationException("At least one included scored competency is required before saving question review.");
         }
 
-        Map<String, Double> defaultWeights = calculateBalancedWeights(usageByCode);
+        Map<String, Double> defaultWeights = calculateEqualWeights(usageByCode);
         Map<String, Double> requestedByCode = new LinkedHashMap<>();
         for (FeedbackCampaignCompetencyWeightRequest requested : requestedWeights == null ? List.<FeedbackCampaignCompetencyWeightRequest>of() : requestedWeights) {
             if (requested == null || requested.getCompetencyCode() == null || requested.getCompetencyCode().isBlank()) {
@@ -671,7 +745,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     private Map<String, CompetencyUsage> collectCompetencyUsage(List<QuestionGroup> groups) {
         Map<String, CompetencyUsage> usageByCode = new LinkedHashMap<>();
         for (QuestionGroup group : groups == null ? List.<QuestionGroup>of() : groups) {
-            String formKey = groupKey(group.relationshipType(), group.targetLevelCode());
+            String formKey = groupKey(group.relationshipType(), group.targetLevelCode(), group.targetDepartmentId(), group.targetPositionId());
             String formLabel = formLabelForWeightUsage(group);
             for (QuestionCandidate question : group.questions()) {
                 if (!Boolean.TRUE.equals(question.included()) || !isScored(question.responseType(), question.scoringBehavior())) {
@@ -692,41 +766,22 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         return usageByCode;
     }
 
-    private Map<String, Double> calculateBalancedWeights(Map<String, CompetencyUsage> usageByCode) {
+    private Map<String, Double> calculateEqualWeights(Map<String, CompetencyUsage> usageByCode) {
         Map<String, Double> weights = new LinkedHashMap<>();
         if (usageByCode == null || usageByCode.isEmpty()) {
             return weights;
         }
-        int totalBasis = usageByCode.values().stream().mapToInt(CompetencyUsage::defaultQuestionBasis).sum();
-        if (totalBasis <= 0) {
-            return weights;
-        }
 
+        int competencyCount = usageByCode.size();
         int totalPercentCents = 10_000;
-        Map<String, Integer> allocatedCents = new LinkedHashMap<>();
-        Map<String, Double> remainders = new LinkedHashMap<>();
-        int usedCents = 0;
-        for (CompetencyUsage usage : usageByCode.values()) {
-            double rawCents = (usage.defaultQuestionBasis() * totalPercentCents) / (double) totalBasis;
-            int cents = (int) Math.floor(rawCents);
-            allocatedCents.put(usage.competencyCode(), cents);
-            remainders.put(usage.competencyCode(), rawCents - cents);
-            usedCents += cents;
+        int baseCents = totalPercentCents / competencyCount;
+        int remainder = totalPercentCents % competencyCount;
+        int index = 0;
+        for (String code : usageByCode.keySet()) {
+            int cents = baseCents + (index < remainder ? 1 : 0);
+            weights.put(code, roundToTwoDecimals(cents / 100.0));
+            index += 1;
         }
-
-        int remaining = totalPercentCents - usedCents;
-        List<String> orderedRemainders = remainders.entrySet().stream()
-                .sorted((left, right) -> {
-                    int byRemainder = Double.compare(right.getValue(), left.getValue());
-                    return byRemainder != 0 ? byRemainder : left.getKey().compareTo(right.getKey());
-                })
-                .map(Map.Entry::getKey)
-                .toList();
-        for (int index = 0; index < remaining && !orderedRemainders.isEmpty(); index++) {
-            String code = orderedRemainders.get(index % orderedRemainders.size());
-            allocatedCents.put(code, allocatedCents.get(code) + 1);
-        }
-        allocatedCents.forEach((code, cents) -> weights.put(code, roundToTwoDecimals(cents / 100.0)));
         return weights;
     }
 
@@ -735,7 +790,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         if (DEFAULT_LEVEL.equals(level)) {
             return group.relationshipLabel();
         }
-        return group.relationshipLabel() + " · " + level;
+        return variantLabel(group);
     }
 
     private double toDouble(BigDecimal value) {
@@ -760,7 +815,14 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 request.getTargetCurrentDepartmentId() == null ? null : request.getTargetCurrentDepartmentId().longValue(),
                 resolveCurrentDepartmentId(employee)
         );
-        return new AssignmentContext(levelCode, levelRank, positionId, departmentId);
+        return new AssignmentContext(
+                levelCode,
+                levelRank,
+                positionId,
+                firstNonBlank(request.getTargetPositionName(), resolvePositionName(employee), "Any position"),
+                departmentId,
+                firstNonBlank(request.getTargetCurrentDepartmentName(), resolveCurrentDepartmentName(employee), "Any department")
+        );
     }
 
     private FeedbackCompetency findCompetency(String competencyCode) {
@@ -785,6 +847,64 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         }
         String code = firstNonBlank(competencyCode, null);
         return code == null ? "Unmapped competency" : code;
+    }
+
+
+    private String resolvePositionName(Employee employee) {
+        return employee != null && employee.getPosition() != null ? employee.getPosition().getPositionTitle() : null;
+    }
+
+    private String resolveCurrentDepartmentName(Employee employee) {
+        EmployeeDepartment assignment = latestActiveDepartmentAssignment(employee);
+        Department department = assignment == null ? null : firstNonNull(assignment.getCurrentDepartment(), assignment.getParentDepartment());
+        return department == null ? null : department.getDepartmentName();
+    }
+
+    private String buildFormVariantLabel(com.epms.entity.enums.FeedbackRelationshipType relationshipType, AssignmentContext context) {
+        return buildFormVariantLabel(relationshipType, context.targetLevelCode(), context.targetDepartmentName(), context.targetPositionName());
+    }
+
+    private String buildFormVariantLabel(com.epms.entity.enums.FeedbackRelationshipType relationshipType, String targetLevelCode, String departmentName, String positionName) {
+        List<String> parts = new ArrayList<>();
+        parts.add(relationshipLabel(relationshipType));
+        String department = firstNonBlank(departmentName, "Any department");
+        String position = firstNonBlank(positionName, "Any position");
+        String level = firstNonBlank(targetLevelCode, DEFAULT_LEVEL);
+        if (!"Any department".equalsIgnoreCase(department)) {
+            parts.add(department);
+        }
+        if (!"Any position".equalsIgnoreCase(position)) {
+            parts.add(position);
+        }
+        parts.add(level);
+        return String.join(" · ", parts);
+    }
+
+    private String variantLabel(QuestionGroup group) {
+        return firstNonBlank(group.formVariantLabel(), buildFormVariantLabel(group.relationshipType(), group.targetLevelCode(), group.targetDepartmentName(), group.targetPositionName()));
+    }
+
+    private String resolveRuleSetName(FeedbackQuestionApplicabilityRule rule) {
+        if (rule == null) {
+            return "Active Question Rules";
+        }
+        if (rule.getRuleSet() != null && rule.getRuleSet().getName() != null && !rule.getRuleSet().getName().isBlank()) {
+            return rule.getRuleSet().getName().trim();
+        }
+        return rule.getId() == null ? "Active Question Rules" : "Rule #" + rule.getId();
+    }
+
+    private String resolveRuleScope(FeedbackQuestionApplicabilityRule rule) {
+        if (rule == null) {
+            return "Active rule scope";
+        }
+        List<String> scope = new ArrayList<>();
+        scope.add("L" + String.format("%02d", rule.getTargetLevelMinRank() == null ? 1 : rule.getTargetLevelMinRank())
+                + "–L" + String.format("%02d", rule.getTargetLevelMaxRank() == null ? 9 : rule.getTargetLevelMaxRank()));
+        scope.add(rule.getTargetDepartmentId() == null ? "All departments" : "Department-specific");
+        scope.add(rule.getTargetPositionId() == null ? "All positions" : "Position-specific");
+        scope.add(firstNonBlank(rule.getEvaluatorRelationshipType(), "Relationship matched"));
+        return String.join(" · ", scope);
     }
 
     private Long resolvePositionId(Employee employee) {
@@ -820,17 +940,33 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
 
     private Comparator<QuestionGroup> groupComparator() {
         return Comparator.comparing(QuestionGroup::relationshipType)
+                .thenComparing(QuestionGroup::targetDepartmentName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(QuestionGroup::targetPositionName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                 .thenComparing(QuestionGroup::targetLevelRank, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(QuestionGroup::targetLevelCode, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     @Override
-    public String decisionKey(String relationshipType, String targetLevelCode, String questionCode) {
-        return normalizeRelationship(relationshipType).name() + "::" + normalizeLevel(targetLevelCode) + "::" + normalizeCode(questionCode, "QUESTION");
+    public String decisionKey(String relationshipType, String targetLevelCode, Long targetDepartmentId, Long targetPositionId, String questionCode) {
+        return normalizeRelationship(relationshipType).name()
+                + "::" + normalizeLevel(targetLevelCode)
+                + "::D" + normalizeId(targetDepartmentId)
+                + "::P" + normalizeId(targetPositionId)
+                + "::" + normalizeCode(questionCode, "QUESTION");
     }
 
-    private String groupKey(com.epms.entity.enums.FeedbackRelationshipType relationshipType, String targetLevelCode) {
-        return relationshipType.name() + "::" + normalizeLevel(targetLevelCode);
+    private String groupKey(com.epms.entity.enums.FeedbackRelationshipType relationshipType, String targetLevelCode, Long targetDepartmentId, Long targetPositionId) {
+        return relationshipType.name()
+                + "::" + normalizeLevel(targetLevelCode)
+                + "::D" + normalizeId(targetDepartmentId)
+                + "::P" + normalizeId(targetPositionId);
+    }
+
+
+    private String groupSignature(com.epms.entity.enums.FeedbackRelationshipType relationshipType, String targetLevelCode, Long targetDepartmentId, Long targetPositionId, Integer targetCount, Integer assignmentCount) {
+        return groupKey(relationshipType, targetLevelCode, targetDepartmentId, targetPositionId)
+                + "::T" + (targetCount == null ? 0 : targetCount)
+                + "::A" + (assignmentCount == null ? 0 : assignmentCount);
     }
 
     private com.epms.entity.enums.FeedbackRelationshipType normalizeRelationship(String relationshipType) {
@@ -916,7 +1052,14 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
 
     private boolean isRatingResponseType(String responseType) {
         String normalized = normalizeResponseType(responseType);
-        return RESPONSE_RATING_WITH_COMMENT.equals(normalized) || RESPONSE_RATING.equals(normalized);
+        return RESPONSE_RATING_WITH_COMMENT.equals(normalized);
+    }
+
+    private boolean isValidCampaignQuestion(QuestionCandidate question) {
+        return question != null
+                && RESPONSE_RATING_WITH_COMMENT.equals(normalizeResponseType(question.responseType()))
+                && SCORING_SCORED.equals(question.scoringBehavior())
+                && Boolean.TRUE.equals(question.required());
     }
 
     private boolean isScored(String responseType, String scoringBehavior) {
@@ -931,6 +1074,10 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
             return fallback;
         }
         return 1.0;
+    }
+
+    private String normalizeId(Long value) {
+        return value == null ? "ANY" : String.valueOf(value);
     }
 
     private String normalizeCode(String value, String fallback) {
@@ -957,7 +1104,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         return null;
     }
 
-    private record AssignmentContext(String targetLevelCode, Integer targetLevelRank, Long targetPositionId, Long targetDepartmentId) {}
+    private record AssignmentContext(String targetLevelCode, Integer targetLevelRank, Long targetPositionId, String targetPositionName, Long targetDepartmentId, String targetDepartmentName) {}
 
     private static class CompetencyUsage {
         private final String competencyCode;
@@ -1010,14 +1157,6 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         private int totalIncludedScoredQuestionCount() {
             return includedScoredQuestionCountByForm.values().stream().mapToInt(Integer::intValue).sum();
         }
-
-        private int defaultQuestionBasis() {
-            Integer perForm = questionCountPerForm();
-            if (perForm != null) {
-                return perForm;
-            }
-            return includedScoredQuestionCountByForm.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        }
     }
 
     private static class MutableQuestionGroup {
@@ -1025,6 +1164,11 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         private final String relationshipLabel;
         private final String targetLevelCode;
         private final Integer targetLevelRank;
+        private final Long targetDepartmentId;
+        private final String targetDepartmentName;
+        private final Long targetPositionId;
+        private final String targetPositionName;
+        private final String formVariantLabel;
         private final Set<Long> targetIds = new LinkedHashSet<>();
         private int assignmentCount = 0;
         private final Map<String, QuestionCandidate> questions = new LinkedHashMap<>();
@@ -1034,12 +1178,22 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 com.epms.entity.enums.FeedbackRelationshipType relationshipType,
                 String relationshipLabel,
                 String targetLevelCode,
-                Integer targetLevelRank
+                Integer targetLevelRank,
+                Long targetDepartmentId,
+                String targetDepartmentName,
+                Long targetPositionId,
+                String targetPositionName,
+                String formVariantLabel
         ) {
             this.relationshipType = relationshipType;
             this.relationshipLabel = relationshipLabel;
             this.targetLevelCode = targetLevelCode;
             this.targetLevelRank = targetLevelRank;
+            this.targetDepartmentId = targetDepartmentId;
+            this.targetDepartmentName = targetDepartmentName;
+            this.targetPositionId = targetPositionId;
+            this.targetPositionName = targetPositionName;
+            this.formVariantLabel = formVariantLabel;
         }
 
         private QuestionGroup toImmutable() {
@@ -1048,6 +1202,11 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                     relationshipLabel,
                     targetLevelCode,
                     targetLevelRank,
+                    targetDepartmentId,
+                    targetDepartmentName,
+                    targetPositionId,
+                    targetPositionName,
+                    formVariantLabel,
                     targetIds.size(),
                     assignmentCount,
                     new ArrayList<>(questions.values()),

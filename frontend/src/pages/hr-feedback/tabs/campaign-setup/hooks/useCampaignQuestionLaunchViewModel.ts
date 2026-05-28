@@ -61,7 +61,6 @@ export function useCampaignQuestionLaunchViewModel({
     const questionReviewReady = Boolean(questionReview.saved && questionReview.includedQuestionCount > 0 && competencyWeightsReady && questionGroups.every(group => group.includedQuestionCount > 0));
 
     const activationBlocked = activationReadiness.blockingIssues.length > 0;
-    const activationWarnings = activationReadiness.warnings.length;
     const setupReady = Boolean(selectedCampaign && activationReadiness.ready && !activationBlocked);
     const campaignReadyToActivate = selectedCampaign?.status === 'READY_TO_ACTIVATE';
     const canValidateSetup = Boolean(selectedCampaign && selectedCampaign.status === 'DRAFT' && activationReadiness.canMarkReady && setupReady);
@@ -102,8 +101,8 @@ export function useCampaignQuestionLaunchViewModel({
         selectedCampaign.subordinateFeedbackAnonymous ? 'Direct Report' : '',
     ].filter(Boolean) : [];
     const privacySummary = anonymousRoleLabels.length > 0
-        ? `Grouped feedback identity is hidden from recipients for ${anonymousRoleLabels.join(', ')}.`
-        : 'Grouped peer and direct report feedback identity is visible to recipients.';
+        ? `Peer and direct report feedback are grouped without showing individual evaluator names to recipients.`
+        : 'Peer and direct report evaluator names are visible to recipients.';
 
     const launchChecklist = useMemo(() => {
         const checks = activationReadiness.checks.map(check => ({ ...check }));
@@ -146,7 +145,6 @@ export function useCampaignQuestionLaunchViewModel({
         activeQuestionFormTitle,
         questionSaveDisabled,
         questionReviewReady,
-        activationWarnings,
         setupReady,
         canValidateSetup,
         canActivate,

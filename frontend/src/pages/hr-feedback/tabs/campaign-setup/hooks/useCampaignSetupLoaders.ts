@@ -161,7 +161,7 @@ export function useCampaignSetupLoaders({
             setQuestionReview(data);
             setSelectedQuestionGroupKey(current => current && data.groups.some(group => group.groupKey === current) ? current : data.groups[0]?.groupKey ?? '');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load question review.');
+            setError(err instanceof Error ? err.message : 'Failed to load question snapshot.');
         } finally {
             setLoadingQuestionReview(false);
         }

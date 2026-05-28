@@ -80,7 +80,12 @@ public class FeedbackCampaignQuestionReviewServiceImpl implements FeedbackCampai
                 .stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toMap(
-                        selection -> questionReviewBuilderService.decisionKey(selection.getRelationshipType(), selection.getTargetLevelCode(), selection.getQuestionCode()),
+                        selection -> questionReviewBuilderService.decisionKey(
+                                selection.getRelationshipType(),
+                                selection.getTargetLevelCode(),
+                                selection.getTargetDepartmentId(),
+                                selection.getTargetPositionId(),
+                                selection.getQuestionCode()),
                         selection -> selection,
                         (first, duplicate) -> duplicate,
                         LinkedHashMap::new

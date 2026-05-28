@@ -1,46 +1,206 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useMemo, useState } from "react";
+import type { FeedbackCampaignQuestionGroup } from "../../../../../types/feedbackCampaign";
+import {
+    buildQuestionCompetencies,
+    sortQuestionItems,
+} from "../utils/campaignSetupQuestionUtils";
 
-
-type StateSetter = Dispatch<SetStateAction<any>>;
-
-interface Props {
-    savedAssignmentCount: any;
+type QuestionReviewStepProps = {
+    savedAssignmentCount: number;
     selectedCampaign: any;
-    competencyWeightsReady: any;
-    formatPercent: any;
-    competencyWeightTotal: any;
-    competencyWeights: any;
-    competencyWeightDelta: any;
-    questionSaveDisabled: any;
-    saveQuestionReview: any;
-    savingQuestionReview: any;
-    loadingQuestionReview: any;
-    balanceCompetencyWeightsByQuestions: any;
-    equalizeCompetencyWeights: any;
-    updateCompetencyWeight: any;
-    resolvingQuestionReview: any;
-    resolveQuestionReview: any;
+    competencyWeightsReady: boolean;
+    formatPercent: (value: number) => string;
+    competencyWeightTotal: number;
+    competencyWeights: any[];
+    competencyWeightDelta: number;
+    questionSaveDisabled: boolean;
+    saveQuestionReview: () => Promise<void> | void;
+    savingQuestionReview: boolean;
+    loadingQuestionReview: boolean;
+    equalizeCompetencyWeights: () => void;
+    updateCompetencyWeight: (competencyCode: string, value: number) => void;
+    resolvingQuestionReview: boolean;
+    resolveQuestionReview: () => Promise<void> | void;
     questionReview: any;
-    questionGroups: any;
-    buildQuestionCompetencies: any;
-    selectedQuestionGroup: any;
-    setSelectedQuestionGroupKey: StateSetter;
-    relationshipLabel: any;
-    activeQuestionFormTitle: any;
-    selectedQuestionIncludedQuestionCount: any;
-    selectedQuestionTotalQuestionCount: any;
-    selectedQuestionIncludedCompetencyCount: any;
-    selectedQuestionTotalCompetencyCount: any;
-    selectedQuestionCompetencies: any;
-    isQuestionCompetencyExpanded: any;
-    handleCompetencyDrop: any;
-    writeQuestionDragData: any;
-    toggleQuestionCompetency: any;
-    isQuestionPreviewExpanded: any;
-    handleQuestionDrop: any;
-    toggleQuestionPreview: any;
-    toggleQuestionIncluded: any;
-}
+    questionGroups: FeedbackCampaignQuestionGroup[];
+    selectedQuestionGroupKey: string;
+    setSelectedQuestionGroupKey: (value: string) => void;
+};
+
+type QuestionSet = {
+    setKey: string;
+    title: string;
+    relationshipLabels: string[];
+    variants: FeedbackCampaignQuestionGroup[];
+    questions: FeedbackCampaignQuestionGroup["questions"];
+    competencies: ReturnType<typeof buildQuestionCompetencies>;
+    targetCount: number;
+    assignmentCount: number;
+    validQuestionCount: number;
+    invalidQuestionCount: number;
+    questionCount: number;
+    ready: boolean;
+};
+
+type InvalidQuestionSummary = {
+    questionCode: string;
+    questionText: string;
+    sourceRules: string[];
+    competencies: string[];
+    variantLabels: string[];
+};
+
+const normalizeResponse = (value: unknown) =>
+    String(value ?? "")
+        .trim()
+        .toUpperCase()
+        .replace(/[-\s]+/g, "_");
+
+const isRatingWithRequiredComment = (question: any) =>
+    normalizeResponse(question.responseType) === "RATING_WITH_COMMENT" &&
+    normalizeResponse(question.scoringBehavior) === "SCORED" &&
+    question.required === true;
+
+const variantLabel = (group: any) =>
+    group?.formVariantLabel ||
+    [
+        group?.relationshipLabel,
+        group?.targetDepartmentName,
+        group?.targetPositionName,
+        group?.targetLevelCode,
+    ]
+        .filter(Boolean)
+        .join(" · ") ||
+    "Form variant";
+
+const unique = (values: Array<string | null | undefined>) =>
+    Array.from(
+        new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)),
+    );
+
+const hashSignature = (value: string) => {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+        hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+    }
+    return `QS-${Math.abs(hash).toString(36)}-${value.length.toString(36)}`;
+};
+
+const questionSignature = (group: FeedbackCampaignQuestionGroup) =>
+    sortQuestionItems(group.questions ?? [])
+        .map((question) =>
+            [
+                question.questionCode,
+                question.questionVersionId ?? "active",
+                question.competencyCode || question.sectionCode || "UNMAPPED",
+                question.sectionOrder ?? "",
+                question.displayOrder ?? "",
+                normalizeResponse(question.responseType),
+                normalizeResponse(question.scoringBehavior),
+                question.required ? "required" : "optional",
+                question.included ? "included" : "excluded",
+            ].join("~"),
+        )
+        .join("|");
+
+const buildQuestionSets = (
+    groups: FeedbackCampaignQuestionGroup[],
+): QuestionSet[] => {
+    const bySignature = new Map<string, FeedbackCampaignQuestionGroup[]>();
+    groups.forEach((group) => {
+        const signature = questionSignature(group) || `EMPTY-${group.groupKey}`;
+        bySignature.set(signature, [...(bySignature.get(signature) ?? []), group]);
+    });
+
+    return Array.from(bySignature.entries())
+        .map(([signature, variants], index) => {
+            const first = variants[0];
+            const questions = sortQuestionItems(first?.questions ?? []);
+            const competencies = buildQuestionCompetencies(questions);
+            const relationshipLabels = unique(
+                variants.map((variant) => variant.relationshipLabel),
+            );
+            const validQuestionCount = questions.filter(
+                isRatingWithRequiredComment,
+            ).length;
+            const invalidQuestionCount = questions.filter(
+                (question) => !isRatingWithRequiredComment(question),
+            ).length;
+            const title =
+                relationshipLabels.length === 1
+                    ? `${relationshipLabels[0]} Question Set`
+                    : `Shared Question Set ${index + 1}`;
+            return {
+                setKey: hashSignature(signature),
+                title,
+                relationshipLabels,
+                variants,
+                questions,
+                competencies,
+                targetCount: variants.reduce(
+                    (sum, variant) => sum + Number(variant.targetCount ?? 0),
+                    0,
+                ),
+                assignmentCount: variants.reduce(
+                    (sum, variant) => sum + Number(variant.assignmentCount ?? 0),
+                    0,
+                ),
+                validQuestionCount,
+                invalidQuestionCount,
+                questionCount: questions.length,
+                ready: validQuestionCount > 0 && invalidQuestionCount === 0,
+            };
+        })
+        .sort(
+            (left, right) =>
+                Number(!left.ready) - Number(!right.ready) ||
+                right.assignmentCount - left.assignmentCount ||
+                right.variants.length - left.variants.length ||
+                left.title.localeCompare(right.title),
+        );
+};
+
+const buildInvalidQuestionSummaries = (
+    groups: FeedbackCampaignQuestionGroup[],
+): InvalidQuestionSummary[] => {
+    const byQuestion = new Map<string, InvalidQuestionSummary>();
+    groups.forEach((group) => {
+        (group.questions ?? [])
+            .filter((question) => !isRatingWithRequiredComment(question))
+            .forEach((question) => {
+                const questionCode = String(question.questionCode || "UNKNOWN");
+                const existing = byQuestion.get(questionCode) ?? {
+                    questionCode,
+                    questionText: String(question.questionText ?? ""),
+                    sourceRules: [],
+                    competencies: [],
+                    variantLabels: [],
+                };
+                existing.sourceRules = unique([
+                    ...existing.sourceRules,
+                    question.sourceRuleName ||
+                    (question.sourceRuleId
+                        ? `Rule #${question.sourceRuleId}`
+                        : "Active Rule Set"),
+                ]);
+                existing.competencies = unique([
+                    ...existing.competencies,
+                    question.competencyName ||
+                    question.sectionTitle ||
+                    question.competencyCode ||
+                    "Unmapped competency",
+                ]);
+                existing.variantLabels = unique([
+                    ...existing.variantLabels,
+                    variantLabel(group),
+                ]);
+                byQuestion.set(questionCode, existing);
+            });
+    });
+    return Array.from(byQuestion.values()).sort((left, right) =>
+        left.questionCode.localeCompare(right.questionCode),
+    );
+};
 
 export function QuestionReviewStep({
                                        savedAssignmentCount,
@@ -54,269 +214,520 @@ export function QuestionReviewStep({
                                        saveQuestionReview,
                                        savingQuestionReview,
                                        loadingQuestionReview,
-                                       balanceCompetencyWeightsByQuestions,
                                        equalizeCompetencyWeights,
                                        updateCompetencyWeight,
                                        resolvingQuestionReview,
                                        resolveQuestionReview,
                                        questionReview,
                                        questionGroups,
-                                       buildQuestionCompetencies,
-                                       selectedQuestionGroup,
+                                       selectedQuestionGroupKey,
                                        setSelectedQuestionGroupKey,
-                                       relationshipLabel,
-                                       activeQuestionFormTitle,
-                                       selectedQuestionIncludedQuestionCount,
-                                       selectedQuestionTotalQuestionCount,
-                                       selectedQuestionIncludedCompetencyCount,
-                                       selectedQuestionTotalCompetencyCount,
-                                       selectedQuestionCompetencies,
-                                       isQuestionCompetencyExpanded,
-                                       handleCompetencyDrop,
-                                       writeQuestionDragData,
-                                       toggleQuestionCompetency,
-                                       isQuestionPreviewExpanded,
-                                       handleQuestionDrop,
-                                       toggleQuestionPreview,
-                                       toggleQuestionIncluded,
-                                   }: Props) {
+                                   }: QuestionReviewStepProps) {
+    const [selectedQuestionSetKey, setSelectedQuestionSetKey] = useState("");
+    const hasSnapshot = questionGroups.length > 0;
+    const snapshotStale = hasSnapshot && !questionReview.saved;
+
+    const questionSets = useMemo(
+        () => buildQuestionSets(questionGroups),
+        [questionGroups],
+    );
+    const invalidQuestionSummaries = useMemo(
+        () => buildInvalidQuestionSummaries(questionGroups),
+        [questionGroups],
+    );
+    const blockingGroups = questionGroups.filter(
+        (group) => Number(group.includedScoredQuestionCount ?? 0) === 0,
+    );
+    const formVariantCount = questionGroups.length;
+    const selectedQuestionSet =
+        questionSets.find((set) => set.setKey === selectedQuestionSetKey) ??
+        questionSets.find((set) =>
+            set.variants.some(
+                (variant) => variant.groupKey === selectedQuestionGroupKey,
+            ),
+        ) ??
+        questionSets[0] ??
+        null;
+    const invalidVariantCount = unique(
+        invalidQuestionSummaries.flatMap((item) => item.variantLabels),
+    ).length;
+
+    useEffect(() => {
+        if (questionSets.length === 0) {
+            setSelectedQuestionSetKey("");
+            return;
+        }
+        const selectedStillExists = questionSets.some(
+            (set) => set.setKey === selectedQuestionSetKey,
+        );
+        if (!selectedStillExists) {
+            const matchFromVariant = questionSets.find((set) =>
+                set.variants.some(
+                    (variant) => variant.groupKey === selectedQuestionGroupKey,
+                ),
+            );
+            setSelectedQuestionSetKey(
+                matchFromVariant?.setKey ?? questionSets[0].setKey,
+            );
+        }
+    }, [questionSets, selectedQuestionGroupKey, selectedQuestionSetKey]);
+
+    const selectQuestionSet = (questionSet: QuestionSet) => {
+        setSelectedQuestionSetKey(questionSet.setKey);
+        setSelectedQuestionGroupKey(questionSet.variants[0]?.groupKey ?? "");
+    };
+
     return (
-        <section className={`hfdq-table-card hfdqr-card hfdqw-card ${savedAssignmentCount === 0 ? 'disabled' : ''}`}>
-            <div className="hfdqw-page-head">
-                <div className="hfdqw-title-block">
+        <section
+            className={`hfdq-table-card hfdqs-card ${savedAssignmentCount === 0 ? "disabled" : ""}`}
+        >
+            <div className="hfdqs-head">
+                <div>
                     <span className="hfdq-kicker">Step 4</span>
-                    <h3>{selectedCampaign?.name ?? 'Feedback Campaign'}</h3>
-                    <p>Question review · evaluator forms · form readiness</p>
+                    <h3>Question Snapshot</h3>
+                    <p>
+                        Review unique question sets and scoring readiness before freezing
+                        the campaign forms. Questions are controlled by Question Bank and
+                        Rule Sets.
+                    </p>
                 </div>
-                <div className={`hfdqw-weight-indicator ${competencyWeightsReady ? 'ready' : 'warning'}`}>
-                    <span>Scoring weights</span>
-                    <strong>{formatPercent(competencyWeightTotal)}%</strong>
-                    <em>{competencyWeightsReady ? `${competencyWeights.length} competencies` : `${formatPercent(Math.abs(competencyWeightDelta))}% ${competencyWeightDelta > 0 ? 'remaining' : 'over'}`}</em>
-                    <button className="hfd-btn hfd-btn-primary" type="button" disabled={questionSaveDisabled} onClick={() => void saveQuestionReview()}>
-                        <i className="bi bi-save2" /> {savingQuestionReview ? 'Saving...' : 'Save Review'}
+                <div className="hfdqs-head-actions">
+                    <button
+                        className="hfd-btn hfd-btn-secondary"
+                        type="button"
+                        disabled={
+                            !selectedCampaign ||
+                            selectedCampaign.status !== "DRAFT" ||
+                            savedAssignmentCount === 0 ||
+                            resolvingQuestionReview
+                        }
+                        onClick={() => void resolveQuestionReview()}
+                    >
+                        <i className="bi bi-arrow-clockwise" />{" "}
+                        {resolvingQuestionReview ? "Refreshing..." : "Refresh Snapshot"}
+                    </button>
+                    <button
+                        className="hfd-btn hfd-btn-primary"
+                        type="button"
+                        disabled={
+                            questionSaveDisabled ||
+                            blockingGroups.length > 0 ||
+                            invalidQuestionSummaries.length > 0
+                        }
+                        onClick={() => void saveQuestionReview()}
+                    >
+                        <i className="bi bi-save2" />{" "}
+                        {savingQuestionReview ? "Saving..." : "Save Snapshot"}
                     </button>
                 </div>
             </div>
 
             {!selectedCampaign ? (
-                <div className="hfd-empty-state hfdt-empty"><i className="bi bi-save" /><strong>Save campaign info first</strong><p>Questions become available after the campaign setup is ready.</p></div>
+                <div className="hfd-empty-state hfdt-empty">
+                    <i className="bi bi-save" />
+                    <strong>Save campaign details first</strong>
+                    <p>
+                        Question snapshot becomes available after the campaign setup is
+                        ready.
+                    </p>
+                </div>
             ) : savedAssignmentCount === 0 ? (
-                <div className="hfd-empty-state hfdt-empty"><i className="bi bi-diagram-3" /><strong>Save evaluators first</strong><p>Questions become available after evaluators are saved.</p></div>
+                <div className="hfd-empty-state hfdt-empty">
+                    <i className="bi bi-diagram-3" />
+                    <strong>Save evaluator assignments first</strong>
+                    <p>
+                        Question forms are generated from the saved evaluator relationships.
+                    </p>
+                </div>
             ) : loadingQuestionReview ? (
-                <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading questions...</div>
+                <div className="hfd-spinner">
+                    <i className="bi bi-arrow-repeat" /> Loading question snapshot...
+                </div>
             ) : (
-                <div className="hfdqw-step-stack">
-                    <section className="hfdqw-scoring-panel">
-                        <div className="hfdqw-scoring-head">
+                <div className="hfdqs-body">
+                    <div className="hfdqs-summary-grid hfdqs-summary-grid-wide">
+                        <div>
+                            <strong>{questionSets.length}</strong>
+                            <span>question sets</span>
+                        </div>
+                        <div>
+                            <strong>{formVariantCount}</strong>
+                            <span>form variants</span>
+                        </div>
+                        <div>
+                            <strong>{questionReview.targetCount ?? 0}</strong>
+                            <span>recipients covered</span>
+                        </div>
+                        <div>
+                            <strong>{questionReview.assignmentCount ?? 0}</strong>
+                            <span>assignments covered</span>
+                        </div>
+                        <div
+                            className={
+                                invalidQuestionSummaries.length > 0 ? "danger" : "ready"
+                            }
+                        >
+                            <strong>{invalidQuestionSummaries.length}</strong>
+                            <span>invalid questions</span>
+                        </div>
+                    </div>
+
+                    {(snapshotStale ||
+                        (questionReview.warnings ?? []).length > 0 ||
+                        blockingGroups.length > 0 ||
+                        invalidQuestionSummaries.length > 0) && (
+                        <div
+                            className={`hfdqs-alert ${blockingGroups.length > 0 || invalidQuestionSummaries.length > 0 ? "danger" : "warning"}`}
+                        >
+                            <i
+                                className={`bi ${blockingGroups.length > 0 || invalidQuestionSummaries.length > 0 ? "bi-exclamation-octagon" : "bi-info-circle"}`}
+                            />
                             <div>
-                                <span className="hfdq-kicker">Scoring weights</span>
-                                <h4>Competency weights</h4>
-                                <p>Set how much each competency contributes to each evaluator form score.</p>
-                            </div>
-                            <div className={`hfdqw-total-pill ${competencyWeightsReady ? 'ready' : 'warning'}`}>
-                                <span>Total</span>
-                                <strong>{formatPercent(competencyWeightTotal)}%</strong>
+                                <strong>
+                                    {blockingGroups.length > 0 ||
+                                    invalidQuestionSummaries.length > 0
+                                        ? "Snapshot needs attention before it can be saved."
+                                        : snapshotStale
+                                            ? "Snapshot needs save."
+                                            : "Snapshot notice"}
+                                </strong>
+                                {snapshotStale && (
+                                    <p>
+                                        The evaluator assignments or active rules may have changed.
+                                        Save this snapshot before launch.
+                                    </p>
+                                )}
+                                {(questionReview.warnings ?? [])
+                                    .slice(0, 3)
+                                    .map((warning: string) => (
+                                        <p key={warning}>{warning}</p>
+                                    ))}
+                                {blockingGroups.length > 0 && (
+                                    <p>
+                                        {blockingGroups.length} form variant
+                                        {blockingGroups.length === 1 ? "" : "s"} have no rating
+                                        question with required comment.
+                                    </p>
+                                )}
+                                {invalidQuestionSummaries.length > 0 && (
+                                    <p>
+                                        {invalidQuestionSummaries.length} invalid question
+                                        {invalidQuestionSummaries.length === 1 ? "" : "s"} are used
+                                        across {invalidVariantCount} form variant
+                                        {invalidVariantCount === 1 ? "" : "s"}. Replace them in
+                                        Question Bank or Rule Sets, then refresh this snapshot.
+                                    </p>
+                                )}
                             </div>
                         </div>
+                    )}
 
-                        <div className="hfdqw-weight-actions">
-                            <button className="hfd-btn hfd-btn-secondary" type="button" disabled={selectedCampaign.status !== 'DRAFT'} onClick={balanceCompetencyWeightsByQuestions}>
-                                Balance by questions
-                            </button>
-                            <button className="hfd-btn hfd-btn-secondary" type="button" disabled={selectedCampaign.status !== 'DRAFT'} onClick={equalizeCompetencyWeights}>
-                                Equal by competency
-                            </button>
-                            <span>{competencyWeightsReady ? 'Ready to save.' : `Adjust weights to total 100%. ${formatPercent(Math.abs(competencyWeightDelta))}% ${competencyWeightDelta > 0 ? 'remaining' : 'over'}.`}</span>
-                        </div>
-
-                        {competencyWeights.length === 0 ? (
-                            <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-sliders" /><strong>No scoring weights yet</strong><p>Refresh questions from active rules to prepare competency weights.</p></div>
-                        ) : (
-                            <div className="hfdqw-weight-table">
-                                <div className="hfdqw-weight-row hfdqw-weight-header">
-                                    <span>Competency</span>
-                                    <span>Questions</span>
-                                    <span>Used in</span>
-                                    <span>Weight</span>
-                                </div>
-                                {competencyWeights.map((weight: any) => (
-                                    <div key={weight.competencyCode} className={`hfdqw-weight-row ${(weight.warnings ?? []).length > 0 ? 'warning' : ''}`}>
-                                        <div>
-                                            <strong>{weight.competencyName}</strong>
-                                            <small>{weight.competencyCode}</small>
-                                            {(weight.warnings ?? []).map((warning: any) => <em key={warning}><i className="bi bi-exclamation-triangle" /> {warning}</em>)}
-                                        </div>
-                                        <span>{weight.questionCountVariesByForm ? 'Varies by form' : `${weight.questionCountPerForm ?? 0} per form`}</span>
-                                        <span>{(weight.usedInForms ?? []).join(', ') || 'Not used'}</span>
-                                        <label className="hfdqw-weight-input">
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                step="0.01"
-                                                disabled={selectedCampaign.status !== 'DRAFT'}
-                                                value={Number(weight.weightPercent ?? 0)}
-                                                onChange={(event: any) => updateCompetencyWeight(weight.competencyCode, Number(event.target.value))}
-                                            />
-                                            <span>%</span>
-                                        </label>
-                                    </div>
+                    {invalidQuestionSummaries.length > 0 && (
+                        <section className="hfdqs-invalid-panel">
+                            <div className="hfdqs-panel-title">
+                                <span className="hfdq-kicker">Invalid questions</span>
+                                <strong>{invalidQuestionSummaries.length}</strong>
+                            </div>
+                            <div className="hfdqs-invalid-list">
+                                {invalidQuestionSummaries.slice(0, 6).map((item) => (
+                                    <article key={item.questionCode}>
+                                        <strong>{item.questionCode}</strong>
+                                        <span>{item.questionText}</span>
+                                        <small>
+                                            {item.competencies.join(", ")} · Used in{" "}
+                                            {item.variantLabels.length} variant
+                                            {item.variantLabels.length === 1 ? "" : "s"} ·{" "}
+                                            {item.sourceRules.join(", ")}
+                                        </small>
+                                    </article>
                                 ))}
+                                {invalidQuestionSummaries.length > 6 && (
+                                    <p>
+                                        {invalidQuestionSummaries.length - 6} more invalid question
+                                        {invalidQuestionSummaries.length - 6 === 1 ? "" : "s"}{" "}
+                                        hidden for readability.
+                                    </p>
+                                )}
                             </div>
-                        )}
-                    </section>
+                        </section>
+                    )}
 
-                    <div className="hfdqw-builder-layout">
-                        <aside className="hfdqw-form-panel">
-                            <div className="hfdqw-panel-head">
-                                <span className="hfdq-kicker">Forms</span>
-                                <h4>Feedback forms</h4>
-                                <p>Select the form to review.</p>
-                            </div>
-
-                            <div className="hfdqr-actions hfdqw-actions-top">
-                                <button className="hfd-btn hfd-btn-secondary" type="button" disabled={resolvingQuestionReview || savingQuestionReview} onClick={() => void resolveQuestionReview()}>
-                                    <i className="bi bi-arrow-repeat" /> {resolvingQuestionReview ? 'Refreshing...' : 'Refresh from Rules'}
-                                </button>
-                            </div>
-
-                            {questionReview.warnings.length > 0 && (
-                                <div className="hfdt-response-warnings compact">
-                                    {questionReview.warnings.slice(0, 4).map((item: any) => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
-                                </div>
-                            )}
-
-                            <div className="hfdqr-group-list hfdqw-form-list">
-                                {questionGroups.length === 0 ? (
-                                    <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-ui-checks-grid" /><strong>No questions yet</strong><p>Refresh from active rules to review the form.</p></div>
-                                ) : questionGroups.map((group: any) => {
-                                    const groupCompetencies = buildQuestionCompetencies(group.questions);
-                                    const groupReady = group.includedQuestionCount > 0 && group.warnings.length === 0;
-                                    return (
-                                        <button key={group.groupKey} type="button" className={`hfdqr-group-card hfdqw-form-tab ${selectedQuestionGroup?.groupKey === group.groupKey ? 'selected' : ''} ${groupReady ? 'ready' : 'warning'}`} onClick={() => setSelectedQuestionGroupKey(group.groupKey)}>
-                                            <span className={`hfdt-readiness-dot ${groupReady ? 'ready' : 'warning'}`} />
-                                            <span>
-                              <strong>{relationshipLabel(group.relationshipType)} form</strong>
-                              <small>{group.includedQuestionCount}/{group.questionCount} questions · {groupCompetencies.length} competencies</small>
-                            </span>
-                                            <em>{group.includedQuestionCount}</em>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </aside>
-
-                        <main className="hfdqw-builder-panel">
-                            {!selectedQuestionGroup ? (
-                                <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-ui-checks" /><strong>Select a form</strong><p>The question review will appear here.</p></div>
-                            ) : (
-                                <>
-                                    <div className="hfdqw-builder-head">
-                                        <div>
-                                            <span className="hfdq-kicker">Question review</span>
-                                            <h4>{activeQuestionFormTitle}</h4>
-                                            <p>{selectedQuestionIncludedQuestionCount}/{selectedQuestionTotalQuestionCount} questions · {selectedQuestionIncludedCompetencyCount}/{selectedQuestionTotalCompetencyCount} competencies</p>
-                                        </div>
-                                        <div className="hfdqw-form-meta">
-                                            <span>Rating scale: 1–5</span>
-                                            <span>Comments included</span>
-                                        </div>
+                    {!hasSnapshot ? (
+                        <div className="hfd-empty-state hfdt-empty">
+                            <i className="bi bi-ui-checks-grid" />
+                            <strong>No question snapshot yet</strong>
+                            <p>
+                                Refresh the snapshot to resolve forms from active Rule Sets.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="hfdqs-workbench hfdqs-workbench-grouped hfdqs-primary-workbench">
+                                <aside className="hfdqs-variants">
+                                    <div className="hfdqs-panel-title">
+                                        <span className="hfdq-kicker">Question sets</span>
+                                        <strong>{questionSets.length}</strong>
                                     </div>
-
-                                    {selectedQuestionGroup.warnings.length > 0 && (
-                                        <div className="hfdt-selected-issues hfdqr-group-warnings">
-                                            {selectedQuestionGroup.warnings.map((warning: any) => <span key={warning}><i className="bi bi-exclamation-triangle" /> {warning}</span>)}
-                                        </div>
-                                    )}
-
-                                    <div className="hfdqw-accordion-list">
-                                        {selectedQuestionCompetencies.length === 0 ? (
-                                            <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-slash-circle" /><strong>No questions found</strong><p>Refresh from active rules after updating the question setup.</p></div>
-                                        ) : selectedQuestionCompetencies.map((competency: any) => {
-                                            const includedCount = competency.questions.filter((question: any) => question.included).length;
-                                            const expanded = isQuestionCompetencyExpanded(selectedQuestionGroup.groupKey, competency.sectionCode);
+                                    <div className="hfdqs-variant-list">
+                                        {questionSets.map((questionSet) => {
+                                            const active =
+                                                selectedQuestionSet?.setKey === questionSet.setKey;
                                             return (
-                                                <article
-                                                    key={competency.sectionCode}
-                                                    className={`hfdqw-accordion-card ${expanded ? 'open' : ''}`}
-                                                    onDragOver={(event: any) => event.preventDefault()}
-                                                    onDrop={(event: any) => handleCompetencyDrop(event, selectedQuestionGroup.groupKey, competency.sectionCode)}
+                                                <button
+                                                    key={questionSet.setKey}
+                                                    type="button"
+                                                    className={`hfdqs-variant hfdqs-question-set ${active ? "active" : ""} ${questionSet.ready ? "ready" : "blocked"}`}
+                                                    onClick={() => selectQuestionSet(questionSet)}
                                                 >
-                                                    <div className="hfdqw-accordion-head">
-                                    <span
-                                        className="hfdqw-drag-handle"
-                                        draggable={selectedCampaign.status === 'DRAFT'}
-                                        onDragStart={(event: any) => writeQuestionDragData(event, { kind: 'competency', groupKey: selectedQuestionGroup.groupKey, sectionCode: competency.sectionCode })}
-                                        title="Drag to reorder"
-                                    >
-                                      <i className="bi bi-grip-vertical" />
-                                    </span>
-                                                        <button type="button" className="hfdqw-accordion-toggle" onClick={() => toggleQuestionCompetency(selectedQuestionGroup.groupKey, competency.sectionCode)}>
-                                      <span>
-                                        <strong>{competency.sectionTitle}</strong>
-                                        <small>{includedCount} question{includedCount === 1 ? '' : 's'}</small>
-                                      </span>
-                                                            <i className={`bi ${expanded ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                                                        </button>
-
-                                                    </div>
-
-                                                    {expanded && (
-                                                        <div className="hfdqw-question-stack">
-                                                            {competency.questions.map((question: any, questionIndex: any) => (
-                                                                <article
-                                                                    key={question.questionCode}
-                                                                    className={`hfdqw-question-card ${question.included ? 'included' : 'excluded'} ${isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) ? 'preview-open' : ''}`}
-                                                                    onDragOver={(event: any) => event.preventDefault()}
-                                                                    onDrop={(event: any) => {
-                                                                        event.stopPropagation();
-                                                                        handleQuestionDrop(event, selectedQuestionGroup.groupKey, competency.sectionCode, question.questionCode);
-                                                                    }}
-                                                                >
-                                              <span
-                                                  className="hfdqw-drag-handle"
-                                                  draggable={selectedCampaign.status === 'DRAFT'}
-                                                  onDragStart={(event: any) => writeQuestionDragData(event, { kind: 'question', groupKey: selectedQuestionGroup.groupKey, sectionCode: competency.sectionCode, questionCode: question.questionCode })}
-                                                  title="Drag to reorder"
-                                              >
-                                                <i className="bi bi-grip-vertical" />
-                                              </span>
-                                                                    <div className="hfdqw-question-body">
-                                                                        <div className="hfdqw-question-topline">
-                                                                            <small>Question {questionIndex + 1}</small>
-                                                                            <div className="hfdqw-question-actions">
-                                                                                <button type="button" className="hfdqw-preview-toggle" onClick={() => toggleQuestionPreview(selectedQuestionGroup.groupKey, question.questionCode)}>
-                                                                                    {isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) ? 'Hide preview' : 'Show preview'}
-                                                                                    <i className={`bi ${isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
-                                                                                </button>
-                                                                                <label className="hfdqw-include-toggle">
-                                                                                    <input type="checkbox" checked={question.included} disabled={selectedCampaign.status !== 'DRAFT'} onChange={() => toggleQuestionIncluded(selectedQuestionGroup.groupKey, question.questionCode)} />
-                                                                                    <span>{question.included ? 'Included' : 'Excluded'}</span>
-                                                                                </label>
-                                                                            </div>
-                                                                        </div>
-                                                                        <strong>{question.questionText}</strong>
-                                                                        {isQuestionPreviewExpanded(selectedQuestionGroup.groupKey, question.questionCode) && (
-                                                                            <div className="hfdqw-preview-controls">
-                                                                                <div className="hfdqw-rating-preview" aria-hidden="true">
-                                                                                    {[1, 2, 3, 4, 5].map((value: any) => <button key={value} type="button" disabled>{value}</button>)}
-                                                                                </div>
-                                                                                <textarea className="hfdqw-comment-preview" disabled rows={3} placeholder="Write a clear, helpful comment for this feedback response." />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </article>
-                                                            ))}
-                                                        </div>
+                          <span>
+                            {questionSet.relationshipLabels.length === 1
+                                ? questionSet.relationshipLabels[0]
+                                : "Shared form"}
+                          </span>
+                                                    <strong>{questionSet.title}</strong>
+                                                    <em>
+                                                        {questionSet.validQuestionCount} valid questions ·{" "}
+                                                        {questionSet.variants.length} variant
+                                                        {questionSet.variants.length === 1 ? "" : "s"}
+                                                    </em>
+                                                    <small>
+                                                        {questionSet.targetCount} recipients ·{" "}
+                                                        {questionSet.assignmentCount} assignments
+                                                    </small>
+                                                    {!questionSet.ready && (
+                                                        <b>
+                                                            {questionSet.invalidQuestionCount > 0
+                                                                ? `${questionSet.invalidQuestionCount} invalid`
+                                                                : "No valid question"}
+                                                        </b>
                                                     )}
-                                                </article>
+                                                </button>
                                             );
                                         })}
                                     </div>
-                                </>
-                            )}
-                        </main>
-                    </div>
+                                </aside>
+
+                                <main className="hfdqs-preview-panel">
+                                    {!selectedQuestionSet ? (
+                                        <div className="hfd-empty-state hfdt-mini-empty">
+                                            <i className="bi bi-ui-checks" />
+                                            <strong>Select a question set</strong>
+                                            <p>
+                                                Choose a question set to preview the evaluator form
+                                                once.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="hfdqs-form-head">
+                                                <div>
+                          <span className="hfdq-kicker">
+                            Evaluator form preview
+                          </span>
+                                                    <h4>{selectedQuestionSet.title}</h4>
+                                                    <p>
+                                                        {selectedQuestionSet.variants.length} variants ·{" "}
+                                                        {selectedQuestionSet.targetCount} recipients ·{" "}
+                                                        {selectedQuestionSet.assignmentCount} assignments ·{" "}
+                                                        {selectedQuestionSet.validQuestionCount} valid
+                                                        questions
+                                                    </p>
+                                                </div>
+                                                <span
+                                                    className={`hfdqs-status ${selectedQuestionSet.ready ? "ready" : "blocked"}`}
+                                                >
+                          {selectedQuestionSet.ready ? "Ready" : "Blocked"}
+                        </span>
+                                            </div>
+
+                                            <div className="hfdqs-form-preview hfdqs-form-preview-compact">
+                                                {selectedQuestionSet.competencies.length === 0 ? (
+                                                    <div className="hfd-empty-state hfdt-mini-empty">
+                                                        <i className="bi bi-slash-circle" />
+                                                        <strong>No questions matched</strong>
+                                                        <p>
+                                                            Update active Rule Sets for this recipient and
+                                                            relationship scope.
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    selectedQuestionSet.competencies.map(
+                                                        (competency: any, competencyIndex: number) => (
+                                                            <article
+                                                                key={competency.sectionCode}
+                                                                className="hfdqs-competency"
+                                                            >
+                                                                <header>
+                                  <span>
+                                    {String(competencyIndex + 1).padStart(
+                                        2,
+                                        "0",
+                                    )}
+                                  </span>
+                                                                    <div>
+                                                                        <strong>{competency.sectionTitle}</strong>
+                                                                        <small>
+                                                                            {(competency.questions ?? []).length}{" "}
+                                                                            question
+                                                                            {(competency.questions ?? []).length === 1
+                                                                                ? ""
+                                                                                : "s"}
+                                                                        </small>
+                                                                    </div>
+                                                                </header>
+                                                                <div className="hfdqs-question-list">
+                                                                    {(competency.questions ?? []).map(
+                                                                        (question: any, questionIndex: number) => {
+                                                                            const valid =
+                                                                                isRatingWithRequiredComment(question);
+                                                                            return (
+                                                                                <article
+                                                                                    key={`${question.questionCode}-${questionIndex}`}
+                                                                                    className={`hfdqs-question ${valid ? "" : "invalid"}`}
+                                                                                >
+                                                                                    <div className="hfdqs-question-copy">
+                                                                                        <small>
+                                                                                            {question.questionCode} ·{" "}
+                                                                                            {valid
+                                                                                                ? "Rating 1–5 + required comment"
+                                                                                                : "Invalid for 360 campaign"}
+                                                                                        </small>
+                                                                                        <strong>
+                                                                                            {question.questionText}
+                                                                                        </strong>
+                                                                                    </div>
+                                                                                    <div className="hfdqs-question-response-row">
+                                                                                        <div
+                                                                                            className="hfdqs-rating-preview"
+                                                                                            aria-hidden="true"
+                                                                                        >
+                                                                                            {[1, 2, 3, 4, 5].map((value) => (
+                                                                                                <span key={value}>{value}</span>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                        <div className="hfdqs-comment-preview">
+                                                                                            Comment required
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </article>
+                                                                            );
+                                                                        },
+                                                                    )}
+                                                                </div>
+                                                            </article>
+                                                        ),
+                                                    )
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </main>
+                            </div>
+
+                            <section className="hfdqs-competency-weight-panel">
+                                <div className="hfdqs-weight-header">
+                                    <div>
+                                        <span className="hfdq-kicker">Competency weights</span>
+                                        <h4>Scoring importance</h4>
+                                        <p>
+                                            Questions come from Rule Sets. This section only controls
+                                            how much each competency contributes to the final score.
+                                        </p>
+                                    </div>
+                                    <div className="hfdqs-weight-total">
+                                        <span>Total</span>
+                                        <strong
+                                            className={
+                                                competencyWeightsReady ? "ready-text" : "warn-text"
+                                            }
+                                        >
+                                            {formatPercent(competencyWeightTotal)}%
+                                        </strong>
+                                    </div>
+                                </div>
+
+                                <div className="hfdqs-weight-mode-row">
+                                    <button
+                                        className="hfd-btn hfd-btn-secondary"
+                                        type="button"
+                                        disabled={selectedCampaign.status !== "DRAFT"}
+                                        onClick={equalizeCompetencyWeights}
+                                    >
+                                        Equal weight
+                                    </button>
+                                    <span className="hfdqs-weight-mode-note">
+                    Edit any percentage to use custom competency weights. Weight
+                    by question count is not used.
+                  </span>
+                                </div>
+
+                                {!competencyWeightsReady && (
+                                    <p className="hfdqs-weight-warning">
+                                        {formatPercent(Math.abs(competencyWeightDelta))}%{" "}
+                                        {competencyWeightDelta > 0 ? "remaining" : "over"}. Total
+                                        must equal 100% before saving.
+                                    </p>
+                                )}
+
+                                <div
+                                    className="hfdqs-weight-table"
+                                    role="table"
+                                    aria-label="Competency weights"
+                                >
+                                    <div className="hfdqs-weight-table-head" role="row">
+                                        <span>Competency</span>
+                                        <span>Questions</span>
+                                        <span>Used in</span>
+                                        <span>Weight</span>
+                                    </div>
+                                    {competencyWeights.map((weight: any) => {
+                                        const questionCountLabel = weight.questionCountVariesByForm
+                                            ? "Varies"
+                                            : `${Number(weight.questionCountPerForm ?? 0)}`;
+                                        return (
+                                            <label
+                                                key={weight.competencyCode}
+                                                className="hfdqs-weight-table-row"
+                                                role="row"
+                                            >
+                        <span className="hfdqs-weight-name">
+                          <strong>{weight.competencyName}</strong>
+                          <small>{weight.competencyCode}</small>
+                        </span>
+                                                <span>{questionCountLabel}</span>
+                                                <span>
+                          {Number(weight.formCount ?? 0)} variant
+                                                    {Number(weight.formCount ?? 0) === 1 ? "" : "s"}
+                        </span>
+                                                <span className="hfdqs-weight-input-wrap">
+                          <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              disabled={selectedCampaign.status !== "DRAFT"}
+                              value={Number(weight.weightPercent ?? 0)}
+                              onChange={(event) =>
+                                  updateCompetencyWeight(
+                                      weight.competencyCode,
+                                      Number(event.target.value),
+                                  )
+                              }
+                          />
+                          <em>%</em>
+                        </span>
+                                                {(weight.warnings ?? []).length > 0 && (
+                                                    <small className="hfdqs-weight-row-warning">
+                                                        {weight.warnings[0]}
+                                                    </small>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        </>
+                    )}
                 </div>
             )}
         </section>

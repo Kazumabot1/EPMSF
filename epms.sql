@@ -23,30 +23,30 @@ DROP TABLE IF EXISTS `appraisal_cycle`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_cycle` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `activated_at` datetime(6) DEFAULT NULL,
-  `completed_at` datetime(6) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `cycle_name` varchar(180) NOT NULL,
-  `cycle_type` enum('ANNUAL','SEMI_ANNUAL','CUSTOM') NOT NULL,
-  `cycle_year` int NOT NULL,
-  `description` text,
-  `end_date` date NOT NULL,
-  `locked` bit(1) NOT NULL,
-  `period_no` int NOT NULL,
-  `start_date` date NOT NULL,
-  `status` enum('DRAFT','ACTIVE','LOCKED','COMPLETED') NOT NULL,
-  `submission_deadline` date NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `created_by_user_id` int DEFAULT NULL,
-  `template_id` int NOT NULL,
-  `dept_head_submission_deadline` date DEFAULT NULL,
-  `manager_submission_deadline` date DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKpr6d1yxrn765qtqii2q27f568` (`created_by_user_id`),
-  KEY `FKdlnsd6yu2qyfbwnq98fpa8fa` (`template_id`),
-  CONSTRAINT `FKdlnsd6yu2qyfbwnq98fpa8fa` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`),
-  CONSTRAINT `FKpr6d1yxrn765qtqii2q27f568` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
+                                   `id` int NOT NULL AUTO_INCREMENT,
+                                   `activated_at` datetime(6) DEFAULT NULL,
+                                   `completed_at` datetime(6) DEFAULT NULL,
+                                   `created_at` datetime(6) NOT NULL,
+                                   `cycle_name` varchar(180) NOT NULL,
+                                   `cycle_type` enum('ANNUAL','SEMI_ANNUAL','CUSTOM') NOT NULL,
+                                   `cycle_year` int NOT NULL,
+                                   `description` text,
+                                   `end_date` date NOT NULL,
+                                   `locked` bit(1) NOT NULL,
+                                   `period_no` int NOT NULL,
+                                   `start_date` date NOT NULL,
+                                   `status` enum('DRAFT','ACTIVE','LOCKED','COMPLETED') NOT NULL,
+                                   `submission_deadline` date NOT NULL,
+                                   `updated_at` datetime(6) DEFAULT NULL,
+                                   `created_by_user_id` int DEFAULT NULL,
+                                   `template_id` int NOT NULL,
+                                   `dept_head_submission_deadline` date DEFAULT NULL,
+                                   `manager_submission_deadline` date DEFAULT NULL,
+                                   PRIMARY KEY (`id`),
+                                   KEY `FKpr6d1yxrn765qtqii2q27f568` (`created_by_user_id`),
+                                   KEY `FKdlnsd6yu2qyfbwnq98fpa8fa` (`template_id`),
+                                   CONSTRAINT `FKdlnsd6yu2qyfbwnq98fpa8fa` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`),
+                                   CONSTRAINT `FKpr6d1yxrn765qtqii2q27f568` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -67,14 +67,14 @@ DROP TABLE IF EXISTS `appraisal_cycle_department`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_cycle_department` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cycle_id` int NOT NULL,
-  `department_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_appraisal_cycle_department` (`cycle_id`,`department_id`),
-  KEY `FKhglm09i5o8yfbcs999htl5j1w` (`department_id`),
-  CONSTRAINT `FKhglm09i5o8yfbcs999htl5j1w` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
-  CONSTRAINT `FKr25yvv3o9yar96xekmei0mtb2` FOREIGN KEY (`cycle_id`) REFERENCES `appraisal_cycle` (`id`)
+                                              `id` int NOT NULL AUTO_INCREMENT,
+                                              `cycle_id` int NOT NULL,
+                                              `department_id` int NOT NULL,
+                                              PRIMARY KEY (`id`),
+                                              UNIQUE KEY `uk_appraisal_cycle_department` (`cycle_id`,`department_id`),
+                                              KEY `FKhglm09i5o8yfbcs999htl5j1w` (`department_id`),
+                                              CONSTRAINT `FKhglm09i5o8yfbcs999htl5j1w` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
+                                              CONSTRAINT `FKr25yvv3o9yar96xekmei0mtb2` FOREIGN KEY (`cycle_id`) REFERENCES `appraisal_cycle` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -95,17 +95,17 @@ DROP TABLE IF EXISTS `appraisal_form_criteria`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_form_criteria` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) NOT NULL,
-  `criteria_text` text NOT NULL,
-  `description` text,
-  `max_rating` int NOT NULL,
-  `rating_required` bit(1) NOT NULL,
-  `sort_order` int NOT NULL,
-  `section_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKs6l5j3f7mprp4dmb5f29u5229` (`section_id`),
-  CONSTRAINT `FKs6l5j3f7mprp4dmb5f29u5229` FOREIGN KEY (`section_id`) REFERENCES `appraisal_section` (`id`)
+                                           `id` int NOT NULL AUTO_INCREMENT,
+                                           `active` bit(1) NOT NULL,
+                                           `criteria_text` text NOT NULL,
+                                           `description` text,
+                                           `max_rating` int NOT NULL,
+                                           `rating_required` bit(1) NOT NULL,
+                                           `sort_order` int NOT NULL,
+                                           `section_id` int NOT NULL,
+                                           PRIMARY KEY (`id`),
+                                           KEY `FKs6l5j3f7mprp4dmb5f29u5229` (`section_id`),
+                                           CONSTRAINT `FKs6l5j3f7mprp4dmb5f29u5229` FOREIGN KEY (`section_id`) REFERENCES `appraisal_section` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -126,24 +126,24 @@ DROP TABLE IF EXISTS `appraisal_form_template`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_form_template` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `appraisee_signature_id` bigint DEFAULT NULL,
-  `appraiser_signature_id` bigint DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `cycle_specific_copy` bit(1) NOT NULL,
-  `description` text,
-  `form_type` enum('ANNUAL','SEMI_ANNUAL','CUSTOM') NOT NULL,
-  `hr_signature_id` bigint DEFAULT NULL,
-  `signature_date_format` varchar(20) DEFAULT NULL,
-  `status` enum('DRAFT','ACTIVE','ARCHIVED') NOT NULL,
-  `target_all_departments` bit(1) NOT NULL,
-  `template_name` varchar(180) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `version_no` int NOT NULL,
-  `created_by_user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKbiqsi6pe34m2s663ovhfvgt5c` (`created_by_user_id`),
-  CONSTRAINT `FKbiqsi6pe34m2s663ovhfvgt5c` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
+                                           `id` int NOT NULL AUTO_INCREMENT,
+                                           `appraisee_signature_id` bigint DEFAULT NULL,
+                                           `appraiser_signature_id` bigint DEFAULT NULL,
+                                           `created_at` datetime(6) NOT NULL,
+                                           `cycle_specific_copy` bit(1) NOT NULL,
+                                           `description` text,
+                                           `form_type` enum('ANNUAL','SEMI_ANNUAL','CUSTOM') NOT NULL,
+                                           `hr_signature_id` bigint DEFAULT NULL,
+                                           `signature_date_format` varchar(20) DEFAULT NULL,
+                                           `status` enum('DRAFT','ACTIVE','ARCHIVED') NOT NULL,
+                                           `target_all_departments` bit(1) NOT NULL,
+                                           `template_name` varchar(180) NOT NULL,
+                                           `updated_at` datetime(6) DEFAULT NULL,
+                                           `version_no` int NOT NULL,
+                                           `created_by_user_id` int DEFAULT NULL,
+                                           PRIMARY KEY (`id`),
+                                           KEY `FKbiqsi6pe34m2s663ovhfvgt5c` (`created_by_user_id`),
+                                           CONSTRAINT `FKbiqsi6pe34m2s663ovhfvgt5c` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -164,23 +164,23 @@ DROP TABLE IF EXISTS `appraisal_review`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_review` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `comment` text,
-  `created_at` datetime(6) NOT NULL,
-  `decision` enum('SUBMITTED','APPROVED','RETURNED','REJECTED') NOT NULL,
-  `recommendation` text,
-  `review_stage` enum('PM','DEPT_HEAD','HR') NOT NULL,
-  `signature_image_data` longtext,
-  `signature_image_type` varchar(80) DEFAULT NULL,
-  `submitted_at` datetime(6) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `employee_appraisal_form_id` int NOT NULL,
-  `reviewer_user_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_appraisal_review_form_stage` (`employee_appraisal_form_id`,`review_stage`),
-  KEY `FKego6hms3jeu7dhv7eq9t6j2vs` (`reviewer_user_id`),
-  CONSTRAINT `FK16lpj94uojky6e0u1thns1j9c` FOREIGN KEY (`employee_appraisal_form_id`) REFERENCES `employee_appraisal_form` (`id`),
-  CONSTRAINT `FKego6hms3jeu7dhv7eq9t6j2vs` FOREIGN KEY (`reviewer_user_id`) REFERENCES `users` (`id`)
+                                    `id` int NOT NULL AUTO_INCREMENT,
+                                    `comment` text,
+                                    `created_at` datetime(6) NOT NULL,
+                                    `decision` enum('SUBMITTED','APPROVED','RETURNED','REJECTED') NOT NULL,
+                                    `recommendation` text,
+                                    `review_stage` enum('PM','DEPT_HEAD','HR') NOT NULL,
+                                    `signature_image_data` longtext,
+                                    `signature_image_type` varchar(80) DEFAULT NULL,
+                                    `submitted_at` datetime(6) DEFAULT NULL,
+                                    `updated_at` datetime(6) DEFAULT NULL,
+                                    `employee_appraisal_form_id` int NOT NULL,
+                                    `reviewer_user_id` int NOT NULL,
+                                    PRIMARY KEY (`id`),
+                                    UNIQUE KEY `uk_appraisal_review_form_stage` (`employee_appraisal_form_id`,`review_stage`),
+                                    KEY `FKego6hms3jeu7dhv7eq9t6j2vs` (`reviewer_user_id`),
+                                    CONSTRAINT `FK16lpj94uojky6e0u1thns1j9c` FOREIGN KEY (`employee_appraisal_form_id`) REFERENCES `employee_appraisal_form` (`id`),
+                                    CONSTRAINT `FKego6hms3jeu7dhv7eq9t6j2vs` FOREIGN KEY (`reviewer_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -201,14 +201,14 @@ DROP TABLE IF EXISTS `appraisal_score_band`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_score_band` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) NOT NULL,
-  `description` text,
-  `label` varchar(100) NOT NULL,
-  `max_score` int NOT NULL,
-  `min_score` int NOT NULL,
-  `sort_order` int NOT NULL,
-  PRIMARY KEY (`id`)
+                                        `id` int NOT NULL AUTO_INCREMENT,
+                                        `active` bit(1) NOT NULL,
+                                        `description` text,
+                                        `label` varchar(100) NOT NULL,
+                                        `max_score` int NOT NULL,
+                                        `min_score` int NOT NULL,
+                                        `sort_order` int NOT NULL,
+                                        PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -229,15 +229,15 @@ DROP TABLE IF EXISTS `appraisal_section`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_section` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) NOT NULL,
-  `description` text,
-  `section_name` varchar(180) NOT NULL,
-  `sort_order` int NOT NULL,
-  `template_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKa1dhmqq0twqelb5f0vvxwyei4` (`template_id`),
-  CONSTRAINT `FKa1dhmqq0twqelb5f0vvxwyei4` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`)
+                                     `id` int NOT NULL AUTO_INCREMENT,
+                                     `active` bit(1) NOT NULL,
+                                     `description` text,
+                                     `section_name` varchar(180) NOT NULL,
+                                     `sort_order` int NOT NULL,
+                                     `template_id` int NOT NULL,
+                                     PRIMARY KEY (`id`),
+                                     KEY `FKa1dhmqq0twqelb5f0vvxwyei4` (`template_id`),
+                                     CONSTRAINT `FKa1dhmqq0twqelb5f0vvxwyei4` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -258,14 +258,14 @@ DROP TABLE IF EXISTS `appraisal_template_department`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_template_department` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `department_id` int NOT NULL,
-  `template_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_appraisal_template_department` (`template_id`,`department_id`),
-  KEY `FKkchplgeqwtf3gyxyj4eg60ypn` (`department_id`),
-  CONSTRAINT `FKkchplgeqwtf3gyxyj4eg60ypn` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
-  CONSTRAINT `FKp85mmiv685o0ur8f8jw9819ao` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`)
+                                                 `id` int NOT NULL AUTO_INCREMENT,
+                                                 `department_id` int NOT NULL,
+                                                 `template_id` int NOT NULL,
+                                                 PRIMARY KEY (`id`),
+                                                 UNIQUE KEY `uk_appraisal_template_department` (`template_id`,`department_id`),
+                                                 KEY `FKkchplgeqwtf3gyxyj4eg60ypn` (`department_id`),
+                                                 CONSTRAINT `FKkchplgeqwtf3gyxyj4eg60ypn` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
+                                                 CONSTRAINT `FKp85mmiv685o0ur8f8jw9819ao` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -286,17 +286,17 @@ DROP TABLE IF EXISTS `appraisal_template_score_band`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `appraisal_template_score_band` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) NOT NULL,
-  `description` text,
-  `label` varchar(100) NOT NULL,
-  `max_score` int NOT NULL,
-  `min_score` int NOT NULL,
-  `sort_order` int NOT NULL,
-  `template_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKjbw9qhsasvlpcx0txk2mqqoah` (`template_id`),
-  CONSTRAINT `FKjbw9qhsasvlpcx0txk2mqqoah` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`)
+                                                 `id` int NOT NULL AUTO_INCREMENT,
+                                                 `active` bit(1) NOT NULL,
+                                                 `description` text,
+                                                 `label` varchar(100) NOT NULL,
+                                                 `max_score` int NOT NULL,
+                                                 `min_score` int NOT NULL,
+                                                 `sort_order` int NOT NULL,
+                                                 `template_id` int NOT NULL,
+                                                 PRIMARY KEY (`id`),
+                                                 KEY `FKjbw9qhsasvlpcx0txk2mqqoah` (`template_id`),
+                                                 CONSTRAINT `FKjbw9qhsasvlpcx0txk2mqqoah` FOREIGN KEY (`template_id`) REFERENCES `appraisal_form_template` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -317,15 +317,15 @@ DROP TABLE IF EXISTS `assessment_form_questions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assessment_form_questions` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `question_text` text NOT NULL,
-  `is_required` bit(1) NOT NULL,
-  `response_type` varchar(30) NOT NULL,
-  `weight` double NOT NULL,
-  `section_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKqnit6dvmbfsxrog36pcgjlodg` (`section_id`),
-  CONSTRAINT `FKqnit6dvmbfsxrog36pcgjlodg` FOREIGN KEY (`section_id`) REFERENCES `assessment_form_sections` (`id`)
+                                             `id` int NOT NULL AUTO_INCREMENT,
+                                             `question_text` text NOT NULL,
+                                             `is_required` bit(1) NOT NULL,
+                                             `response_type` varchar(30) NOT NULL,
+                                             `weight` double NOT NULL,
+                                             `section_id` int NOT NULL,
+                                             PRIMARY KEY (`id`),
+                                             KEY `FKqnit6dvmbfsxrog36pcgjlodg` (`section_id`),
+                                             CONSTRAINT `FKqnit6dvmbfsxrog36pcgjlodg` FOREIGN KEY (`section_id`) REFERENCES `assessment_form_sections` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -346,16 +346,16 @@ DROP TABLE IF EXISTS `assessment_form_score_bands`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assessment_form_score_bands` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `description` text,
-  `label` varchar(100) NOT NULL,
-  `max_score` int NOT NULL,
-  `min_score` int NOT NULL,
-  `sort_order` int NOT NULL,
-  `form_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKsm876cea5orp361hykipvx8lb` (`form_id`),
-  CONSTRAINT `FKsm876cea5orp361hykipvx8lb` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
+                                               `id` int NOT NULL AUTO_INCREMENT,
+                                               `description` text,
+                                               `label` varchar(100) NOT NULL,
+                                               `max_score` int NOT NULL,
+                                               `min_score` int NOT NULL,
+                                               `sort_order` int NOT NULL,
+                                               `form_id` int NOT NULL,
+                                               PRIMARY KEY (`id`),
+                                               KEY `FKsm876cea5orp361hykipvx8lb` (`form_id`),
+                                               CONSTRAINT `FKsm876cea5orp361hykipvx8lb` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -376,13 +376,13 @@ DROP TABLE IF EXISTS `assessment_form_sections`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assessment_form_sections` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `order_no` int NOT NULL,
-  `title` varchar(180) NOT NULL,
-  `form_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKkr81olmi6ul6ibtb0o66q4kxr` (`form_id`),
-  CONSTRAINT `FKkr81olmi6ul6ibtb0o66q4kxr` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
+                                            `id` int NOT NULL AUTO_INCREMENT,
+                                            `order_no` int NOT NULL,
+                                            `title` varchar(180) NOT NULL,
+                                            `form_id` int NOT NULL,
+                                            PRIMARY KEY (`id`),
+                                            KEY `FKkr81olmi6ul6ibtb0o66q4kxr` (`form_id`),
+                                            CONSTRAINT `FKkr81olmi6ul6ibtb0o66q4kxr` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -403,10 +403,10 @@ DROP TABLE IF EXISTS `assessment_form_target_departments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assessment_form_target_departments` (
-  `form_id` int NOT NULL,
-  `department_id` int NOT NULL,
-  KEY `FKmjrb9rk7xntne85uc7t5fghss` (`form_id`),
-  CONSTRAINT `FKmjrb9rk7xntne85uc7t5fghss` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
+                                                      `form_id` int NOT NULL,
+                                                      `department_id` int NOT NULL,
+                                                      KEY `FKmjrb9rk7xntne85uc7t5fghss` (`form_id`),
+                                                      CONSTRAINT `FKmjrb9rk7xntne85uc7t5fghss` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -427,10 +427,10 @@ DROP TABLE IF EXISTS `assessment_form_target_roles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assessment_form_target_roles` (
-  `form_id` int NOT NULL,
-  `target_role` varchar(60) NOT NULL,
-  KEY `FK72khsfufd3nmjxo6cj2ki501q` (`form_id`),
-  CONSTRAINT `FK72khsfufd3nmjxo6cj2ki501q` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
+                                                `form_id` int NOT NULL,
+                                                `target_role` varchar(60) NOT NULL,
+                                                KEY `FK72khsfufd3nmjxo6cj2ki501q` (`form_id`),
+                                                CONSTRAINT `FK72khsfufd3nmjxo6cj2ki501q` FOREIGN KEY (`form_id`) REFERENCES `assessment_forms` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -451,16 +451,16 @@ DROP TABLE IF EXISTS `assessment_forms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `assessment_forms` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `is_active` bit(1) NOT NULL,
-  `company_name` varchar(180) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `description` text,
-  `end_date` date NOT NULL,
-  `form_name` varchar(180) NOT NULL,
-  `start_date` date NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                    `id` int NOT NULL AUTO_INCREMENT,
+                                    `is_active` bit(1) NOT NULL,
+                                    `company_name` varchar(180) DEFAULT NULL,
+                                    `created_at` datetime(6) NOT NULL,
+                                    `description` text,
+                                    `end_date` date NOT NULL,
+                                    `form_name` varchar(180) NOT NULL,
+                                    `start_date` date NOT NULL,
+                                    `updated_at` datetime(6) DEFAULT NULL,
+                                    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -481,17 +481,17 @@ DROP TABLE IF EXISTS `audit_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `audit_logs` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `action` varchar(255) DEFAULT NULL,
-  `changed_column` varchar(255) DEFAULT NULL,
-  `entity_id` int DEFAULT NULL,
-  `entity_type` varchar(255) DEFAULT NULL,
-  `new_value` text,
-  `old_value` text,
-  `reason` varchar(150) DEFAULT NULL,
-  `timestamp` datetime(6) DEFAULT NULL,
-  `user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                              `id` int NOT NULL AUTO_INCREMENT,
+                              `action` varchar(255) DEFAULT NULL,
+                              `changed_column` varchar(255) DEFAULT NULL,
+                              `entity_id` int DEFAULT NULL,
+                              `entity_type` varchar(255) DEFAULT NULL,
+                              `new_value` text,
+                              `old_value` text,
+                              `reason` varchar(150) DEFAULT NULL,
+                              `timestamp` datetime(6) DEFAULT NULL,
+                              `user_id` int DEFAULT NULL,
+                              PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -512,22 +512,22 @@ DROP TABLE IF EXISTS `continuous_feedback`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `continuous_feedback` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `category` varchar(50) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `feedback_text` text NOT NULL,
-  `rating` int DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `employee_id` int NOT NULL,
-  `giver_user_id` int NOT NULL,
-  `team_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK76absyh67j31ryu4qbxct13hq` (`employee_id`),
-  KEY `FKkgbgy3qbx1n57tm2vb1qj8vl4` (`giver_user_id`),
-  KEY `FKmeeum7fg0s9040bqdpgc8wgp5` (`team_id`),
-  CONSTRAINT `FK76absyh67j31ryu4qbxct13hq` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
-  CONSTRAINT `FKkgbgy3qbx1n57tm2vb1qj8vl4` FOREIGN KEY (`giver_user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKmeeum7fg0s9040bqdpgc8wgp5` FOREIGN KEY (`team_id`) REFERENCES `team` (`id`)
+                                       `id` int NOT NULL AUTO_INCREMENT,
+                                       `category` varchar(50) NOT NULL,
+                                       `created_at` datetime(6) NOT NULL,
+                                       `feedback_text` text NOT NULL,
+                                       `rating` int DEFAULT NULL,
+                                       `updated_at` datetime(6) DEFAULT NULL,
+                                       `employee_id` int NOT NULL,
+                                       `giver_user_id` int NOT NULL,
+                                       `team_id` int DEFAULT NULL,
+                                       PRIMARY KEY (`id`),
+                                       KEY `FK76absyh67j31ryu4qbxct13hq` (`employee_id`),
+                                       KEY `FKkgbgy3qbx1n57tm2vb1qj8vl4` (`giver_user_id`),
+                                       KEY `FKmeeum7fg0s9040bqdpgc8wgp5` (`team_id`),
+                                       CONSTRAINT `FK76absyh67j31ryu4qbxct13hq` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
+                                       CONSTRAINT `FKkgbgy3qbx1n57tm2vb1qj8vl4` FOREIGN KEY (`giver_user_id`) REFERENCES `users` (`id`),
+                                       CONSTRAINT `FKmeeum7fg0s9040bqdpgc8wgp5` FOREIGN KEY (`team_id`) REFERENCES `team` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -549,16 +549,16 @@ DROP TABLE IF EXISTS `department`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `department` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `created_by` varchar(255) DEFAULT NULL,
-  `department_code` varchar(255) DEFAULT NULL,
-  `department_name` varchar(255) NOT NULL,
-  `head_employee` varchar(255) DEFAULT NULL,
-  `status` bit(1) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_f5np34wnxt905fwmrs6133l28` (`department_name`),
-  UNIQUE KEY `UK_tc0vggvvuqc22trtdy0dmrahh` (`department_code`)
+                              `id` int NOT NULL AUTO_INCREMENT,
+                              `created_at` datetime(6) DEFAULT NULL,
+                              `created_by` varchar(255) DEFAULT NULL,
+                              `department_code` varchar(255) DEFAULT NULL,
+                              `department_name` varchar(255) NOT NULL,
+                              `head_employee` varchar(255) DEFAULT NULL,
+                              `status` bit(1) DEFAULT NULL,
+                              PRIMARY KEY (`id`),
+                              UNIQUE KEY `UK_f5np34wnxt905fwmrs6133l28` (`department_name`),
+                              UNIQUE KEY `UK_tc0vggvvuqc22trtdy0dmrahh` (`department_code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -580,29 +580,29 @@ DROP TABLE IF EXISTS `employee`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) DEFAULT NULL,
-  `contact_address` varchar(255) DEFAULT NULL,
-  `date_of_birth` date DEFAULT NULL,
-  `email` varchar(255) DEFAULT NULL,
-  `father_name` varchar(255) DEFAULT NULL,
-  `father_nrc` varchar(255) DEFAULT NULL,
-  `first_name` varchar(255) DEFAULT NULL,
-  `gender` varchar(255) DEFAULT NULL,
-  `last_name` varchar(255) DEFAULT NULL,
-  `marital_status` varchar(255) DEFAULT NULL,
-  `password` varchar(255) DEFAULT NULL,
-  `permanent_address` varchar(255) DEFAULT NULL,
-  `phone_number` varchar(255) DEFAULT NULL,
-  `race` varchar(255) DEFAULT NULL,
-  `religion` varchar(255) DEFAULT NULL,
-  `spouse_name` varchar(255) DEFAULT NULL,
-  `spouse_nrc` varchar(255) DEFAULT NULL,
-  `staff_nrc` varchar(255) DEFAULT NULL,
-  `position_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKirla0e5n0j54wihlxctb03cc0` (`position_id`),
-  CONSTRAINT `FKirla0e5n0j54wihlxctb03cc0` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`)
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `active` bit(1) DEFAULT NULL,
+                            `contact_address` varchar(255) DEFAULT NULL,
+                            `date_of_birth` date DEFAULT NULL,
+                            `email` varchar(255) DEFAULT NULL,
+                            `father_name` varchar(255) DEFAULT NULL,
+                            `father_nrc` varchar(255) DEFAULT NULL,
+                            `first_name` varchar(255) DEFAULT NULL,
+                            `gender` varchar(255) DEFAULT NULL,
+                            `last_name` varchar(255) DEFAULT NULL,
+                            `marital_status` varchar(255) DEFAULT NULL,
+                            `password` varchar(255) DEFAULT NULL,
+                            `permanent_address` varchar(255) DEFAULT NULL,
+                            `phone_number` varchar(255) DEFAULT NULL,
+                            `race` varchar(255) DEFAULT NULL,
+                            `religion` varchar(255) DEFAULT NULL,
+                            `spouse_name` varchar(255) DEFAULT NULL,
+                            `spouse_nrc` varchar(255) DEFAULT NULL,
+                            `staff_nrc` varchar(255) DEFAULT NULL,
+                            `position_id` int DEFAULT NULL,
+                            PRIMARY KEY (`id`),
+                            KEY `FKirla0e5n0j54wihlxctb03cc0` (`position_id`),
+                            CONSTRAINT `FKirla0e5n0j54wihlxctb03cc0` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -624,18 +624,18 @@ DROP TABLE IF EXISTS `employee_appraisal_criteria_rating`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_appraisal_criteria_rating` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `comment` text,
-  `created_at` datetime(6) NOT NULL,
-  `rating_value` int NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `criteria_id` int NOT NULL,
-  `employee_appraisal_form_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_employee_appraisal_criteria_rating` (`employee_appraisal_form_id`,`criteria_id`),
-  KEY `FK4yuntswivevm9f119suxsw8g0` (`criteria_id`),
-  CONSTRAINT `FK4yuntswivevm9f119suxsw8g0` FOREIGN KEY (`criteria_id`) REFERENCES `appraisal_form_criteria` (`id`),
-  CONSTRAINT `FKhksb9tla4qosv4773ic2erus4` FOREIGN KEY (`employee_appraisal_form_id`) REFERENCES `employee_appraisal_form` (`id`)
+                                                      `id` int NOT NULL AUTO_INCREMENT,
+                                                      `comment` text,
+                                                      `created_at` datetime(6) NOT NULL,
+                                                      `rating_value` int NOT NULL,
+                                                      `updated_at` datetime(6) DEFAULT NULL,
+                                                      `criteria_id` int NOT NULL,
+                                                      `employee_appraisal_form_id` int NOT NULL,
+                                                      PRIMARY KEY (`id`),
+                                                      UNIQUE KEY `uk_employee_appraisal_criteria_rating` (`employee_appraisal_form_id`,`criteria_id`),
+                                                      KEY `FK4yuntswivevm9f119suxsw8g0` (`criteria_id`),
+                                                      CONSTRAINT `FK4yuntswivevm9f119suxsw8g0` FOREIGN KEY (`criteria_id`) REFERENCES `appraisal_form_criteria` (`id`),
+                                                      CONSTRAINT `FKhksb9tla4qosv4773ic2erus4` FOREIGN KEY (`employee_appraisal_form_id`) REFERENCES `employee_appraisal_form` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -656,41 +656,41 @@ DROP TABLE IF EXISTS `employee_appraisal_form`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_appraisal_form` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `answered_criteria_count` int DEFAULT NULL,
-  `assessment_date` date DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `department_name_snapshot` varchar(180) DEFAULT NULL,
-  `dept_head_submitted_at` datetime(6) DEFAULT NULL,
-  `effective_date` date DEFAULT NULL,
-  `employee_code_snapshot` varchar(80) DEFAULT NULL,
-  `employee_name_snapshot` varchar(180) DEFAULT NULL,
-  `hr_approved_at` datetime(6) DEFAULT NULL,
-  `locked` bit(1) NOT NULL,
-  `performance_label` varchar(80) DEFAULT NULL,
-  `pm_submitted_at` datetime(6) DEFAULT NULL,
-  `position_snapshot` varchar(180) DEFAULT NULL,
-  `score_percent` double DEFAULT NULL,
-  `status` enum('PM_DRAFT','DEPT_HEAD_PENDING','HR_PENDING','COMPLETED','RETURNED','REJECTED') NOT NULL,
-  `total_points` int DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `visible_to_employee` bit(1) NOT NULL,
-  `cycle_id` int NOT NULL,
-  `department_id` int NOT NULL,
-  `department_head_user_id` int DEFAULT NULL,
-  `employee_id` int NOT NULL,
-  `project_manager_user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_employee_appraisal_cycle_employee` (`cycle_id`,`employee_id`),
-  KEY `FKi86gbj5wdfhy4gh22c2ie1s5i` (`department_id`),
-  KEY `FK77lt4ayo3lio3v4ijcq8laa6e` (`department_head_user_id`),
-  KEY `FK6292c3f09dxdg0gcygu8835wk` (`employee_id`),
-  KEY `FKi94stmmulbyip4wws9tbr4sh2` (`project_manager_user_id`),
-  CONSTRAINT `FK6292c3f09dxdg0gcygu8835wk` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
-  CONSTRAINT `FK77lt4ayo3lio3v4ijcq8laa6e` FOREIGN KEY (`department_head_user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKi86gbj5wdfhy4gh22c2ie1s5i` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
-  CONSTRAINT `FKi94stmmulbyip4wws9tbr4sh2` FOREIGN KEY (`project_manager_user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKn9iodfekfaifi8l99lf8ab6t` FOREIGN KEY (`cycle_id`) REFERENCES `appraisal_cycle` (`id`)
+                                           `id` int NOT NULL AUTO_INCREMENT,
+                                           `answered_criteria_count` int DEFAULT NULL,
+                                           `assessment_date` date DEFAULT NULL,
+                                           `created_at` datetime(6) NOT NULL,
+                                           `department_name_snapshot` varchar(180) DEFAULT NULL,
+                                           `dept_head_submitted_at` datetime(6) DEFAULT NULL,
+                                           `effective_date` date DEFAULT NULL,
+                                           `employee_code_snapshot` varchar(80) DEFAULT NULL,
+                                           `employee_name_snapshot` varchar(180) DEFAULT NULL,
+                                           `hr_approved_at` datetime(6) DEFAULT NULL,
+                                           `locked` bit(1) NOT NULL,
+                                           `performance_label` varchar(80) DEFAULT NULL,
+                                           `pm_submitted_at` datetime(6) DEFAULT NULL,
+                                           `position_snapshot` varchar(180) DEFAULT NULL,
+                                           `score_percent` double DEFAULT NULL,
+                                           `status` enum('PM_DRAFT','DEPT_HEAD_PENDING','HR_PENDING','COMPLETED','RETURNED','REJECTED') NOT NULL,
+                                           `total_points` int DEFAULT NULL,
+                                           `updated_at` datetime(6) DEFAULT NULL,
+                                           `visible_to_employee` bit(1) NOT NULL,
+                                           `cycle_id` int NOT NULL,
+                                           `department_id` int NOT NULL,
+                                           `department_head_user_id` int DEFAULT NULL,
+                                           `employee_id` int NOT NULL,
+                                           `project_manager_user_id` int DEFAULT NULL,
+                                           PRIMARY KEY (`id`),
+                                           UNIQUE KEY `uk_employee_appraisal_cycle_employee` (`cycle_id`,`employee_id`),
+                                           KEY `FKi86gbj5wdfhy4gh22c2ie1s5i` (`department_id`),
+                                           KEY `FK77lt4ayo3lio3v4ijcq8laa6e` (`department_head_user_id`),
+                                           KEY `FK6292c3f09dxdg0gcygu8835wk` (`employee_id`),
+                                           KEY `FKi94stmmulbyip4wws9tbr4sh2` (`project_manager_user_id`),
+                                           CONSTRAINT `FK6292c3f09dxdg0gcygu8835wk` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
+                                           CONSTRAINT `FK77lt4ayo3lio3v4ijcq8laa6e` FOREIGN KEY (`department_head_user_id`) REFERENCES `users` (`id`),
+                                           CONSTRAINT `FKi86gbj5wdfhy4gh22c2ie1s5i` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
+                                           CONSTRAINT `FKi94stmmulbyip4wws9tbr4sh2` FOREIGN KEY (`project_manager_user_id`) REFERENCES `users` (`id`),
+                                           CONSTRAINT `FKn9iodfekfaifi8l99lf8ab6t` FOREIGN KEY (`cycle_id`) REFERENCES `appraisal_cycle` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -711,19 +711,19 @@ DROP TABLE IF EXISTS `employee_appraisal_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_appraisal_history` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `action_name` varchar(80) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `from_status` enum('PM_DRAFT','DEPT_HEAD_PENDING','HR_PENDING','COMPLETED','RETURNED','REJECTED') DEFAULT NULL,
-  `note` text,
-  `to_status` enum('PM_DRAFT','DEPT_HEAD_PENDING','HR_PENDING','COMPLETED','RETURNED','REJECTED') DEFAULT NULL,
-  `action_by_user_id` int DEFAULT NULL,
-  `employee_appraisal_form_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKe2tgns9kns29f7w2edgpf3d9o` (`action_by_user_id`),
-  KEY `FKdc2bodtmv38r94qdhwpdwoc18` (`employee_appraisal_form_id`),
-  CONSTRAINT `FKdc2bodtmv38r94qdhwpdwoc18` FOREIGN KEY (`employee_appraisal_form_id`) REFERENCES `employee_appraisal_form` (`id`),
-  CONSTRAINT `FKe2tgns9kns29f7w2edgpf3d9o` FOREIGN KEY (`action_by_user_id`) REFERENCES `users` (`id`)
+                                              `id` int NOT NULL AUTO_INCREMENT,
+                                              `action_name` varchar(80) NOT NULL,
+                                              `created_at` datetime(6) NOT NULL,
+                                              `from_status` enum('PM_DRAFT','DEPT_HEAD_PENDING','HR_PENDING','COMPLETED','RETURNED','REJECTED') DEFAULT NULL,
+                                              `note` text,
+                                              `to_status` enum('PM_DRAFT','DEPT_HEAD_PENDING','HR_PENDING','COMPLETED','RETURNED','REJECTED') DEFAULT NULL,
+                                              `action_by_user_id` int DEFAULT NULL,
+                                              `employee_appraisal_form_id` int NOT NULL,
+                                              PRIMARY KEY (`id`),
+                                              KEY `FKe2tgns9kns29f7w2edgpf3d9o` (`action_by_user_id`),
+                                              KEY `FKdc2bodtmv38r94qdhwpdwoc18` (`employee_appraisal_form_id`),
+                                              CONSTRAINT `FKdc2bodtmv38r94qdhwpdwoc18` FOREIGN KEY (`employee_appraisal_form_id`) REFERENCES `employee_appraisal_form` (`id`),
+                                              CONSTRAINT `FKe2tgns9kns29f7w2edgpf3d9o` FOREIGN KEY (`action_by_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -744,22 +744,22 @@ DROP TABLE IF EXISTS `employee_assessment_answers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_assessment_answers` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `comment` text,
-  `item_order` int NOT NULL,
-  `max_rating` int NOT NULL,
-  `question_id` int DEFAULT NULL,
-  `question_text` text NOT NULL,
-  `rating` int DEFAULT NULL,
-  `is_required` bit(1) NOT NULL,
-  `response_type` varchar(30) NOT NULL,
-  `section_title` varchar(255) NOT NULL,
-  `weight` double NOT NULL,
-  `yes_no_answer` bit(1) DEFAULT NULL,
-  `assessment_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKshp9yi3wfvb562nyvp3jmx9t2` (`assessment_id`),
-  CONSTRAINT `FKshp9yi3wfvb562nyvp3jmx9t2` FOREIGN KEY (`assessment_id`) REFERENCES `employee_assessments` (`id`)
+                                               `id` bigint NOT NULL AUTO_INCREMENT,
+                                               `comment` text,
+                                               `item_order` int NOT NULL,
+                                               `max_rating` int NOT NULL,
+                                               `question_id` int DEFAULT NULL,
+                                               `question_text` text NOT NULL,
+                                               `rating` int DEFAULT NULL,
+                                               `is_required` bit(1) NOT NULL,
+                                               `response_type` varchar(30) NOT NULL,
+                                               `section_title` varchar(255) NOT NULL,
+                                               `weight` double NOT NULL,
+                                               `yes_no_answer` bit(1) DEFAULT NULL,
+                                               `assessment_id` bigint NOT NULL,
+                                               PRIMARY KEY (`id`),
+                                               KEY `FKshp9yi3wfvb562nyvp3jmx9t2` (`assessment_id`),
+                                               CONSTRAINT `FKshp9yi3wfvb562nyvp3jmx9t2` FOREIGN KEY (`assessment_id`) REFERENCES `employee_assessments` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -780,59 +780,59 @@ DROP TABLE IF EXISTS `employee_assessments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_assessments` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `approved_at` datetime(6) DEFAULT NULL,
-  `assessment_date` date DEFAULT NULL,
-  `assessment_form_id` int DEFAULT NULL,
-  `company_name` varchar(255) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `current_position` varchar(255) DEFAULT NULL,
-  `decline_reason` text,
-  `declined_at` datetime(6) DEFAULT NULL,
-  `department_head_comment` text,
-  `department_head_name` varchar(255) DEFAULT NULL,
-  `department_head_signature_id` bigint DEFAULT NULL,
-  `department_head_signature_image_data` longtext,
-  `department_head_signature_image_type` varchar(50) DEFAULT NULL,
-  `department_head_signature_name` varchar(255) DEFAULT NULL,
-  `department_head_signed_at` datetime(6) DEFAULT NULL,
-  `department_head_user_id` int DEFAULT NULL,
-  `department_id` int DEFAULT NULL,
-  `department_name` varchar(255) DEFAULT NULL,
-  `employee_code` varchar(255) DEFAULT NULL,
-  `employee_id` int DEFAULT NULL,
-  `employee_name` varchar(255) NOT NULL,
-  `employee_signature_id` bigint DEFAULT NULL,
-  `employee_signature_image_data` longtext,
-  `employee_signature_image_type` varchar(50) DEFAULT NULL,
-  `employee_signature_name` varchar(255) DEFAULT NULL,
-  `employee_signed_at` datetime(6) DEFAULT NULL,
-  `form_name` varchar(255) DEFAULT NULL,
-  `hr_comment` text,
-  `hr_signature_id` bigint DEFAULT NULL,
-  `hr_signature_image_data` longtext,
-  `hr_signature_image_type` varchar(50) DEFAULT NULL,
-  `hr_signature_name` varchar(255) DEFAULT NULL,
-  `hr_signed_at` datetime(6) DEFAULT NULL,
-  `manager_comment` text,
-  `manager_name` varchar(255) DEFAULT NULL,
-  `manager_signature_id` bigint DEFAULT NULL,
-  `manager_signature_image_data` longtext,
-  `manager_signature_image_type` varchar(50) DEFAULT NULL,
-  `manager_signature_name` varchar(255) DEFAULT NULL,
-  `manager_signed_at` datetime(6) DEFAULT NULL,
-  `manager_user_id` int DEFAULT NULL,
-  `max_score` double DEFAULT NULL,
-  `performance_label` varchar(255) DEFAULT NULL,
-  `period_label` varchar(255) NOT NULL,
-  `remarks` text,
-  `score_percent` double DEFAULT NULL,
-  `status` enum('DRAFT','SUBMITTED','REJECTED','PENDING_MANAGER','PENDING_DEPARTMENT_HEAD','PENDING_HR','APPROVED','DECLINED') NOT NULL,
-  `submitted_at` datetime(6) DEFAULT NULL,
-  `total_score` double DEFAULT NULL,
-  `updated_at` datetime(6) NOT NULL,
-  `user_id` int NOT NULL,
-  PRIMARY KEY (`id`)
+                                        `id` bigint NOT NULL AUTO_INCREMENT,
+                                        `approved_at` datetime(6) DEFAULT NULL,
+                                        `assessment_date` date DEFAULT NULL,
+                                        `assessment_form_id` int DEFAULT NULL,
+                                        `company_name` varchar(255) DEFAULT NULL,
+                                        `created_at` datetime(6) NOT NULL,
+                                        `current_position` varchar(255) DEFAULT NULL,
+                                        `decline_reason` text,
+                                        `declined_at` datetime(6) DEFAULT NULL,
+                                        `department_head_comment` text,
+                                        `department_head_name` varchar(255) DEFAULT NULL,
+                                        `department_head_signature_id` bigint DEFAULT NULL,
+                                        `department_head_signature_image_data` longtext,
+                                        `department_head_signature_image_type` varchar(50) DEFAULT NULL,
+                                        `department_head_signature_name` varchar(255) DEFAULT NULL,
+                                        `department_head_signed_at` datetime(6) DEFAULT NULL,
+                                        `department_head_user_id` int DEFAULT NULL,
+                                        `department_id` int DEFAULT NULL,
+                                        `department_name` varchar(255) DEFAULT NULL,
+                                        `employee_code` varchar(255) DEFAULT NULL,
+                                        `employee_id` int DEFAULT NULL,
+                                        `employee_name` varchar(255) NOT NULL,
+                                        `employee_signature_id` bigint DEFAULT NULL,
+                                        `employee_signature_image_data` longtext,
+                                        `employee_signature_image_type` varchar(50) DEFAULT NULL,
+                                        `employee_signature_name` varchar(255) DEFAULT NULL,
+                                        `employee_signed_at` datetime(6) DEFAULT NULL,
+                                        `form_name` varchar(255) DEFAULT NULL,
+                                        `hr_comment` text,
+                                        `hr_signature_id` bigint DEFAULT NULL,
+                                        `hr_signature_image_data` longtext,
+                                        `hr_signature_image_type` varchar(50) DEFAULT NULL,
+                                        `hr_signature_name` varchar(255) DEFAULT NULL,
+                                        `hr_signed_at` datetime(6) DEFAULT NULL,
+                                        `manager_comment` text,
+                                        `manager_name` varchar(255) DEFAULT NULL,
+                                        `manager_signature_id` bigint DEFAULT NULL,
+                                        `manager_signature_image_data` longtext,
+                                        `manager_signature_image_type` varchar(50) DEFAULT NULL,
+                                        `manager_signature_name` varchar(255) DEFAULT NULL,
+                                        `manager_signed_at` datetime(6) DEFAULT NULL,
+                                        `manager_user_id` int DEFAULT NULL,
+                                        `max_score` double DEFAULT NULL,
+                                        `performance_label` varchar(255) DEFAULT NULL,
+                                        `period_label` varchar(255) NOT NULL,
+                                        `remarks` text,
+                                        `score_percent` double DEFAULT NULL,
+                                        `status` enum('DRAFT','SUBMITTED','REJECTED','PENDING_MANAGER','PENDING_DEPARTMENT_HEAD','PENDING_HR','APPROVED','DECLINED') NOT NULL,
+                                        `submitted_at` datetime(6) DEFAULT NULL,
+                                        `total_score` double DEFAULT NULL,
+                                        `updated_at` datetime(6) NOT NULL,
+                                        `user_id` int NOT NULL,
+                                        PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -853,15 +853,15 @@ DROP TABLE IF EXISTS `employee_audit_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_audit_history` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `edited_at` datetime(6) NOT NULL,
-  `edited_by` int DEFAULT NULL,
-  `employee_id` int NOT NULL,
-  `field_name` varchar(100) NOT NULL,
-  `new_value` varchar(500) DEFAULT NULL,
-  `old_value` varchar(500) DEFAULT NULL,
-  `reason` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                          `id` int NOT NULL AUTO_INCREMENT,
+                                          `edited_at` datetime(6) NOT NULL,
+                                          `edited_by` int DEFAULT NULL,
+                                          `employee_id` int NOT NULL,
+                                          `field_name` varchar(100) NOT NULL,
+                                          `new_value` varchar(500) DEFAULT NULL,
+                                          `old_value` varchar(500) DEFAULT NULL,
+                                          `reason` varchar(255) DEFAULT NULL,
+                                          PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -882,20 +882,20 @@ DROP TABLE IF EXISTS `employee_department`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_department` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `assign_by` varchar(255) DEFAULT NULL,
-  `enddate` date DEFAULT NULL,
-  `startdate` date DEFAULT NULL,
-  `currentdepartment` int DEFAULT NULL,
-  `employee_id` int NOT NULL,
-  `parentdepartment` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKmc1pr3fh1bxau5stjmx4rpjgw` (`currentdepartment`),
-  KEY `FK6njtipgqouu9ax631vmw9xlra` (`employee_id`),
-  KEY `FKf8190iecicmi04nixqkvbcw4r` (`parentdepartment`),
-  CONSTRAINT `FK6njtipgqouu9ax631vmw9xlra` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
-  CONSTRAINT `FKf8190iecicmi04nixqkvbcw4r` FOREIGN KEY (`parentdepartment`) REFERENCES `department` (`id`),
-  CONSTRAINT `FKmc1pr3fh1bxau5stjmx4rpjgw` FOREIGN KEY (`currentdepartment`) REFERENCES `department` (`id`)
+                                       `id` int NOT NULL AUTO_INCREMENT,
+                                       `assign_by` varchar(255) DEFAULT NULL,
+                                       `enddate` date DEFAULT NULL,
+                                       `startdate` date DEFAULT NULL,
+                                       `currentdepartment` int DEFAULT NULL,
+                                       `employee_id` int NOT NULL,
+                                       `parentdepartment` int DEFAULT NULL,
+                                       PRIMARY KEY (`id`),
+                                       KEY `FKmc1pr3fh1bxau5stjmx4rpjgw` (`currentdepartment`),
+                                       KEY `FK6njtipgqouu9ax631vmw9xlra` (`employee_id`),
+                                       KEY `FKf8190iecicmi04nixqkvbcw4r` (`parentdepartment`),
+                                       CONSTRAINT `FK6njtipgqouu9ax631vmw9xlra` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
+                                       CONSTRAINT `FKf8190iecicmi04nixqkvbcw4r` FOREIGN KEY (`parentdepartment`) REFERENCES `department` (`id`),
+                                       CONSTRAINT `FKmc1pr3fh1bxau5stjmx4rpjgw` FOREIGN KEY (`currentdepartment`) REFERENCES `department` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -917,29 +917,29 @@ DROP TABLE IF EXISTS `employee_kpi_forms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_kpi_forms` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `acknowledged_at` datetime(6) DEFAULT NULL,
-  `assigned_at` datetime(6) NOT NULL,
-  `finalized_at` datetime(6) DEFAULT NULL,
-  `sent_at` datetime(6) DEFAULT NULL,
-  `status` enum('ASSIGNED','IN_PROGRESS','FINALIZED','CLOSED','SENT_TO_EMPLOYEE','ACKNOWLEDGED') NOT NULL,
-  `total_score` double DEFAULT NULL,
-  `total_weighted_score` double DEFAULT NULL,
-  `employee_id` int NOT NULL,
-  `kpi_form_id` int NOT NULL,
-  `early_finalized_reason` text,
-  `finalized_before_end_date` bit(1) DEFAULT NULL,
-  `finalized_by_user_id` int DEFAULT NULL,
-  `kpi_template_cycle_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKglyrpfyy6wkkqwn2o8500pe14` (`employee_id`),
-  KEY `FK2vy170w0p665ds8g697oi1gwj` (`kpi_form_id`),
-  KEY `FK5kqrcrniahjfa8a7vlgv5vroa` (`finalized_by_user_id`),
-  KEY `FKc2nxy7fgo2il3e8n1672uvwu1` (`kpi_template_cycle_id`),
-  CONSTRAINT `FK2vy170w0p665ds8g697oi1gwj` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`),
-  CONSTRAINT `FK5kqrcrniahjfa8a7vlgv5vroa` FOREIGN KEY (`finalized_by_user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKc2nxy7fgo2il3e8n1672uvwu1` FOREIGN KEY (`kpi_template_cycle_id`) REFERENCES `kpi_template_cycle` (`id`),
-  CONSTRAINT `FKglyrpfyy6wkkqwn2o8500pe14` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`)
+                                      `id` int NOT NULL AUTO_INCREMENT,
+                                      `acknowledged_at` datetime(6) DEFAULT NULL,
+                                      `assigned_at` datetime(6) NOT NULL,
+                                      `finalized_at` datetime(6) DEFAULT NULL,
+                                      `sent_at` datetime(6) DEFAULT NULL,
+                                      `status` enum('ASSIGNED','IN_PROGRESS','FINALIZED','CLOSED','SENT_TO_EMPLOYEE','ACKNOWLEDGED') NOT NULL,
+                                      `total_score` double DEFAULT NULL,
+                                      `total_weighted_score` double DEFAULT NULL,
+                                      `employee_id` int NOT NULL,
+                                      `kpi_form_id` int NOT NULL,
+                                      `early_finalized_reason` text,
+                                      `finalized_before_end_date` bit(1) DEFAULT NULL,
+                                      `finalized_by_user_id` int DEFAULT NULL,
+                                      `kpi_template_cycle_id` int DEFAULT NULL,
+                                      PRIMARY KEY (`id`),
+                                      KEY `FKglyrpfyy6wkkqwn2o8500pe14` (`employee_id`),
+                                      KEY `FK2vy170w0p665ds8g697oi1gwj` (`kpi_form_id`),
+                                      KEY `FK5kqrcrniahjfa8a7vlgv5vroa` (`finalized_by_user_id`),
+                                      KEY `FKc2nxy7fgo2il3e8n1672uvwu1` (`kpi_template_cycle_id`),
+                                      CONSTRAINT `FK2vy170w0p665ds8g697oi1gwj` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`),
+                                      CONSTRAINT `FK5kqrcrniahjfa8a7vlgv5vroa` FOREIGN KEY (`finalized_by_user_id`) REFERENCES `users` (`id`),
+                                      CONSTRAINT `FKc2nxy7fgo2il3e8n1672uvwu1` FOREIGN KEY (`kpi_template_cycle_id`) REFERENCES `kpi_template_cycle` (`id`),
+                                      CONSTRAINT `FKglyrpfyy6wkkqwn2o8500pe14` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -960,23 +960,23 @@ DROP TABLE IF EXISTS `employee_kpi_scores`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_kpi_scores` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `actual_value` double DEFAULT NULL,
-  `comment` text,
-  `evaluated_at` datetime(6) DEFAULT NULL,
-  `evaluated_by_string` varchar(255) DEFAULT NULL,
-  `score` double DEFAULT NULL,
-  `weighted_score` double DEFAULT NULL,
-  `employee_kpi_form_id` int NOT NULL,
-  `evaluated_by` int DEFAULT NULL,
-  `kpi_form_item_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKhxdad26ggjrb4qw4d7x838yyo` (`employee_kpi_form_id`),
-  KEY `FKsbcwf31jn7vxdnkfy9waw9x2x` (`evaluated_by`),
-  KEY `FKje1huo6w1wgrivodyg5qfxpac` (`kpi_form_item_id`),
-  CONSTRAINT `FKhxdad26ggjrb4qw4d7x838yyo` FOREIGN KEY (`employee_kpi_form_id`) REFERENCES `employee_kpi_forms` (`id`),
-  CONSTRAINT `FKje1huo6w1wgrivodyg5qfxpac` FOREIGN KEY (`kpi_form_item_id`) REFERENCES `kpi_form_items` (`id`),
-  CONSTRAINT `FKsbcwf31jn7vxdnkfy9waw9x2x` FOREIGN KEY (`evaluated_by`) REFERENCES `users` (`id`)
+                                       `id` int NOT NULL AUTO_INCREMENT,
+                                       `actual_value` double DEFAULT NULL,
+                                       `comment` text,
+                                       `evaluated_at` datetime(6) DEFAULT NULL,
+                                       `evaluated_by_string` varchar(255) DEFAULT NULL,
+                                       `score` double DEFAULT NULL,
+                                       `weighted_score` double DEFAULT NULL,
+                                       `employee_kpi_form_id` int NOT NULL,
+                                       `evaluated_by` int DEFAULT NULL,
+                                       `kpi_form_item_id` int NOT NULL,
+                                       PRIMARY KEY (`id`),
+                                       KEY `FKhxdad26ggjrb4qw4d7x838yyo` (`employee_kpi_form_id`),
+                                       KEY `FKsbcwf31jn7vxdnkfy9waw9x2x` (`evaluated_by`),
+                                       KEY `FKje1huo6w1wgrivodyg5qfxpac` (`kpi_form_item_id`),
+                                       CONSTRAINT `FKhxdad26ggjrb4qw4d7x838yyo` FOREIGN KEY (`employee_kpi_form_id`) REFERENCES `employee_kpi_forms` (`id`),
+                                       CONSTRAINT `FKje1huo6w1wgrivodyg5qfxpac` FOREIGN KEY (`kpi_form_item_id`) REFERENCES `kpi_form_items` (`id`),
+                                       CONSTRAINT `FKsbcwf31jn7vxdnkfy9waw9x2x` FOREIGN KEY (`evaluated_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -997,31 +997,31 @@ DROP TABLE IF EXISTS `feedback_assignment_questions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_assignment_questions` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `competency_code` varchar(80) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `display_order` int NOT NULL,
-  `question_bank_id` bigint DEFAULT NULL,
-  `question_code` varchar(80) NOT NULL,
-  `question_text_snapshot` text NOT NULL,
-  `rating_scale_id` int DEFAULT NULL,
-  `is_required` bit(1) NOT NULL,
-  `response_type` varchar(40) NOT NULL,
-  `scoring_behavior` varchar(30) NOT NULL,
-  `section_code` varchar(80) NOT NULL,
-  `section_order` int NOT NULL,
-  `section_title` varchar(150) NOT NULL,
-  `weight` double NOT NULL,
-  `assignment_id` bigint NOT NULL,
-  `question_version_id` bigint DEFAULT NULL,
-  `source_question_id` bigint DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_feedback_assignment_question_code` (`assignment_id`,`question_code`),
-  KEY `FKo8b4r2efnytna64ddjwvlmw4m` (`question_version_id`),
-  KEY `FKsf4wcljqu0ndth1rf6hmdsyed` (`source_question_id`),
-  CONSTRAINT `FK72tc86dpv18qxbd62hbxrjxqh` FOREIGN KEY (`assignment_id`) REFERENCES `feedback_evaluator_assignments` (`id`),
-  CONSTRAINT `FKo8b4r2efnytna64ddjwvlmw4m` FOREIGN KEY (`question_version_id`) REFERENCES `feedback_question_versions` (`id`),
-  CONSTRAINT `FKsf4wcljqu0ndth1rf6hmdsyed` FOREIGN KEY (`source_question_id`) REFERENCES `feedback_questions` (`id`)
+                                                 `id` bigint NOT NULL AUTO_INCREMENT,
+                                                 `competency_code` varchar(80) DEFAULT NULL,
+                                                 `created_at` datetime(6) NOT NULL,
+                                                 `display_order` int NOT NULL,
+                                                 `question_bank_id` bigint DEFAULT NULL,
+                                                 `question_code` varchar(80) NOT NULL,
+                                                 `question_text_snapshot` text NOT NULL,
+                                                 `rating_scale_id` int DEFAULT NULL,
+                                                 `is_required` bit(1) NOT NULL,
+                                                 `response_type` varchar(40) NOT NULL,
+                                                 `scoring_behavior` varchar(30) NOT NULL,
+                                                 `section_code` varchar(80) NOT NULL,
+                                                 `section_order` int NOT NULL,
+                                                 `section_title` varchar(150) NOT NULL,
+                                                 `weight` double NOT NULL,
+                                                 `assignment_id` bigint NOT NULL,
+                                                 `question_version_id` bigint DEFAULT NULL,
+                                                 `source_question_id` bigint DEFAULT NULL,
+                                                 PRIMARY KEY (`id`),
+                                                 UNIQUE KEY `uk_feedback_assignment_question_code` (`assignment_id`,`question_code`),
+                                                 KEY `FKo8b4r2efnytna64ddjwvlmw4m` (`question_version_id`),
+                                                 KEY `FKsf4wcljqu0ndth1rf6hmdsyed` (`source_question_id`),
+                                                 CONSTRAINT `FK72tc86dpv18qxbd62hbxrjxqh` FOREIGN KEY (`assignment_id`) REFERENCES `feedback_evaluator_assignments` (`id`),
+                                                 CONSTRAINT `FKo8b4r2efnytna64ddjwvlmw4m` FOREIGN KEY (`question_version_id`) REFERENCES `feedback_question_versions` (`id`),
+                                                 CONSTRAINT `FKsf4wcljqu0ndth1rf6hmdsyed` FOREIGN KEY (`source_question_id`) REFERENCES `feedback_questions` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1042,34 +1042,34 @@ DROP TABLE IF EXISTS `feedback_campaigns`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_campaigns` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `auto_submit_completed_drafts_on_close` bit(1) NOT NULL,
-  `close_reason` text,
-  `closed_at` datetime(6) DEFAULT NULL,
-  `closed_by_user_id` bigint DEFAULT NULL,
-  `closed_early` bit(1) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `created_by_user_id` bigint NOT NULL,
-  `description` text,
-  `early_close_request_reason` text,
-  `early_close_request_status` enum('NONE','REQUESTED','APPROVED','REJECTED') NOT NULL,
-  `early_close_requested_at` datetime(6) DEFAULT NULL,
-  `early_close_requested_by_user_id` bigint DEFAULT NULL,
-  `early_close_review_reason` text,
-  `early_close_reviewed_at` datetime(6) DEFAULT NULL,
-  `early_close_reviewed_by_user_id` bigint DEFAULT NULL,
-  `end_date` date NOT NULL,
-  `end_time` time(6) DEFAULT NULL,
-  `form_id` bigint NOT NULL,
-  `instructions` text,
-  `name` varchar(255) NOT NULL,
-  `review_round` enum('ANNUAL','FIRST_HALF','SECOND_HALF','SPECIAL') DEFAULT NULL,
-  `review_year` int DEFAULT NULL,
-  `start_date` date NOT NULL,
-  `start_time` time(6) DEFAULT NULL,
-  `status` enum('DRAFT','ACTIVE','CLOSED','CANCELLED') NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                      `id` bigint NOT NULL AUTO_INCREMENT,
+                                      `auto_submit_completed_drafts_on_close` bit(1) NOT NULL,
+                                      `close_reason` text,
+                                      `closed_at` datetime(6) DEFAULT NULL,
+                                      `closed_by_user_id` bigint DEFAULT NULL,
+                                      `closed_early` bit(1) NOT NULL,
+                                      `created_at` datetime(6) NOT NULL,
+                                      `created_by_user_id` bigint NOT NULL,
+                                      `description` text,
+                                      `early_close_request_reason` text,
+                                      `early_close_request_status` enum('NONE','REQUESTED','APPROVED','REJECTED') NOT NULL,
+                                      `early_close_requested_at` datetime(6) DEFAULT NULL,
+                                      `early_close_requested_by_user_id` bigint DEFAULT NULL,
+                                      `early_close_review_reason` text,
+                                      `early_close_reviewed_at` datetime(6) DEFAULT NULL,
+                                      `early_close_reviewed_by_user_id` bigint DEFAULT NULL,
+                                      `end_date` date NOT NULL,
+                                      `end_time` time(6) DEFAULT NULL,
+                                      `form_id` bigint NOT NULL,
+                                      `instructions` text,
+                                      `name` varchar(255) NOT NULL,
+                                      `review_round` enum('ANNUAL','FIRST_HALF','SECOND_HALF','SPECIAL') DEFAULT NULL,
+                                      `review_year` int DEFAULT NULL,
+                                      `start_date` date NOT NULL,
+                                      `start_time` time(6) DEFAULT NULL,
+                                      `status` enum('DRAFT','ACTIVE','CLOSED','CANCELLED') NOT NULL,
+                                      `updated_at` datetime(6) DEFAULT NULL,
+                                      PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1090,18 +1090,18 @@ DROP TABLE IF EXISTS `feedback_evaluator_assignments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_evaluator_assignments` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) NOT NULL,
-  `evaluator_employee_id` bigint NOT NULL,
-  `is_anonymous` bit(1) NOT NULL,
-  `source_type` enum('MANAGER','PEER','SUBORDINATE','SELF','PROJECT_STAKEHOLDER') NOT NULL,
-  `selection_method` enum('AUTO_RANDOM','AUTO_RELATIONSHIP','MANUAL') NOT NULL,
-  `status` enum('PENDING','IN_PROGRESS','SUBMITTED','DECLINED','CANCELLED') NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `feedback_request_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKsoa3uho3n4wl0dboccomtx1qh` (`feedback_request_id`,`evaluator_employee_id`),
-  CONSTRAINT `FK7t9vf8klj7rl2v947p7odwgx0` FOREIGN KEY (`feedback_request_id`) REFERENCES `feedback_requests` (`id`)
+                                                  `id` bigint NOT NULL AUTO_INCREMENT,
+                                                  `created_at` datetime(6) NOT NULL,
+                                                  `evaluator_employee_id` bigint NOT NULL,
+                                                  `is_anonymous` bit(1) NOT NULL,
+                                                  `source_type` enum('MANAGER','PEER','SUBORDINATE','SELF','PROJECT_STAKEHOLDER') NOT NULL,
+                                                  `selection_method` varchar(40) NOT NULL,
+                                                  `status` enum('PENDING','IN_PROGRESS','SUBMITTED','DECLINED','CANCELLED') NOT NULL,
+                                                  `updated_at` datetime(6) DEFAULT NULL,
+                                                  `feedback_request_id` bigint NOT NULL,
+                                                  PRIMARY KEY (`id`),
+                                                  UNIQUE KEY `UKsoa3uho3n4wl0dboccomtx1qh` (`feedback_request_id`,`evaluator_employee_id`),
+                                                  CONSTRAINT `FK7t9vf8klj7rl2v947p7odwgx0` FOREIGN KEY (`feedback_request_id`) REFERENCES `feedback_requests` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1122,16 +1122,16 @@ DROP TABLE IF EXISTS `feedback_forms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_forms` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `anonymous_allowed` bit(1) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `created_by_user_id` bigint NOT NULL,
-  `form_name` varchar(255) NOT NULL,
-  `root_form_id` bigint DEFAULT NULL,
-  `status` enum('DRAFT','ACTIVE','ARCHIVED') NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `version_number` int NOT NULL,
-  PRIMARY KEY (`id`)
+                                  `id` bigint NOT NULL AUTO_INCREMENT,
+                                  `anonymous_allowed` bit(1) NOT NULL,
+                                  `created_at` datetime(6) NOT NULL,
+                                  `created_by_user_id` bigint NOT NULL,
+                                  `form_name` varchar(255) NOT NULL,
+                                  `root_form_id` bigint DEFAULT NULL,
+                                  `status` enum('DRAFT','ACTIVE','ARCHIVED') NOT NULL,
+                                  `updated_at` datetime(6) DEFAULT NULL,
+                                  `version_number` int NOT NULL,
+                                  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1152,29 +1152,29 @@ DROP TABLE IF EXISTS `feedback_question_applicability_rules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_question_applicability_rules` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `active` bit(1) NOT NULL,
-  `condition_json` json DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `display_order` int NOT NULL,
-  `evaluator_relationship_type` varchar(40) NOT NULL,
-  `required_override` bit(1) DEFAULT NULL,
-  `rule_priority` int NOT NULL,
-  `section_code` varchar(80) NOT NULL,
-  `section_order` int NOT NULL,
-  `section_title` varchar(150) NOT NULL,
-  `target_department_id` bigint DEFAULT NULL,
-  `target_level_max_rank` int NOT NULL,
-  `target_level_min_rank` int NOT NULL,
-  `target_position_id` bigint DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `valid_from` date DEFAULT NULL,
-  `valid_to` date DEFAULT NULL,
-  `weight_override` double DEFAULT NULL,
-  `question_version_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKcma1od9mtk37b2sxxhpt4wjfw` (`question_version_id`),
-  CONSTRAINT `FKcma1od9mtk37b2sxxhpt4wjfw` FOREIGN KEY (`question_version_id`) REFERENCES `feedback_question_versions` (`id`)
+                                                         `id` bigint NOT NULL AUTO_INCREMENT,
+                                                         `active` bit(1) NOT NULL,
+                                                         `condition_json` json DEFAULT NULL,
+                                                         `created_at` datetime(6) NOT NULL,
+                                                         `display_order` int NOT NULL,
+                                                         `evaluator_relationship_type` varchar(40) NOT NULL,
+                                                         `required_override` bit(1) DEFAULT NULL,
+                                                         `rule_priority` int NOT NULL,
+                                                         `section_code` varchar(80) NOT NULL,
+                                                         `section_order` int NOT NULL,
+                                                         `section_title` varchar(150) NOT NULL,
+                                                         `target_department_id` bigint DEFAULT NULL,
+                                                         `target_level_max_rank` int NOT NULL,
+                                                         `target_level_min_rank` int NOT NULL,
+                                                         `target_position_id` bigint DEFAULT NULL,
+                                                         `updated_at` datetime(6) DEFAULT NULL,
+                                                         `valid_from` date DEFAULT NULL,
+                                                         `valid_to` date DEFAULT NULL,
+                                                         `weight_override` double DEFAULT NULL,
+                                                         `question_version_id` bigint NOT NULL,
+                                                         PRIMARY KEY (`id`),
+                                                         KEY `FKcma1od9mtk37b2sxxhpt4wjfw` (`question_version_id`),
+                                                         CONSTRAINT `FKcma1od9mtk37b2sxxhpt4wjfw` FOREIGN KEY (`question_version_id`) REFERENCES `feedback_question_versions` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1195,21 +1195,21 @@ DROP TABLE IF EXISTS `feedback_question_bank`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_question_bank` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `competency_code` varchar(80) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `created_by_user_id` bigint NOT NULL,
-  `default_rating_scale_id` int DEFAULT NULL,
-  `default_required` bit(1) NOT NULL,
-  `default_response_type` varchar(40) NOT NULL,
-  `default_scoring_behavior` varchar(30) NOT NULL,
-  `default_text` text NOT NULL,
-  `default_weight` double NOT NULL,
-  `question_code` varchar(80) NOT NULL,
-  `status` varchar(30) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_feedback_question_bank_code` (`question_code`)
+                                          `id` bigint NOT NULL AUTO_INCREMENT,
+                                          `competency_code` varchar(80) NOT NULL,
+                                          `created_at` datetime(6) NOT NULL,
+                                          `created_by_user_id` bigint NOT NULL,
+                                          `default_rating_scale_id` int DEFAULT NULL,
+                                          `default_required` bit(1) NOT NULL,
+                                          `default_response_type` varchar(40) NOT NULL,
+                                          `default_scoring_behavior` varchar(30) NOT NULL,
+                                          `default_text` text NOT NULL,
+                                          `default_weight` double NOT NULL,
+                                          `question_code` varchar(80) NOT NULL,
+                                          `status` varchar(30) NOT NULL,
+                                          `updated_at` datetime(6) DEFAULT NULL,
+                                          PRIMARY KEY (`id`),
+                                          UNIQUE KEY `uk_feedback_question_bank_code` (`question_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1230,19 +1230,19 @@ DROP TABLE IF EXISTS `feedback_question_versions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_question_versions` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `is_active` bit(1) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `help_text` text,
-  `question_text` text NOT NULL,
-  `rating_scale_id` int DEFAULT NULL,
-  `response_type` varchar(40) NOT NULL,
-  `scoring_behavior` varchar(30) NOT NULL,
-  `version_number` int NOT NULL,
-  `question_bank_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_feedback_question_version` (`question_bank_id`,`version_number`),
-  CONSTRAINT `FKjh8252s176o5bepp54dmor7ar` FOREIGN KEY (`question_bank_id`) REFERENCES `feedback_question_bank` (`id`)
+                                              `id` bigint NOT NULL AUTO_INCREMENT,
+                                              `is_active` bit(1) NOT NULL,
+                                              `created_at` datetime(6) NOT NULL,
+                                              `help_text` text,
+                                              `question_text` text NOT NULL,
+                                              `rating_scale_id` int DEFAULT NULL,
+                                              `response_type` varchar(40) NOT NULL,
+                                              `scoring_behavior` varchar(30) NOT NULL,
+                                              `version_number` int NOT NULL,
+                                              `question_bank_id` bigint NOT NULL,
+                                              PRIMARY KEY (`id`),
+                                              UNIQUE KEY `uk_feedback_question_version` (`question_bank_id`,`version_number`),
+                                              CONSTRAINT `FKjh8252s176o5bepp54dmor7ar` FOREIGN KEY (`question_bank_id`) REFERENCES `feedback_question_bank` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1263,18 +1263,18 @@ DROP TABLE IF EXISTS `feedback_questions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_questions` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) NOT NULL,
-  `is_required` bit(1) NOT NULL,
-  `question_order` int NOT NULL,
-  `question_text` text NOT NULL,
-  `rating_scale_id` int DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `weight` double DEFAULT NULL,
-  `section_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKeh5yj0ueoa331ia160if5wb2v` (`section_id`,`question_order`),
-  CONSTRAINT `FKmgoeyg85jke0gplkiwjde8vpx` FOREIGN KEY (`section_id`) REFERENCES `feedback_sections` (`id`)
+                                      `id` bigint NOT NULL AUTO_INCREMENT,
+                                      `created_at` datetime(6) NOT NULL,
+                                      `is_required` bit(1) NOT NULL,
+                                      `question_order` int NOT NULL,
+                                      `question_text` text NOT NULL,
+                                      `rating_scale_id` int DEFAULT NULL,
+                                      `updated_at` datetime(6) DEFAULT NULL,
+                                      `weight` double DEFAULT NULL,
+                                      `section_id` bigint NOT NULL,
+                                      PRIMARY KEY (`id`),
+                                      UNIQUE KEY `UKeh5yj0ueoa331ia160if5wb2v` (`section_id`,`question_order`),
+                                      CONSTRAINT `FKmgoeyg85jke0gplkiwjde8vpx` FOREIGN KEY (`section_id`) REFERENCES `feedback_sections` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1295,21 +1295,21 @@ DROP TABLE IF EXISTS `feedback_requests`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_requests` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) NOT NULL,
-  `due_at` datetime(6) DEFAULT NULL,
-  `is_anonymous_enabled` bit(1) NOT NULL,
-  `requested_by_user_id` bigint NOT NULL,
-  `status` enum('PENDING','IN_PROGRESS','COMPLETED','CANCELLED') NOT NULL,
-  `target_employee_id` bigint NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `campaign_id` bigint NOT NULL,
-  `form_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKbd80owy8qh71hsm24k0dpoi54` (`campaign_id`,`target_employee_id`),
-  KEY `FKbhbu6gwglqpy80xvbx5nlyv3w` (`form_id`),
-  CONSTRAINT `FKbhbu6gwglqpy80xvbx5nlyv3w` FOREIGN KEY (`form_id`) REFERENCES `feedback_forms` (`id`),
-  CONSTRAINT `FKj0dh7m9yhsshdeitupurqn5uu` FOREIGN KEY (`campaign_id`) REFERENCES `feedback_campaigns` (`id`)
+                                     `id` bigint NOT NULL AUTO_INCREMENT,
+                                     `created_at` datetime(6) NOT NULL,
+                                     `due_at` datetime(6) DEFAULT NULL,
+                                     `is_anonymous_enabled` bit(1) NOT NULL,
+                                     `requested_by_user_id` bigint NOT NULL,
+                                     `status` enum('PENDING','IN_PROGRESS','COMPLETED','CANCELLED') NOT NULL,
+                                     `target_employee_id` bigint NOT NULL,
+                                     `updated_at` datetime(6) DEFAULT NULL,
+                                     `campaign_id` bigint NOT NULL,
+                                     `form_id` bigint NOT NULL,
+                                     PRIMARY KEY (`id`),
+                                     UNIQUE KEY `UKbd80owy8qh71hsm24k0dpoi54` (`campaign_id`,`target_employee_id`),
+                                     KEY `FKbhbu6gwglqpy80xvbx5nlyv3w` (`form_id`),
+                                     CONSTRAINT `FKbhbu6gwglqpy80xvbx5nlyv3w` FOREIGN KEY (`form_id`) REFERENCES `feedback_forms` (`id`),
+                                     CONSTRAINT `FKj0dh7m9yhsshdeitupurqn5uu` FOREIGN KEY (`campaign_id`) REFERENCES `feedback_campaigns` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1330,22 +1330,22 @@ DROP TABLE IF EXISTS `feedback_response_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_response_items` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `comment` text,
-  `created_at` datetime(6) NOT NULL,
-  `rating_value` double DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `assignment_question_id` bigint DEFAULT NULL,
-  `question_id` bigint DEFAULT NULL,
-  `response_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKbl40b4vyfp9s0hwf5k4smvgg1` (`response_id`,`question_id`),
-  UNIQUE KEY `uk_feedback_response_assignment_question` (`response_id`,`assignment_question_id`),
-  KEY `FK4b3j9ivs6gsopxww2y58vp9ha` (`assignment_question_id`),
-  KEY `FK85bcs0630p90djooeywqbsq5u` (`question_id`),
-  CONSTRAINT `FK4b3j9ivs6gsopxww2y58vp9ha` FOREIGN KEY (`assignment_question_id`) REFERENCES `feedback_assignment_questions` (`id`),
-  CONSTRAINT `FK6bmxosocoxdaf1556cqpk6fo8` FOREIGN KEY (`response_id`) REFERENCES `feedback_responses` (`id`),
-  CONSTRAINT `FK85bcs0630p90djooeywqbsq5u` FOREIGN KEY (`question_id`) REFERENCES `feedback_questions` (`id`)
+                                           `id` bigint NOT NULL AUTO_INCREMENT,
+                                           `comment` text,
+                                           `created_at` datetime(6) NOT NULL,
+                                           `rating_value` double DEFAULT NULL,
+                                           `updated_at` datetime(6) DEFAULT NULL,
+                                           `assignment_question_id` bigint DEFAULT NULL,
+                                           `question_id` bigint DEFAULT NULL,
+                                           `response_id` bigint NOT NULL,
+                                           PRIMARY KEY (`id`),
+                                           UNIQUE KEY `UKbl40b4vyfp9s0hwf5k4smvgg1` (`response_id`,`question_id`),
+                                           UNIQUE KEY `uk_feedback_response_assignment_question` (`response_id`,`assignment_question_id`),
+                                           KEY `FK4b3j9ivs6gsopxww2y58vp9ha` (`assignment_question_id`),
+                                           KEY `FK85bcs0630p90djooeywqbsq5u` (`question_id`),
+                                           CONSTRAINT `FK4b3j9ivs6gsopxww2y58vp9ha` FOREIGN KEY (`assignment_question_id`) REFERENCES `feedback_assignment_questions` (`id`),
+                                           CONSTRAINT `FK6bmxosocoxdaf1556cqpk6fo8` FOREIGN KEY (`response_id`) REFERENCES `feedback_responses` (`id`),
+                                           CONSTRAINT `FK85bcs0630p90djooeywqbsq5u` FOREIGN KEY (`question_id`) REFERENCES `feedback_questions` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1366,17 +1366,17 @@ DROP TABLE IF EXISTS `feedback_responses`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_responses` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `comments` text,
-  `created_at` datetime(6) NOT NULL,
-  `final_status` enum('DRAFT','SUBMITTED','APPROVED') NOT NULL,
-  `overall_score` double DEFAULT NULL,
-  `submitted_at` datetime(6) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `evaluator_assignment_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKhoedo9ns6nmccpoe34eokoqp9` (`evaluator_assignment_id`),
-  CONSTRAINT `FKrg9p4jq8phsl2pta77jvytaoj` FOREIGN KEY (`evaluator_assignment_id`) REFERENCES `feedback_evaluator_assignments` (`id`)
+                                      `id` bigint NOT NULL AUTO_INCREMENT,
+                                      `comments` text,
+                                      `created_at` datetime(6) NOT NULL,
+                                      `final_status` enum('DRAFT','SUBMITTED','APPROVED') NOT NULL,
+                                      `overall_score` double DEFAULT NULL,
+                                      `submitted_at` datetime(6) DEFAULT NULL,
+                                      `updated_at` datetime(6) DEFAULT NULL,
+                                      `evaluator_assignment_id` bigint NOT NULL,
+                                      PRIMARY KEY (`id`),
+                                      UNIQUE KEY `UKhoedo9ns6nmccpoe34eokoqp9` (`evaluator_assignment_id`),
+                                      CONSTRAINT `FKrg9p4jq8phsl2pta77jvytaoj` FOREIGN KEY (`evaluator_assignment_id`) REFERENCES `feedback_evaluator_assignments` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1397,15 +1397,15 @@ DROP TABLE IF EXISTS `feedback_sections`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_sections` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) NOT NULL,
-  `order_no` int NOT NULL,
-  `title` varchar(255) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `form_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKl8mb8xmk1ymfh030021bucahe` (`form_id`,`order_no`),
-  CONSTRAINT `FKyxvavwlb4gnkdqq2b18km8kl` FOREIGN KEY (`form_id`) REFERENCES `feedback_forms` (`id`)
+                                     `id` bigint NOT NULL AUTO_INCREMENT,
+                                     `created_at` datetime(6) NOT NULL,
+                                     `order_no` int NOT NULL,
+                                     `title` varchar(255) NOT NULL,
+                                     `updated_at` datetime(6) DEFAULT NULL,
+                                     `form_id` bigint NOT NULL,
+                                     PRIMARY KEY (`id`),
+                                     UNIQUE KEY `UKl8mb8xmk1ymfh030021bucahe` (`form_id`,`order_no`),
+                                     CONSTRAINT `FKyxvavwlb4gnkdqq2b18km8kl` FOREIGN KEY (`form_id`) REFERENCES `feedback_forms` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1426,40 +1426,40 @@ DROP TABLE IF EXISTS `feedback_summary`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_summary` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `assigned_evaluator_count` bigint NOT NULL,
-  `average_score` double DEFAULT NULL,
-  `completion_rate` double NOT NULL,
-  `confidence_level` varchar(32) NOT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `insufficient_feedback` bit(1) NOT NULL,
-  `manager_average_score` double DEFAULT NULL,
-  `manager_responses` bigint NOT NULL,
-  `peer_average_score` double DEFAULT NULL,
-  `peer_responses` bigint NOT NULL,
-  `pending_evaluator_count` bigint NOT NULL,
-  `project_stakeholder_average_score` double DEFAULT NULL,
-  `project_stakeholder_responses` bigint NOT NULL,
-  `publish_note` text,
-  `published_at` datetime(6) DEFAULT NULL,
-  `published_by_user_id` bigint DEFAULT NULL,
-  `raw_average_score` double DEFAULT NULL,
-  `score_calculation_method` varchar(64) NOT NULL,
-  `score_calculation_note` varchar(500) DEFAULT NULL,
-  `self_average_score` double DEFAULT NULL,
-  `self_responses` bigint NOT NULL,
-  `submitted_evaluator_count` bigint NOT NULL,
-  `subordinate_average_score` double DEFAULT NULL,
-  `subordinate_responses` bigint NOT NULL,
-  `summarized_at` datetime(6) NOT NULL,
-  `target_employee_id` bigint NOT NULL,
-  `total_responses` bigint NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `visibility_status` enum('HIDDEN','READY_TO_PUBLISH','PUBLISHED') NOT NULL,
-  `campaign_id` bigint NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK6yr9jmk1h2cycwmq6jntqtjw1` (`campaign_id`,`target_employee_id`),
-  CONSTRAINT `FK3c43fckob3rnhriuf3jqyoqfa` FOREIGN KEY (`campaign_id`) REFERENCES `feedback_campaigns` (`id`)
+                                    `id` bigint NOT NULL AUTO_INCREMENT,
+                                    `assigned_evaluator_count` bigint NOT NULL,
+                                    `average_score` double DEFAULT NULL,
+                                    `completion_rate` double NOT NULL,
+                                    `confidence_level` varchar(32) NOT NULL,
+                                    `created_at` datetime(6) NOT NULL,
+                                    `insufficient_feedback` bit(1) NOT NULL,
+                                    `manager_average_score` double DEFAULT NULL,
+                                    `manager_responses` bigint NOT NULL,
+                                    `peer_average_score` double DEFAULT NULL,
+                                    `peer_responses` bigint NOT NULL,
+                                    `pending_evaluator_count` bigint NOT NULL,
+                                    `project_stakeholder_average_score` double DEFAULT NULL,
+                                    `project_stakeholder_responses` bigint NOT NULL,
+                                    `publish_note` text,
+                                    `published_at` datetime(6) DEFAULT NULL,
+                                    `published_by_user_id` bigint DEFAULT NULL,
+                                    `raw_average_score` double DEFAULT NULL,
+                                    `score_calculation_method` varchar(64) NOT NULL,
+                                    `score_calculation_note` varchar(500) DEFAULT NULL,
+                                    `self_average_score` double DEFAULT NULL,
+                                    `self_responses` bigint NOT NULL,
+                                    `submitted_evaluator_count` bigint NOT NULL,
+                                    `subordinate_average_score` double DEFAULT NULL,
+                                    `subordinate_responses` bigint NOT NULL,
+                                    `summarized_at` datetime(6) NOT NULL,
+                                    `target_employee_id` bigint NOT NULL,
+                                    `total_responses` bigint NOT NULL,
+                                    `updated_at` datetime(6) DEFAULT NULL,
+                                    `visibility_status` enum('HIDDEN','READY_TO_PUBLISH','PUBLISHED') NOT NULL,
+                                    `campaign_id` bigint NOT NULL,
+                                    PRIMARY KEY (`id`),
+                                    UNIQUE KEY `UK6yr9jmk1h2cycwmq6jntqtjw1` (`campaign_id`,`target_employee_id`),
+                                    CONSTRAINT `FK3c43fckob3rnhriuf3jqyoqfa` FOREIGN KEY (`campaign_id`) REFERENCES `feedback_campaigns` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1480,11 +1480,11 @@ DROP TABLE IF EXISTS `form_questions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `form_questions` (
-  `question_id` bigint NOT NULL AUTO_INCREMENT,
-  `is_required` bit(1) DEFAULT NULL,
-  `question_text` varchar(255) DEFAULT NULL,
-  `response_type` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`question_id`)
+                                  `question_id` bigint NOT NULL AUTO_INCREMENT,
+                                  `is_required` bit(1) DEFAULT NULL,
+                                  `question_text` varchar(255) DEFAULT NULL,
+                                  `response_type` varchar(255) DEFAULT NULL,
+                                  PRIMARY KEY (`question_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1505,9 +1505,9 @@ DROP TABLE IF EXISTS `kpi_category`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_category` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                `id` int NOT NULL AUTO_INCREMENT,
+                                `name` varchar(255) DEFAULT NULL,
+                                PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1529,24 +1529,24 @@ DROP TABLE IF EXISTS `kpi_form`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_form` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `created_by_string` varchar(255) DEFAULT NULL,
-  `end_date` date DEFAULT NULL,
-  `finalized_at` datetime(6) DEFAULT NULL,
-  `sent_at` datetime(6) DEFAULT NULL,
-  `start_date` date DEFAULT NULL,
-  `status` enum('DRAFT','ACTIVE','FINALIZED','SENT','ARCHIVED') NOT NULL,
-  `title` varchar(255) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `version` int NOT NULL,
-  `created_by` int DEFAULT NULL,
-  `updated_by` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKpk8dcdijh69iyl5vf8tpyyam6` (`created_by`),
-  KEY `FKnhfk4jt2h56odhrc99jvpq9g5` (`updated_by`),
-  CONSTRAINT `FKnhfk4jt2h56odhrc99jvpq9g5` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKpk8dcdijh69iyl5vf8tpyyam6` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `created_at` datetime(6) DEFAULT NULL,
+                            `created_by_string` varchar(255) DEFAULT NULL,
+                            `end_date` date DEFAULT NULL,
+                            `finalized_at` datetime(6) DEFAULT NULL,
+                            `sent_at` datetime(6) DEFAULT NULL,
+                            `start_date` date DEFAULT NULL,
+                            `status` enum('DRAFT','ACTIVE','FINALIZED','SENT','ARCHIVED') NOT NULL,
+                            `title` varchar(255) NOT NULL,
+                            `updated_at` datetime(6) DEFAULT NULL,
+                            `version` int NOT NULL,
+                            `created_by` int DEFAULT NULL,
+                            `updated_by` int DEFAULT NULL,
+                            PRIMARY KEY (`id`),
+                            KEY `FKpk8dcdijh69iyl5vf8tpyyam6` (`created_by`),
+                            KEY `FKnhfk4jt2h56odhrc99jvpq9g5` (`updated_by`),
+                            CONSTRAINT `FKnhfk4jt2h56odhrc99jvpq9g5` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`),
+                            CONSTRAINT `FKpk8dcdijh69iyl5vf8tpyyam6` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1567,27 +1567,27 @@ DROP TABLE IF EXISTS `kpi_form_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_form_items` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `description` text,
-  `kpi_label` varchar(500) DEFAULT NULL,
-  `sort_order` int DEFAULT NULL,
-  `target` double NOT NULL,
-  `weight` int NOT NULL,
-  `kpi_category_id` int NOT NULL,
-  `kpi_form_id` int NOT NULL,
-  `kpi_item_id` int DEFAULT NULL,
-  `kpi_unit_id` int NOT NULL,
-  `kpi_unit_label` varchar(100) DEFAULT NULL,
-  `kpi_category_label` varchar(100) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK7iscfv9gr2d1huegw22jtsvnu` (`kpi_category_id`),
-  KEY `FKpvy2dvvtmn6kih6mlvmmf3dsb` (`kpi_form_id`),
-  KEY `FKsrmemil0pyp25kiy65oi12dd6` (`kpi_item_id`),
-  KEY `FKkdl7fa5m9c6iosyc7xf31kmfv` (`kpi_unit_id`),
-  CONSTRAINT `FK7iscfv9gr2d1huegw22jtsvnu` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_category` (`id`),
-  CONSTRAINT `FKkdl7fa5m9c6iosyc7xf31kmfv` FOREIGN KEY (`kpi_unit_id`) REFERENCES `kpi_unit` (`id`),
-  CONSTRAINT `FKpvy2dvvtmn6kih6mlvmmf3dsb` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`),
-  CONSTRAINT `FKsrmemil0pyp25kiy65oi12dd6` FOREIGN KEY (`kpi_item_id`) REFERENCES `kpi_items` (`id`)
+                                  `id` int NOT NULL AUTO_INCREMENT,
+                                  `description` text,
+                                  `kpi_label` varchar(500) DEFAULT NULL,
+                                  `sort_order` int DEFAULT NULL,
+                                  `target` double NOT NULL,
+                                  `weight` int NOT NULL,
+                                  `kpi_category_id` int NOT NULL,
+                                  `kpi_form_id` int NOT NULL,
+                                  `kpi_item_id` int DEFAULT NULL,
+                                  `kpi_unit_id` int NOT NULL,
+                                  `kpi_unit_label` varchar(100) DEFAULT NULL,
+                                  `kpi_category_label` varchar(100) DEFAULT NULL,
+                                  PRIMARY KEY (`id`),
+                                  KEY `FK7iscfv9gr2d1huegw22jtsvnu` (`kpi_category_id`),
+                                  KEY `FKpvy2dvvtmn6kih6mlvmmf3dsb` (`kpi_form_id`),
+                                  KEY `FKsrmemil0pyp25kiy65oi12dd6` (`kpi_item_id`),
+                                  KEY `FKkdl7fa5m9c6iosyc7xf31kmfv` (`kpi_unit_id`),
+                                  CONSTRAINT `FK7iscfv9gr2d1huegw22jtsvnu` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_category` (`id`),
+                                  CONSTRAINT `FKkdl7fa5m9c6iosyc7xf31kmfv` FOREIGN KEY (`kpi_unit_id`) REFERENCES `kpi_unit` (`id`),
+                                  CONSTRAINT `FKpvy2dvvtmn6kih6mlvmmf3dsb` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`),
+                                  CONSTRAINT `FKsrmemil0pyp25kiy65oi12dd6` FOREIGN KEY (`kpi_item_id`) REFERENCES `kpi_items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1608,24 +1608,24 @@ DROP TABLE IF EXISTS `kpi_histories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_histories` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `actual_value` double DEFAULT NULL,
-  `changed_at` datetime(6) DEFAULT NULL,
-  `changed_by` varchar(255) DEFAULT NULL,
-  `cycle_id` int DEFAULT NULL,
-  `department_id` int DEFAULT NULL,
-  `description` varchar(255) DEFAULT NULL,
-  `employee_id` int DEFAULT NULL,
-  `end_date` datetime(6) DEFAULT NULL,
-  `kpi_id` int DEFAULT NULL,
-  `measurement_type` varchar(255) DEFAULT NULL,
-  `start_date` datetime(6) DEFAULT NULL,
-  `status` varchar(255) DEFAULT NULL,
-  `target_value` double DEFAULT NULL,
-  `title` varchar(255) DEFAULT NULL,
-  `unit` varchar(255) DEFAULT NULL,
-  `weight` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                 `id` int NOT NULL AUTO_INCREMENT,
+                                 `actual_value` double DEFAULT NULL,
+                                 `changed_at` datetime(6) DEFAULT NULL,
+                                 `changed_by` varchar(255) DEFAULT NULL,
+                                 `cycle_id` int DEFAULT NULL,
+                                 `department_id` int DEFAULT NULL,
+                                 `description` varchar(255) DEFAULT NULL,
+                                 `employee_id` int DEFAULT NULL,
+                                 `end_date` datetime(6) DEFAULT NULL,
+                                 `kpi_id` int DEFAULT NULL,
+                                 `measurement_type` varchar(255) DEFAULT NULL,
+                                 `start_date` datetime(6) DEFAULT NULL,
+                                 `status` varchar(255) DEFAULT NULL,
+                                 `target_value` double DEFAULT NULL,
+                                 `title` varchar(255) DEFAULT NULL,
+                                 `unit` varchar(255) DEFAULT NULL,
+                                 `weight` int DEFAULT NULL,
+                                 PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1646,12 +1646,12 @@ DROP TABLE IF EXISTS `kpi_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_items` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `kpi_name` varchar(255) NOT NULL,
-  `kpi_category_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKl1tnimq7fxsxkujaqhdu3eqfy` (`kpi_category_id`),
-  CONSTRAINT `FKl1tnimq7fxsxkujaqhdu3eqfy` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_category` (`id`)
+                             `id` int NOT NULL AUTO_INCREMENT,
+                             `kpi_name` varchar(255) NOT NULL,
+                             `kpi_category_id` int NOT NULL,
+                             PRIMARY KEY (`id`),
+                             KEY `FKl1tnimq7fxsxkujaqhdu3eqfy` (`kpi_category_id`),
+                             CONSTRAINT `FKl1tnimq7fxsxkujaqhdu3eqfy` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_category` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1673,21 +1673,21 @@ DROP TABLE IF EXISTS `kpi_positions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_positions` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `assigned_at` datetime(6) NOT NULL,
-  `assigned_by_string` varchar(255) DEFAULT NULL,
-  `removed_at` datetime(6) DEFAULT NULL,
-  `status` enum('ACTIVE','INACTIVE','REMOVED') NOT NULL,
-  `assigned_by` int DEFAULT NULL,
-  `kpi_form_id` int NOT NULL,
-  `position_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UKdm708ns7odp9hrm20a9lourfu` (`kpi_form_id`,`position_id`),
-  UNIQUE KEY `UK82x6nm6ro3k7p1ttuxflwbofq` (`position_id`),
-  KEY `FK6r6g1o4rn61skh6s60q3ayk08` (`assigned_by`),
-  CONSTRAINT `FK6r6g1o4rn61skh6s60q3ayk08` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKd1cuepwurd8dgyeb5qwj7bjt1` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`),
-  CONSTRAINT `FKdfecg72wn7r8m1pw38ri3cgb6` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`)
+                                 `id` int NOT NULL AUTO_INCREMENT,
+                                 `assigned_at` datetime(6) NOT NULL,
+                                 `assigned_by_string` varchar(255) DEFAULT NULL,
+                                 `removed_at` datetime(6) DEFAULT NULL,
+                                 `status` enum('ACTIVE','INACTIVE','REMOVED') NOT NULL,
+                                 `assigned_by` int DEFAULT NULL,
+                                 `kpi_form_id` int NOT NULL,
+                                 `position_id` int NOT NULL,
+                                 PRIMARY KEY (`id`),
+                                 UNIQUE KEY `UKdm708ns7odp9hrm20a9lourfu` (`kpi_form_id`,`position_id`),
+                                 UNIQUE KEY `UK82x6nm6ro3k7p1ttuxflwbofq` (`position_id`),
+                                 KEY `FK6r6g1o4rn61skh6s60q3ayk08` (`assigned_by`),
+                                 CONSTRAINT `FK6r6g1o4rn61skh6s60q3ayk08` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`),
+                                 CONSTRAINT `FKd1cuepwurd8dgyeb5qwj7bjt1` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`),
+                                 CONSTRAINT `FKdfecg72wn7r8m1pw38ri3cgb6` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1708,21 +1708,21 @@ DROP TABLE IF EXISTS `kpi_template_cycle`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_template_cycle` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `cycle_name` varchar(255) NOT NULL,
-  `duration_months` int NOT NULL,
-  `end_date` date NOT NULL,
-  `start_date` date NOT NULL,
-  `status` enum('DRAFT','ACTIVE','CLOSING','DEACTIVATED') NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `updated_by` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKuqjxpsukc2mjr04l9rmrlfhl` (`created_by`),
-  KEY `FK8l5kksqjbx8htwpsgdefx717c` (`updated_by`),
-  CONSTRAINT `FK8l5kksqjbx8htwpsgdefx717c` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKuqjxpsukc2mjr04l9rmrlfhl` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+                                      `id` int NOT NULL AUTO_INCREMENT,
+                                      `created_at` datetime(6) DEFAULT NULL,
+                                      `cycle_name` varchar(255) NOT NULL,
+                                      `duration_months` int NOT NULL,
+                                      `end_date` date NOT NULL,
+                                      `start_date` date NOT NULL,
+                                      `status` enum('DRAFT','ACTIVE','CLOSING','DEACTIVATED') NOT NULL,
+                                      `updated_at` datetime(6) DEFAULT NULL,
+                                      `created_by` int DEFAULT NULL,
+                                      `updated_by` int DEFAULT NULL,
+                                      PRIMARY KEY (`id`),
+                                      KEY `FKuqjxpsukc2mjr04l9rmrlfhl` (`created_by`),
+                                      KEY `FK8l5kksqjbx8htwpsgdefx717c` (`updated_by`),
+                                      CONSTRAINT `FK8l5kksqjbx8htwpsgdefx717c` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`),
+                                      CONSTRAINT `FKuqjxpsukc2mjr04l9rmrlfhl` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1743,14 +1743,14 @@ DROP TABLE IF EXISTS `kpi_template_cycle_form`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_template_cycle_form` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cycle_id` int NOT NULL,
-  `kpi_form_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_cycle_form` (`cycle_id`,`kpi_form_id`),
-  KEY `FKq05vp2d87y8tfpryfjpu4v0m7` (`kpi_form_id`),
-  CONSTRAINT `FKew2819f3ylofxir21915dlxwv` FOREIGN KEY (`cycle_id`) REFERENCES `kpi_template_cycle` (`id`),
-  CONSTRAINT `FKq05vp2d87y8tfpryfjpu4v0m7` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`)
+                                           `id` int NOT NULL AUTO_INCREMENT,
+                                           `cycle_id` int NOT NULL,
+                                           `kpi_form_id` int NOT NULL,
+                                           PRIMARY KEY (`id`),
+                                           UNIQUE KEY `uk_cycle_form` (`cycle_id`,`kpi_form_id`),
+                                           KEY `FKq05vp2d87y8tfpryfjpu4v0m7` (`kpi_form_id`),
+                                           CONSTRAINT `FKew2819f3ylofxir21915dlxwv` FOREIGN KEY (`cycle_id`) REFERENCES `kpi_template_cycle` (`id`),
+                                           CONSTRAINT `FKq05vp2d87y8tfpryfjpu4v0m7` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1771,20 +1771,20 @@ DROP TABLE IF EXISTS `kpi_template_version_rows`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_template_version_rows` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `changed_at` datetime(6) DEFAULT NULL,
-  `changed_by_string` varchar(255) DEFAULT NULL,
-  `reason` text,
-  `row_snapshot` text NOT NULL,
-  `row_status` enum('INITIAL','UNCHANGED','ADDED','REMOVED') NOT NULL,
-  `version_number` int NOT NULL,
-  `changed_by` int DEFAULT NULL,
-  `kpi_form_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKhetxon9isqhh2ycxe9um8m8s7` (`changed_by`),
-  KEY `FKnia972qvrimaeqkav1bu6g26w` (`kpi_form_id`),
-  CONSTRAINT `FKhetxon9isqhh2ycxe9um8m8s7` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKnia972qvrimaeqkav1bu6g26w` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`)
+                                             `id` int NOT NULL AUTO_INCREMENT,
+                                             `changed_at` datetime(6) DEFAULT NULL,
+                                             `changed_by_string` varchar(255) DEFAULT NULL,
+                                             `reason` text,
+                                             `row_snapshot` text NOT NULL,
+                                             `row_status` enum('INITIAL','UNCHANGED','ADDED','REMOVED') NOT NULL,
+                                             `version_number` int NOT NULL,
+                                             `changed_by` int DEFAULT NULL,
+                                             `kpi_form_id` int NOT NULL,
+                                             PRIMARY KEY (`id`),
+                                             KEY `FKhetxon9isqhh2ycxe9um8m8s7` (`changed_by`),
+                                             KEY `FKnia972qvrimaeqkav1bu6g26w` (`kpi_form_id`),
+                                             CONSTRAINT `FKhetxon9isqhh2ycxe9um8m8s7` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`),
+                                             CONSTRAINT `FKnia972qvrimaeqkav1bu6g26w` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1805,10 +1805,10 @@ DROP TABLE IF EXISTS `kpi_unit`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_unit` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_o5afp6hfjhccjx1pbypenyxdh` (`name`)
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(100) NOT NULL,
+                            PRIMARY KEY (`id`),
+                            UNIQUE KEY `UK_o5afp6hfjhccjx1pbypenyxdh` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1830,25 +1830,25 @@ DROP TABLE IF EXISTS `kpi_version_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kpi_version_history` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `change_type` enum('CREATED','UPDATED','DELETED','RESTORED','WEIGHT_MODIFIED','TARGET_MODIFIED','CATEGORY_CHANGED','STATUS_CHANGED','DATE_CHANGED') DEFAULT NULL,
-  `changed_at` datetime(6) NOT NULL,
-  `changed_reason` varchar(255) DEFAULT NULL,
-  `column_name` varchar(255) NOT NULL,
-  `modified_by_string` varchar(255) DEFAULT NULL,
-  `new_value` text,
-  `old_value` text,
-  `version_number` int DEFAULT NULL,
-  `kpi_form_id` int NOT NULL,
-  `kpi_form_item_id` int DEFAULT NULL,
-  `modified_by` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK798p7d4h7x091p28a1jx59sqf` (`kpi_form_id`),
-  KEY `FK299l88vhnv000rxarrsrmjeau` (`kpi_form_item_id`),
-  KEY `FKbjk8cq2k7k58otmk55fy4en3n` (`modified_by`),
-  CONSTRAINT `FK299l88vhnv000rxarrsrmjeau` FOREIGN KEY (`kpi_form_item_id`) REFERENCES `kpi_form_items` (`id`),
-  CONSTRAINT `FK798p7d4h7x091p28a1jx59sqf` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`),
-  CONSTRAINT `FKbjk8cq2k7k58otmk55fy4en3n` FOREIGN KEY (`modified_by`) REFERENCES `users` (`id`)
+                                       `id` int NOT NULL AUTO_INCREMENT,
+                                       `change_type` enum('CREATED','UPDATED','DELETED','RESTORED','WEIGHT_MODIFIED','TARGET_MODIFIED','CATEGORY_CHANGED','STATUS_CHANGED','DATE_CHANGED') DEFAULT NULL,
+                                       `changed_at` datetime(6) NOT NULL,
+                                       `changed_reason` varchar(255) DEFAULT NULL,
+                                       `column_name` varchar(255) NOT NULL,
+                                       `modified_by_string` varchar(255) DEFAULT NULL,
+                                       `new_value` text,
+                                       `old_value` text,
+                                       `version_number` int DEFAULT NULL,
+                                       `kpi_form_id` int NOT NULL,
+                                       `kpi_form_item_id` int DEFAULT NULL,
+                                       `modified_by` int DEFAULT NULL,
+                                       PRIMARY KEY (`id`),
+                                       KEY `FK798p7d4h7x091p28a1jx59sqf` (`kpi_form_id`),
+                                       KEY `FK299l88vhnv000rxarrsrmjeau` (`kpi_form_item_id`),
+                                       KEY `FKbjk8cq2k7k58otmk55fy4en3n` (`modified_by`),
+                                       CONSTRAINT `FK299l88vhnv000rxarrsrmjeau` FOREIGN KEY (`kpi_form_item_id`) REFERENCES `kpi_form_items` (`id`),
+                                       CONSTRAINT `FK798p7d4h7x091p28a1jx59sqf` FOREIGN KEY (`kpi_form_id`) REFERENCES `kpi_form` (`id`),
+                                       CONSTRAINT `FKbjk8cq2k7k58otmk55fy4en3n` FOREIGN KEY (`modified_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1869,10 +1869,10 @@ DROP TABLE IF EXISTS `notification_template_channels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_template_channels` (
-  `notification_template_id` int NOT NULL,
-  `channel` varchar(255) NOT NULL,
-  PRIMARY KEY (`notification_template_id`,`channel`),
-  CONSTRAINT `FK52evye0y2ah4elcfp9ef789ty` FOREIGN KEY (`notification_template_id`) REFERENCES `notification_templates` (`id`)
+                                                  `notification_template_id` int NOT NULL,
+                                                  `channel` varchar(255) NOT NULL,
+                                                  PRIMARY KEY (`notification_template_id`,`channel`),
+                                                  CONSTRAINT `FK52evye0y2ah4elcfp9ef789ty` FOREIGN KEY (`notification_template_id`) REFERENCES `notification_templates` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1893,10 +1893,10 @@ DROP TABLE IF EXISTS `notification_template_target_roles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_template_target_roles` (
-  `notification_template_id` int NOT NULL,
-  `target_role` varchar(255) NOT NULL,
-  PRIMARY KEY (`notification_template_id`,`target_role`),
-  CONSTRAINT `FKn1ouqc6lr44i5xckbnao77qkd` FOREIGN KEY (`notification_template_id`) REFERENCES `notification_templates` (`id`)
+                                                      `notification_template_id` int NOT NULL,
+                                                      `target_role` varchar(255) NOT NULL,
+                                                      PRIMARY KEY (`notification_template_id`,`target_role`),
+                                                      CONSTRAINT `FKn1ouqc6lr44i5xckbnao77qkd` FOREIGN KEY (`notification_template_id`) REFERENCES `notification_templates` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1917,11 +1917,11 @@ DROP TABLE IF EXISTS `notification_templates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notification_templates` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `body_template` varchar(255) DEFAULT NULL,
-  `channel_type` varchar(255) DEFAULT NULL,
-  `subject_template` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                          `id` int NOT NULL AUTO_INCREMENT,
+                                          `body_template` varchar(255) DEFAULT NULL,
+                                          `channel_type` varchar(255) DEFAULT NULL,
+                                          `subject_template` varchar(255) DEFAULT NULL,
+                                          PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1942,20 +1942,20 @@ DROP TABLE IF EXISTS `notifications`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notifications` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `is_read` bit(1) DEFAULT NULL,
-  `message` varchar(255) DEFAULT NULL,
-  `reference_id` int DEFAULT NULL,
-  `title` varchar(255) DEFAULT NULL,
-  `type` varchar(255) DEFAULT NULL,
-  `notification_template_id` int DEFAULT NULL,
-  `user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKjc59ahnrlwgodc921i07g9k36` (`notification_template_id`),
-  KEY `FK9y21adhxn0ayjhfocscqox7bh` (`user_id`),
-  CONSTRAINT `FK9y21adhxn0ayjhfocscqox7bh` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKjc59ahnrlwgodc921i07g9k36` FOREIGN KEY (`notification_template_id`) REFERENCES `notification_templates` (`id`)
+                                 `id` int NOT NULL AUTO_INCREMENT,
+                                 `created_at` datetime(6) DEFAULT NULL,
+                                 `is_read` bit(1) DEFAULT NULL,
+                                 `message` varchar(255) DEFAULT NULL,
+                                 `reference_id` int DEFAULT NULL,
+                                 `title` varchar(255) DEFAULT NULL,
+                                 `type` varchar(255) DEFAULT NULL,
+                                 `notification_template_id` int DEFAULT NULL,
+                                 `user_id` int DEFAULT NULL,
+                                 PRIMARY KEY (`id`),
+                                 KEY `FKjc59ahnrlwgodc921i07g9k36` (`notification_template_id`),
+                                 KEY `FK9y21adhxn0ayjhfocscqox7bh` (`user_id`),
+                                 CONSTRAINT `FK9y21adhxn0ayjhfocscqox7bh` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+                                 CONSTRAINT `FKjc59ahnrlwgodc921i07g9k36` FOREIGN KEY (`notification_template_id`) REFERENCES `notification_templates` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1977,17 +1977,17 @@ DROP TABLE IF EXISTS `one_on_one_action_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `one_on_one_action_items` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `description` varchar(1000) DEFAULT NULL,
-  `due_date` date DEFAULT NULL,
-  `owner` varchar(255) DEFAULT NULL,
-  `status` varchar(255) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `meeting_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_oj4f693xbfrh4rg4cma7lyane` (`meeting_id`),
-  CONSTRAINT `FK4ydciuamt6tglwi47tk7q3d0g` FOREIGN KEY (`meeting_id`) REFERENCES `one_on_one_meetings` (`id`)
+                                           `id` int NOT NULL AUTO_INCREMENT,
+                                           `created_at` datetime(6) DEFAULT NULL,
+                                           `description` varchar(1000) DEFAULT NULL,
+                                           `due_date` date DEFAULT NULL,
+                                           `owner` varchar(255) DEFAULT NULL,
+                                           `status` varchar(255) DEFAULT NULL,
+                                           `updated_at` datetime(6) DEFAULT NULL,
+                                           `meeting_id` int NOT NULL,
+                                           PRIMARY KEY (`id`),
+                                           UNIQUE KEY `UK_oj4f693xbfrh4rg4cma7lyane` (`meeting_id`),
+                                           CONSTRAINT `FK4ydciuamt6tglwi47tk7q3d0g` FOREIGN KEY (`meeting_id`) REFERENCES `one_on_one_meetings` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2009,34 +2009,34 @@ DROP TABLE IF EXISTS `one_on_one_meetings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `one_on_one_meetings` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `first_meeting_end_date` datetime(6) DEFAULT NULL,
-  `follow_up_date` datetime(6) DEFAULT NULL,
-  `follow_up_end_date` datetime(6) DEFAULT NULL,
-  `follow_up_goal` varchar(1000) DEFAULT NULL,
-  `follow_up_location` varchar(500) DEFAULT NULL,
-  `follow_up_notes` varchar(1000) DEFAULT NULL,
-  `follow_up_reminder_24h_sent` bit(1) DEFAULT NULL,
-  `follow_up_status` bit(1) DEFAULT NULL,
-  `is_finalized` datetime(6) DEFAULT NULL,
-  `location` varchar(500) DEFAULT NULL,
-  `notes` varchar(1000) DEFAULT NULL,
-  `parent_meeting_id` int DEFAULT NULL,
-  `reminder_24h_sent` bit(1) DEFAULT NULL,
-  `scheduled_date` datetime(6) DEFAULT NULL,
-  `status` bit(1) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `created_by_user_id` int DEFAULT NULL,
-  `employee_id` int DEFAULT NULL,
-  `manager_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKl14awlv3reb2rbxev2oumffvt` (`created_by_user_id`),
-  KEY `FK61qtduvwoed0co702dlufmlgx` (`employee_id`),
-  KEY `FK9ii881kth594rds3dh0twrchg` (`manager_id`),
-  CONSTRAINT `FK61qtduvwoed0co702dlufmlgx` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
-  CONSTRAINT `FK9ii881kth594rds3dh0twrchg` FOREIGN KEY (`manager_id`) REFERENCES `employee` (`id`),
-  CONSTRAINT `FKl14awlv3reb2rbxev2oumffvt` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
+                                       `id` int NOT NULL AUTO_INCREMENT,
+                                       `created_at` datetime(6) DEFAULT NULL,
+                                       `first_meeting_end_date` datetime(6) DEFAULT NULL,
+                                       `follow_up_date` datetime(6) DEFAULT NULL,
+                                       `follow_up_end_date` datetime(6) DEFAULT NULL,
+                                       `follow_up_goal` varchar(1000) DEFAULT NULL,
+                                       `follow_up_location` varchar(500) DEFAULT NULL,
+                                       `follow_up_notes` varchar(1000) DEFAULT NULL,
+                                       `follow_up_reminder_24h_sent` bit(1) DEFAULT NULL,
+                                       `follow_up_status` bit(1) DEFAULT NULL,
+                                       `is_finalized` datetime(6) DEFAULT NULL,
+                                       `location` varchar(500) DEFAULT NULL,
+                                       `notes` varchar(1000) DEFAULT NULL,
+                                       `parent_meeting_id` int DEFAULT NULL,
+                                       `reminder_24h_sent` bit(1) DEFAULT NULL,
+                                       `scheduled_date` datetime(6) DEFAULT NULL,
+                                       `status` bit(1) DEFAULT NULL,
+                                       `updated_at` datetime(6) DEFAULT NULL,
+                                       `created_by_user_id` int DEFAULT NULL,
+                                       `employee_id` int DEFAULT NULL,
+                                       `manager_id` int DEFAULT NULL,
+                                       PRIMARY KEY (`id`),
+                                       KEY `FKl14awlv3reb2rbxev2oumffvt` (`created_by_user_id`),
+                                       KEY `FK61qtduvwoed0co702dlufmlgx` (`employee_id`),
+                                       KEY `FK9ii881kth594rds3dh0twrchg` (`manager_id`),
+                                       CONSTRAINT `FK61qtduvwoed0co702dlufmlgx` FOREIGN KEY (`employee_id`) REFERENCES `employee` (`id`),
+                                       CONSTRAINT `FK9ii881kth594rds3dh0twrchg` FOREIGN KEY (`manager_id`) REFERENCES `employee` (`id`),
+                                       CONSTRAINT `FKl14awlv3reb2rbxev2oumffvt` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2058,19 +2058,19 @@ DROP TABLE IF EXISTS `password_reset_otps`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `password_reset_otps` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `consumed_at` datetime(6) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `expires_at` datetime(6) NOT NULL,
-  `failed_attempts` int NOT NULL,
-  `otp_hash` varchar(128) NOT NULL,
-  `reset_token_hash` varchar(128) DEFAULT NULL,
-  `verified_at` datetime(6) DEFAULT NULL,
-  `user_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK9c75odu4o05pvbvhn2n9ia0tj` (`user_id`),
-  CONSTRAINT `FK9c75odu4o05pvbvhn2n9ia0tj` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+                                       `id` int NOT NULL AUTO_INCREMENT,
+                                       `consumed_at` datetime(6) DEFAULT NULL,
+                                       `created_at` datetime(6) NOT NULL,
+                                       `email` varchar(255) NOT NULL,
+                                       `expires_at` datetime(6) NOT NULL,
+                                       `failed_attempts` int NOT NULL,
+                                       `otp_hash` varchar(128) NOT NULL,
+                                       `reset_token_hash` varchar(128) DEFAULT NULL,
+                                       `verified_at` datetime(6) DEFAULT NULL,
+                                       `user_id` int NOT NULL,
+                                       PRIMARY KEY (`id`),
+                                       KEY `FK9c75odu4o05pvbvhn2n9ia0tj` (`user_id`),
+                                       CONSTRAINT `FK9c75odu4o05pvbvhn2n9ia0tj` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2091,11 +2091,11 @@ DROP TABLE IF EXISTS `permissions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `permissions` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `module` varchar(255) DEFAULT NULL,
-  `name` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_pnvtwliis6p05pn6i3ndjrqt2` (`name`)
+                               `id` int NOT NULL AUTO_INCREMENT,
+                               `module` varchar(255) DEFAULT NULL,
+                               `name` varchar(255) NOT NULL,
+                               PRIMARY KEY (`id`),
+                               UNIQUE KEY `UK_pnvtwliis6p05pn6i3ndjrqt2` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2117,20 +2117,20 @@ DROP TABLE IF EXISTS `pip_phases`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pip_phases` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) NOT NULL,
-  `end_date` date NOT NULL,
-  `phase_goal` varchar(4000) NOT NULL,
-  `phase_number` int NOT NULL,
-  `reason_note` varchar(4000) DEFAULT NULL,
-  `start_date` date NOT NULL,
-  `status` varchar(40) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `updated_by_user_id` int DEFAULT NULL,
-  `pip_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK8d0e9w9byvym3nkfmaj4vap1x` (`pip_id`),
-  CONSTRAINT `FK8d0e9w9byvym3nkfmaj4vap1x` FOREIGN KEY (`pip_id`) REFERENCES `pips` (`id`)
+                              `id` int NOT NULL AUTO_INCREMENT,
+                              `created_at` datetime(6) NOT NULL,
+                              `end_date` date NOT NULL,
+                              `phase_goal` varchar(4000) NOT NULL,
+                              `phase_number` int NOT NULL,
+                              `reason_note` varchar(4000) DEFAULT NULL,
+                              `start_date` date NOT NULL,
+                              `status` varchar(40) NOT NULL,
+                              `updated_at` datetime(6) DEFAULT NULL,
+                              `updated_by_user_id` int DEFAULT NULL,
+                              `pip_id` int NOT NULL,
+                              PRIMARY KEY (`id`),
+                              KEY `FK8d0e9w9byvym3nkfmaj4vap1x` (`pip_id`),
+                              CONSTRAINT `FK8d0e9w9byvym3nkfmaj4vap1x` FOREIGN KEY (`pip_id`) REFERENCES `pips` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2152,17 +2152,17 @@ DROP TABLE IF EXISTS `pip_updates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pip_updates` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `action_type` varchar(80) DEFAULT NULL,
-  `comments` varchar(4000) DEFAULT NULL,
-  `new_value` varchar(4000) DEFAULT NULL,
-  `old_value` varchar(4000) DEFAULT NULL,
-  `phase_id` int DEFAULT NULL,
-  `pip_id` int NOT NULL,
-  `status` varchar(80) DEFAULT NULL,
-  `updated_at` datetime(6) NOT NULL,
-  `updated_by` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                               `id` int NOT NULL AUTO_INCREMENT,
+                               `action_type` varchar(80) DEFAULT NULL,
+                               `comments` varchar(4000) DEFAULT NULL,
+                               `new_value` varchar(4000) DEFAULT NULL,
+                               `old_value` varchar(4000) DEFAULT NULL,
+                               `phase_id` int DEFAULT NULL,
+                               `pip_id` int NOT NULL,
+                               `status` varchar(80) DEFAULT NULL,
+                               `updated_at` datetime(6) NOT NULL,
+                               `updated_by` int DEFAULT NULL,
+                               PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2184,20 +2184,20 @@ DROP TABLE IF EXISTS `pips`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pips` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `comments` varchar(4000) DEFAULT NULL,
-  `created_at` datetime(6) NOT NULL,
-  `created_by_user_id` int NOT NULL,
-  `employee_user_id` int NOT NULL,
-  `end_date` date NOT NULL,
-  `expected_outcomes` varchar(4000) NOT NULL,
-  `finished_at` datetime(6) DEFAULT NULL,
-  `finished_by_user_id` int DEFAULT NULL,
-  `goal` varchar(4000) NOT NULL,
-  `start_date` date NOT NULL,
-  `status` bit(1) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                        `id` int NOT NULL AUTO_INCREMENT,
+                        `comments` varchar(4000) DEFAULT NULL,
+                        `created_at` datetime(6) NOT NULL,
+                        `created_by_user_id` int NOT NULL,
+                        `employee_user_id` int NOT NULL,
+                        `end_date` date NOT NULL,
+                        `expected_outcomes` varchar(4000) NOT NULL,
+                        `finished_at` datetime(6) DEFAULT NULL,
+                        `finished_by_user_id` int DEFAULT NULL,
+                        `goal` varchar(4000) NOT NULL,
+                        `start_date` date NOT NULL,
+                        `status` bit(1) NOT NULL,
+                        `updated_at` datetime(6) DEFAULT NULL,
+                        PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2219,14 +2219,14 @@ DROP TABLE IF EXISTS `position_levels`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `position_levels` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) DEFAULT NULL,
-  `created_at` datetime(6) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `level_code` varchar(255) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_5s5d0boaq5jidwk9m5hnku55g` (`level_code`)
+                                   `id` int NOT NULL AUTO_INCREMENT,
+                                   `active` bit(1) DEFAULT NULL,
+                                   `created_at` datetime(6) DEFAULT NULL,
+                                   `created_by` int DEFAULT NULL,
+                                   `level_code` varchar(255) NOT NULL,
+                                   `updated_at` datetime(6) DEFAULT NULL,
+                                   PRIMARY KEY (`id`),
+                                   UNIQUE KEY `UK_5s5d0boaq5jidwk9m5hnku55g` (`level_code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2248,15 +2248,15 @@ DROP TABLE IF EXISTS `position_permission_audit`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `position_permission_audit` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `column_name` varchar(100) NOT NULL,
-  `edited_at` datetime(6) NOT NULL,
-  `edited_by` int NOT NULL,
-  `new_value` varchar(5) NOT NULL,
-  `old_value` varchar(5) DEFAULT NULL,
-  `position_id` int NOT NULL,
-  `position_title_snapshot` varchar(150) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                             `id` int NOT NULL AUTO_INCREMENT,
+                                             `column_name` varchar(100) NOT NULL,
+                                             `edited_at` datetime(6) NOT NULL,
+                                             `edited_by` int NOT NULL,
+                                             `new_value` varchar(5) NOT NULL,
+                                             `old_value` varchar(5) DEFAULT NULL,
+                                             `position_id` int NOT NULL,
+                                             `position_title_snapshot` varchar(150) DEFAULT NULL,
+                                             PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2278,16 +2278,16 @@ DROP TABLE IF EXISTS `position_permission_audits`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `position_permission_audits` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `column_name` varchar(255) DEFAULT NULL,
-  `edited_at` datetime(6) DEFAULT NULL,
-  `edited_by` int DEFAULT NULL,
-  `edited_by_name` varchar(255) DEFAULT NULL,
-  `new_value` varchar(255) DEFAULT NULL,
-  `old_value` varchar(255) DEFAULT NULL,
-  `position_id` int DEFAULT NULL,
-  `position_title_snapshot` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                              `id` bigint NOT NULL AUTO_INCREMENT,
+                                              `column_name` varchar(255) DEFAULT NULL,
+                                              `edited_at` datetime(6) DEFAULT NULL,
+                                              `edited_by` int DEFAULT NULL,
+                                              `edited_by_name` varchar(255) DEFAULT NULL,
+                                              `new_value` varchar(255) DEFAULT NULL,
+                                              `old_value` varchar(255) DEFAULT NULL,
+                                              `position_id` int DEFAULT NULL,
+                                              `position_title_snapshot` varchar(255) DEFAULT NULL,
+                                              PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2308,49 +2308,49 @@ DROP TABLE IF EXISTS `position_permissions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `position_permissions` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `appraisal_approve` bit(1) NOT NULL,
-  `appraisal_review` bit(1) NOT NULL,
-  `appraisal_score_input` bit(1) NOT NULL,
-  `appraisal_sign` bit(1) NOT NULL,
-  `appraisal_view` bit(1) NOT NULL,
-  `continuous_feedback_give` bit(1) NOT NULL,
-  `continuous_feedback_view` bit(1) NOT NULL,
-  `department_comparison_view` bit(1) NOT NULL,
-  `department_crud` bit(1) NOT NULL,
-  `employee_crud` bit(1) NOT NULL,
-  `employee_excel_import` bit(1) NOT NULL,
-  `feedback_form_create` bit(1) NOT NULL,
-  `feedback_send` bit(1) NOT NULL,
-  `kpi_create` bit(1) NOT NULL,
-  `kpi_edit` bit(1) NOT NULL,
-  `kpi_input` bit(1) NOT NULL,
-  `kpi_score` bit(1) NOT NULL,
-  `kpi_view` bit(1) NOT NULL,
-  `one_on_one_create` bit(1) NOT NULL,
-  `one_on_one_dept_selection` bit(1) NOT NULL,
-  `one_on_one_team_selection` bit(1) NOT NULL,
-  `pip_create` bit(1) NOT NULL,
-  `pip_edit` bit(1) NOT NULL,
-  `pip_view_all` bit(1) NOT NULL,
-  `position_crud` bit(1) NOT NULL,
-  `self_assessment_input` bit(1) NOT NULL,
-  `self_assessment_lock` bit(1) NOT NULL,
-  `self_assessment_sign` bit(1) NOT NULL,
-  `self_assessment_view` bit(1) NOT NULL,
-  `team_assign_as_leader` bit(1) NOT NULL,
-  `team_assign_as_member` bit(1) NOT NULL,
-  `team_assign_as_pm` bit(1) NOT NULL,
-  `team_create` bit(1) NOT NULL,
-  `team_edit` bit(1) NOT NULL,
-  `team_history` bit(1) NOT NULL,
-  `team_view` bit(1) NOT NULL,
-  `position_id` int NOT NULL,
-  `created_at` datetime(6) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_j5an1u7ov25976eftwsg9mflg` (`position_id`),
-  CONSTRAINT `FKflpalfxe9ytt1wy5gy0fvyinb` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`)
+                                        `id` bigint NOT NULL AUTO_INCREMENT,
+                                        `appraisal_approve` bit(1) NOT NULL,
+                                        `appraisal_review` bit(1) NOT NULL,
+                                        `appraisal_score_input` bit(1) NOT NULL,
+                                        `appraisal_sign` bit(1) NOT NULL,
+                                        `appraisal_view` bit(1) NOT NULL,
+                                        `continuous_feedback_give` bit(1) NOT NULL,
+                                        `continuous_feedback_view` bit(1) NOT NULL,
+                                        `department_comparison_view` bit(1) NOT NULL,
+                                        `department_crud` bit(1) NOT NULL,
+                                        `employee_crud` bit(1) NOT NULL,
+                                        `employee_excel_import` bit(1) NOT NULL,
+                                        `feedback_form_create` bit(1) NOT NULL,
+                                        `feedback_send` bit(1) NOT NULL,
+                                        `kpi_create` bit(1) NOT NULL,
+                                        `kpi_edit` bit(1) NOT NULL,
+                                        `kpi_input` bit(1) NOT NULL,
+                                        `kpi_score` bit(1) NOT NULL,
+                                        `kpi_view` bit(1) NOT NULL,
+                                        `one_on_one_create` bit(1) NOT NULL,
+                                        `one_on_one_dept_selection` bit(1) NOT NULL,
+                                        `one_on_one_team_selection` bit(1) NOT NULL,
+                                        `pip_create` bit(1) NOT NULL,
+                                        `pip_edit` bit(1) NOT NULL,
+                                        `pip_view_all` bit(1) NOT NULL,
+                                        `position_crud` bit(1) NOT NULL,
+                                        `self_assessment_input` bit(1) NOT NULL,
+                                        `self_assessment_lock` bit(1) NOT NULL,
+                                        `self_assessment_sign` bit(1) NOT NULL,
+                                        `self_assessment_view` bit(1) NOT NULL,
+                                        `team_assign_as_leader` bit(1) NOT NULL,
+                                        `team_assign_as_member` bit(1) NOT NULL,
+                                        `team_assign_as_pm` bit(1) NOT NULL,
+                                        `team_create` bit(1) NOT NULL,
+                                        `team_edit` bit(1) NOT NULL,
+                                        `team_history` bit(1) NOT NULL,
+                                        `team_view` bit(1) NOT NULL,
+                                        `position_id` int NOT NULL,
+                                        `created_at` datetime(6) DEFAULT NULL,
+                                        `updated_at` datetime(6) DEFAULT NULL,
+                                        PRIMARY KEY (`id`),
+                                        UNIQUE KEY `UK_j5an1u7ov25976eftwsg9mflg` (`position_id`),
+                                        CONSTRAINT `FKflpalfxe9ytt1wy5gy0fvyinb` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=127 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2372,19 +2372,19 @@ DROP TABLE IF EXISTS `positions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `positions` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) DEFAULT NULL,
-  `created_by` varchar(255) DEFAULT NULL,
-  `description` text,
-  `position_title` varchar(150) NOT NULL,
-  `status` bit(1) NOT NULL,
-  `level_id` int NOT NULL,
-  `role_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKr7u7lb83d5c88gtlnttckhmb1` (`level_id`),
-  KEY `FKf1as2etuafbbyed7iup1vhy2c` (`role_id`),
-  CONSTRAINT `FKf1as2etuafbbyed7iup1vhy2c` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`),
-  CONSTRAINT `FKr7u7lb83d5c88gtlnttckhmb1` FOREIGN KEY (`level_id`) REFERENCES `position_levels` (`id`)
+                             `id` int NOT NULL AUTO_INCREMENT,
+                             `created_at` datetime(6) DEFAULT NULL,
+                             `created_by` varchar(255) DEFAULT NULL,
+                             `description` text,
+                             `position_title` varchar(150) NOT NULL,
+                             `status` bit(1) NOT NULL,
+                             `level_id` int NOT NULL,
+                             `role_id` int DEFAULT NULL,
+                             PRIMARY KEY (`id`),
+                             KEY `FKr7u7lb83d5c88gtlnttckhmb1` (`level_id`),
+                             KEY `FKf1as2etuafbbyed7iup1vhy2c` (`role_id`),
+                             CONSTRAINT `FKf1as2etuafbbyed7iup1vhy2c` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`),
+                             CONSTRAINT `FKr7u7lb83d5c88gtlnttckhmb1` FOREIGN KEY (`level_id`) REFERENCES `position_levels` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=69 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2406,22 +2406,22 @@ DROP TABLE IF EXISTS `rating_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `rating_history` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `column_name` varchar(50) NOT NULL,
-  `edited_at` datetime(6) NOT NULL,
-  `edited_by` varchar(100) NOT NULL,
-  `new_text` varchar(500) DEFAULT NULL,
-  `old_text` varchar(500) DEFAULT NULL,
-  `edited_by_id` int DEFAULT NULL,
-  `rating_scale_id` int DEFAULT NULL,
-  `rating_score_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FKc4c8tcm7c8hehj46otpml4ppb` (`edited_by_id`),
-  KEY `FKi9vkjddsysgontolyo660jsa2` (`rating_scale_id`),
-  KEY `FKlg5yx11rgneft1v6r1emj4cpv` (`rating_score_id`),
-  CONSTRAINT `FKc4c8tcm7c8hehj46otpml4ppb` FOREIGN KEY (`edited_by_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKi9vkjddsysgontolyo660jsa2` FOREIGN KEY (`rating_scale_id`) REFERENCES `rating_scales` (`id`),
-  CONSTRAINT `FKlg5yx11rgneft1v6r1emj4cpv` FOREIGN KEY (`rating_score_id`) REFERENCES `rating_score` (`id`)
+                                  `id` int NOT NULL AUTO_INCREMENT,
+                                  `column_name` varchar(50) NOT NULL,
+                                  `edited_at` datetime(6) NOT NULL,
+                                  `edited_by` varchar(100) NOT NULL,
+                                  `new_text` varchar(500) DEFAULT NULL,
+                                  `old_text` varchar(500) DEFAULT NULL,
+                                  `edited_by_id` int DEFAULT NULL,
+                                  `rating_scale_id` int DEFAULT NULL,
+                                  `rating_score_id` int DEFAULT NULL,
+                                  PRIMARY KEY (`id`),
+                                  KEY `FKc4c8tcm7c8hehj46otpml4ppb` (`edited_by_id`),
+                                  KEY `FKi9vkjddsysgontolyo660jsa2` (`rating_scale_id`),
+                                  KEY `FKlg5yx11rgneft1v6r1emj4cpv` (`rating_score_id`),
+                                  CONSTRAINT `FKc4c8tcm7c8hehj46otpml4ppb` FOREIGN KEY (`edited_by_id`) REFERENCES `users` (`id`),
+                                  CONSTRAINT `FKi9vkjddsysgontolyo660jsa2` FOREIGN KEY (`rating_scale_id`) REFERENCES `rating_scales` (`id`),
+                                  CONSTRAINT `FKlg5yx11rgneft1v6r1emj4cpv` FOREIGN KEY (`rating_score_id`) REFERENCES `rating_score` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2442,13 +2442,13 @@ DROP TABLE IF EXISTS `rating_scales`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `rating_scales` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `description` varchar(50) NOT NULL,
-  `performance_level` varchar(50) DEFAULT NULL,
-  `promotion_eligibility` varchar(50) DEFAULT NULL,
-  `scales` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_rgr046e0eojj3rx7t1fayi5b0` (`scales`)
+                                 `id` int NOT NULL AUTO_INCREMENT,
+                                 `description` varchar(50) NOT NULL,
+                                 `performance_level` varchar(50) DEFAULT NULL,
+                                 `promotion_eligibility` varchar(50) DEFAULT NULL,
+                                 `scales` int NOT NULL,
+                                 PRIMARY KEY (`id`),
+                                 UNIQUE KEY `UK_rgr046e0eojj3rx7t1fayi5b0` (`scales`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2469,14 +2469,14 @@ DROP TABLE IF EXISTS `rating_score`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `rating_score` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `explanation` varchar(200) NOT NULL,
-  `score_range` varchar(10) NOT NULL,
-  `description_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_guqbumk5051v886gt1qk1nsfs` (`score_range`),
-  KEY `FKev1uajv9l7jhk1q2qhbugd3l5` (`description_id`),
-  CONSTRAINT `FKev1uajv9l7jhk1q2qhbugd3l5` FOREIGN KEY (`description_id`) REFERENCES `rating_scales` (`id`)
+                                `id` int NOT NULL AUTO_INCREMENT,
+                                `explanation` varchar(200) NOT NULL,
+                                `score_range` varchar(10) NOT NULL,
+                                `description_id` int NOT NULL,
+                                PRIMARY KEY (`id`),
+                                UNIQUE KEY `UK_guqbumk5051v886gt1qk1nsfs` (`score_range`),
+                                KEY `FKev1uajv9l7jhk1q2qhbugd3l5` (`description_id`),
+                                CONSTRAINT `FKev1uajv9l7jhk1q2qhbugd3l5` FOREIGN KEY (`description_id`) REFERENCES `rating_scales` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2497,12 +2497,12 @@ DROP TABLE IF EXISTS `refresh_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `refresh_tokens` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `expiry_date` datetime(6) NOT NULL,
-  `token` varchar(255) NOT NULL,
-  `user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_ghpmfn23vmxfu3spu3lfg4r2d` (`token`)
+                                  `id` int NOT NULL AUTO_INCREMENT,
+                                  `expiry_date` datetime(6) NOT NULL,
+                                  `token` varchar(255) NOT NULL,
+                                  `user_id` int DEFAULT NULL,
+                                  PRIMARY KEY (`id`),
+                                  UNIQUE KEY `UK_ghpmfn23vmxfu3spu3lfg4r2d` (`token`)
 ) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2524,10 +2524,10 @@ DROP TABLE IF EXISTS `role_permissions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `role_permissions` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `permission_id` int DEFAULT NULL,
-  `role_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                                    `id` int NOT NULL AUTO_INCREMENT,
+                                    `permission_id` int DEFAULT NULL,
+                                    `role_id` int DEFAULT NULL,
+                                    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2549,15 +2549,15 @@ DROP TABLE IF EXISTS `roles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `roles` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `active` bit(1) DEFAULT NULL,
-  `created_at` datetime(6) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `description` varchar(255) DEFAULT NULL,
-  `name` varchar(255) NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_ofx66keruapi6vyqpv6f2or37` (`name`)
+                         `id` int NOT NULL AUTO_INCREMENT,
+                         `active` bit(1) DEFAULT NULL,
+                         `created_at` datetime(6) DEFAULT NULL,
+                         `created_by` int DEFAULT NULL,
+                         `description` varchar(255) DEFAULT NULL,
+                         `name` varchar(255) NOT NULL,
+                         `updated_at` datetime(6) DEFAULT NULL,
+                         PRIMARY KEY (`id`),
+                         UNIQUE KEY `UK_ofx66keruapi6vyqpv6f2or37` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2579,18 +2579,18 @@ DROP TABLE IF EXISTS `signatures`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `signatures` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(6) NOT NULL,
-  `image_data` longtext NOT NULL,
-  `image_type` varchar(50) NOT NULL,
-  `is_active` bit(1) NOT NULL,
-  `is_default` bit(1) NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `role` enum('CEO','HR','DEPARTMENT_HEAD','MANAGER','ADMIN','EMPLOYEE') NOT NULL,
-  `source_type` enum('DRAWN','UPLOADED') NOT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `user_id` bigint NOT NULL,
-  PRIMARY KEY (`id`)
+                              `id` bigint NOT NULL AUTO_INCREMENT,
+                              `created_at` datetime(6) NOT NULL,
+                              `image_data` longtext NOT NULL,
+                              `image_type` varchar(50) NOT NULL,
+                              `is_active` bit(1) NOT NULL,
+                              `is_default` bit(1) NOT NULL,
+                              `name` varchar(120) NOT NULL,
+                              `role` enum('CEO','HR','DEPARTMENT_HEAD','MANAGER','ADMIN','EMPLOYEE') NOT NULL,
+                              `source_type` enum('DRAWN','UPLOADED') NOT NULL,
+                              `updated_at` datetime(6) DEFAULT NULL,
+                              `user_id` bigint NOT NULL,
+                              PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2611,24 +2611,24 @@ DROP TABLE IF EXISTS `team`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `team` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `created_date` date NOT NULL,
-  `status` varchar(20) NOT NULL,
-  `team_goal` varchar(500) DEFAULT NULL,
-  `team_name` varchar(100) NOT NULL,
-  `created_by_id` int NOT NULL,
-  `department_id` int NOT NULL,
-  `project_manager_id` int DEFAULT NULL,
-  `team_leader_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK3yj1v7emjl0k3liuk1hh5x9yo` (`created_by_id`),
-  KEY `FKcitsl0ygrf7nbmydhlcqorb3p` (`department_id`),
-  KEY `FKk2j63676ol745bgvpye7le7t6` (`project_manager_id`),
-  KEY `FK4sibnb6rjpyth97lemggqt2ul` (`team_leader_id`),
-  CONSTRAINT `FK3yj1v7emjl0k3liuk1hh5x9yo` FOREIGN KEY (`created_by_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FK4sibnb6rjpyth97lemggqt2ul` FOREIGN KEY (`team_leader_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKcitsl0ygrf7nbmydhlcqorb3p` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
-  CONSTRAINT `FKk2j63676ol745bgvpye7le7t6` FOREIGN KEY (`project_manager_id`) REFERENCES `users` (`id`)
+                        `id` int NOT NULL AUTO_INCREMENT,
+                        `created_date` date NOT NULL,
+                        `status` varchar(20) NOT NULL,
+                        `team_goal` varchar(500) DEFAULT NULL,
+                        `team_name` varchar(100) NOT NULL,
+                        `created_by_id` int NOT NULL,
+                        `department_id` int NOT NULL,
+                        `project_manager_id` int DEFAULT NULL,
+                        `team_leader_id` int NOT NULL,
+                        PRIMARY KEY (`id`),
+                        KEY `FK3yj1v7emjl0k3liuk1hh5x9yo` (`created_by_id`),
+                        KEY `FKcitsl0ygrf7nbmydhlcqorb3p` (`department_id`),
+                        KEY `FKk2j63676ol745bgvpye7le7t6` (`project_manager_id`),
+                        KEY `FK4sibnb6rjpyth97lemggqt2ul` (`team_leader_id`),
+                        CONSTRAINT `FK3yj1v7emjl0k3liuk1hh5x9yo` FOREIGN KEY (`created_by_id`) REFERENCES `users` (`id`),
+                        CONSTRAINT `FK4sibnb6rjpyth97lemggqt2ul` FOREIGN KEY (`team_leader_id`) REFERENCES `users` (`id`),
+                        CONSTRAINT `FKcitsl0ygrf7nbmydhlcqorb3p` FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
+                        CONSTRAINT `FKk2j63676ol745bgvpye7le7t6` FOREIGN KEY (`project_manager_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2650,21 +2650,21 @@ DROP TABLE IF EXISTS `team_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `team_history` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `action_type` varchar(60) NOT NULL,
-  `changed_at` datetime(6) NOT NULL,
-  `changed_by_name` varchar(255) DEFAULT NULL,
-  `field_name` varchar(100) DEFAULT NULL,
-  `new_value` text,
-  `old_value` text,
-  `reason` text,
-  `changed_by_id` int DEFAULT NULL,
-  `team_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK4hvr4sshvkob3c6st1nh8n5a5` (`changed_by_id`),
-  KEY `FKlk1mymkn0bmgig97x851e60g4` (`team_id`),
-  CONSTRAINT `FK4hvr4sshvkob3c6st1nh8n5a5` FOREIGN KEY (`changed_by_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKlk1mymkn0bmgig97x851e60g4` FOREIGN KEY (`team_id`) REFERENCES `team` (`id`)
+                                `id` int NOT NULL AUTO_INCREMENT,
+                                `action_type` varchar(60) NOT NULL,
+                                `changed_at` datetime(6) NOT NULL,
+                                `changed_by_name` varchar(255) DEFAULT NULL,
+                                `field_name` varchar(100) DEFAULT NULL,
+                                `new_value` text,
+                                `old_value` text,
+                                `reason` text,
+                                `changed_by_id` int DEFAULT NULL,
+                                `team_id` int NOT NULL,
+                                PRIMARY KEY (`id`),
+                                KEY `FK4hvr4sshvkob3c6st1nh8n5a5` (`changed_by_id`),
+                                KEY `FKlk1mymkn0bmgig97x851e60g4` (`team_id`),
+                                CONSTRAINT `FK4hvr4sshvkob3c6st1nh8n5a5` FOREIGN KEY (`changed_by_id`) REFERENCES `users` (`id`),
+                                CONSTRAINT `FKlk1mymkn0bmgig97x851e60g4` FOREIGN KEY (`team_id`) REFERENCES `team` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2685,19 +2685,19 @@ DROP TABLE IF EXISTS `team_member`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `team_member` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `ended_date` date DEFAULT NULL,
-  `started_date` date NOT NULL,
-  `edited_by_id` int DEFAULT NULL,
-  `member_user_id` int NOT NULL,
-  `team_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_team_member_team_user` (`team_id`,`member_user_id`),
-  KEY `FKqjxjdup2qlcfoqi57l2fu9qep` (`edited_by_id`),
-  KEY `FKsxx4o7670cev98s9hsboljaap` (`member_user_id`),
-  CONSTRAINT `FK9ubp79ei4tv4crd0r9n7u5i6e` FOREIGN KEY (`team_id`) REFERENCES `team` (`id`),
-  CONSTRAINT `FKqjxjdup2qlcfoqi57l2fu9qep` FOREIGN KEY (`edited_by_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `FKsxx4o7670cev98s9hsboljaap` FOREIGN KEY (`member_user_id`) REFERENCES `users` (`id`)
+                               `id` int NOT NULL AUTO_INCREMENT,
+                               `ended_date` date DEFAULT NULL,
+                               `started_date` date NOT NULL,
+                               `edited_by_id` int DEFAULT NULL,
+                               `member_user_id` int NOT NULL,
+                               `team_id` int NOT NULL,
+                               PRIMARY KEY (`id`),
+                               UNIQUE KEY `uk_team_member_team_user` (`team_id`,`member_user_id`),
+                               KEY `FKqjxjdup2qlcfoqi57l2fu9qep` (`edited_by_id`),
+                               KEY `FKsxx4o7670cev98s9hsboljaap` (`member_user_id`),
+                               CONSTRAINT `FK9ubp79ei4tv4crd0r9n7u5i6e` FOREIGN KEY (`team_id`) REFERENCES `team` (`id`),
+                               CONSTRAINT `FKqjxjdup2qlcfoqi57l2fu9qep` FOREIGN KEY (`edited_by_id`) REFERENCES `users` (`id`),
+                               CONSTRAINT `FKsxx4o7670cev98s9hsboljaap` FOREIGN KEY (`member_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2719,14 +2719,14 @@ DROP TABLE IF EXISTS `user_profiles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_profiles` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `phone_number` varchar(50) DEFAULT NULL,
-  `profile_image_data` longtext,
-  `profile_image_type` varchar(100) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `user_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_e5h89rk3ijvdmaiig4srogdc6` (`user_id`)
+                                 `id` bigint NOT NULL AUTO_INCREMENT,
+                                 `phone_number` varchar(50) DEFAULT NULL,
+                                 `profile_image_data` longtext,
+                                 `profile_image_type` varchar(100) DEFAULT NULL,
+                                 `updated_at` datetime(6) DEFAULT NULL,
+                                 `user_id` int NOT NULL,
+                                 PRIMARY KEY (`id`),
+                                 UNIQUE KEY `UK_e5h89rk3ijvdmaiig4srogdc6` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2747,10 +2747,10 @@ DROP TABLE IF EXISTS `user_roles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_roles` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `role_id` int DEFAULT NULL,
-  `user_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`)
+                              `id` int NOT NULL AUTO_INCREMENT,
+                              `role_id` int DEFAULT NULL,
+                              `user_id` int DEFAULT NULL,
+                              PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2772,27 +2772,27 @@ DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `account_status` varchar(255) DEFAULT NULL,
-  `active` bit(1) DEFAULT NULL,
-  `created_at` datetime(6) DEFAULT NULL,
-  `department_id` int DEFAULT NULL,
-  `email` varchar(255) NOT NULL,
-  `employee_code` varchar(255) DEFAULT NULL,
-  `employee_id` int DEFAULT NULL,
-  `full_name` varchar(255) DEFAULT NULL,
-  `join_date` date DEFAULT NULL,
-  `last_temporary_password_sent_at` datetime(6) DEFAULT NULL,
-  `manager_id` int DEFAULT NULL,
-  `must_change_password` bit(1) DEFAULT NULL,
-  `password` varchar(255) NOT NULL,
-  `password_changed_at` datetime(6) DEFAULT NULL,
-  `updated_at` datetime(6) DEFAULT NULL,
-  `position_id` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `UK_6dotkott2kjsp8vw4d0m25fb7` (`email`),
-  KEY `FK6ph6xiiydudp6umjf2xckbbmi` (`position_id`),
-  CONSTRAINT `FK6ph6xiiydudp6umjf2xckbbmi` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`)
+                         `id` int NOT NULL AUTO_INCREMENT,
+                         `account_status` varchar(255) DEFAULT NULL,
+                         `active` bit(1) DEFAULT NULL,
+                         `created_at` datetime(6) DEFAULT NULL,
+                         `department_id` int DEFAULT NULL,
+                         `email` varchar(255) NOT NULL,
+                         `employee_code` varchar(255) DEFAULT NULL,
+                         `employee_id` int DEFAULT NULL,
+                         `full_name` varchar(255) DEFAULT NULL,
+                         `join_date` date DEFAULT NULL,
+                         `last_temporary_password_sent_at` datetime(6) DEFAULT NULL,
+                         `manager_id` int DEFAULT NULL,
+                         `must_change_password` bit(1) DEFAULT NULL,
+                         `password` varchar(255) NOT NULL,
+                         `password_changed_at` datetime(6) DEFAULT NULL,
+                         `updated_at` datetime(6) DEFAULT NULL,
+                         `position_id` int DEFAULT NULL,
+                         PRIMARY KEY (`id`),
+                         UNIQUE KEY `UK_6dotkott2kjsp8vw4d0m25fb7` (`email`),
+                         KEY `FK6ph6xiiydudp6umjf2xckbbmi` (`position_id`),
+                         CONSTRAINT `FK6ph6xiiydudp6umjf2xckbbmi` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -8,6 +8,7 @@ import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackRequest;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
+import com.epms.entity.enums.EvaluatorSelectionMethod;
 import com.epms.entity.enums.FeedbackRelationshipType;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
@@ -194,6 +195,25 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         if (missingRelationship) assignmentIssues.add("Some evaluator assignments are missing a relationship type.");
         boolean missingEvaluator = assignments.stream().anyMatch(assignment -> assignment.getEvaluatorEmployeeId() == null);
         if (missingEvaluator) assignmentIssues.add("Some evaluator assignments are missing evaluator employees.");
+
+        boolean invalidSelfRelationship = assignments.stream().anyMatch(assignment -> {
+            FeedbackRequest request = assignment.getFeedbackRequest();
+            if (request == null || assignment.getEvaluatorEmployeeId() == null || assignment.getRelationshipType() == null) return false;
+            boolean samePerson = Objects.equals(request.getTargetEmployeeId(), assignment.getEvaluatorEmployeeId());
+            return assignment.getRelationshipType() == FeedbackRelationshipType.SELF ? !samePerson : samePerson;
+        });
+        if (invalidSelfRelationship) {
+            assignmentIssues.add("Self assignments must use the recipient, and non-self assignments cannot use the recipient as evaluator.");
+        }
+
+        boolean manualWithoutReason = assignments.stream().anyMatch(assignment ->
+                assignment.getSelectionMethod() == EvaluatorSelectionMethod.MANUAL
+                        && (assignment.getManualReason() == null || assignment.getManualReason().isBlank())
+        );
+        if (manualWithoutReason) {
+            assignmentIssues.add("Manual evaluator changes require a reason before launch.");
+        }
+
         Set<Long> requestsWithAssignments = assignments.stream()
                 .filter(assignment -> assignment.getFeedbackRequest() != null)
                 .map(assignment -> assignment.getFeedbackRequest().getId())
@@ -205,11 +225,12 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         if (!missingTargetIds.isEmpty()) {
             assignmentIssues.add("Targets without evaluator assignments: " + missingTargetIds + ".");
         }
+
         if (!assignmentIssues.isEmpty()) {
             blocking.addAll(assignmentIssues);
-            checks.add(readinessCheck("EVALUATOR_ASSIGNMENTS", "Evaluator assignments", "BLOCKED", "Evaluator assignment data has blocking issues."));
+            checks.add(readinessCheck("EVALUATOR_ASSIGNMENTS", "Evaluator assignments", "BLOCKED", String.join(" ", assignmentIssues)));
         } else {
-            checks.add(readinessCheck("EVALUATOR_ASSIGNMENTS", "Evaluator assignments", "PASS", assignments.size() + " evaluator assignment(s) are generated."));
+            checks.add(readinessCheck("EVALUATOR_ASSIGNMENTS", "Evaluator assignments", "PASS", assignments.size() + " evaluator assignment(s) are generated and linked to recipients."));
         }
     }
 
@@ -222,8 +243,8 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         try {
             FeedbackCampaignQuestionReviewResponse review = questionReviewService.getQuestionReview(campaign.getId());
             if (!Boolean.TRUE.equals(review.getSaved()) || review.getIncludedQuestionCount() == null || review.getIncludedQuestionCount() <= 0) {
-                blocking.add("Complete and save Campaign Question Review before activation.");
-                checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "BLOCKED", "Campaign question selection has not been saved."));
+                blocking.add("Complete and save the Question Snapshot before activation.");
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", "Campaign question snapshot has not been saved."));
                 return;
             }
             questionReviewService.validateCampaignQuestionSelectionReady(campaign.getId());
@@ -232,7 +253,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
                                                                 .count();
             if (emptyGroups > 0) {
                 blocking.add("Every evaluator group must keep at least one included question.");
-                checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "BLOCKED", emptyGroups + " evaluator group(s) have no included questions."));
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", emptyGroups + " evaluator group(s) have no included questions."));
                 return;
             }
             long noScoredGroups = review.getGroups() == null ? 0 : review.getGroups().stream()
@@ -240,13 +261,13 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
                                                                    .count();
             if (noScoredGroups > 0) {
                 warnings.add(noScoredGroups + " question group(s) have no scored questions.");
-                checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "WARNING", review.getIncludedQuestionCount() + " questions saved; " + noScoredGroups + " group(s) are non-scored only."));
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "WARNING", review.getIncludedQuestionCount() + " questions saved; " + noScoredGroups + " group(s) are non-scored only."));
             } else {
-                checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "PASS", review.getIncludedQuestionCount() + " included campaign question(s) are saved."));
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "PASS", review.getIncludedQuestionCount() + " rating question(s) with required comments are saved in the snapshot."));
             }
         } catch (BusinessValidationException ex) {
             blocking.add(ex.getMessage());
-            checks.add(readinessCheck("QUESTION_SELECTION", "Question review", "BLOCKED", ex.getMessage()));
+            checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", ex.getMessage()));
         }
     }
 
@@ -258,35 +279,41 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
             List<String> warnings
     ) {
         Map<FeedbackRelationshipType, FeedbackCampaignRelationshipWeight> stored = relationshipWeightsByType(campaign);
+        if (stored.size() < FeedbackRelationshipType.values().length) {
+            String message = "Save Evaluator & Weight Rules before launch.";
+            blocking.add(message);
+            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Evaluator & Weight Rules", "BLOCKED", message));
+            return;
+        }
         Map<FeedbackRelationshipType, BigDecimal> weights = new EnumMap<>(FeedbackRelationshipType.class);
         for (FeedbackRelationshipType type : FeedbackRelationshipType.values()) {
-            weights.put(type, stored.containsKey(type) ? stored.get(type).getWeightPercent() : defaultRelationshipWeight(type));
+            weights.put(type, stored.get(type).getWeightPercent());
         }
         BigDecimal total = relationshipWeightTotal(weights);
         if (total.compareTo(new BigDecimal("100.00")) != 0) {
             String message = "Evaluator relationship weights must total 100%. Current total is " + total + "% .";
             blocking.add(message);
-            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "BLOCKED", message));
+            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Evaluator & Weight Rules", "BLOCKED", message));
             return;
         }
         if (weights.values().stream().noneMatch(value -> value.compareTo(BigDecimal.ZERO) > 0)) {
             String message = "At least one evaluator relationship must have a positive weight.";
             blocking.add(message);
-            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "BLOCKED", message));
+            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Evaluator & Weight Rules", "BLOCKED", message));
             return;
         }
         List<String> weightWarnings = relationshipWeightWarnings(campaign, weights, assignments);
         if (!weightWarnings.isEmpty() && !Boolean.TRUE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
             blocking.addAll(weightWarnings);
-            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "BLOCKED", String.join(" ", weightWarnings)));
+            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Evaluator & Weight Rules", "BLOCKED", String.join(" ", weightWarnings)));
             return;
         }
         if (!weightWarnings.isEmpty()) {
             warnings.addAll(weightWarnings);
-            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "WARNING", String.join(" ", weightWarnings)));
+            checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Evaluator & Weight Rules", "WARNING", String.join(" ", weightWarnings)));
             return;
         }
-        checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Relationship weights", "PASS", "Relationship weights total 100% and are ready for scoring."));
+        checks.add(readinessCheck("RELATIONSHIP_WEIGHTS", "Evaluator & Weight Rules", "PASS", "Evaluator & Weight Rules total 100% and are ready for scoring."));
     }
 
     private void addPrivacyPolicyCheck(
@@ -295,10 +322,8 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
             List<String> warnings
     ) {
         List<String> anonymousRoles = new ArrayList<>();
-        if (Boolean.TRUE.equals(campaign.getManagerFeedbackAnonymous())) anonymousRoles.add("manager");
         if (!Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) anonymousRoles.add("peer");
         if (!Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) anonymousRoles.add("direct report");
-        if (Boolean.TRUE.equals(campaign.getSelfFeedbackAnonymous())) anonymousRoles.add("self");
 
         List<String> privacyWarnings = new ArrayList<>();
         if (Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) {
@@ -312,7 +337,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
             warnings.addAll(privacyWarnings);
             checks.add(readinessCheck(
                     "PRIVACY_POLICY",
-                    "Privacy settings",
+                    "Feedback visibility",
                     "WARNING",
                     String.join(" ", privacyWarnings)
             ));
@@ -320,9 +345,9 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         }
 
         String message = anonymousRoles.isEmpty()
-                ? "No anonymous feedback roles are enabled."
-                : "Anonymous feedback enabled for " + String.join(", ", anonymousRoles) + " feedback.";
-        checks.add(readinessCheck("PRIVACY_POLICY", "Privacy settings", "PASS", message));
+                ? "Peer and direct report feedback identity is visible to recipients."
+                : "Grouped feedback identity is hidden from recipients for " + String.join(", ", anonymousRoles) + " feedback.";
+        checks.add(readinessCheck("PRIVACY_POLICY", "Feedback visibility", "PASS", message));
     }
 
     private void addSubmissionWindowCheck(
@@ -334,15 +359,15 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         LocalDateTime now = LocalDateTime.now();
         if (campaign.getEndAt() != null && !campaign.getEndAt().isAfter(now)) {
             blocking.add("Campaign end date/time is already in the past.");
-            checks.add(readinessCheck("SUBMISSION_WINDOW", "Submission window", "BLOCKED", "The end date/time has already passed."));
+            checks.add(readinessCheck("SUBMISSION_WINDOW", "Launch window", "BLOCKED", "The end date/time has already passed."));
             return;
         }
         if (campaign.getStartAt() != null && campaign.getStartAt().isAfter(now)) {
-            warnings.add("Campaign start date/time is in the future; activation will prepare assignments before collection begins.");
-            checks.add(readinessCheck("SUBMISSION_WINDOW", "Submission window", "WARNING", "Start date/time is in the future. Evaluators should submit only during the campaign window."));
+            warnings.add("Campaign start date/time is in the future; launch can happen now and collection will open at the start time.");
+            checks.add(readinessCheck("SUBMISSION_WINDOW", "Launch window", "WARNING", "Campaign can be launched now. Evaluators can submit when the start time arrives."));
             return;
         }
-        checks.add(readinessCheck("SUBMISSION_WINDOW", "Submission window", "PASS", "Campaign submission window is currently open."));
+        checks.add(readinessCheck("SUBMISSION_WINDOW", "Launch window", "PASS", "Campaign submission window is currently open."));
     }
 
     private boolean hasTargetWarnings(FeedbackRequest request) {
@@ -395,14 +420,6 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal defaultRelationshipWeight(FeedbackRelationshipType type) {
-        return switch (type) {
-            case MANAGER -> new BigDecimal("40.00");
-            case PEER -> new BigDecimal("30.00");
-            case SUBORDINATE -> new BigDecimal("20.00");
-            case SELF -> new BigDecimal("10.00");
-        };
-    }
 
     private List<String> relationshipWeightWarnings(
             FeedbackCampaign campaign,
@@ -432,8 +449,8 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         if (targetsMissingWeightedRole <= 0) return List.of();
         String message = targetsMissingWeightedRole + " target(s) do not have every weighted evaluator role.";
         if (Boolean.TRUE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
-            return List.of(message + " Missing relationship weight will redistribute across that target's available submitted roles.");
+            return List.of(message + " Unavailable relationship weight will redistribute across that target's available evaluator groups.");
         }
-        return List.of(message + " Enable redistribution or adjust evaluator generation before activation.");
+        return List.of(message + " Enable unavailable relationship redistribution or adjust evaluator generation before activation.");
     }
 }
