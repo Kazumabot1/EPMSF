@@ -36,7 +36,8 @@ const EmployeeKpiResultsPage = () => {
     <div style={{ padding: '2rem', maxWidth: '960px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>My KPI results</h1>
       <p style={{ color: '#64748b', marginBottom: '1.75rem' }}>
-        Finalized scores from your manager appear here. New results arrive as in-app notifications.
+        Finalized scores and in-progress actuals entered by your evaluator appear here. New finalized
+        results also arrive as in-app notifications.
       </p>
 
       {loading && <p style={{ color: '#64748b' }}>Loading…</p>}
@@ -51,7 +52,7 @@ const EmployeeKpiResultsPage = () => {
             color: '#64748b',
           }}
         >
-          No finalized KPI results yet.
+          No KPI results yet. Scores appear here once your evaluator records actual values.
         </div>
       )}
 
@@ -75,7 +76,7 @@ const EmployeeKpiResultsPage = () => {
                     Position: <strong style={{ color: '#0f172a' }}>{r.positionTitle}</strong> Â·{' '}
                   </>
                 )}
-                Finalized {formatWhen(r.finalizedAt)}
+                {r.status === 'FINALIZED' ? `Finalized ${formatWhen(r.finalizedAt)}` : `Status: ${r.status?.replace(/_/g, ' ') ?? 'In progress'}`}
                 {r.totalScore != null && (
                   <>
                     {' '}

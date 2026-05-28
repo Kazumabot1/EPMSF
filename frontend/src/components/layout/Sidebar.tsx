@@ -141,8 +141,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       (normalizedRoles.includes('EMPLOYEE') ||
           normalizedDashboard === 'EMPLOYEE_DASHBOARD');
 
-  const isHrOnly = variant === 'hr' || isHr;
-  const canCreatePip = !isHrOnly && !isEmployee && variant !== 'admin';
+  const canCreatePip = variant !== 'admin' && !isEmployee && allow(positionPermissions, 'pipCreate');
+  const canViewPip = allow(positionPermissions, 'pipViewAll') || canCreatePip || allow(positionPermissions, 'pipEdit');
 
   const roleLabel =
       variant === 'admin'
@@ -435,7 +435,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'pipViewAll') && {
+      canViewPip && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
@@ -448,8 +448,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-bell',
         children: [
           {
-            to: '/notification-templates',
-            label: 'Notification Template',
+            to: '/announcements',
+            label: 'Announcement',
             icon: 'bi bi-file-earmark-text',
           },
           { to: '/notifications', label: 'System Notification', icon: 'bi bi-bell' },
@@ -556,6 +556,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard-check',
       },
       {
+        to: '/manager/kpis',
+        label: 'My KPIs',
+        icon: 'bi bi-bullseye',
+      },
+      {
         to: '/manager/kpi-scoring',
         label: 'Team KPIs',
         icon: 'bi bi-bullseye',
@@ -574,7 +579,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'appraisalPermission') && {
+      {
         to: '/manager/appraisals',
         label: 'Appraisal Review',
         icon: 'bi bi-clipboard-data',
@@ -604,13 +609,13 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'continuousFeedbackView') && {
+      {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
 
-      allow(positionPermissions, 'oneOnOnePermission') && {
+      {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -628,7 +633,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'pipViewAll') && {
+      {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
@@ -693,26 +698,18 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       { to: '/executive/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       {
-        to: '/executive/approval/kpi',
-        label: 'Approval',
-        icon: 'bi bi-shield-check',
+        to: '/executive/kpi-scoring',
+        label: 'KPI Management',
+        icon: 'bi bi-bullseye',
         children: [
-          { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
+          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
+          { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-shield-check' },
           {
             to: '/executive/approval/department-kpi',
             label: 'Department KPI Approval',
             icon: 'bi bi-building-check',
-            end: true,
           },
-        ],
-      },
-      {
-        to: '/executive/kpi-scoring',
-        label: 'KPI Review',
-        icon: 'bi bi-clipboard2-check',
-        children: [
-          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-clipboard2-check', end: true },
-          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
       {
@@ -757,7 +754,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-clipboard-data',
       },
 
-      allow(positionPermissions, 'continuousFeedbackView') && {
+      {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
@@ -769,10 +766,33 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-chat-square-dots',
       },
 
-      allow(positionPermissions, 'departmentKpiPermission') && {
+      {
+        to: '/department-head/kpis',
+        label: 'My KPIs',
+        icon: 'bi bi-bullseye',
+      },
+      {
         to: '/department-head/department-kpis',
         label: 'Department KPIs',
         icon: 'bi bi-building-check',
+      },
+      {
+        to: '/department-head/kpi-scoring',
+        label: 'Manager KPI Scoring',
+        icon: 'bi bi-ui-checks-grid',
+        children: [
+          {
+            to: '/department-head/kpi-scoring',
+            label: 'Score Managers',
+            icon: 'bi bi-clipboard2-check',
+            end: true,
+          },
+          {
+            to: '/department-head/kpi/history',
+            label: 'KPI History',
+            icon: 'bi bi-clock-history',
+          },
+        ],
       },
 
       {
@@ -837,7 +857,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'appraisalPermission') && {
+      {
         to: '/department-head/appraisals/review',
         label: 'Appraisals',
         icon: 'bi bi-clipboard-check',
@@ -856,7 +876,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'oneOnOnePermission') && {
+      {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -875,19 +895,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
 
       {
-        to: '/notifications',
-        label: 'Notifications',
-        icon: 'bi bi-bell',
-        children: [
-          {
-            to: '/notifications',
-            label: 'System Notification',
-            icon: 'bi bi-bell',
-          },
-        ],
-      },
-
-      allow(positionPermissions, 'pipViewAll') && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
@@ -901,6 +908,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             to: '/pip/past-plans',
             label: 'Past Plans',
             icon: 'bi bi-clock-history',
+          },
+        ],
+      },
+
+      {
+        to: '/notifications',
+        label: 'Notifications',
+        icon: 'bi bi-bell',
+        children: [
+          {
+            to: '/notifications',
+            label: 'System Notification',
+            icon: 'bi bi-bell',
           },
         ],
       },
@@ -925,6 +945,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     isManager,
     isEmployee,
     canCreatePip,
+    canViewPip,
     positionPermissions,
     hasMyTeams,
   ]);
@@ -958,11 +979,23 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const onNotificationsUpdated = () => {
       void loadUnreadCount();
     };
+    const onNotificationsReadStateChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ unreadCount?: number }>).detail;
+
+      if (typeof detail?.unreadCount === 'number') {
+        setUnreadCount(detail.unreadCount);
+        return;
+      }
+
+      void loadUnreadCount();
+    };
 
     window.addEventListener('epms:notifications-updated', onNotificationsUpdated);
+    window.addEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
 
     return () => {
       window.removeEventListener('epms:notifications-updated', onNotificationsUpdated);
+      window.removeEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
     };
   }, [loadUnreadCount]);
 

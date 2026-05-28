@@ -3,15 +3,19 @@ package com.epms.controller;
 import com.epms.dto.GenericApiResponse;
 import com.epms.dto.NotificationResponseDto;
 import com.epms.entity.Notification;
+import com.epms.entity.User;
 import com.epms.repository.NotificationRepository;
+import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -20,6 +24,8 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @GetMapping
     public GenericApiResponse<List<NotificationResponseDto>> getMyNotifications() {
@@ -54,6 +60,7 @@ public class NotificationController {
             n.setIsRead(true);
         }
         notificationRepository.saveAll(unread);
+        publishReadStateChanged(userId, unread.stream().map(Notification::getId).toList(), true);
 
         return GenericApiResponse.success(
                 "All notifications marked as read",
@@ -73,10 +80,31 @@ public class NotificationController {
         }
 
         notification.setIsRead(true);
+        Notification saved = notificationRepository.save(notification);
+        publishReadStateChanged(userId, List.of(saved.getId()), false);
 
         return GenericApiResponse.success(
                 "Notification marked as read",
-                toDto(notificationRepository.save(notification))
+                toDto(saved)
+        );
+    }
+
+    private void publishReadStateChanged(Integer userId, List<Integer> notificationIds, boolean allRead) {
+        User user = userRepository.findById(userId).orElse(null);
+
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+
+        messagingTemplate.convertAndSendToUser(
+                user.getEmail(),
+                "/queue/events",
+                Map.of(
+                        "eventType", "NOTIFICATIONS_READ_STATE_CHANGED",
+                        "unreadCount", notificationRepository.countByUser_IdAndIsReadFalse(userId),
+                        "notificationIds", notificationIds,
+                        "allRead", allRead
+                )
         );
     }
 

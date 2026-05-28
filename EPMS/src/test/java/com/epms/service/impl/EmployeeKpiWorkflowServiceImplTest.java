@@ -14,8 +14,12 @@ import com.epms.entity.Position;
 import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
+import com.epms.entity.KpiTemplateCycle;
+import com.epms.entity.KpiTemplateCyclePeriod;
 import com.epms.entity.enums.EmployeeKpiStatus;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
+import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeKpiFormRepository;
 import com.epms.repository.EmployeeKpiFormEvaluatorRepository;
@@ -45,6 +49,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -106,6 +111,112 @@ class EmployeeKpiWorkflowServiceImplTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void generatePeriodsCreatesAllThreeMonthPeriodsForOneYearCycleAndCapsAtCycleEnd() {
+        KpiTemplateCycle cycle = new KpiTemplateCycle();
+        cycle.setId(1);
+        cycle.setStartDate(LocalDate.of(2026, 1, 1));
+        cycle.setEndDate(LocalDate.of(2026, 12, 31));
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+
+        KpiForm form = new KpiForm();
+        form.setId(10);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+
+        KpiPosition link = new KpiPosition();
+        link.setDurationMonths(3);
+        when(kpiPositionRepository.findWithPositionByKpiForm_Id(10)).thenReturn(List.of(link));
+        when(kpiTemplateCyclePeriodRepository.findByCycle_IdAndKpiForm_IdOrderByPeriodNumberAsc(1, 10)).thenReturn(List.of());
+        when(kpiTemplateCyclePeriodRepository.save(any(KpiTemplateCyclePeriod.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<KpiTemplateCyclePeriod> periods = service.ensureAllCycleFormPeriodsGenerated(cycle, form);
+
+        assertThat(periods).hasSize(4);
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getPeriodNumber).containsExactly(1, 2, 3, 4);
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getStartDate).containsExactly(
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 4, 1),
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 10, 1)
+        );
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getEndDate).containsExactly(
+                LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 6, 30),
+                LocalDate.of(2026, 9, 30),
+                LocalDate.of(2026, 12, 31)
+        );
+    }
+
+    @Test
+    void generatePeriodsCapsUnevenDurationFinalPeriodAtCycleEnd() {
+        KpiTemplateCycle cycle = new KpiTemplateCycle();
+        cycle.setId(1);
+        cycle.setStartDate(LocalDate.of(2026, 1, 1));
+        cycle.setEndDate(LocalDate.of(2026, 12, 31));
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+
+        KpiForm form = new KpiForm();
+        form.setId(10);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+
+        KpiPosition link = new KpiPosition();
+        link.setDurationMonths(5);
+        when(kpiPositionRepository.findWithPositionByKpiForm_Id(10)).thenReturn(List.of(link));
+        when(kpiTemplateCyclePeriodRepository.findByCycle_IdAndKpiForm_IdOrderByPeriodNumberAsc(1, 10)).thenReturn(List.of());
+        when(kpiTemplateCyclePeriodRepository.save(any(KpiTemplateCyclePeriod.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<KpiTemplateCyclePeriod> periods = service.ensureAllCycleFormPeriodsGenerated(cycle, form);
+
+        assertThat(periods).hasSize(3);
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getStartDate).containsExactly(
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 11, 1)
+        );
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getEndDate).containsExactly(
+                LocalDate.of(2026, 5, 31),
+                LocalDate.of(2026, 10, 31),
+                LocalDate.of(2026, 12, 31)
+        );
+    }
+
+    @Test
+    void generatePeriodsIsIdempotentAndDoesNotDuplicateExistingPeriodNumbers() {
+        KpiTemplateCycle cycle = new KpiTemplateCycle();
+        cycle.setId(1);
+        cycle.setStartDate(LocalDate.of(2026, 1, 1));
+        cycle.setEndDate(LocalDate.of(2026, 12, 31));
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+
+        KpiForm form = new KpiForm();
+        form.setId(10);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+
+        KpiPosition link = new KpiPosition();
+        link.setDurationMonths(3);
+        when(kpiPositionRepository.findWithPositionByKpiForm_Id(10)).thenReturn(List.of(link));
+
+        KpiTemplateCyclePeriod existing = new KpiTemplateCyclePeriod();
+        existing.setId(100);
+        existing.setCycle(cycle);
+        existing.setKpiForm(form);
+        existing.setPeriodNumber(1);
+        existing.setStartDate(LocalDate.of(2026, 1, 1));
+        existing.setEndDate(LocalDate.of(2026, 3, 31));
+        existing.setStatus(KpiTemplateCyclePeriodStatus.OPEN);
+
+        when(kpiTemplateCyclePeriodRepository.findByCycle_IdAndKpiForm_IdOrderByPeriodNumberAsc(1, 10)).thenReturn(List.of(existing));
+        when(kpiTemplateCyclePeriodRepository.save(any(KpiTemplateCyclePeriod.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<KpiTemplateCyclePeriod> periods = service.ensureAllCycleFormPeriodsGenerated(cycle, form);
+
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getPeriodNumber).contains(1, 2, 3, 4);
+        verify(kpiTemplateCyclePeriodRepository, never()).save(org.mockito.Mockito.argThat(p -> p.getPeriodNumber() != null && p.getPeriodNumber() == 1 && p.getId() == null));
     }
 
     @Test

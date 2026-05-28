@@ -308,6 +308,165 @@ const CeoDashboard = () => {
       >
         <button
           type="button"
+          onClick={() => navigate('/executive/kpi-scoring')}
+          style={{
+            border: '1px solid #bbf7d0',
+            background: '#fff',
+            borderRadius: 18,
+            padding: '1.2rem',
+            textAlign: 'left',
+            cursor: 'pointer',
+            boxShadow: '0 12px 30px rgba(15,23,42,.06)',
+          }}
+        >
+          <span
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              display: 'grid',
+              placeItems: 'center',
+              background: '#f0fdf4',
+              color: '#16a34a',
+              fontSize: 20,
+              marginBottom: 10,
+            }}
+          >
+            <i className="bi bi-bullseye" />
+          </span>
+
+          <strong
+            style={{
+              display: 'block',
+              color: '#1e293b',
+              fontSize: '1rem',
+              fontWeight: 900,
+              marginBottom: 6,
+            }}
+          >
+            KPI Management
+          </strong>
+
+          <small
+            style={{
+              display: 'block',
+              color: '#64748b',
+              fontWeight: 650,
+              lineHeight: 1.5,
+            }}
+          >
+            Enter actual KPI scores for department heads and HR, review history, and manage approvals.
+          </small>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/executive/approval/kpi')}
+          style={{
+            border: '1px solid #dcfce7',
+            background: '#fff',
+            borderRadius: 18,
+            padding: '1.2rem',
+            textAlign: 'left',
+            cursor: 'pointer',
+            boxShadow: '0 12px 30px rgba(15,23,42,.06)',
+          }}
+        >
+          <span
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              display: 'grid',
+              placeItems: 'center',
+              background: '#ecfdf5',
+              color: '#15803d',
+              fontSize: 20,
+              marginBottom: 10,
+            }}
+          >
+            <i className="bi bi-shield-check" />
+          </span>
+
+          <strong
+            style={{
+              display: 'block',
+              color: '#1e293b',
+              fontSize: '1rem',
+              fontWeight: 900,
+              marginBottom: 6,
+            }}
+          >
+            KPI Approval
+          </strong>
+
+          <small
+            style={{
+              display: 'block',
+              color: '#64748b',
+              fontWeight: 650,
+              lineHeight: 1.5,
+            }}
+          >
+            Review and approve employee KPI submissions awaiting executive sign-off.
+          </small>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/executive/approval/department-kpi')}
+          style={{
+            border: '1px solid #bfdbfe',
+            background: '#fff',
+            borderRadius: 18,
+            padding: '1.2rem',
+            textAlign: 'left',
+            cursor: 'pointer',
+            boxShadow: '0 12px 30px rgba(15,23,42,.06)',
+          }}
+        >
+          <span
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              display: 'grid',
+              placeItems: 'center',
+              background: '#eff6ff',
+              color: '#2563eb',
+              fontSize: 20,
+              marginBottom: 10,
+            }}
+          >
+            <i className="bi bi-building-check" />
+          </span>
+
+          <strong
+            style={{
+              display: 'block',
+              color: '#1e293b',
+              fontSize: '1rem',
+              fontWeight: 900,
+              marginBottom: 6,
+            }}
+          >
+            Department KPI Approval
+          </strong>
+
+          <small
+            style={{
+              display: 'block',
+              color: '#64748b',
+              fontWeight: 650,
+              lineHeight: 1.5,
+            }}
+          >
+            Approve department KPI early-close requests and finalization submissions.
+          </small>
+        </button>
+
+        <button
+          type="button"
           onClick={() => navigate('/executive/reports')}
           style={{
             border: '1px solid #ddd6fe',

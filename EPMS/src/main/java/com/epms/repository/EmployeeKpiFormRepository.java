@@ -41,6 +41,24 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
     @EntityGraph(attributePaths = {
             "employee",
             "employee.position",
+            "kpiForm",
+            "kpiTemplateCycle",
+            "cyclePeriod",
+            "scores",
+            "scores.kpiFormItem",
+            "scores.kpiFormItem.kpiUnit"
+    })
+    @Query("""
+        SELECT DISTINCT ekf
+        FROM EmployeeKpiForm ekf
+        WHERE ekf.employee.id = :employeeId
+        ORDER BY ekf.assignedAt DESC, ekf.id DESC
+        """)
+    List<EmployeeKpiForm> findRecentByEmployeeIdWithDetail(@Param("employeeId") Integer employeeId);
+
+    @EntityGraph(attributePaths = {
+            "employee",
+            "employee.position",
             "kpiTemplateCycle",
             "cyclePeriod",
             "scores",

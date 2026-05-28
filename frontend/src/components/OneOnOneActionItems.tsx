@@ -11,6 +11,7 @@ import {
   updateMeeting,
 } from '../services/oneOnOneService';
 import type { Meeting } from '../services/oneOnOneService';
+import { useNotificationsWebSocket } from '../hooks/useNotificationsWebSocket';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -144,6 +145,22 @@ const OneOnOneActionItems: React.FC = () => {
 
   useEffect(() => {
     loadAll();
+  }, [loadAll]);
+
+  useNotificationsWebSocket(() => {
+    /* This page listens for meeting events; notification payloads are handled by shared layout UI. */
+  });
+
+  useEffect(() => {
+    const onOneOnOneMeetingsChanged = () => {
+      void loadAll();
+    };
+
+    window.addEventListener('epms:one-on-one-meetings-changed', onOneOnOneMeetingsChanged);
+
+    return () => {
+      window.removeEventListener('epms:one-on-one-meetings-changed', onOneOnOneMeetingsChanged);
+    };
   }, [loadAll]);
 
   const openUpcomingModal = (m: Meeting) => {
@@ -423,7 +440,7 @@ const OneOnOneActionItems: React.FC = () => {
     <div className="oom-page">
       <div className="oom-header">
         <h1>🗒️ Action Items</h1>
-        <p>Track all your 1:1 meetings — upcoming, ongoing, and past.</p>
+        <p>Track all your 1:1 meetings: upcoming, ongoing, and past.</p>
       </div>
 
       <div className="oom-tabs">
@@ -501,7 +518,7 @@ const OneOnOneActionItems: React.FC = () => {
         <div className="oom-modal-overlay" onClick={closeOngoingModal}>
           <div className="oom-modal" onClick={(e) => e.stopPropagation()}>
             <div className="oom-modal-header">
-              <h2>{isFollowUpStage(modalMeeting) ? '🔁 Follow-Up Meeting' : '🟢 Ongoing Meeting'}</h2>
+              <h2>{isFollowUpStage(modalMeeting) ? 'Follow-Up Meeting' : 'Ongoing Meeting'}</h2>
               <button className="oom-modal-close" onClick={closeOngoingModal}>×</button>
             </div>
 
@@ -671,7 +688,7 @@ const OneOnOneActionItems: React.FC = () => {
 
               {!isFollowUpStage(modalMeeting) && (
                 <button className="oom-btn-primary" onClick={handleFinishWithFollowUp} disabled={modalSaving}>
-                  {modalSaving ? 'Saving…' : '🔁 Finish + Follow-Up'}
+                  {modalSaving ? 'Saving…' : 'Finish + Follow-Up'}
                 </button>
               )}
             </div>

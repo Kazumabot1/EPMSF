@@ -108,6 +108,34 @@ const KpiTemplateCycleViewModal = ({ open, cycleId, onClose }: Props) => {
                 </ul>
               )}
             </div>
+
+            {cycle.periodSchedules && cycle.periodSchedules.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Generated period schedule</p>
+                <div className="mt-2 space-y-4">
+                  {cycle.periodSchedules.map((sched) => (
+                    <div key={sched.kpiFormId} className="rounded-xl border border-gray-200 bg-white p-3">
+                      <div className="text-sm font-semibold text-gray-900">{sched.kpiFormTitle}</div>
+                      {sched.periods.length === 0 ? (
+                        <div className="mt-2 text-sm text-gray-600">—</div>
+                      ) : (
+                        <ul className="mt-2 space-y-1 text-sm text-gray-800">
+                          {sched.periods.map((p) => (
+                            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium">Period {p.periodNumber}</span>
+                              <span className="text-gray-600">
+                                {formatDate(p.startDate)} – {formatDate(p.endDate)}
+                              </span>
+                              <span className="text-xs font-semibold text-gray-500">{p.status}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

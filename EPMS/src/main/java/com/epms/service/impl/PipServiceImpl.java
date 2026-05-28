@@ -19,6 +19,8 @@ import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
 import com.epms.entity.User;
 import com.epms.entity.UserRole;
+import com.epms.exception.BusinessValidationException;
+import com.epms.exception.ResourceNotFoundException;
 import com.epms.notification.NotificationEventKey;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
@@ -35,6 +37,7 @@ import com.epms.service.NotificationService;
 import com.epms.service.PipService;
 import com.epms.service.PositionPermissionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -92,7 +95,17 @@ public class PipServiceImpl implements PipService {
         User currentUser = getCurrentUser();
 
         if (isHr(currentUser)) {
-            return List.of();
+            if (!positionPermissionService.currentUserHasPermission("pipCreate")) {
+                return List.of();
+            }
+
+            return userRepository.findAll()
+                    .stream()
+                    .filter(user -> !Objects.equals(user.getId(), currentUser.getId()))
+                    .filter(this::hasActiveEmployeeRecord)
+                    .map(this::toEligibleEmployee)
+                    .sorted(Comparator.comparing(PipEligibleEmployeeDto::getEmployeeName, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
         }
 
         List<User> candidates;
@@ -114,19 +127,7 @@ public class PipServiceImpl implements PipService {
         return candidates.stream()
                 .filter(user -> !Objects.equals(user.getId(), currentUser.getId()))
                 .filter(this::hasActiveEmployeeRecord)
-                .map(user -> {
-                    boolean hasActivePip = pipRepository.existsByEmployeeUserIdAndStatusTrue(user.getId());
-                    String departmentName = getWorkingDepartmentName(user.getId());
-
-                    return new PipEligibleEmployeeDto(
-                            user.getId(),
-                            displayName(user),
-                            user.getDepartmentId(),
-                            departmentName,
-                            hasActivePip,
-                            hasActivePip ? "Already have PIP currently" : null
-                    );
-                })
+                .map(this::toEligibleEmployee)
                 .sorted(Comparator.comparing(PipEligibleEmployeeDto::getEmployeeName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
@@ -138,16 +139,12 @@ public class PipServiceImpl implements PipService {
         positionPermissionService.assertCurrentUserHasPermission("pipCreate");
         User employee = getUser(requestDto.getEmployeeUserId(), "Employee user not found.");
 
-        if (isHr(currentUser)) {
-            throw new RuntimeException("HR can view PIPs only and cannot create PIPs.");
-        }
-
         if (!hasActiveEmployeeRecord(employee)) {
-            throw new RuntimeException("Inactive employees cannot be selected for PIP.");
+            throw new BusinessValidationException("Inactive employees cannot be selected for PIP.");
         }
 
         if (pipRepository.existsByEmployeeUserIdAndStatusTrue(employee.getId())) {
-            throw new RuntimeException("This employee already has an active PIP currently.");
+            throw new BusinessValidationException("This employee already has an active PIP currently.");
         }
 
         assertCanManageEmployee(currentUser, employee);
@@ -235,7 +232,7 @@ public class PipServiceImpl implements PipService {
         Pip pip = getPip(id);
 
         if (!canView(currentUser, pip)) {
-            throw new RuntimeException("You are not allowed to view this PIP.");
+            throw new AccessDeniedException("You are not allowed to view this PIP.");
         }
 
         return toDetail(pip, currentUser);
@@ -249,11 +246,11 @@ public class PipServiceImpl implements PipService {
         Pip pip = getPip(pipId);
 
         if (!Boolean.TRUE.equals(pip.getStatus())) {
-            throw new RuntimeException("Finished PIPs are view-only and cannot be edited.");
+            throw new BusinessValidationException("Finished PIPs are view-only and cannot be edited.");
         }
 
         if (!canEdit(currentUser, pip)) {
-            throw new RuntimeException("You are not allowed to update this PIP.");
+            throw new AccessDeniedException("You are not allowed to update this PIP.");
         }
 
         String newStatus = normalizePhaseStatus(requestDto.getStatus());
@@ -264,14 +261,14 @@ public class PipServiceImpl implements PipService {
         }
 
         PipPhase phase = pipPhaseRepository.findById(phaseId)
-                .orElseThrow(() -> new RuntimeException("PIP phase not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("PIP phase not found."));
 
         if (phase.getPip() == null || !Objects.equals(phase.getPip().getId(), pipId)) {
-            throw new RuntimeException("Selected phase does not belong to this PIP.");
+            throw new BusinessValidationException("Selected phase does not belong to this PIP.");
         }
 
         if (phase.getStartDate() != null && LocalDate.now().isBefore(phase.getStartDate())) {
-            throw new RuntimeException("This PIP phase has not started yet. You can update it from " + phase.getStartDate() + ".");
+            throw new BusinessValidationException("This PIP phase has not started yet. You can update it from " + phase.getStartDate() + ".");
         }
 
         String oldValue = phase.getStatus() + " | " + nullToBlank(phase.getReasonNote());
@@ -334,15 +331,15 @@ public class PipServiceImpl implements PipService {
         Pip pip = getPip(id);
 
         if (!Boolean.TRUE.equals(pip.getStatus())) {
-            throw new RuntimeException("This PIP is already finished.");
+            throw new BusinessValidationException("This PIP is already finished.");
         }
 
         if (!canEdit(currentUser, pip)) {
-            throw new RuntimeException("You are not allowed to finish this PIP.");
+            throw new AccessDeniedException("You are not allowed to finish this PIP.");
         }
 
         if (LocalDate.now().isBefore(pip.getEndDate())) {
-            throw new RuntimeException("FINISH is available only after the PIP end date.");
+            throw new BusinessValidationException("FINISH is available only after the PIP end date.");
         }
 
         String comments = clean(requestDto.getComments());
@@ -393,15 +390,15 @@ public class PipServiceImpl implements PipService {
         LocalDate today = LocalDate.now();
 
         if (request.getStartDate().isBefore(today)) {
-            throw new RuntimeException("PIP start date cannot be in the past.");
+            throw new BusinessValidationException("PIP start date cannot be in the past.");
         }
 
         if (request.getEndDate().isBefore(today)) {
-            throw new RuntimeException("PIP end date cannot be in the past.");
+            throw new BusinessValidationException("PIP end date cannot be in the past.");
         }
 
         if (!request.getEndDate().isAfter(request.getStartDate())) {
-            throw new RuntimeException("PIP end date must be after start date.");
+            throw new BusinessValidationException("PIP end date must be after start date.");
         }
 
         assertWordLimit(request.getGoal(), "PIP goal");
@@ -411,11 +408,11 @@ public class PipServiceImpl implements PipService {
                 .sorted(Comparator.comparing(PipPhaseRequestDto::getPhaseNumber))
                 .toList();
         if (phases.isEmpty()) {
-            throw new RuntimeException("At least one phase is required.");
+            throw new BusinessValidationException("At least one phase is required.");
         }
 
         if (phases.size() > MAX_PHASE_COUNT) {
-            throw new RuntimeException("PIP can have at most " + MAX_PHASE_COUNT + " phases.");
+            throw new BusinessValidationException("PIP can have at most " + MAX_PHASE_COUNT + " phases.");
         }
 
 
@@ -424,25 +421,25 @@ public class PipServiceImpl implements PipService {
 
         for (PipPhaseRequestDto phase : phases) {
             if (!Objects.equals(phase.getPhaseNumber(), expectedNumber++)) {
-                throw new RuntimeException("Phase numbers must be sequential starting from 1.");
+                throw new BusinessValidationException("Phase numbers must be sequential starting from 1.");
             }
 
             assertWordLimit(phase.getPhaseGoal(), "Phase " + phase.getPhaseNumber() + " goal");
 
             if (phase.getStartDate().isBefore(today)) {
-                throw new RuntimeException("Phase start date cannot be in the past.");
+                throw new BusinessValidationException("Phase start date cannot be in the past.");
             }
 
             if (!phase.getEndDate().isAfter(phase.getStartDate())) {
-                throw new RuntimeException("Phase end date must be after phase start date.");
+                throw new BusinessValidationException("Phase end date must be after phase start date.");
             }
 
             if (phase.getStartDate().isBefore(request.getStartDate()) || phase.getEndDate().isAfter(request.getEndDate())) {
-                throw new RuntimeException("Phase dates must be inside the PIP start and end dates.");
+                throw new BusinessValidationException("Phase dates must be inside the PIP start and end dates.");
             }
 
             if (previousEnd != null && phase.getStartDate().isBefore(previousEnd)) {
-                throw new RuntimeException("Next phase start date cannot be before previous phase end date.");
+                throw new BusinessValidationException("Next phase start date cannot be before previous phase end date.");
             }
 
             previousEnd = phase.getEndDate();
@@ -451,12 +448,20 @@ public class PipServiceImpl implements PipService {
 
     private void assertCanManageEmployee(User manager, User employee) {
         if (manager == null || employee == null) {
-            throw new RuntimeException("Invalid PIP users.");
+            throw new BusinessValidationException("Invalid PIP users.");
+        }
+
+        if (Objects.equals(manager.getId(), employee.getId())) {
+            throw new BusinessValidationException("You cannot create a PIP for yourself.");
+        }
+
+        if (isHr(manager)) {
+            return;
         }
 
         if (isDepartmentHead(manager)) {
             if (manager.getDepartmentId() == null) {
-                throw new RuntimeException("Department Head has no assigned department.");
+                throw new BusinessValidationException("Department Head has no assigned department.");
             }
 
             boolean belongs = employeeDepartmentRepository.existsActiveUserInWorkingDepartment(
@@ -465,18 +470,18 @@ public class PipServiceImpl implements PipService {
             );
 
             if (!belongs) {
-                throw new RuntimeException("Department Head can create PIP only for employees in their own department.");
+                throw new BusinessValidationException("Department Head can create PIP only for employees in their own department.");
             }
 
             if (isActiveMemberOfAnyTeam(employee)) {
-                throw new RuntimeException("Department Head can create PIP only for employees who do not have an active team.");
+                throw new BusinessValidationException("Department Head can create PIP only for employees who do not have an active team.");
             }
 
             return;
         }
 
         if (!canManageByTeam(manager, employee)) {
-            throw new RuntimeException("Manager or Team Leader can create PIP only for employees in their own team.");
+            throw new BusinessValidationException("Manager or Team Leader can create PIP only for employees in their own team.");
         }
     }
 
@@ -644,9 +649,23 @@ public class PipServiceImpl implements PipService {
         pipUpdateRepository.save(history);
     }
 
+    private PipEligibleEmployeeDto toEligibleEmployee(User user) {
+        boolean hasActivePip = pipRepository.existsByEmployeeUserIdAndStatusTrue(user.getId());
+        String departmentName = getWorkingDepartmentName(user.getId());
+
+        return new PipEligibleEmployeeDto(
+                user.getId(),
+                displayName(user),
+                user.getDepartmentId(),
+                departmentName,
+                hasActivePip,
+                hasActivePip ? "Already have PIP currently" : null
+        );
+    }
+
     private Pip getPip(Integer id) {
         return pipRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("PIP not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("PIP not found."));
     }
 
     private User getCurrentUser() {
@@ -655,7 +674,7 @@ public class PipServiceImpl implements PipService {
 
     private User getUser(Integer id, String errorMessage) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(errorMessage));
+                .orElseThrow(() -> new ResourceNotFoundException(errorMessage));
     }
 
     private boolean hasActiveEmployeeRecord(User user) {
@@ -664,7 +683,7 @@ public class PipServiceImpl implements PipService {
         }
 
         if (user.getEmployeeId() == null) {
-            return true;
+            return false;
         }
 
         return employeeRepository.findById(user.getEmployeeId())
@@ -759,11 +778,12 @@ public class PipServiceImpl implements PipService {
 
 
     private boolean isHr(User user) {
-        return hasRole(user, "HR") || hasRole(user, "ROLE_HR");
+        return hasDashboard(user, "HR_DASHBOARD") || hasRole(user, "HR") || hasRole(user, "ROLE_HR");
     }
 
     private boolean isDepartmentHead(User user) {
-        return hasRole(user, "DEPARTMENT_HEAD")
+        return hasDashboard(user, "DEPARTMENT_HEAD_DASHBOARD")
+                || hasRole(user, "DEPARTMENT_HEAD")
                 || hasRole(user, "ROLE_DEPARTMENT_HEAD")
                 || hasRole(user, "DepartmentHead")
                 || hasRole(user, "Department Head");
@@ -776,6 +796,13 @@ public class PipServiceImpl implements PipService {
 
         String expected = normalizeRole(roleName);
 
+        if (user.getPosition() != null
+                && user.getPosition().getRole() != null
+                && user.getPosition().getRole().getName() != null
+                && expected.equals(normalizeRole(user.getPosition().getRole().getName()))) {
+            return true;
+        }
+
         return userRoleRepository.findByUserId(user.getId()).stream()
                 .map(UserRole::getRoleId)
                 .filter(Objects::nonNull)
@@ -785,6 +812,13 @@ public class PipServiceImpl implements PipService {
                 .filter(Objects::nonNull)
                 .map(this::normalizeRole)
                 .anyMatch(expected::equals);
+    }
+
+    private boolean hasDashboard(User user, String dashboard) {
+        return user != null
+                && user.getDashboard() != null
+                && dashboard != null
+                && normalizeRole(user.getDashboard()).equals(normalizeRole(dashboard));
     }
 
     private String normalizeRole(String role) {
@@ -797,7 +831,7 @@ public class PipServiceImpl implements PipService {
 
     private String normalizePhaseStatus(String status) {
         if (status == null) {
-            throw new RuntimeException("Phase status is required.");
+            throw new BusinessValidationException("Phase status is required.");
         }
 
         String normalized = status.trim().toUpperCase(Locale.ROOT);
@@ -807,7 +841,7 @@ public class PipServiceImpl implements PipService {
         }
 
         if (!PHASE_STATUSES.contains(normalized)) {
-            throw new RuntimeException("Invalid phase status.");
+            throw new BusinessValidationException("Invalid phase status.");
         }
 
         return normalized;
@@ -833,7 +867,7 @@ public class PipServiceImpl implements PipService {
 
     private void assertWordLimit(String value, String fieldName) {
         if (wordCount(value) > WORD_LIMIT) {
-            throw new RuntimeException(fieldName + " cannot exceed 1000 words.");
+            throw new BusinessValidationException(fieldName + " cannot exceed 1000 words.");
         }
     }
 
@@ -847,7 +881,7 @@ public class PipServiceImpl implements PipService {
 
     private String clean(String value) {
         if (value == null || value.trim().isEmpty()) {
-            throw new RuntimeException("Required text cannot be empty.");
+            throw new BusinessValidationException("Required text cannot be empty.");
         }
 
         return value.trim();

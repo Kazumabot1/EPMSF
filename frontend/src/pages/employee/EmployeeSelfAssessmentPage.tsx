@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
-import { signatureService } from '../../services/signatureService';
-import SignatureModal from '../../components/signature/SignatureModal';
-import type { Signature } from '../../types/signature';
+import FormSignaturePicker, { type FormSignatureValue } from '../../components/signature/FormSignaturePicker';
+import '../../components/signature/form-signature-picker.css';
 import type {
   AssessmentItem,
   AssessmentRequest,
@@ -219,8 +218,11 @@ const EmployeeSelfAssessmentPage = () => {
   const [ongoingAssessment, setOngoingAssessment] = useState<EmployeeAssessment | null>(null);
   const [pastRows, setPastRows] = useState<AssessmentScoreRow[]>([]);
   const [selectedPast, setSelectedPast] = useState<EmployeeAssessment | null>(null);
-  const [ownSig, setOwnSig] = useState<Signature | null>(null);
-  const [sigOpen, setSigOpen] = useState(false);
+  const [employeeSignature, setEmployeeSignature] = useState<FormSignatureValue>({
+    signatureId: 0,
+    imageData: null,
+    imageType: null,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -242,15 +244,6 @@ const EmployeeSelfAssessmentPage = () => {
       setToasts((previous) => previous.filter((item) => item.id !== id));
     }, 4200);
   };
-
-  const loadSig = useCallback(async () => {
-    try {
-      const signatures = await signatureService.list();
-      setOwnSig(signatures.find((item) => item.isDefault) ?? signatures[0] ?? null);
-    } catch {
-      setOwnSig(null);
-    }
-  }, []);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -309,14 +302,12 @@ const EmployeeSelfAssessmentPage = () => {
 
       setPastRows(rows);
       setActiveTab(isLatestEditable ? 'ongoing' : 'past');
-
-      await loadSig();
     } catch (error) {
       toast('error', errMsg(error, 'Unable to load self-assessment.'));
     } finally {
       setLoading(false);
     }
-  }, [loadSig]);
+  }, []);
 
   useEffect(() => {
     void loadPage();
@@ -474,9 +465,8 @@ const EmployeeSelfAssessmentPage = () => {
 
     setInvalids(new Set());
 
-    if (!ownSig) {
-      toast('error', 'Please create a default signature first.');
-      setSigOpen(true);
+    if (!employeeSignature.imageData || !employeeSignature.imageType) {
+      toast('error', 'Please create or select your signature before submitting.');
       return;
     }
 
@@ -551,10 +541,9 @@ const EmployeeSelfAssessmentPage = () => {
   const renderSignatureGrid = (assessment: EmployeeAssessment, editable: boolean) => (
     <div className="ess-sig-grid">
       <div className="ess-sig-slot">
-        <span className="ess-sig-label">Employee Signature</span>
-
         {assessment.employeeSignatureImageData ? (
           <>
+            <span className="ess-sig-label">Employee Signature</span>
             <img
               className="ess-sig-img"
               src={sigSrc(
@@ -563,37 +552,25 @@ const EmployeeSelfAssessmentPage = () => {
               )}
               alt="Employee signature"
             />
-
             <p className="ess-sig-date">
               Date: {fmtDate(assessment.employeeSignedAt || assessment.submittedAt)}
             </p>
-
             <small className="ess-sig-name">
               {assessment.employeeSignatureName || assessment.employeeName}
             </small>
           </>
-        ) : ownSig && editable ? (
-          <>
-            <img
-              className="ess-sig-img"
-              src={sigSrc(ownSig.imageData, ownSig.imageType)}
-              alt={ownSig.name}
-            />
-
-            <p className="ess-sig-preview-note">Will be attached on submit</p>
-          </>
+        ) : editable ? (
+          <FormSignaturePicker
+            label="Employee Signature"
+            value={employeeSignature}
+            onChange={setEmployeeSignature}
+            disabled={submitting || saving}
+          />
         ) : (
-          <span className="ess-sig-pending">Pending</span>
-        )}
-
-        {editable && (
-          <button
-            type="button"
-            className="ess-btn ghost small"
-            onClick={() => setSigOpen(true)}
-          >
-            {ownSig ? 'Change Signature' : 'Create Signature'}
-          </button>
+          <>
+            <span className="ess-sig-label">Employee Signature</span>
+            <span className="ess-sig-pending">Pending</span>
+          </>
         )}
       </div>
 
@@ -1225,14 +1202,6 @@ const EmployeeSelfAssessmentPage = () => {
           </div>
         </div>
       )}
-
-      <SignatureModal
-        open={sigOpen}
-        onClose={() => {
-          setSigOpen(false);
-          void loadSig();
-        }}
-      />
 
       {renderPastDetail()}
 

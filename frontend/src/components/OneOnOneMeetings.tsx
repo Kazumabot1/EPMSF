@@ -506,13 +506,15 @@ const OneOnOneMeetings: React.FC = () => {
         <p className="oom-eyebrow">One-on-One Meetings</p>
         <h1>Create 1:1 Meeting</h1>
         <p>
-          {canSelectDepartment
-            ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
-            : teamRequired
-              ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
-              : hasDefaultDepartment
-                ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
-                : 'Create one-on-one meetings with employees.'}
+          {context?.accessMode === 'DEPARTMENT_HEAD_SCOPE'
+            ? 'Your department is fixed. Choose any team in your department or pick an employee from the full department list.'
+            : canSelectDepartment
+              ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
+              : teamRequired
+                ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
+                : hasDefaultDepartment
+                  ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
+                  : 'Create one-on-one meetings with employees.'}
         </p>
       </div>
 
@@ -536,18 +538,22 @@ const OneOnOneMeetings: React.FC = () => {
             <div>
               <span className="oom-scope-pill">Scope</span>
               <h3>
-                {canSelectDepartment
-                  ? 'Department selection enabled'
-                  : teamRequired
-                    ? 'Managed team scope'
-                    : 'Default department applied'}
+                {context?.accessMode === 'DEPARTMENT_HEAD_SCOPE'
+                  ? 'Department head scope'
+                  : canSelectDepartment
+                    ? 'Department selection enabled'
+                    : teamRequired
+                      ? 'Managed team scope'
+                      : 'Default department applied'}
               </h3>
               <p>
-                {canSelectDepartment
-                  ? 'Choose an allowed department. Team is optional and only narrows the employee list.'
-                  : teamRequired
-                    ? 'Select one of the teams you lead or manage before choosing an employee.'
-                    : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
+                {context?.accessMode === 'DEPARTMENT_HEAD_SCOPE'
+                  ? `${context?.departmentName || 'Your department'} is locked. Teams and employees are limited to that department.`
+                  : canSelectDepartment
+                    ? 'Choose an allowed department. Team is optional and only narrows the employee list.'
+                    : teamRequired
+                      ? 'Select one of the teams you lead or manage before choosing an employee.'
+                      : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
               </p>
             </div>
           </div>

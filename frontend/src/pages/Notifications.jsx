@@ -163,6 +163,35 @@ export default function Notifications() {
 
   useNotificationsWebSocket(onWsNotification);
 
+  useEffect(() => {
+    const onNotificationsReadStateChanged = (event) => {
+      const detail = event?.detail ?? {};
+
+      setNotifications((prev) => {
+        if (detail.allRead) {
+          return prev.map((item) => ({ ...item, isRead: true }));
+        }
+
+        const ids = new Set(detail.notificationIds ?? []);
+        if (ids.size === 0) {
+          return prev;
+        }
+
+        return prev.map((item) => (ids.has(item.id) ? { ...item, isRead: true } : item));
+      });
+
+      if (!detail.allRead && !Array.isArray(detail.notificationIds)) {
+        void load();
+      }
+    };
+
+    window.addEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
+
+    return () => {
+      window.removeEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
+    };
+  }, [load]);
+
   const counts = useMemo(() => {
     const unread = notifications.filter((n) => !n.isRead).length;
     const byType = (want) => notifications.filter((n) => matchesType(n, want)).length;
@@ -254,9 +283,9 @@ export default function Notifications() {
             </Link>
 
             {canTemplates && (
-                <Link to="/notification-templates" className="notif-btn-outline">
+                <Link to="/announcements" className="notif-btn-outline">
                   <i className="bi bi-gear" aria-hidden />
-                  Templates
+                  Announcements
                 </Link>
             )}
           </div>

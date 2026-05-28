@@ -8,12 +8,12 @@ import type {
   PmAppraisalSubmitRequest,
 } from '../../types/appraisal';
 import AppraisalPopup from './AppraisalPopup';
-import { signatureService } from '../../services/signatureService';
-import type { Signature } from '../../types/signature';
+import FormSignaturePicker, { type FormSignatureValue } from '../signature/FormSignaturePicker';
 import AppraisalRatingDots from './AppraisalRatingDots';
 import { formatDisplayDate } from '../../utils/appraisalDateFormat';
 import { getAppraisalScoreBandToneClass } from '../../utils/appraisalScoreBandTone';
 import '../../pages/appraisal/appraisal.css';
+import '../signature/form-signature-picker.css';
 
 type AppraisalFormMode = 'pm' | 'dept-head' | 'hr' | 'employee' | 'readonly';
 
@@ -69,13 +69,6 @@ const getSignatureImageSrc = (review?: AppraisalReviewResponse) => {
   return review.signatureImageData.startsWith('data:')
     ? review.signatureImageData
     : `data:${review.signatureImageType};base64,${review.signatureImageData}`;
-};
-
-const getSignatureMasterImageSrc = (signature?: Signature | null) => {
-  if (!signature?.imageData || !signature?.imageType) return null;
-  return signature.imageData.startsWith('data:')
-    ? signature.imageData
-    : `data:${signature.imageType};base64,${signature.imageData}`;
 };
 
 const getCurrentStageReview = (form: EmployeeAppraisalFormResponse, mode: AppraisalFormMode) => {
@@ -142,9 +135,6 @@ const AppraisalFormView = ({
   const [signatureImageData, setSignatureImageData] = useState<string | null>(null);
   const [signatureImageType, setSignatureImageType] = useState<string | null>(null);
   const [selectedSignatureId, setSelectedSignatureId] = useState<number>(0);
-  const [signatures, setSignatures] = useState<Signature[]>([]);
-  const [signatureLoading, setSignatureLoading] = useState(false);
-  const [signatureError, setSignatureError] = useState('');
   const [confirmPmOpen, setConfirmPmOpen] = useState(false);
   const [confirmReviewOpen, setConfirmReviewOpen] = useState(false);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -188,7 +178,7 @@ const AppraisalFormView = ({
     setEffectiveDateText(nextEffectiveDateText);
     setSignatureImageData(nextSignatureImageData);
     setSignatureImageType(nextSignatureImageType);
-    setSelectedSignatureId(0);
+    setSelectedSignatureId(currentStageReview?.signatureId ?? 0);
     setConfirmPmOpen(false);
     setConfirmReviewOpen(false);
     lastAutoSaveKeyRef.current = buildAutoSaveKey(
@@ -214,45 +204,6 @@ const AppraisalFormView = ({
   }, [form.id, mode]);
 
 
-  useEffect(() => {
-    if (mode !== 'pm' && mode !== 'dept-head' && mode !== 'hr') {
-      setSignatures([]);
-      return;
-    }
-
-    let mounted = true;
-    setSignatureLoading(true);
-    setSignatureError('');
-
-    signatureService.list()
-      .then((items) => {
-        if (!mounted) return;
-        setSignatures(items);
-
-        const currentStageReview = getCurrentStageReview(form, mode);
-        const hasCurrentSignature = Boolean(currentStageReview?.signatureImageData && currentStageReview?.signatureImageType);
-        if (!hasCurrentSignature) {
-          const defaultSignature = items.find((item) => item.isDefault) ?? items[0];
-          if (defaultSignature) {
-            setSelectedSignatureId(defaultSignature.id);
-            setSignatureImageData(defaultSignature.imageData);
-            setSignatureImageType(defaultSignature.imageType);
-          }
-        }
-      })
-      .catch((error) => {
-        if (!mounted) return;
-        setSignatureError(error instanceof Error ? error.message : 'Failed to load saved signatures.');
-      })
-      .finally(() => {
-        if (mounted) setSignatureLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [mode, form.id]);
-
   const allCriteria = useMemo(
     () => form.sections.flatMap((section) => section.criteria),
     [form.sections],
@@ -272,13 +223,21 @@ const AppraisalFormView = ({
     draftDirtyRef.current = true;
   };
 
-  const handleSignatureSelect = (signatureId: number) => {
+  const handleSignatureChange = (next: FormSignatureValue) => {
     markDraftDirty();
-    const signature = signatures.find((item) => item.id === signatureId);
-    setSelectedSignatureId(signature?.id ?? 0);
-    setSignatureImageData(signature?.imageData ?? null);
-    setSignatureImageType(signature?.imageType ?? null);
+    setSelectedSignatureId(next.signatureId);
+    setSignatureImageData(next.imageData);
+    setSignatureImageType(next.imageType);
   };
+
+  const signatureValue = useMemo<FormSignatureValue>(
+    () => ({
+      signatureId: selectedSignatureId,
+      imageData: signatureImageData,
+      imageType: signatureImageType,
+    }),
+    [selectedSignatureId, signatureImageData, signatureImageType],
+  );
 
   const resolvedAssessmentDate = useMemo(() => resolveAssessmentDateValue(form, pmReview), [form, pmReview]);
 
@@ -464,11 +423,6 @@ const AppraisalFormView = ({
     }
   };
 
-  const currentSignatureSrc = signatureImageData && signatureImageType
-    ? signatureImageData.startsWith('data:')
-      ? signatureImageData
-      : `data:${signatureImageType};base64,${signatureImageData}`
-    : null;
   const currentSignatureDateText = formatDate(new Date().toISOString());
   const displayDepartmentName = mode === 'pm'
     ? departmentNameOverride || form.departmentName || '-'
@@ -639,13 +593,9 @@ const AppraisalFormView = ({
             pmReview={pmReview}
             deptHeadReview={deptHeadReview}
             hrReview={hrReview}
-            pendingSignatureSrc={currentSignatureSrc}
             pendingDateText={currentSignatureDateText}
-            signatures={signatures}
-            selectedSignatureId={selectedSignatureId}
-            signatureLoading={signatureLoading}
-            signatureError={signatureError}
-            onSignatureSelect={handleSignatureSelect}
+            signatureValue={signatureValue}
+            onSignatureChange={handleSignatureChange}
           />
 
           <div className="appraisal-button-row">
@@ -765,13 +715,9 @@ interface WorkflowSignatureSectionProps {
   pmReview?: AppraisalReviewResponse;
   deptHeadReview?: AppraisalReviewResponse;
   hrReview?: AppraisalReviewResponse;
-  pendingSignatureSrc: string | null;
   pendingDateText: string;
-  signatures: Signature[];
-  selectedSignatureId: number;
-  signatureLoading: boolean;
-  signatureError: string;
-  onSignatureSelect: (signatureId: number) => void;
+  signatureValue: FormSignatureValue;
+  onSignatureChange: (value: FormSignatureValue) => void;
 }
 
 const WorkflowSignatureSection = ({
@@ -780,13 +726,9 @@ const WorkflowSignatureSection = ({
   pmReview,
   deptHeadReview,
   hrReview,
-  pendingSignatureSrc,
   pendingDateText,
-  signatures,
-  selectedSignatureId,
-  signatureLoading,
-  signatureError,
-  onSignatureSelect,
+  signatureValue,
+  onSignatureChange,
 }: WorkflowSignatureSectionProps) => {
   const slots = [
     {
@@ -794,21 +736,18 @@ const WorkflowSignatureSection = ({
       label: 'Manager Signature & Date',
       review: pmReview,
       editable: mode === 'pm',
-      pendingSignatureSrc: mode === 'pm' ? pendingSignatureSrc : null,
     },
     {
       key: 'dept-head',
       label: 'Dept Head Signature & Date',
       review: deptHeadReview,
       editable: mode === 'dept-head',
-      pendingSignatureSrc: mode === 'dept-head' ? pendingSignatureSrc : null,
     },
     {
       key: 'hr',
       label: 'HR Signature / Date / Designation',
       review: hrReview,
       editable: mode === 'hr',
-      pendingSignatureSrc: mode === 'hr' ? pendingSignatureSrc : null,
     },
   ];
 
@@ -825,13 +764,9 @@ const WorkflowSignatureSection = ({
             review={slot.review}
             editable={slot.editable}
             busy={busy}
-            pendingSignatureSrc={slot.pendingSignatureSrc}
             pendingDateText={pendingDateText}
-            signatures={signatures}
-            selectedSignatureId={selectedSignatureId}
-            signatureLoading={signatureLoading}
-            signatureError={signatureError}
-            onSignatureSelect={onSignatureSelect}
+            signatureValue={signatureValue}
+            onSignatureChange={onSignatureChange}
           />
         ))}
       </div>
@@ -844,13 +779,9 @@ interface WorkflowSignatureSlotProps {
   review?: AppraisalReviewResponse;
   editable: boolean;
   busy: boolean;
-  pendingSignatureSrc: string | null;
   pendingDateText: string;
-  signatures: Signature[];
-  selectedSignatureId: number;
-  signatureLoading: boolean;
-  signatureError: string;
-  onSignatureSelect: (signatureId: number) => void;
+  signatureValue: FormSignatureValue;
+  onSignatureChange: (value: FormSignatureValue) => void;
 }
 
 const WorkflowSignatureSlot = ({
@@ -858,54 +789,39 @@ const WorkflowSignatureSlot = ({
   review,
   editable,
   busy,
-  pendingSignatureSrc,
   pendingDateText,
-  signatures,
-  selectedSignatureId,
-  signatureLoading,
-  signatureError,
-  onSignatureSelect,
+  signatureValue,
+  onSignatureChange,
 }: WorkflowSignatureSlotProps) => {
   const storedSignatureSrc = getSignatureImageSrc(review);
-  const selectedSignature = editable ? signatures.find((item) => item.id === selectedSignatureId) ?? null : null;
-  const importedSignatureSrc = editable ? getSignatureMasterImageSrc(selectedSignature) : null;
-  const signatureSrc = editable ? pendingSignatureSrc || importedSignatureSrc || storedSignatureSrc : storedSignatureSrc;
+  const pendingSignatureSrc =
+    signatureValue.imageData && signatureValue.imageType
+      ? signatureValue.imageData.startsWith('data:')
+        ? signatureValue.imageData
+        : `data:${signatureValue.imageType};base64,${signatureValue.imageData}`
+      : null;
+  const signatureSrc = editable ? pendingSignatureSrc || storedSignatureSrc : storedSignatureSrc;
   const dateText = review?.submittedAt ? formatDate(review.submittedAt) : (editable && signatureSrc ? pendingDateText : '-');
 
   return (
     <div className={`appraisal-signature-slot ${editable ? 'appraisal-editable-signature-slot' : 'appraisal-readonly-signature-slot'}`}>
-      <p className="appraisal-signature-role-label">{label}</p>
       {editable ? (
-        <div className="appraisal-signature-import-box">
-          <label className="appraisal-field compact">
-            <span>Import Saved Signature</span>
-            <select
-              value={selectedSignatureId || ''}
-              onChange={(event) => onSignatureSelect(Number(event.target.value))}
-              disabled={busy || signatureLoading}
-            >
-              <option value="">{signatureLoading ? 'Loading signatures...' : 'Select signature'}</option>
-              {signatures.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}{item.isDefault ? ' (Default)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          {signatureError ? <small className="appraisal-error-text">{signatureError}</small> : null}
-          {!signatureLoading && signatures.length === 0 ? (
-            <small className="appraisal-muted">No saved signatures found. Create or upload one from the Signature menu first.</small>
-          ) : null}
+        <FormSignaturePicker
+          label={label}
+          value={signatureValue}
+          onChange={onSignatureChange}
+          disabled={busy}
+          className="appraisal-signature-import-box"
+        />
+      ) : (
+        <>
+          <p className="appraisal-signature-role-label">{label}</p>
           {signatureSrc ? (
             <img src={signatureSrc} alt={label} className="appraisal-signature-image" />
           ) : (
-            <span className="appraisal-signature-placeholder">No signature selected</span>
+            <span className="appraisal-signature-placeholder">No signature submitted</span>
           )}
-        </div>
-      ) : signatureSrc ? (
-        <img src={signatureSrc} alt={label} className="appraisal-signature-image" />
-      ) : (
-        <span className="appraisal-signature-placeholder">No signature submitted</span>
+        </>
       )}
       <p className="appraisal-signature-date">Date: {dateText}</p>
       {review?.reviewerName ? <small className="appraisal-signature-name">{review.reviewerName}</small> : null}

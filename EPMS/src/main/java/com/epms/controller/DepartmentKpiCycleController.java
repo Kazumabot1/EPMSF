@@ -54,6 +54,6 @@ public class DepartmentKpiCycleController {
             @PathVariable Integer id,
             @Valid @RequestBody KpiTemplateCycleStatusRequestDTO request
     ) {
-        return ResponseEntity.ok(service.updateCycleStatus(id, Boolean.TRUE.equals(request.getActive())));
+        return ResponseEntity.ok(service.updateCycleStatus(id, request));
     }
 }

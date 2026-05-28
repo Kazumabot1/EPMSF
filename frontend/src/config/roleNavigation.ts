@@ -196,7 +196,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/notifications',
       icon: 'bi-bell',
       children: [
-        { label: 'Notification Template', path: '/notification-templates', icon: 'bi-file-earmark-text' },
+        { label: 'Announcement', path: '/announcements', icon: 'bi-file-earmark-text' },
         { label: 'System Notification', path: '/notifications', icon: 'bi-bell' },
       ],
     },
@@ -247,6 +247,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'My KPIs', path: '/department-head/kpis', icon: 'bi-bullseye' },
     {
       label: 'View Self-assessment Form',
       path: '/department-head/self-assessment-forms',
@@ -275,6 +276,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       ],
     },
     { label: 'Department KPIs', path: '/department-head/department-kpis', icon: 'bi-building-check' },
+    {
+      label: 'Manager KPI Scoring',
+      path: '/department-head/kpi-scoring',
+      icon: 'bi-ui-checks-grid',
+      children: [
+        { label: 'Score Managers', path: '/department-head/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
+        { label: 'KPI History', path: '/department-head/kpi/history', icon: 'bi-clock-history' },
+      ],
+    },
     {
       label: 'Teams',
       path: '/department-head/teams',
@@ -324,6 +334,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
 
   Manager: [
     { label: 'Manager Dashboard', path: '/manager/dashboard', icon: 'bi-person-workspace', end: true },
+    { label: 'My KPIs', path: '/manager/kpis', icon: 'bi-bullseye' },
     {
       label: 'Assessment Review',
       path: '/manager/assessment-review',
@@ -395,12 +406,25 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'My KPIs', path: '/executive/kpis', icon: 'bi-bullseye' },
+    {
+      label: 'KPI Management',
+      path: '/executive/kpi-scoring',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'KPI Scoring', path: '/executive/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'KPI History', path: '/executive/kpi/history', icon: 'bi-clock-history' },
+        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-shield-check' },
+        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check' },
+      ],
+    },
     {
       label: 'Approval',
       path: '/executive/approval/kpi',
       icon: 'bi-shield-check',
       children: [
         { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
+        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check' },
       ],
     },
     {

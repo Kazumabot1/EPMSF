@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -28,13 +27,24 @@ const normalizeRole = (role?: string | null) =>
 const isDepartmentHeadUser = (user: any) => {
   const dashboard = String(user?.dashboard ?? '').toUpperCase();
 
-  if (dashboard === 'DEPARTMENT_HEAD_DASHBOARD') {
+  if (
+    dashboard === 'DEPARTMENT_HEAD_DASHBOARD' ||
+    dashboard === 'DEPARTMENTHEAD_DASHBOARD' ||
+    dashboard === 'DEPT_HEAD_DASHBOARD'
+  ) {
     return true;
   }
 
   return (user?.roles ?? []).some((role: string) => {
     const normalized = normalizeRole(role);
-    return normalized === 'DEPARTMENTHEAD';
+
+    return (
+      normalized === 'DEPARTMENTHEAD' ||
+      normalized === 'DEPARTMENT_HEAD' ||
+      normalized === 'DEPTHEAD' ||
+      normalized === 'DEPT_HEAD' ||
+      normalized === 'HEADOFDEPARTMENT'
+    );
   });
 };
 
@@ -45,12 +55,7 @@ const getApiErrorMessage = (err: any) => {
     return data;
   }
 
-  return (
-    data?.message ||
-    data?.error ||
-    err?.message ||
-    'Request failed.'
-  );
+  return data?.message || data?.error || err?.message || 'Request failed.';
 };
 
 const TeamCreate: React.FC = () => {
@@ -67,7 +72,6 @@ const TeamCreate: React.FC = () => {
   const [departmentId, setDepartmentId] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamGoal, setTeamGoal] = useState('');
-  const [status, setStatus] = useState('Active');
   const [teamLeaderId, setTeamLeaderId] = useState('');
   const [projectManagerId, setProjectManagerId] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
@@ -202,9 +206,9 @@ const TeamCreate: React.FC = () => {
     };
 
     if (isDepartmentHead) {
-      loadForDepartmentHead();
+      void loadForDepartmentHead();
     } else {
-      loadForHr();
+      void loadForHr();
     }
 
     return () => {
@@ -221,9 +225,7 @@ const TeamCreate: React.FC = () => {
       setProjectManagerId('');
     }
 
-    setSelectedMemberIds((prev) =>
-      prev.filter((id) => id !== Number(teamLeaderId))
-    );
+    setSelectedMemberIds((prev) => prev.filter((id) => id !== Number(teamLeaderId)));
   }, [teamLeaderId, projectManagerId]);
 
   useEffect(() => {
@@ -231,9 +233,7 @@ const TeamCreate: React.FC = () => {
       return;
     }
 
-    setSelectedMemberIds((prev) =>
-      prev.filter((id) => id !== Number(projectManagerId))
-    );
+    setSelectedMemberIds((prev) => prev.filter((id) => id !== Number(projectManagerId)));
   }, [projectManagerId]);
 
   const availableProjectManagers = useMemo(() => {
@@ -275,9 +275,6 @@ const TeamCreate: React.FC = () => {
       return [...prev, memberId];
     });
   };
-
-
-
 
   const validateForm = () => {
     if (!isDepartmentHead && !departmentId) {
@@ -333,7 +330,7 @@ const TeamCreate: React.FC = () => {
         teamLeaderId: Number(teamLeaderId),
         projectManagerId: projectManagerId ? Number(projectManagerId) : null,
         teamGoal: teamGoal.trim(),
-        status,
+        status: 'Active',
         memberUserIds: selectedMemberIds,
         memberEmployeeIds: selectedMemberIds,
       };
@@ -365,8 +362,8 @@ const TeamCreate: React.FC = () => {
           <p className="team-eyebrow">Team Organization</p>
           <h1>Create Team</h1>
           <p>
-            Create a team, assign a Team Leader, optionally assign a Project Manager, and choose
-            members.
+            Create an active team, assign a Team Leader, optionally assign a Project Manager,
+            and choose at least one Team Member.
           </p>
         </div>
 
@@ -428,12 +425,9 @@ const TeamCreate: React.FC = () => {
           />
         </div>
 
-        <div className="team-field">
-          <label>Status</label>
-          <select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+        <div className="team-info-banner">
+          New teams are created as Active. To close a team later, remove all members from
+          the team edit screen.
         </div>
 
         <div className="team-field">
@@ -450,12 +444,15 @@ const TeamCreate: React.FC = () => {
             {leaders.map((leader) => {
               const unavailable = leader.available === false || leader.isAvailable === false;
               const suffix = unavailable
-                ? ` (Already Team Leader in ${leader.currentTeamName || leader.currentTeamNames || 'another active team'})`
+                ? ` (Already Team Leader in ${
+                    leader.currentTeamName || leader.currentTeamNames || 'another active team'
+                  })`
                 : '';
 
               return (
                 <option key={leader.id} value={leader.id} disabled={unavailable}>
-                  {leader.name}{suffix}
+                  {leader.name}
+                  {suffix}
                 </option>
               );
             })}
@@ -479,8 +476,8 @@ const TeamCreate: React.FC = () => {
           </select>
 
           <small>
-            Optional. Project Manager can manage many teams, but cannot be the Team Leader or a
-            normal member in this team.
+            Optional. Project Manager can manage many teams, but cannot be the Team Leader
+            or a normal member in this team.
           </small>
 
           {selectedProjectManager?.currentTeamNames && (
@@ -495,7 +492,7 @@ const TeamCreate: React.FC = () => {
           <div className="team-members-head">
             <div>
               <h3>Members</h3>
-              <p>Select available members for this team.</p>
+              <p>Select available members for this team. At least one member is required.</p>
             </div>
 
             <span>{selectedMemberIds.length} selected</span>
@@ -545,7 +542,11 @@ const TeamCreate: React.FC = () => {
             type="submit"
             className="team-btn team-btn-primary"
             disabled={submitting || selectedMemberIds.length === 0}
-            title={selectedMemberIds.length === 0 ? 'Please select at least one Team Member.' : undefined}
+            title={
+              selectedMemberIds.length === 0
+                ? 'Please select at least one Team Member.'
+                : undefined
+            }
           >
             {submitting ? 'Creating...' : 'Create Team'}
           </button>

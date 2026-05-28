@@ -32,6 +32,12 @@ type NotifItem = {
   referenceId?: number | null;
 };
 
+type NotificationReadStateEvent = {
+  unreadCount?: number;
+  notificationIds?: number[];
+  allRead?: boolean;
+};
+
 function unwrap<T>(res: { data?: { data?: T } & T }): T | undefined {
   const body = res?.data as { data?: T } | undefined;
 
@@ -163,6 +169,39 @@ const EmployeeHeader = ({
     if (!notifOpen) return;
     void loadNotifications();
   }, [notifOpen, loadNotifications]);
+
+  useEffect(() => {
+    const onNotificationsReadStateChanged = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationReadStateEvent>).detail;
+
+      if (typeof detail?.unreadCount === 'number') {
+        setUnreadCount(detail.unreadCount);
+      }
+
+      setNotifItems((prev) => {
+        if (detail?.allRead) {
+          return prev.map((item) => ({ ...item, isRead: true }));
+        }
+
+        const ids = new Set(detail?.notificationIds ?? []);
+        if (ids.size === 0) {
+          return prev;
+        }
+
+        return prev.map((item) => (ids.has(item.id) ? { ...item, isRead: true } : item));
+      });
+
+      if (typeof detail?.unreadCount !== 'number') {
+        void loadNotifications();
+      }
+    };
+
+    window.addEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
+
+    return () => {
+      window.removeEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
+    };
+  }, [loadNotifications]);
 
   const onWsNotification = useCallback((payload: NotifItem) => {
     setNotifItems((prev) => mergeByLatest(prev, payload).slice(0, 5));

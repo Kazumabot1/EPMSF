@@ -1,10 +1,25 @@
 export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'PENDING_APPROVAL' | 'CLOSING' | 'DEACTIVATED';
+export type KpiTemplateCyclePeriodStatus = 'SCHEDULED' | 'OPEN' | 'CLOSING' | 'CLOSED';
 export type KpiGraceExtension = 'ONE_WEEK' | 'TWO_WEEKS' | 'THREE_WEEKS' | 'ONE_MONTH';
 export type KpiEarlyCloseReviewDecision = 'APPROVED' | 'REJECTED';
 
 export interface KpiTemplateCycleFormSummary {
   id: number;
   title: string;
+}
+
+export interface KpiTemplateCyclePeriodDto {
+  id: number;
+  periodNumber: number;
+  startDate: string;
+  endDate: string;
+  status: KpiTemplateCyclePeriodStatus;
+}
+
+export interface KpiTemplateCycleFormPeriodSchedule {
+  kpiFormId: number;
+  kpiFormTitle: string;
+  periods: KpiTemplateCyclePeriodDto[];
 }
 
 export interface KpiTemplateCycleResponse {
@@ -36,6 +51,8 @@ export interface KpiTemplateCycleResponse {
   createdAt: string | null;
   updatedAt: string | null;
   kpiForms: KpiTemplateCycleFormSummary[];
+  /** Full generated schedule, grouped by KPI form (available once periods are generated). */
+  periodSchedules?: KpiTemplateCycleFormPeriodSchedule[];
 }
 
 export interface KpiTemplateCycleStatusRequest {

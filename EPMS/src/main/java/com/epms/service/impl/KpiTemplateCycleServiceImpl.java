@@ -167,7 +167,21 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycleRepository.save(cycle);
         cycleRepository.flush();
         if (active) {
-            employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+            List<KpiTemplateCycleForm> links = cycleFormRepository.findWithFormsByCycleId(id);
+            if (links.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
+            }
+            try {
+                employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+            } catch (ResponseStatusException ex) {
+                throw ex;
+            } catch (RuntimeException ex) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Failed to activate KPI cycle. Check cycle dates and period configuration.",
+                        ex
+                );
+            }
         } else {
             employeeKpiWorkflowService.startCycleClosingGrace(id);
         }
@@ -363,9 +377,49 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         .build())
                 .toList();
         KpiTemplateCyclePeriod currentPeriod = cyclePeriodRepository
-                .findTopByCycle_IdOrderByPeriodNumberDesc(cycle.getId())
+                .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
+                        cycle.getId(),
+                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
+                )
                 .orElse(null);
         Integer durationYears = responseDurationYears(cycle);
+
+        List<KpiTemplateCyclePeriod> allPeriods = cyclePeriodRepository.findAllWithFormByCycleIdOrderByFormIdAndPeriodNumber(cycle.getId());
+        Map<Integer, KpiTemplateCycleResponseDTO.KpiFormPeriodScheduleDTO> schedulesByFormId = new LinkedHashMap<>();
+        // Ensure linked forms exist in response even if no periods yet.
+        for (KpiTemplateCycleForm link : links) {
+            if (link.getKpiForm() == null || link.getKpiForm().getId() == null) {
+                continue;
+            }
+            schedulesByFormId.putIfAbsent(
+                    link.getKpiForm().getId(),
+                    KpiTemplateCycleResponseDTO.KpiFormPeriodScheduleDTO.builder()
+                            .kpiFormId(link.getKpiForm().getId())
+                            .kpiFormTitle(link.getKpiForm().getTitle())
+                            .periods(new java.util.ArrayList<>())
+                            .build()
+            );
+        }
+        for (KpiTemplateCyclePeriod p : allPeriods) {
+            if (p.getKpiForm() == null || p.getKpiForm().getId() == null) {
+                continue;
+            }
+            KpiTemplateCycleResponseDTO.KpiFormPeriodScheduleDTO group = schedulesByFormId.computeIfAbsent(
+                    p.getKpiForm().getId(),
+                    id -> KpiTemplateCycleResponseDTO.KpiFormPeriodScheduleDTO.builder()
+                            .kpiFormId(id)
+                            .kpiFormTitle(p.getKpiForm().getTitle())
+                            .periods(new java.util.ArrayList<>())
+                            .build()
+            );
+            group.getPeriods().add(KpiTemplateCycleResponseDTO.PeriodDTO.builder()
+                    .id(p.getId())
+                    .periodNumber(p.getPeriodNumber())
+                    .startDate(p.getStartDate())
+                    .endDate(p.getEndDate())
+                    .status(p.getStatus())
+                    .build());
+        }
 
         return KpiTemplateCycleResponseDTO.builder()
                 .id(cycle.getId())
@@ -396,6 +450,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .createdAt(cycle.getCreatedAt())
                 .updatedAt(cycle.getUpdatedAt())
                 .kpiForms(forms)
+                .periodSchedules(schedulesByFormId.values().stream().toList())
                 .build();
     }
 

@@ -50,7 +50,7 @@ const DepartmentKpiApprovalPage = () => {
       setLoading(true);
       setError('');
       const [earlyCloseRows, finalizationRows] = await Promise.all([
-        departmentKpiApprovalService.listPendingApprovals(),
+        departmentKpiApprovalService.listPendingEarlyCloseRequests(),
         departmentKpiApprovalService.listPendingFinalizationRequests(),
       ]);
       setRequests(earlyCloseRows);

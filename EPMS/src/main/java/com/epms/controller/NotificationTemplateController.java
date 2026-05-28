@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/notification-templates")
+@RequestMapping({"/api/notification-templates", "/api/announcements"})
 @RequiredArgsConstructor
 public class NotificationTemplateController {
 

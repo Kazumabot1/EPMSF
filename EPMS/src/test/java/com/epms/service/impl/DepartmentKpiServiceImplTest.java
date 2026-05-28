@@ -2,9 +2,11 @@ package com.epms.service.impl;
 
 import com.epms.dto.DepartmentKpiCycleRequestDto;
 import com.epms.dto.DepartmentKpiResultDto;
+import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.dto.UpdateDepartmentKpiScoresRequest;
 import com.epms.entity.Department;
 import com.epms.entity.DepartmentKpiCycle;
+import com.epms.entity.DepartmentKpiCyclePeriod;
 import com.epms.entity.DepartmentKpiCycleTemplate;
 import com.epms.entity.DepartmentKpiResult;
 import com.epms.entity.DepartmentKpiScore;
@@ -12,7 +14,10 @@ import com.epms.entity.DepartmentKpiTemplate;
 import com.epms.entity.DepartmentKpiTemplateRow;
 import com.epms.entity.User;
 import com.epms.entity.enums.DepartmentKpiResultStatus;
+import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
 import com.epms.entity.enums.KpiFormStatus;
+import com.epms.entity.enums.KpiGraceExtension;
+import com.epms.entity.enums.KpiTemplateCyclePeriodStatus;
 import com.epms.entity.enums.KpiTemplateCycleStatus;
 import com.epms.repository.DepartmentKpiCyclePeriodRepository;
 import com.epms.repository.DepartmentKpiCycleRepository;
@@ -37,6 +42,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,6 +51,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -148,6 +156,90 @@ class DepartmentKpiServiceImplTest {
     }
 
     @Test
+    void earlyDeactivateBeforeOfficialEndCreatesPendingApprovalWithoutClosingResults() {
+        User hr = user(1);
+        DepartmentKpiCycle cycle = departmentCycle(KpiTemplateCycleStatus.ACTIVE);
+        cycle.setEndDate(LocalDate.now().plusDays(20));
+        authenticate(hr);
+        when(cycleRepository.findDetailById(10)).thenReturn(Optional.of(cycle));
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(10))
+                .thenReturn(Optional.of(openPeriod(cycle)));
+
+        KpiTemplateCycleStatusRequestDTO request = new KpiTemplateCycleStatusRequestDTO();
+        request.setActive(false);
+        request.setReason("Need to wrap up early");
+        request.setGraceExtension(KpiGraceExtension.TWO_WEEKS);
+
+        service.updateCycleStatus(10, request);
+
+        assertThat(cycle.getStatus()).isEqualTo(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        assertThat(cycle.getEarlyCloseReason()).isEqualTo("Need to wrap up early");
+        assertThat(cycle.getGraceExtension()).isEqualTo(KpiGraceExtension.TWO_WEEKS);
+        verify(resultRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void ceoApprovalStartsGraceAndKeepsCycleClosing() {
+        User ceo = user(2);
+        DepartmentKpiCycle cycle = pendingCycle();
+        authenticate(ceo);
+        when(cycleRepository.findDetailById(10)).thenReturn(Optional.of(cycle));
+        when(userRepository.findById(2)).thenReturn(Optional.of(ceo));
+        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(10))
+                .thenReturn(Optional.of(openPeriod(cycle)));
+
+        service.approveEarlyClose(10, "Approved");
+
+        assertThat(cycle.getStatus()).isEqualTo(KpiTemplateCycleStatus.CLOSING);
+        assertThat(cycle.getEarlyCloseReviewDecision()).isEqualTo(KpiEarlyCloseReviewDecision.APPROVED);
+        assertThat(cycle.getGraceEndsAt()).isAfter(LocalDateTime.now().plusDays(13));
+        verify(resultRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void ceoRejectionRestoresActiveStatus() {
+        User ceo = user(2);
+        DepartmentKpiCycle cycle = pendingCycle();
+        authenticate(ceo);
+        when(cycleRepository.findDetailById(10)).thenReturn(Optional.of(cycle));
+        when(userRepository.findById(2)).thenReturn(Optional.of(ceo));
+
+        service.rejectEarlyClose(10, "Not enough evidence");
+
+        assertThat(cycle.getStatus()).isEqualTo(KpiTemplateCycleStatus.ACTIVE);
+        assertThat(cycle.getEarlyCloseReviewDecision()).isEqualTo(KpiEarlyCloseReviewDecision.REJECTED);
+        assertThat(cycle.getGraceEndsAt()).isNull();
+    }
+
+    @Test
+    void expiredGraceClosesUnfinishedResults() {
+        User hr = user(1);
+        DepartmentKpiCycle cycle = departmentCycle(KpiTemplateCycleStatus.CLOSING);
+        cycle.setGraceEndsAt(LocalDateTime.now().minusHours(1));
+        DepartmentKpiCyclePeriod period = openPeriod(cycle);
+        DepartmentKpiTemplate template = DepartmentKpiTemplate.builder().id(100).title("Finance KPI").build();
+        DepartmentKpiCycleTemplate link = DepartmentKpiCycleTemplate.builder().cycle(cycle).template(template).build();
+        DepartmentKpiResult result = result(700, row(501, 80.0, 40, 0));
+        result.setCycle(cycle);
+        result.setCyclePeriod(period);
+        result.setTemplate(template);
+        authenticate(hr);
+        when(userRepository.findById(1)).thenReturn(Optional.of(hr));
+        when(resultRepository.findDetailById(700)).thenReturn(Optional.of(result));
+        when(cycleTemplateRepository.findByCycle_Id(10)).thenReturn(List.of(link));
+        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(10))
+                .thenReturn(Optional.of(period));
+        when(resultRepository.findByTemplateAndPeriod(100, 50)).thenReturn(List.of(result));
+
+        assertThatThrownBy(() -> service.updateScores(700, scoreRequest(501, 80.0)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("cannot be changed after finalization");
+
+        assertThat(result.getStatus()).isEqualTo(DepartmentKpiResultStatus.CLOSED);
+    }
+
+    @Test
     void updateScoresRejectsActualGreaterThanTarget() {
         User hr = user(1);
         DepartmentKpiResult result = result(700, row(501, 80.0, 40, 0));
@@ -218,6 +310,24 @@ class DepartmentKpiServiceImplTest {
                 .endDate(LocalDate.of(2026, 3, 31))
                 .durationMonths(3)
                 .status(status)
+                .build();
+    }
+
+    private static DepartmentKpiCycle pendingCycle() {
+        DepartmentKpiCycle cycle = departmentCycle(KpiTemplateCycleStatus.PENDING_APPROVAL);
+        cycle.setGraceExtension(KpiGraceExtension.TWO_WEEKS);
+        cycle.setEarlyCloseReason("Wrap up");
+        return cycle;
+    }
+
+    private static DepartmentKpiCyclePeriod openPeriod(DepartmentKpiCycle cycle) {
+        return DepartmentKpiCyclePeriod.builder()
+                .id(50)
+                .cycle(cycle)
+                .periodNumber(1)
+                .startDate(cycle.getStartDate())
+                .endDate(cycle.getEndDate())
+                .status(KpiTemplateCyclePeriodStatus.OPEN)
                 .build();
     }
 
