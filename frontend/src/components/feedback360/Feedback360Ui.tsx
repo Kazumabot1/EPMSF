@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import './feedback360-ui.css';
 
 export type Feedback360Tone = 'neutral' | 'brand' | 'info' | 'success' | 'warning' | 'danger' | 'purple';
@@ -299,3 +299,93 @@ export const Feedback360VisuallyGrouped = ({
                                                className,
                                                ...props
                                            }: HTMLAttributes<HTMLDivElement>) => <div className={cx('f360-group', className)} {...props}>{children}</div>;
+
+
+export type Feedback360WorkspaceStep = {
+    label: ReactNode;
+    description?: ReactNode;
+    to: string;
+    end?: boolean;
+};
+
+export const Feedback360PageHeader = ({
+                                          eyebrow,
+                                          title,
+                                          description,
+                                          actions,
+                                          meta,
+                                      }: {
+    eyebrow?: ReactNode;
+    title: ReactNode;
+    description?: ReactNode;
+    actions?: ReactNode;
+    meta?: ReactNode;
+}) => (
+    <section className="f360-page-header">
+        <div className="f360-page-header-copy">
+            {eyebrow ? <span className="f360-eyebrow">{eyebrow}</span> : null}
+            <h1>{title}</h1>
+            {description ? <p>{description}</p> : null}
+            {meta ? <div className="f360-page-header-meta">{meta}</div> : null}
+        </div>
+        {actions ? <div className="f360-page-header-actions">{actions}</div> : null}
+    </section>
+);
+
+export const Feedback360WorkspaceTabs = ({
+                                             steps,
+                                         }: {
+    steps: Feedback360WorkspaceStep[];
+}) => (
+    <nav className="f360-workspace-tabs" aria-label="360 feedback workspace">
+        {steps.map((step) => (
+            <NavLink
+                key={String(step.to)}
+                to={step.to}
+                end={step.end}
+                className={({ isActive }) => cx('f360-workspace-tab', isActive && 'active')}
+            >
+                <span>{step.label}</span>
+                {step.description ? <small>{step.description}</small> : null}
+            </NavLink>
+        ))}
+    </nav>
+);
+
+export const Feedback360WorkspaceCard = ({
+                                             children,
+                                             className,
+                                             ...props
+                                         }: HTMLAttributes<HTMLDivElement>) => (
+    <div className={cx('f360-workspace-card', className)} {...props}>{children}</div>
+);
+
+export const Feedback360SummaryStrip = ({ children }: { children: ReactNode }) => (
+    <section className="f360-summary-strip">{children}</section>
+);
+
+export const Feedback360SummaryItem = ({
+                                           label,
+                                           value,
+                                           hint,
+                                           tone = 'neutral',
+                                       }: {
+    label: ReactNode;
+    value: ReactNode;
+    hint?: ReactNode;
+    tone?: Feedback360Tone;
+}) => (
+    <div className={cx('f360-summary-item', formatClassTone(tone))}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {hint ? <small>{hint}</small> : null}
+    </div>
+);
+
+export const Feedback360MicroNote = ({
+                                         children,
+                                         tone = 'info',
+                                     }: {
+    children: ReactNode;
+    tone?: Feedback360Tone;
+}) => <div className={cx('f360-micro-note', formatClassTone(tone))}>{children}</div>;

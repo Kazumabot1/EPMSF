@@ -16,8 +16,9 @@ type DraftRow = {
     name: string;
     description: string;
     questionCount?: number;
-    activeQuestionCount?: number;
 };
+
+type EditingState = Record<string, boolean>;
 
 const emptyNewCompetency = () => ({
     name: '',
@@ -29,14 +30,16 @@ const buildRowKey = (competency: FeedbackCompetencyItem, index: number) =>
 
 export default function CompetencyManagerModal({ open, competencies, busy, onClose, onCreate, onUpdate }: Props) {
     const persistedCompetencies = useMemo(
-        () => competencies.filter((competency) => competency.id && competency.id > 0),
+        () => competencies.filter((competency) => competency.id > 0),
         [competencies],
     );
 
     const [rows, setRows] = useState<DraftRow[]>([]);
+    const [editing, setEditing] = useState<EditingState>({});
     const [newCompetency, setNewCompetency] = useState(emptyNewCompetency());
-    const [savingKey, setSavingKey] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    const [showCreate, setShowCreate] = useState(false);
+    const [savingKey, setSavingKey] = useState<string | null>(null);
 
     useEffect(() => {
         if (!open) return;
@@ -46,10 +49,11 @@ export default function CompetencyManagerModal({ open, competencies, busy, onClo
             name: competency.name,
             description: competency.description ?? '',
             questionCount: competency.questionCount,
-            activeQuestionCount: competency.activeQuestionCount,
         })));
+        setEditing({});
         setNewCompetency(emptyNewCompetency());
         setSearch('');
+        setShowCreate(false);
     }, [persistedCompetencies, open]);
 
     if (!open) return null;
@@ -63,6 +67,17 @@ export default function CompetencyManagerModal({ open, competencies, busy, onClo
         setRows((current) => current.map((row) => row.rowKey === rowKey ? { ...row, ...patch } : row));
     };
 
+    const resetRow = (rowKey: string) => {
+        const original = persistedCompetencies.find((competency, index) => buildRowKey(competency, index) === rowKey);
+        if (!original) return;
+        patchRow(rowKey, {
+            name: original.name,
+            description: original.description ?? '',
+            questionCount: original.questionCount,
+        });
+        setEditing((current) => ({ ...current, [rowKey]: false }));
+    };
+
     const saveExisting = async (row: DraftRow) => {
         if (!row.id || !row.name.trim()) return;
         setSavingKey(row.rowKey);
@@ -71,6 +86,7 @@ export default function CompetencyManagerModal({ open, competencies, busy, onClo
                 name: row.name.trim(),
                 description: row.description.trim() || null,
             });
+            setEditing((current) => ({ ...current, [row.rowKey]: false }));
         } finally {
             setSavingKey(null);
         }
@@ -83,108 +99,135 @@ export default function CompetencyManagerModal({ open, competencies, busy, onClo
             description: newCompetency.description.trim() || null,
         });
         setNewCompetency(emptyNewCompetency());
+        setShowCreate(false);
     };
 
     return (
-        <div className="hfdqb-drawer-shell" role="dialog" aria-modal="true" aria-labelledby="hfdqb-competency-manager-title">
+        <div className="hfdqb-drawer-shell hfdqb-clean-modal-shell" role="dialog" aria-modal="true" aria-labelledby="hfdqb-competency-manager-title">
             <button type="button" className="hfdqb-drawer-backdrop" aria-label="Close competency manager" onClick={onClose} />
-            <section className="hfdqb-drawer hfdqb-modal hfdqb-competency-modal hfdqb-competency-modal-simple">
-                <header className="hfdqb-drawer-head">
+            <section className="hfdqb-clean-modal hfdqb-clean-competency-modal">
+                <header className="hfdqb-clean-modal-head">
                     <div>
-                        <p>{persistedCompetencies.length} competencies</p>
-                        <h3 id="hfdqb-competency-manager-title">Manage Competencies</h3>
+                        <h3 id="hfdqb-competency-manager-title">Manage competencies</h3>
+                        <p>Add, rename, or describe competencies used to group 360 feedback questions.</p>
                     </div>
                     <button type="button" className="hfdqb-icon-btn" onClick={onClose} disabled={busy} aria-label="Close">
                         <i className="bi bi-x-lg" />
                     </button>
                 </header>
 
-                <div className="hfdqb-drawer-body hfdqb-competency-manager-body">
-                    <section className="hfdqb-form-section hfdqb-competency-create-card">
-                        <div>
-                            <h4>Add Competency</h4>
-                            <p>Use competencies to group related feedback questions.</p>
-                        </div>
-                        <div className="hfdqb-competency-create-simple">
-                            <label className="hfdqb-polished-field">
-                                <input
-                                    className="hfd-input hfdqb-polished-input"
-                                    placeholder="Competency name"
-                                    minLength={2}
-                                    maxLength={120}
-                                    value={newCompetency.name}
-                                    onChange={(event) => setNewCompetency((current) => ({ ...current, name: event.target.value }))}
-                                    disabled={busy}
-                                />
-                                <span className="hfdqb-field-helper">Required · 2–120 characters</span>
-                            </label>
-                            <label className="hfdqb-polished-field">
-                <textarea
-                    className="hfd-input hfd-textarea hfdqb-polished-input"
-                    placeholder="Short description optional"
-                    rows={2}
-                    maxLength={300}
-                    value={newCompetency.description}
-                    onChange={(event) => setNewCompetency((current) => ({ ...current, description: event.target.value }))}
-                    disabled={busy}
-                />
-                                <span className="hfdqb-field-helper">Optional · {newCompetency.description.length}/300 characters</span>
-                            </label>
-                            <button type="button" className="hfd-btn hfd-btn-primary" onClick={createNew} disabled={busy || !newCompetency.name.trim()}>Add</button>
-                        </div>
+                <div className="hfdqb-competency-toolbar">
+                    <label className="hfdqb-clean-search">
+                        <i className="bi bi-search" />
+                        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search competencies" />
+                    </label>
+                    <button type="button" className="hfdqb-secondary-btn" onClick={() => setShowCreate((value) => !value)} disabled={busy}>
+                        {showCreate ? 'Cancel add' : 'Add competency'}
+                    </button>
+                </div>
+
+                {showCreate ? (
+                    <section className="hfdqb-competency-create-inline">
+                        <label>
+                            <span>Competency name</span>
+                            <input
+                                className="hfd-input"
+                                minLength={2}
+                                maxLength={120}
+                                value={newCompetency.name}
+                                onChange={(event) => setNewCompetency((current) => ({ ...current, name: event.target.value }))}
+                                disabled={busy}
+                                placeholder="Example: Communication Skills"
+                            />
+                        </label>
+                        <label>
+                            <span>Description <em>optional</em></span>
+                            <textarea
+                                className="hfd-input hfd-textarea"
+                                rows={2}
+                                maxLength={300}
+                                value={newCompetency.description}
+                                onChange={(event) => setNewCompetency((current) => ({ ...current, description: event.target.value }))}
+                                disabled={busy}
+                                placeholder="Short description shown to HR users"
+                            />
+                        </label>
+                        <button type="button" className="hfdqb-primary-btn compact" onClick={createNew} disabled={busy || !newCompetency.name.trim()}>
+                            Add
+                        </button>
                     </section>
+                ) : null}
 
-                    <section className="hfdqb-form-section hfdqb-competency-list-card">
-                        <div className="hfdqb-competency-list-card-head">
-                            <div>
-                                <h4>Existing Competencies</h4>
-                                <span>Edit the name or description shown to HR users.</span>
-                            </div>
-                            <label className="hfdqb-mini-search">
-                                <i className="bi bi-search" />
-                                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search competencies" />
-                            </label>
+                <div className="hfdqb-competency-list-clean">
+                    {rows.length === 0 ? (
+                        <div className="hfdqb-empty-table hfdqb-clean-empty">
+                            <i className="bi bi-diagram-3" />
+                            <strong>No competencies yet</strong>
+                            <span>Add a competency before creating questions.</span>
                         </div>
-
-                        {rows.length === 0 ? (
-                            <div className="hfdqb-empty-table">
-                                <i className="bi bi-diagram-3" />
-                                <strong>No competencies found</strong>
-                                <span>Create a competency before adding questions.</span>
-                            </div>
-                        ) : visibleRows.length === 0 ? (
-                            <div className="hfdqb-empty-table">
-                                <i className="bi bi-search" />
-                                <strong>No matching competencies</strong>
-                                <span>Try another search term.</span>
-                            </div>
-                        ) : (
-                            <div className="hfdqb-competency-admin-list simple">
-                                {visibleRows.map((row) => (
-                                    <div key={row.rowKey} className="hfdqb-competency-admin-row simple">
-                                        <div className="hfdqb-competency-row-meta" title="Questions linked to this competency">
-                                            <strong>{row.questionCount ?? 0}</strong>
-                                            <span>questions</span>
-                                        </div>
-                                        <label className="hfdqb-polished-field">
-                                            <span>Name</span>
-                                            <input className="hfd-input hfdqb-polished-input" minLength={2} maxLength={120} value={row.name} onChange={(event) => patchRow(row.rowKey, { name: event.target.value })} disabled={busy} />
-                                            <em className="hfdqb-field-helper">2–120 characters</em>
-                                        </label>
-                                        <label className="hfdqb-polished-field">
-                                            <span>Description</span>
-                                            <textarea className="hfd-input hfd-textarea hfdqb-polished-input" rows={2} maxLength={300} value={row.description} onChange={(event) => patchRow(row.rowKey, { description: event.target.value })} disabled={busy} />
-                                            <em className="hfdqb-field-helper">Optional · {row.description.length}/300 characters</em>
-                                        </label>
-                                        <button type="button" className="hfd-btn hfd-btn-secondary" onClick={() => saveExisting(row)} disabled={busy || savingKey === row.rowKey || !row.name.trim()}>
-                                            {savingKey === row.rowKey ? 'Saving...' : 'Save'}
-                                        </button>
-                                        <small>{row.questionCount ?? 0} total questions</small>
+                    ) : visibleRows.length === 0 ? (
+                        <div className="hfdqb-empty-table hfdqb-clean-empty">
+                            <i className="bi bi-search" />
+                            <strong>No matching competencies</strong>
+                            <span>Try another search term.</span>
+                        </div>
+                    ) : (
+                        visibleRows.map((row) => {
+                            const isEditing = Boolean(editing[row.rowKey]);
+                            return (
+                                <article key={row.rowKey} className="hfdqb-competency-row-clean">
+                                    <div className="hfdqb-competency-row-main">
+                                        {isEditing ? (
+                                            <>
+                                                <label>
+                                                    <span>Name</span>
+                                                    <input
+                                                        className="hfd-input"
+                                                        minLength={2}
+                                                        maxLength={120}
+                                                        value={row.name}
+                                                        onChange={(event) => patchRow(row.rowKey, { name: event.target.value })}
+                                                        disabled={busy}
+                                                    />
+                                                </label>
+                                                <label>
+                                                    <span>Description <em>optional</em></span>
+                                                    <textarea
+                                                        className="hfd-input hfd-textarea"
+                                                        rows={2}
+                                                        maxLength={300}
+                                                        value={row.description}
+                                                        onChange={(event) => patchRow(row.rowKey, { description: event.target.value })}
+                                                        disabled={busy}
+                                                    />
+                                                </label>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <h4>{row.name}</h4>
+                                                <p>{row.description || 'No description added.'}</p>
+                                            </>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
+                                    <div className="hfdqb-competency-row-side">
+                                        <span>{row.questionCount ?? 0} question{(row.questionCount ?? 0) === 1 ? '' : 's'}</span>
+                                        {isEditing ? (
+                                            <div className="hfdqb-row-actions">
+                                                <button type="button" className="hfdqb-row-action" onClick={() => resetRow(row.rowKey)} disabled={busy}>Cancel</button>
+                                                <button type="button" className="hfdqb-row-action primary" onClick={() => saveExisting(row)} disabled={busy || savingKey === row.rowKey || !row.name.trim()}>
+                                                    {savingKey === row.rowKey ? 'Saving...' : 'Save'}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button type="button" className="hfdqb-row-action primary" onClick={() => setEditing((current) => ({ ...current, [row.rowKey]: true }))} disabled={busy}>
+                                                Edit
+                                            </button>
+                                        )}
+                                    </div>
+                                </article>
+                            );
+                        })
+                    )}
                 </div>
             </section>
         </div>

@@ -286,9 +286,16 @@ export default function DynamicFormPreviewTab() {
                                         <div className="hfdq-final-question-body">
                                             <div className="hfdq-final-question-meta">
                                                 <span>{question.questionCode}</span>
-                                                <em>Rating 1–5 + Required comment</em>
+                                                <em>Rating 1–5 + required comment</em>
                                             </div>
-                                            <p>{question.questionText}</p>
+                                            <div className="hfdq-final-question-copy">
+                                                <p>{question.questionText}</p>
+                                                {question.helpText?.trim() ? (
+                                                    <span className="hfdq-guidance-indicator" title={question.helpText}>
+                                                        <i className="bi bi-question-circle" /> Guidance
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                             <div className="hfdq-final-response-mock" aria-hidden="true">
                                                 {[1, 2, 3, 4, 5].map(value => <span key={value}>{value}</span>)}
                                             </div>
@@ -427,10 +434,10 @@ export default function DynamicFormPreviewTab() {
                 <div>
                     <p className="hfdq-breadcrumb"><i className="bi bi-house" /> 360 Feedback / Dynamic Preview</p>
                     <h2>Dynamic Preview</h2>
-                    <p>Review the final question form for one employee scenario before using rules in a campaign.</p>
+                    <p>Check the exact competency questions an evaluator will see before HR launches a campaign.</p>
                 </div>
                 <div className="hfdq-actions">
-                    <button className="hfd-btn hfd-btn-secondary" type="button" onClick={goToRules}><i className="bi bi-sliders" /> Question Rules</button>
+                    <button className="hfd-btn hfd-btn-secondary" type="button" onClick={goToRules}><i className="bi bi-sliders" /> Rule Sets</button>
                 </div>
             </div>
 
@@ -439,9 +446,9 @@ export default function DynamicFormPreviewTab() {
             <section className="hfdq-preview-command-center">
                 {renderScenarioControls()}
                 <div className="hfdq-preview-summary-final">
-                    <div><span>Final Questions</span><strong>{metrics.total}</strong><small>unique resolved questions</small></div>
-                    <div><span>Competencies</span><strong>{metrics.competencyCount}</strong><small>grouped in form</small></div>
-                    <div><span>Estimated Time</span><strong>{metrics.estimatedMinutes}</strong><small>approximate effort</small></div>
+                    <div><span>Questions</span><strong>{metrics.total}</strong><small>rating + comment</small></div>
+                    <div><span>Competencies</span><strong>{metrics.competencyCount}</strong><small>grouped preview</small></div>
+                    <div><span>Estimated Time</span><strong>{metrics.estimatedMinutes}</strong><small>approx. effort</small></div>
                 </div>
             </section>
 
@@ -449,12 +456,12 @@ export default function DynamicFormPreviewTab() {
                 <main className="hfdq-preview-main-stage final-form-stage">
                     <div className="hfdq-preview-stage-toolbar">
                         <div>
-                            <span className="hfdq-kicker">Form simulation</span>
+                            <span className="hfdq-kicker">Evaluator preview</span>
                             <h3>{roleLabel} view · {selectedLevelLabel}</h3>
                             <p>{filteredQuestions.length} visible of {metrics.total} final questions · {selectedDepartmentName} · {selectedPositionName}</p>
                         </div>
                         <div className="hfdq-mode-switch compact" role="tablist" aria-label="Preview display mode">
-                            <button type="button" className={displayMode === 'evaluator' ? 'active' : ''} onClick={() => setDisplayMode('evaluator')}>Form view</button>
+                            <button type="button" className={displayMode === 'evaluator' ? 'active' : ''} onClick={() => setDisplayMode('evaluator')}>Evaluator view</button>
                             <button type="button" className={displayMode === 'trace' ? 'active' : ''} onClick={() => setDisplayMode('trace')}>Rule trace</button>
                         </div>
                     </div>
