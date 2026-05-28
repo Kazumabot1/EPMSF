@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import '../hr-feedback-dashboard.css';
+import './question-rules.css';
 import {
     hrFeedbackApi,
     type QuestionBankItem,
@@ -9,10 +10,9 @@ import {
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { positionService } from '../../../services/positionService';
 import type { FeedbackDepartmentOption, FeedbackTargetCandidate } from '../../../types/feedbackCampaign';
-import type { PositionResponse } from '../../../types/position';
+import type { PositionLevelResponse, PositionResponse } from '../../../types/position';
 import {
     EVALUATOR_ROLE_OPTIONS,
-    LEVEL_OPTIONS,
     getCompetencyLabel,
     getRoleLabel,
     normalizeText,
@@ -69,12 +69,31 @@ interface RuleHealthItem {
     value?: number;
 }
 
-const emptyForm = (): RuleSetFormState => ({
+interface LevelOption {
+    id?: number;
+    code: string;
+    rank: number;
+    label: string;
+}
+
+const parseLevelRank = (levelCode?: string | null) => {
+    const match = String(levelCode ?? '').match(/(\d+)/);
+    return match ? Number(match[1]) : null;
+};
+
+const toLevelCode = (rank: number, levels: LevelOption[] = []) =>
+    levels.find(level => level.rank === rank)?.code ?? `L${String(rank).padStart(2, '0')}`;
+
+
+const getLevelRangeLabel = (minRank: number, maxRank: number, levels: LevelOption[] = []) =>
+    `${toLevelCode(minRank, levels)}–${toLevelCode(maxRank, levels)}`;
+
+const emptyForm = (minRank = 1, maxRank = 9): RuleSetFormState => ({
     ruleSetName: '',
     ruleSetDescription: '',
     questionBankIds: [],
-    targetLevelMinRank: 1,
-    targetLevelMaxRank: 9,
+    targetLevelMinRank: minRank,
+    targetLevelMaxRank: maxRank,
     evaluatorRoles: [],
     targetDepartmentId: '',
     targetPositionId: '',
@@ -84,7 +103,7 @@ const emptyForm = (): RuleSetFormState => ({
 
 const normalizeRuleSetStatus = (status?: string | null, active?: boolean | null): RuleSetStatus => {
     const value = (status || '').toUpperCase().replace(/[-\s]+/g, '_');
-    if (value === 'DRAFT' || value === 'ACTIVE' || value === 'DISABLED' || value === 'ARCHIVED') return value;
+    if (['DRAFT', 'ACTIVE', 'DISABLED', 'ARCHIVED'].includes(value)) return value as RuleSetStatus;
     if (value === 'INACTIVE') return 'DISABLED';
     return active === false ? 'DISABLED' : 'ACTIVE';
 };
@@ -125,14 +144,14 @@ const scopeLabel = (
     return `${department} / ${position}`;
 };
 
-const formatGroupLevelRange = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank'>) =>
-    `L${String(group.targetLevelMinRank).padStart(2, '0')}–L${String(group.targetLevelMaxRank).padStart(2, '0')}`;
+const formatGroupLevelRange = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank'>, levels: LevelOption[] = []) =>
+    getLevelRangeLabel(group.targetLevelMinRank, group.targetLevelMaxRank, levels);
 
-const formatRuleSetTitle = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'targetDepartmentId' | 'targetPositionId'>, getDepartmentName: (id?: number | null) => string, getPositionName: (id?: number | null) => string) =>
-    `${formatGroupLevelRange(group)} · ${scopeLabel(group, getDepartmentName, getPositionName)}`;
+const formatRuleSetTitle = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'targetDepartmentId' | 'targetPositionId'>, getDepartmentName: (id?: number | null) => string, getPositionName: (id?: number | null) => string, levels: LevelOption[] = []) =>
+    `${formatGroupLevelRange(group, levels)} · ${scopeLabel(group, getDepartmentName, getPositionName)}`;
 
-const buildSuggestedRuleSetName = (form: Pick<RuleSetFormState, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'evaluatorRoles' | 'targetDepartmentId' | 'targetPositionId'>) => {
-    const level = `L${String(form.targetLevelMinRank).padStart(2, '0')}–L${String(form.targetLevelMaxRank).padStart(2, '0')}`;
+const buildSuggestedRuleSetName = (form: Pick<RuleSetFormState, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'evaluatorRoles' | 'targetDepartmentId' | 'targetPositionId'>, levels: LevelOption[] = []) => {
+    const level = getLevelRangeLabel(form.targetLevelMinRank, form.targetLevelMaxRank, levels);
     const roles = form.evaluatorRoles.length === EVALUATOR_ROLE_OPTIONS.length
         ? 'All Roles'
         : form.evaluatorRoles.length > 0
@@ -166,8 +185,6 @@ const ruleScopeSpecificityLabel = (rule: Pick<QuestionRuleItem, 'targetPositionI
     return 'General';
 };
 
-const questionLabel = (rule: Pick<QuestionRuleItem, 'questionCode' | 'questionBankId' | 'competencyCode'>) =>
-    `${rule.questionCode || `Q-${rule.questionBankId}`} · ${getCompetencyLabel(rule.competencyCode || '')}`;
 
 const rangesOverlap = (aMin: number, aMax: number, bMin: number, bMax: number) =>
     aMin <= bMax && bMin <= aMax;
@@ -342,16 +359,6 @@ const buildRuleGroups = (rules: QuestionRuleItem[], conflictIds: Set<number>): R
     });
 };
 
-const RuleMetric = ({ label, value, note, tone }: { label: string; value: number; note: string; tone: string }) => (
-    <div className={`hfdq-stat-card ${tone}`}>
-        <span className="hfdq-stat-icon"><i className="bi bi-diagram-3" /></span>
-        <div>
-            <small>{label}</small>
-            <strong>{value}</strong>
-            <em>{note}</em>
-        </div>
-    </div>
-);
 
 type RuleMessageTone = 'error' | 'success' | 'warning' | 'info';
 
@@ -409,8 +416,8 @@ const buildRuleMessage = (tone: RuleMessageTone, message: string) => {
 const RuleToast = ({ tone, message, onClose }: { tone: RuleMessageTone; message: string; onClose: () => void }) => {
     const content = buildRuleMessage(tone, message);
     return (
-        <div className={`hfdq-toast ${tone}`} role="status" aria-live="polite">
-            <span className="hfdq-toast-icon"><i className={content.icon} /></span>
+        <div className={`f360-rules-toast ${tone}`} role="status" aria-live="polite">
+            <span className="f360-rules-toast-icon"><i className={content.icon} /></span>
             <div>
                 <strong>{content.title}</strong>
                 <p>{content.detail}</p>
@@ -425,6 +432,7 @@ export default function QuestionRulesTab() {
     const [rules, setRules] = useState<QuestionRuleItem[]>([]);
     const [departments, setDepartments] = useState<FeedbackDepartmentOption[]>([]);
     const [positions, setPositions] = useState<PositionResponse[]>([]);
+    const [positionLevels, setPositionLevels] = useState<PositionLevelResponse[]>([]);
     const [targetCandidates, setTargetCandidates] = useState<FeedbackTargetCandidate[]>([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
@@ -442,6 +450,7 @@ export default function QuestionRulesTab() {
     const [builderQuestionSearch, setBuilderQuestionSearch] = useState('');
     const [builderCompetencyFilter, setBuilderCompetencyFilter] = useState('ALL');
     const [matrixSelection, setMatrixSelection] = useState<MatrixSelection | null>(null);
+    const [coverageOpen, setCoverageOpen] = useState(false);
     const [expandedRuleSetKeys, setExpandedRuleSetKeys] = useState<Set<string>>(new Set());
 
     const activeQuestions = useMemo(
@@ -497,17 +506,19 @@ export default function QuestionRulesTab() {
         setLoading(true);
         setError('');
         try {
-            const [loadedQuestions, loadedRules, loadedDepartments, loadedPositions, loadedTargetCandidates] = await Promise.all([
+            const [loadedQuestions, loadedRules, loadedDepartments, loadedPositions, loadedPositionLevels, loadedTargetCandidates] = await Promise.all([
                 hrFeedbackApi.getQuestionBank(),
                 hrFeedbackApi.getQuestionRules(),
                 feedbackCampaignApi.getDepartments().catch(() => []),
                 positionService.getPositions().catch(() => []),
+                positionService.getPositionLevels().catch(() => []),
                 feedbackCampaignApi.getTargetCandidates().catch(() => []),
             ]);
             setQuestions(loadedQuestions);
             setRules(loadedRules);
             setDepartments(loadedDepartments);
             setPositions(loadedPositions);
+            setPositionLevels(loadedPositionLevels);
             setTargetCandidates(loadedTargetCandidates);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to load question rules.');
@@ -517,8 +528,14 @@ export default function QuestionRulesTab() {
     };
 
     useEffect(() => {
-        loadAll();
+        void loadAll();
     }, []);
+
+    useEffect(() => {
+        if (!success) return;
+        const timer = window.setTimeout(() => setSuccess(''), 3200);
+        return () => window.clearTimeout(timer);
+    }, [success]);
 
     const getDepartmentName = (id?: number | null) => {
         if (!id) return 'All departments';
@@ -542,27 +559,102 @@ export default function QuestionRulesTab() {
         return map;
     }, [targetCandidates]);
 
-    const getPositionsForDepartment = (departmentId: number | '') => {
-        if (departmentId === '') return positions;
-        if (targetCandidates.length === 0) return positions;
-        const mapped = positionIdsByDepartment.get(Number(departmentId));
-        if (!mapped || mapped.size === 0) return [];
-        return positions.filter(position => mapped.has(position.id));
+    const levelOptions = useMemo<LevelOption[]>(() => {
+        const byRank = new Map<number, LevelOption>();
+
+        positionLevels
+            .filter(level => level.active !== false)
+            .forEach(level => {
+                const rank = parseLevelRank(level.levelCode);
+                if (!rank) return;
+                byRank.set(rank, {
+                    id: level.id,
+                    code: level.levelCode,
+                    rank,
+                    label: level.levelCode,
+                });
+            });
+
+        positions
+            .filter(position => position.status !== false)
+            .forEach(position => {
+                const rank = parseLevelRank(position.levelCode);
+                if (!rank || byRank.has(rank)) return;
+                byRank.set(rank, {
+                    id: position.levelId,
+                    code: position.levelCode || `L${String(rank).padStart(2, '0')}`,
+                    rank,
+                    label: position.levelCode || `L${String(rank).padStart(2, '0')}`,
+                });
+            });
+
+        rules.forEach(rule => {
+            [rule.targetLevelMinRank, rule.targetLevelMaxRank].forEach(rank => {
+                if (!rank || byRank.has(rank)) return;
+                byRank.set(rank, {
+                    code: `L${String(rank).padStart(2, '0')}`,
+                    rank,
+                    label: `L${String(rank).padStart(2, '0')}`,
+                });
+            });
+        });
+
+        return [...byRank.values()].sort((a, b) => a.rank - b.rank);
+    }, [positionLevels, positions, rules]);
+
+    const levelRankSet = useMemo(() => new Set(levelOptions.map(level => level.rank)), [levelOptions]);
+    const minAvailableLevelRank = levelOptions[0]?.rank ?? 1;
+    const maxAvailableLevelRank = levelOptions[levelOptions.length - 1]?.rank ?? 9;
+
+    const getPositionRank = (position: PositionResponse) => {
+        const parsed = parseLevelRank(position.levelCode);
+        if (parsed) return parsed;
+        const matchedLevel = levelOptions.find(level => level.id === position.levelId);
+        return matchedLevel?.rank ?? null;
+    };
+
+    const activeScopeOverlapMessage = useMemo(() => {
+        if (!activeScopeOverlapGroup) return '';
+        const sharedMin = Math.max(activeScopeOverlapGroup.targetLevelMinRank, form.targetLevelMinRank);
+        const sharedMax = Math.min(activeScopeOverlapGroup.targetLevelMaxRank, form.targetLevelMaxRank);
+        const sharedRoles = activeScopeOverlapGroup.roles.filter(role => form.evaluatorRoles.includes(role)).map(getRoleLabel).join(', ');
+        const name = activeScopeOverlapGroup.ruleSetName || formatGroupLevelRange(activeScopeOverlapGroup, levelOptions);
+        const scope = scopeLabel(activeScopeOverlapGroup, getDepartmentName, getPositionName);
+        return `This overlaps with "${name}". Shared scope: ${getLevelRangeLabel(sharedMin, sharedMax, levelOptions)}, ${sharedRoles || 'selected relationship'}, ${scope}. Edit the existing Rule Set or change this Rule Set's level range, scope, or relationship.`;
+    }, [activeScopeOverlapGroup, form.evaluatorRoles, form.targetLevelMaxRank, form.targetLevelMinRank, getDepartmentName, getPositionName, levelOptions]);
+
+    const getPositionsForDepartment = (departmentId: number | '', minRank = minAvailableLevelRank, maxRank = maxAvailableLevelRank) => {
+        const byDepartment = departmentId === ''
+            ? positions
+            : targetCandidates.length === 0
+                ? positions
+                : (() => {
+                    const mapped = positionIdsByDepartment.get(Number(departmentId));
+                    return mapped && mapped.size > 0 ? positions.filter(position => mapped.has(position.id)) : [];
+                })();
+
+        return byDepartment
+            .filter(position => position.status !== false)
+            .filter(position => {
+                const rank = getPositionRank(position);
+                return rank != null && rank >= minRank && rank <= maxRank;
+            });
     };
 
     const builderPositions = useMemo(
-        () => getPositionsForDepartment(form.targetDepartmentId),
-        [form.targetDepartmentId, positionIdsByDepartment, positions, targetCandidates.length],
+        () => getPositionsForDepartment(form.targetDepartmentId, form.targetLevelMinRank, form.targetLevelMaxRank),
+        [form.targetDepartmentId, form.targetLevelMaxRank, form.targetLevelMinRank, levelOptions, positionIdsByDepartment, positions, targetCandidates.length],
     );
 
     const matrixPositions = useMemo(
         () => getPositionsForDepartment(matrixDepartmentId),
-        [matrixDepartmentId, positionIdsByDepartment, positions, targetCandidates.length],
+        [levelOptions, matrixDepartmentId, positionIdsByDepartment, positions, targetCandidates.length],
     );
 
     useEffect(() => {
         if (form.targetPositionId !== '' && !builderPositions.some(position => position.id === Number(form.targetPositionId))) {
             setForm(current => ({ ...current, targetPositionId: '' }));
+            setSuccess('Selected position was cleared because it is outside the selected level range.');
         }
     }, [builderPositions, form.targetPositionId]);
 
@@ -572,6 +664,16 @@ export default function QuestionRulesTab() {
         }
     }, [matrixPositions, matrixPositionId]);
 
+    useEffect(() => {
+        if (levelOptions.length === 0) return;
+        setForm(current => {
+            const minRank = levelRankSet.has(current.targetLevelMinRank) ? current.targetLevelMinRank : minAvailableLevelRank;
+            const maxRank = levelRankSet.has(current.targetLevelMaxRank) ? current.targetLevelMaxRank : maxAvailableLevelRank;
+            if (minRank === current.targetLevelMinRank && maxRank === current.targetLevelMaxRank) return current;
+            return { ...current, targetLevelMinRank: minRank, targetLevelMaxRank: Math.max(minRank, maxRank) };
+        });
+    }, [levelOptions.length, levelRankSet, maxAvailableLevelRank, minAvailableLevelRank]);
+
     const filteredGroups = useMemo(() => {
         const query = normalizeText(search);
         return ruleGroups.filter(group => {
@@ -580,7 +682,7 @@ export default function QuestionRulesTab() {
                 group.ruleSetDescription,
                 ruleSetStatusLabel(group.ruleSetStatus),
                 ruleSetTypeLabel(group.ruleSetType),
-                formatGroupLevelRange(group),
+                formatGroupLevelRange(group, levelOptions),
                 scopeLabel(group, getDepartmentName, getPositionName),
                 ...group.roles.map(getRoleLabel),
                 ...group.questions.flatMap(question => [question.questionCode, question.questionText, question.competencyCode]),
@@ -591,9 +693,16 @@ export default function QuestionRulesTab() {
             const matchesStatus = statusFilter === 'ALL' || group.ruleSetStatus === statusFilter;
             return matchesSearch && matchesRole && matchesLevel && matchesStatus;
         });
-    }, [getDepartmentName, getPositionName, levelFilter, roleFilter, ruleGroups, search, statusFilter]);
+    }, [getDepartmentName, getPositionName, levelFilter, levelOptions, roleFilter, ruleGroups, search, statusFilter]);
 
-    const coverageMatrix = useMemo(() => LEVEL_OPTIONS.map(level => {
+    const coverageLevels = useMemo(() => {
+        if (matrixPositionId === '') return levelOptions;
+        const selectedPosition = positions.find(position => position.id === Number(matrixPositionId));
+        const rank = selectedPosition ? getPositionRank(selectedPosition) : null;
+        return rank == null ? levelOptions : levelOptions.filter(level => level.rank === rank);
+    }, [levelOptions, matrixPositionId, positions]);
+
+    const coverageMatrix = useMemo(() => coverageLevels.map(level => {
         const departmentId = toNumberOrNull(matrixDepartmentId);
         const positionId = toNumberOrNull(matrixPositionId);
         const cells = EVALUATOR_ROLE_OPTIONS.map(role => {
@@ -602,7 +711,7 @@ export default function QuestionRulesTab() {
             return { role: role.value, count: matchedRules.length, matchedRules, rawCount: rawMatches.length, duplicatesIgnored: Math.max(0, rawMatches.length - matchedRules.length) };
         });
         return { level, cells };
-    }), [matrixDepartmentId, matrixPositionId, rules]);
+    }), [coverageLevels, matrixDepartmentId, matrixPositionId, rules]);
 
     const stats = useMemo(() => {
         const effectiveRows = rules.filter(isRuleEffectivelyActive);
@@ -693,7 +802,7 @@ export default function QuestionRulesTab() {
         setError('');
         setSuccess('');
         setEditingGroup(null);
-        setForm(emptyForm());
+        setForm(emptyForm(minAvailableLevelRank, maxAvailableLevelRank));
         setBuilderQuestionSearch('');
         setBuilderCompetencyFilter('ALL');
         setBuilderOpen(true);
@@ -703,7 +812,7 @@ export default function QuestionRulesTab() {
         if (busy) return;
         setBuilderOpen(false);
         setEditingGroup(null);
-        setForm(emptyForm());
+        setForm(emptyForm(minAvailableLevelRank, maxAvailableLevelRank));
         setBuilderQuestionSearch('');
         setBuilderCompetencyFilter('ALL');
     };
@@ -759,11 +868,11 @@ export default function QuestionRulesTab() {
 
         const duplicate = ruleGroups.find(group => group.ruleSetId !== editingGroup?.ruleSetId && buildRuleSetSignature(group) === buildFormSignature(form));
         if (duplicate) {
-            setError(`This Rule Set is identical to "${duplicate.ruleSetName || formatGroupLevelRange(duplicate)}". Change the scope, roles, or selected questions before saving.`);
+            setError(`This Rule Set is identical to "${duplicate.ruleSetName || formatGroupLevelRange(duplicate, levelOptions)}". Change the scope, roles, or selected questions before saving.`);
             return;
         }
         if (form.ruleSetStatus === 'ACTIVE' && activeScopeOverlapGroup) {
-            setError(`Active overlap blocked. "${activeScopeOverlapGroup.ruleSetName || formatGroupLevelRange(activeScopeOverlapGroup)}" already covers this level range, exact scope, and one or more selected evaluator roles. Edit that Rule Set instead of creating another active set for the same scope.`);
+            setError(activeScopeOverlapMessage || 'Active Rule Set overlap blocked. Edit the existing Rule Set or change this Rule Set before saving.');
             return;
         }
         if (selectedInheritedQuestions.length > 0) {
@@ -773,7 +882,7 @@ export default function QuestionRulesTab() {
         }
 
         const payload: QuestionRulePayload = {
-            ruleSetName: (form.ruleSetName.trim() || buildSuggestedRuleSetName(form)),
+            ruleSetName: (form.ruleSetName.trim() || buildSuggestedRuleSetName(form, levelOptions)),
             ruleSetDescription: form.ruleSetDescription.trim() || null,
             ruleSetStatus: form.ruleSetStatus,
             questionBankIds: form.questionBankIds,
@@ -841,7 +950,7 @@ export default function QuestionRulesTab() {
                     evaluatorRoles: group.roles,
                     targetDepartmentId: group.targetDepartmentId ?? '',
                     targetPositionId: group.targetPositionId ?? '',
-                }),
+                }, levelOptions),
                 ruleSetDescription: group.ruleSetDescription || null,
                 ruleSetStatus: status,
                 questionBankIds: group.questionIds,
@@ -868,7 +977,7 @@ export default function QuestionRulesTab() {
         setSuccess('');
         setEditingGroup(group);
         setForm({
-            ruleSetName: group.ruleSetName || formatGroupLevelRange(group),
+            ruleSetName: group.ruleSetName || formatGroupLevelRange(group, levelOptions),
             ruleSetDescription: group.ruleSetDescription || '',
             questionBankIds: group.questionIds,
             evaluatorRoles: group.roles,
@@ -889,7 +998,7 @@ export default function QuestionRulesTab() {
         setSuccess('');
         setEditingGroup(null);
         setForm({
-            ruleSetName: `Copy of ${group.ruleSetName || formatGroupLevelRange(group)}`,
+            ruleSetName: `Copy of ${group.ruleSetName || formatGroupLevelRange(group, levelOptions)}`,
             ruleSetDescription: group.ruleSetDescription || '',
             questionBankIds: group.questionIds,
             evaluatorRoles: group.roles,
@@ -923,17 +1032,23 @@ export default function QuestionRulesTab() {
 
     const filteredCompetencyBuckets = useMemo(() => {
         const query = normalizeText(builderQuestionSearch);
-        return competencyBuckets
-            .filter(([competencyCode]) => builderCompetencyFilter === 'ALL' || competencyCode === builderCompetencyFilter)
-            .map(([competencyCode, bucket]) => [
-                competencyCode,
-                bucket.filter(question => !query
-                    || normalizeText(question.questionText).includes(query)
-                    || normalizeText(question.questionCode).includes(query)
-                    || normalizeText(getCompetencyLabel(question.competencyCode)).includes(query)),
-            ] as [string, QuestionBankItem[]])
-            .filter(([, bucket]) => bucket.length > 0);
-    }, [builderCompetencyFilter, builderQuestionSearch, competencyBuckets]);
+        const visibleQuestions = activeQuestions.filter(question => {
+            const matchesCompetency = builderCompetencyFilter === 'ALL' || question.competencyCode === builderCompetencyFilter;
+            const matchesSearch = !query
+                || normalizeText(question.questionText).includes(query)
+                || normalizeText(question.questionCode).includes(query)
+                || normalizeText(getCompetencyLabel(question.competencyCode)).includes(query);
+            return matchesCompetency && matchesSearch;
+        });
+
+        const buckets = new Map<string, QuestionBankItem[]>();
+        visibleQuestions.forEach(question => {
+            const code = question.competencyCode || 'UNCATEGORIZED';
+            buckets.set(code, [...(buckets.get(code) ?? []), question]);
+        });
+
+        return [...buckets.entries()].sort((a, b) => getCompetencyLabel(a[0]).localeCompare(getCompetencyLabel(b[0])));
+    }, [activeQuestions, builderCompetencyFilter, builderQuestionSearch]);
 
     const selectedQuestions = useMemo(() => activeQuestions.filter(question => form.questionBankIds.includes(question.id)), [activeQuestions, form.questionBankIds]);
 
@@ -950,251 +1065,292 @@ export default function QuestionRulesTab() {
     const matrixScopeLabel = `${matrixDepartmentId ? getDepartmentName(Number(matrixDepartmentId)) : 'All departments'} / ${matrixPositionId ? getPositionName(Number(matrixPositionId)) : 'All positions'}`;
 
     return (
-        <div className="hfdq-page hfdq-rule-set-page">
-            <div className="hfdq-page-head">
+        <div className="f360-rules-page f360-rules-rule-clean-page">
+            <header className="f360-rules-clean-header">
                 <div>
-                    <p className="hfdq-breadcrumb"><i className="bi bi-house" /> 360 Feedback / Rule Sets</p>
                     <h2>Rule Sets</h2>
-                    <p>Decide which competency questions appear for each employee level, evaluator relationship, department, and position.</p>
+                    <p>Control which active feedback questions appear for each employee scope and evaluator relationship.</p>
+                    <div className="f360-rules-clean-meta">
+                        <span>{stats.ruleSets} rule sets</span>
+                        <span>{stats.activeRules} active rows</span>
+                        <span>{stats.coveredCombos} covered cells</span>
+                        <span>{stats.conflicts} conflicts</span>
+                    </div>
                 </div>
-                <div className="hfdq-actions">
-                    <button className="hfd-btn hfd-btn-secondary" onClick={loadAll} disabled={loading || busy}><i className="bi bi-arrow-clockwise" /> Refresh</button>
-                    <button className="hfd-btn hfd-btn-primary" onClick={openBuilder}><i className="bi bi-plus-lg" /> New Rule Set</button>
+                <div className="f360-rules-clean-actions">
+                    <button className="f360-rules-secondary-btn" onClick={loadAll} disabled={loading || busy}><i className="bi bi-arrow-clockwise" /> Refresh</button>
+                    <button className="f360-rules-primary-btn" onClick={openBuilder} disabled={busy}><i className="bi bi-plus-lg" /> Create rule set</button>
                 </div>
-            </div>
+            </header>
 
             {(error || success) && (
-                <div className="hfdq-message-stack">
+                <div className="f360-rules-message-stack f360-rules-clean-toast-stack">
                     {error && <RuleToast tone="error" message={error} onClose={() => setError('')} />}
                     {success && <RuleToast tone="success" message={success} onClose={() => setSuccess('')} />}
                 </div>
             )}
 
-            <div className="hfdq-stats-grid">
-                <RuleMetric label="Rule Sets" value={stats.ruleSets} note="Saved groups" tone="blue" />
-                <RuleMetric label="Active Rules" value={stats.activeRules} note="Used by preview" tone="purple" />
-                <RuleMetric label="Covered Cells" value={stats.coveredCombos} note="Level + relationship" tone="green" />
-                <RuleMetric label="Conflicts" value={stats.conflicts} note={stats.conflicts ? 'Needs review' : 'No conflicts'} tone="orange" />
-            </div>
-
             {conflictIds.size > 0 && (
-                <div className="hfd-alert hfd-alert-warning">
+                <div className="hfd-alert hfd-alert-warning f360-rules-clean-alert">
                     <i className="bi bi-exclamation-triangle" />
-                    Some active Rule Sets overlap the same evaluator role, level range, and exact department/position scope. Edit or disable the overlapping Rule Set instead of creating another active set for the same scope.
+                    Some active rule sets overlap the same relationship, level range, and exact department/position scope.
                 </div>
             )}
 
-            <section className="hfdq-rule-workspace">
-                <div className="hfdq-rule-toolbar">
-                    <input className="hfd-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search rule sets by question, competency, role, or scope..." />
-                    <select className="hfd-input" value={roleFilter} onChange={e => setRoleFilter(e.target.value as 'ALL' | RuleRole)}>
-                        <option value="ALL">All roles</option>
-                        {EVALUATOR_ROLE_OPTIONS.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
-                    </select>
-                    <select className="hfd-input" value={levelFilter} onChange={e => setLevelFilter(e.target.value)}>
-                        <option value="ALL">All levels</option>
-                        {LEVEL_OPTIONS.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
-                    </select>
-                    <select className="hfd-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusFilter)}>
-                        <option value="ALL">All statuses</option>
-                        <option value="ACTIVE">Active</option>
-                        <option value="DRAFT">Draft</option>
-                        <option value="DISABLED">Disabled</option>
-                        <option value="ARCHIVED">Archived</option>
-                    </select>
-                    <button className="hfd-btn hfd-btn-secondary" onClick={clearFilters}>Clear</button>
-                </div>
-
-                <div className="hfdq-rule-layout hfdq-rule-layout-normal">
-                    <div className="hfdq-rule-main">
-                        <div className="hfdq-rule-section-head">
-                            <div>
-                                <span>Rule Sets</span>
-                                <strong>{filteredGroups.length} groups</strong>
-                            </div>
-                            <small>Rule Sets define which rating questions appear for each evaluator relationship and target employee group.</small>
-                        </div>
-
-                        {loading ? (
-                            <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading question rules...</div>
-                        ) : filteredGroups.length === 0 ? (
-                            <div className="hfdq-empty-state">No rule sets found. Create a rule set to begin coverage.</div>
-                        ) : (
-                            <div className="hfdq-rule-set-list">
-                                {filteredGroups.map(group => {
-                                    const primaryQuestions = group.questions.slice(0, 4);
-                                    return (
-                                        <article key={group.key} className={`hfdq-rule-set-card ${group.active ? 'active' : 'inactive'} ${group.ruleSetStatus.toLowerCase()}`}>
-                                            <div className="hfdq-rule-set-top">
-                                                <div>
-                                                    <h3>{group.ruleSetName || formatRuleSetTitle(group, getDepartmentName, getPositionName)}</h3>
-                                                    <p>{formatRuleSetTitle(group, getDepartmentName, getPositionName)}</p>
-                                                    {group.ruleSetDescription && <small className="hfdq-rule-purpose">{group.ruleSetDescription}</small>}
-                                                    <small className="hfdq-rule-debug"><b>{ruleSetTypeLabel(group.ruleSetType)}</b> · {group.questionIds.length} final question{group.questionIds.length === 1 ? '' : 's'} · {group.roles.length} evaluator role{group.roles.length === 1 ? '' : 's'} · {group.rules.length} generated row{group.rules.length === 1 ? '' : 's'}</small>
-                                                </div>
-                                                <span className={`hfdq-status-pill ${group.ruleSetStatus.toLowerCase()}`}>{ruleSetStatusLabel(group.ruleSetStatus)}</span>
-                                            </div>
-                                            <div className="hfdq-rule-role-row">
-                                                {EVALUATOR_ROLE_OPTIONS.map(role => (
-                                                    <span key={role.value} className={group.roles.includes(role.value) ? 'selected' : ''}>{role.label}</span>
-                                                ))}
-                                            </div>
-                                            <div className="hfdq-rule-question-list">
-                                                {primaryQuestions.map(question => (
-                                                    <span key={question.questionBankId}>{questionLabel(question)}</span>
-                                                ))}
-                                                {group.questions.length > primaryQuestions.length && <em>+{group.questions.length - primaryQuestions.length} more</em>}
-                                            </div>
-                                            {expandedRuleSetKeys.has(group.key) && (
-                                                <div className="hfdq-rule-set-details">
-                                                    <div>
-                                                        <strong>Competency questions</strong>
-                                                        {group.questions.map(question => <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>)}
-                                                    </div>
-                                                    <div>
-                                                        <strong>Trace</strong>
-                                                        <span>{group.rules.length} generated row{group.rules.length === 1 ? '' : 's'} · {group.active ? 'used in preview' : `ignored while ${ruleSetStatusLabel(group.ruleSetStatus).toLowerCase()}`}</span>
-                                                        <span>{ruleScopeSpecificityLabel(group.rules[0])} scope · {formatRuleSetTitle(group, getDepartmentName, getPositionName)}</span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <div className="hfdq-rule-set-footer">
-                                                {group.conflictCount > 0 ? <span className="hfdq-warning-chip"><i className="bi bi-exclamation-triangle" /> {group.conflictCount} overlaps</span> : <span className="hfdq-muted-chip">No conflicts</span>}
-                                                <div>
-                                                    <button className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={() => toggleRuleSetExpanded(group.key)} disabled={busy}>{expandedRuleSetKeys.has(group.key) ? 'Hide details' : 'Details'}</button>
-                                                    <button className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={() => editRuleSet(group)} disabled={busy}>Edit</button>
-                                                    <button className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={() => duplicateRuleSet(group)} disabled={busy}>Duplicate</button>
-                                                    {group.ruleSetStatus === 'ARCHIVED' ? (
-                                                        <button className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={() => changeRuleSetStatus(group, 'DRAFT')} disabled={busy}>Restore Draft</button>
-                                                    ) : group.active ? (
-                                                        <button className="hfd-btn hfd-btn-danger hfd-btn-sm" onClick={() => setRuleSetActive(group, false)} disabled={busy}>Disable</button>
-                                                    ) : (
-                                                        <button className="hfd-btn hfd-btn-primary hfd-btn-sm" onClick={() => setRuleSetActive(group, true)} disabled={busy}>Activate</button>
-                                                    )}
-                                                    {group.ruleSetStatus !== 'ARCHIVED' && (
-                                                        <button className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={() => changeRuleSetStatus(group, 'ARCHIVED')} disabled={busy}>Archive</button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </article>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <aside className="hfdq-coverage-card">
-                        <div className="hfdq-rule-section-head compact hfdq-matrix-headbar">
-                            <div>
-                                <span>Coverage Matrix</span>
-                                <strong>Questions by level and relationship</strong>
-                            </div>
-                        </div>
-                        {visibleMatrixHealthItems.length > 0 && (
-                            <div className="hfdq-matrix-health-strip" aria-label="Rule health summary">
-                                {visibleMatrixHealthItems.map(item => (
-                                    <span key={item.title} className={item.tone} title={item.message}>
-                                        <i className={item.icon} />
-                                        <b>{item.value}</b>
-                                        {item.title}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        <div className="hfdq-matrix-scope-filters">
-                            <select className="hfd-input" value={matrixDepartmentId} onChange={e => { setMatrixDepartmentId(e.target.value ? Number(e.target.value) : ''); setMatrixPositionId(''); }}>
-                                <option value="">General departments</option>
-                                {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
-                            </select>
-                            <select className="hfd-input" value={matrixPositionId} onChange={e => setMatrixPositionId(e.target.value ? Number(e.target.value) : '')}>
-                                <option value="">General positions</option>
-                                {matrixPositions.map(position => <option key={position.id} value={position.id}>{position.positionTitle}</option>)}
-                            </select>
-                        </div>
-                        <div className="hfdq-coverage-legend" aria-label="Coverage legend">
-                            <span><b className="missing">0</b> Missing</span>
-                            <span><b className="low">1–4</b> Low</span>
-                            <span><b className="covered">5+</b> Covered</span>
-                        </div>
-                        <div className="hfdq-coverage-table">
-                            <div className="hfdq-coverage-head">
-                                <span>Level</span>
-                                {EVALUATOR_ROLE_OPTIONS.map(role => <span key={role.value}>{role.short}</span>)}
-                            </div>
-                            {coverageMatrix.map(row => (
-                                <div key={row.level.code} className="hfdq-coverage-row">
-                                    <span>{row.level.code}</span>
-                                    {row.cells.map(cell => {
-                                        const selected = matrixSelection?.levelRank === row.level.rank && matrixSelection?.role === cell.role;
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={cell.role}
-                                                className={`${cell.count === 0 ? 'empty' : cell.count < 5 ? 'low' : 'covered'} ${selected ? 'selected' : ''}`}
-                                                onClick={() => setMatrixSelection({ levelRank: row.level.rank, levelCode: row.level.code, role: cell.role })}
-                                                title={`View coverage trace for ${row.level.code} ${getRoleLabel(cell.role)}`}
-                                            >
-                                                {cell.count}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ))}
-                        </div>
-                        <small className="hfdq-matrix-help compact">Click any cell for a floating trace. Use scope filters to test department or position-specific coverage.</small>
-                        {selectedMatrixCell && (
-                            <div className={`hfdq-matrix-popover ${selectedMatrixCell.cell.count === 0 ? 'empty' : 'filled'}`} role="dialog" aria-label="Coverage trace">
-                                <button type="button" className="hfdq-matrix-popover-close" onClick={() => setMatrixSelection(null)} aria-label="Close coverage trace"><i className="bi bi-x-lg" /></button>
-                                <div className="hfdq-matrix-popover-head">
-                                    <span>{selectedMatrixCell.level.code}</span>
-                                    <strong>{getRoleLabel(selectedMatrixCell.cell.role)}</strong>
-                                    <em>{selectedMatrixCell.cell.count} final unique question{selectedMatrixCell.cell.count === 1 ? '' : 's'} · {matrixScopeLabel}</em>
-                                </div>
-                                {selectedMatrixCell.cell.count === 0 ? (
-                                    <div className="hfdq-matrix-popover-empty">
-                                        <i className="bi bi-exclamation-octagon" />
-                                        <p>No active questions cover this level, evaluator role, and selected scope. Create or activate a matching Rule Set.</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {selectedMatrixCell.cell.duplicatesIgnored > 0 && (
-                                            <div className="hfdq-matrix-dedupe-note">
-                                                {selectedMatrixCell.cell.rawCount} matching generated rows were resolved into {selectedMatrixCell.cell.count} final unique questions.
-                                            </div>
-                                        )}
-                                        <ul>
-                                            {selectedMatrixCell.cell.matchedRules.map(rule => {
-                                                const group = rule.ruleSetId != null ? ruleSetById.get(rule.ruleSetId) : undefined;
-                                                return (
-                                                    <li key={rule.id}>
-                                                        <b>{rule.questionCode || `Q-${rule.questionBankId}`}</b>
-                                                        <span>{rule.questionText || 'Untitled question'}</span>
-                                                        <em>{group?.ruleSetName || (group ? formatRuleSetTitle(group, getDepartmentName, getPositionName) : `${formatGroupLevelRange(rule)} · ${ruleScopeSpecificityLabel(rule)}`)} · {ruleScopeSpecificityLabel(rule)} · {getRoleLabel(rule.evaluatorRelationshipType as RuleRole)}</em>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </aside>
-                </div>
+            <section className="f360-rules-clean-toolbar" aria-label="Rule set filters">
+                <label className="f360-rules-clean-search">
+                    <i className="bi bi-search" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search rule sets, questions, competency, relationship, or scope" />
+                </label>
+                <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as 'ALL' | RuleRole)} aria-label="Filter by evaluator relationship">
+                    <option value="ALL">All relationships</option>
+                    {EVALUATOR_ROLE_OPTIONS.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
+                </select>
+                <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} aria-label="Filter by employee level">
+                    <option value="ALL">All levels</option>
+                    {levelOptions.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
+                </select>
+                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusFilter)} aria-label="Filter by status">
+                    <option value="ALL">All statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="DISABLED">Disabled</option>
+                    <option value="ARCHIVED">Archived</option>
+                </select>
+                <button className="f360-rules-text-btn" onClick={clearFilters}>Clear</button>
             </section>
 
-            {builderOpen && (
-                <div className="hfdq-modal-shell" role="dialog" aria-modal="true">
-                    <button className="hfdq-modal-backdrop" aria-label="Close rule set builder" onClick={closeBuilder} />
-                    <div className="hfdq-modal hfdq-rule-builder-modal">
-                        <div className="hfdq-modal-head">
+            <div className="f360-rules-specificity-note">
+                <i className="bi bi-info-circle" /> More specific rules take priority when an employee matches multiple scopes: position rules override department rules, and department rules override general rules.
+            </div>
+
+            <section className="f360-rules-clean-workspace">
+                <div className="f360-rules-rule-list-panel">
+                    <div className="f360-rules-clean-section-head">
+                        <div>
+                            <h3>Rule sets</h3>
+                            <p>{filteredGroups.length} result{filteredGroups.length === 1 ? '' : 's'}</p>
+                        </div>
+                        <button className="f360-rules-primary-btn compact" onClick={openBuilder} disabled={busy}><i className="bi bi-plus-lg" /> Create rule set</button>
+                    </div>
+
+                    {loading ? (
+                        <div className="hfd-spinner f360-rules-clean-loading"><i className="bi bi-arrow-repeat" /> Loading rule sets...</div>
+                    ) : filteredGroups.length === 0 ? (
+                        <div className="f360-rules-empty-state f360-rules-clean-empty">No rule sets found. Create a rule set to begin coverage.</div>
+                    ) : (
+                        <div className="f360-rules-rule-list-clean">
+                            {filteredGroups.map(group => {
+                                const primaryQuestions = group.questions.slice(0, 3);
+                                const isExpanded = expandedRuleSetKeys.has(group.key);
+                                return (
+                                    <article key={group.key} className={`f360-rules-rule-card-clean ${group.ruleSetStatus.toLowerCase()} ${group.active ? 'active' : 'inactive'}`}>
+                                        <div className="f360-rules-rule-card-head">
+                                            <div>
+                                                <h4>{group.ruleSetName || formatRuleSetTitle(group, getDepartmentName, getPositionName, levelOptions)}</h4>
+                                                <p>{group.ruleSetDescription || scopeLabel(group, getDepartmentName, getPositionName)}</p>
+                                            </div>
+                                            <span className={`f360-rules-status-pill ${group.ruleSetStatus.toLowerCase()}`}>{ruleSetStatusLabel(group.ruleSetStatus)}</span>
+                                        </div>
+
+                                        <div className="f360-rules-rule-card-meta">
+                                            <span>{ruleSetTypeLabel(group.ruleSetType)}</span>
+                                            <span>{formatGroupLevelRange(group, levelOptions)}</span>
+                                            <span>{scopeLabel(group, getDepartmentName, getPositionName)}</span>
+                                            <span>{group.questionIds.length} question{group.questionIds.length === 1 ? '' : 's'}</span>
+                                        </div>
+
+                                        <div className="f360-rules-role-chip-row">
+                                            {group.roles.map(role => <span key={role}>{getRoleLabel(role)}</span>)}
+                                        </div>
+
+                                        <div className="f360-rules-question-preview-list">
+                                            {primaryQuestions.length === 0 ? <em>No active questions in this set.</em> : primaryQuestions.map(question => (
+                                                <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>
+                                            ))}
+                                            {group.questions.length > primaryQuestions.length && <em>+{group.questions.length - primaryQuestions.length} more</em>}
+                                        </div>
+
+                                        {isExpanded && (
+                                            <div className="f360-rules-rule-detail-clean">
+                                                <div>
+                                                    <strong>Questions</strong>
+                                                    {group.questions.map(question => <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>)}
+                                                </div>
+                                                <div>
+                                                    <strong>Resolver trace</strong>
+                                                    <span>{group.rules.length} generated row{group.rules.length === 1 ? '' : 's'} · {group.active ? 'used in preview' : `ignored while ${ruleSetStatusLabel(group.ruleSetStatus).toLowerCase()}`}</span>
+                                                    <span>{ruleScopeSpecificityLabel(group.rules[0])} scope</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <footer className="f360-rules-rule-card-actions">
+                                            {group.conflictCount > 0 ? <span className="f360-rules-warning-chip"><i className="bi bi-exclamation-triangle" /> {group.conflictCount} overlaps</span> : <span className="f360-rules-muted-chip">No conflicts</span>}
+                                            <div>
+                                                <button className="f360-rules-row-action" onClick={() => toggleRuleSetExpanded(group.key)} disabled={busy}>{isExpanded ? 'Hide' : 'Details'}</button>
+                                                <button className="f360-rules-row-action primary" onClick={() => editRuleSet(group)} disabled={busy}>Edit</button>
+                                                <button className="f360-rules-row-action" onClick={() => duplicateRuleSet(group)} disabled={busy}>Duplicate</button>
+                                                {group.ruleSetStatus === 'ARCHIVED' ? (
+                                                    <button className="f360-rules-row-action" onClick={() => changeRuleSetStatus(group, 'DRAFT')} disabled={busy}>Restore</button>
+                                                ) : group.active ? (
+                                                    <button className="f360-rules-row-action danger" onClick={() => setRuleSetActive(group, false)} disabled={busy}>Disable</button>
+                                                ) : (
+                                                    <button className="f360-rules-row-action primary" onClick={() => setRuleSetActive(group, true)} disabled={busy}>Activate</button>
+                                                )}
+                                                {group.ruleSetStatus !== 'ARCHIVED' && (
+                                                    <button className="f360-rules-row-action" onClick={() => changeRuleSetStatus(group, 'ARCHIVED')} disabled={busy}>Archive</button>
+                                                )}
+                                            </div>
+                                        </footer>
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <aside className="f360-rules-coverage-summary-card">
+                    <div className="f360-rules-clean-section-head compact">
+                        <div>
+                            <h3>Coverage check</h3>
+                            <p>{matrixScopeLabel}</p>
+                        </div>
+                    </div>
+                    <div className="f360-rules-coverage-summary-grid">
+                        <span><strong>{stats.coveredCombos}</strong><em>covered</em></span>
+                        <span><strong>{healthItems.find(item => item.title === 'Missing coverage')?.value ?? 0}</strong><em>missing</em></span>
+                        <span><strong>{healthItems.find(item => item.title === 'Low coverage')?.value ?? 0}</strong><em>low</em></span>
+                    </div>
+                    {visibleMatrixHealthItems.length > 0 ? (
+                        <div className="f360-rules-health-clean compact" aria-label="Rule health summary">
+                            {visibleMatrixHealthItems.map(item => (
+                                <span key={item.title} className={item.tone} title={item.message}>
+                                    <i className={item.icon} />
+                                    <b>{item.value}</b>
+                                    {item.title}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="f360-rules-coverage-summary-note">All dynamic level and relationship combinations have active questions for the selected scope.</p>
+                    )}
+                    <button type="button" className="f360-rules-primary-btn compact" onClick={() => setCoverageOpen(true)}>
+                        Open coverage check
+                    </button>
+                </aside>
+            </section>
+
+            {coverageOpen && (
+                <div className="f360-rules-coverage-drawer-shell" role="dialog" aria-modal="true" aria-label="Coverage check">
+                    <button type="button" className="f360-rules-modal-backdrop" aria-label="Close coverage check" onClick={() => setCoverageOpen(false)} />
+                    <section className="f360-rules-coverage-drawer">
+                        <header className="f360-rules-coverage-drawer-head">
                             <div>
-                                <p>Rule Set Builder</p>
-                                <h3>{editingGroup ? 'Edit Question Rule Set' : 'Create Question Rule Set'}</h3>
+                                <h3>Coverage check</h3>
+                                <p>Review active questions by dynamic position level and evaluator relationship.</p>
                             </div>
-                            <button className="hfdq-icon-button" onClick={closeBuilder} disabled={busy} aria-label="Close"><i className="bi bi-x-lg" /></button>
+                            <button type="button" className="f360-rules-icon-button" onClick={() => setCoverageOpen(false)} aria-label="Close coverage check">
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </header>
+
+                        <div className="f360-rules-coverage-drawer-body">
+                            <div className="f360-rules-coverage-main">
+                                <div className="f360-rules-matrix-scope-clean drawer">
+                                    <select className="hfd-input" value={matrixDepartmentId} onChange={e => { setMatrixDepartmentId(e.target.value ? Number(e.target.value) : ''); setMatrixPositionId(''); setMatrixSelection(null); }}>
+                                        <option value="">All departments</option>
+                                        {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                                    </select>
+                                    <select className="hfd-input" value={matrixPositionId} onChange={e => { setMatrixPositionId(e.target.value ? Number(e.target.value) : ''); setMatrixSelection(null); }}>
+                                        <option value="">All positions</option>
+                                        {matrixPositions.map(position => <option key={position.id} value={position.id}>{position.positionTitle} · {position.levelCode}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="f360-rules-coverage-table-clean drawer">
+                                    <div className="f360-rules-coverage-head-clean">
+                                        <span>Level</span>
+                                        {EVALUATOR_ROLE_OPTIONS.map(role => <span key={role.value}>{role.label}</span>)}
+                                    </div>
+                                    {coverageMatrix.map(row => (
+                                        <div key={row.level.code} className="f360-rules-coverage-row-clean">
+                                            <span title={row.level.label}>{row.level.code}</span>
+                                            {row.cells.map(cell => {
+                                                const selected = matrixSelection?.levelRank === row.level.rank && matrixSelection?.role === cell.role;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={cell.role}
+                                                        className={`${cell.count === 0 ? 'empty' : cell.count < 5 ? 'low' : 'covered'} ${selected ? 'selected' : ''}`}
+                                                        onClick={() => setMatrixSelection({ levelRank: row.level.rank, levelCode: row.level.code, role: cell.role })}
+                                                        title={`View ${row.level.code} ${getRoleLabel(cell.role)} coverage`}
+                                                    >
+                                                        {cell.count}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="f360-rules-coverage-legend-clean">
+                                    <span><b className="missing">0</b> Missing</span>
+                                    <span><b className="low">1–4</b> Low</span>
+                                    <span><b className="covered">5+</b> Covered</span>
+                                </div>
+                            </div>
+
+                            <aside className="f360-rules-coverage-detail-panel">
+                                {selectedMatrixCell ? (
+                                    <>
+                                        <span className="f360-rules-detail-kicker">Selected cell</span>
+                                        <h4>{selectedMatrixCell.level.code} · {getRoleLabel(selectedMatrixCell.cell.role)}</h4>
+                                        <strong>{selectedMatrixCell.cell.count} effective question{selectedMatrixCell.cell.count === 1 ? '' : 's'}</strong>
+                                        <p>{matrixScopeLabel}</p>
+                                        {selectedMatrixCell.cell.count === 0 ? (
+                                            <div className="f360-rules-detail-empty">No active questions cover this level, evaluator relationship, and selected scope.</div>
+                                        ) : (
+                                            <ul>
+                                                {selectedMatrixCell.cell.matchedRules.map(rule => {
+                                                    const group = rule.ruleSetId != null ? ruleSetById.get(rule.ruleSetId) : undefined;
+                                                    return (
+                                                        <li key={rule.id}>
+                                                            <b>{rule.questionCode || `Q-${rule.questionBankId}`}</b>
+                                                            <span>{rule.questionText || 'Untitled question'}</span>
+                                                            <em>{group?.ruleSetName || (group ? formatRuleSetTitle(group, getDepartmentName, getPositionName, levelOptions) : `${formatGroupLevelRange(rule, levelOptions)} · ${ruleScopeSpecificityLabel(rule)}`)}</em>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="f360-rules-detail-empty">
+                                        <i className="bi bi-cursor" />
+                                        <strong>Select a coverage cell</strong>
+                                        <span>Click any level and relationship cell to see the effective questions and applied Rule Sets.</span>
+                                    </div>
+                                )}
+                            </aside>
+                        </div>
+                    </section>
+                </div>
+            )}
+
+            {builderOpen && (
+                <div className="f360-rules-modal-shell f360-rules-clean-modal-shell" role="dialog" aria-modal="true">
+                    <button className="f360-rules-modal-backdrop" aria-label="Close rule set builder" onClick={closeBuilder} />
+                    <div className="f360-rules-modal f360-rules-rule-builder-modal f360-rules-clean-rule-builder-modal">
+                        <div className="f360-rules-modal-head f360-rules-clean-modal-head">
+                            <div>
+                                <h3>{editingGroup ? 'Edit rule set' : 'Create rule set'}</h3>
+                                <p>Choose scope, evaluator relationships, and active questions.</p>
+                            </div>
+                            <button className="f360-rules-icon-button" onClick={closeBuilder} disabled={busy} aria-label="Close"><i className="bi bi-x-lg" /></button>
                         </div>
                         {error && (
-                            <div className="hfdq-modal-message error">
+                            <div className="f360-rules-modal-message error">
                                 <i className={buildRuleMessage('error', error).icon} />
                                 <div>
                                     <strong>{buildRuleMessage('error', error).title}</strong>
@@ -1202,46 +1358,46 @@ export default function QuestionRulesTab() {
                                 </div>
                             </div>
                         )}
-                        <div className="hfdq-rule-builder-body">
-                            <div className="hfdq-builder-setup-column">
-                                <section className="hfdq-builder-panel hfdq-rule-identity-panel">
-                                    <h4>1. Rule Set identity</h4>
+                        <div className="f360-rules-rule-builder-body f360-rules-clean-builder-body">
+                            <div className="f360-rules-builder-setup-column f360-rules-clean-builder-column">
+                                <section className="f360-rules-builder-panel">
+                                    <h4>Details</h4>
                                     <label className="hfd-field">
                                         <span className="hfd-label">Rule Set name</span>
                                         <input
                                             className="hfd-input"
                                             value={form.ruleSetName}
                                             onChange={e => patchForm({ ruleSetName: e.target.value })}
-                                            placeholder={buildSuggestedRuleSetName(form)}
+                                            placeholder={buildSuggestedRuleSetName(form, levelOptions)}
                                             maxLength={180}
                                         />
-                                        <small>Use a clear name like “Senior Staff Core 360 Questions”. If blank, the suggested name is used.</small>
                                     </label>
                                     <label className="hfd-field">
-                                        <span className="hfd-label">Purpose / notes</span>
+                                        <span className="hfd-label">Notes <em>optional</em></span>
                                         <textarea
                                             className="hfd-input"
                                             value={form.ruleSetDescription}
                                             onChange={e => patchForm({ ruleSetDescription: e.target.value })}
-                                            placeholder="Optional note for HR, for example why this Rule Set exists."
+                                            placeholder="Internal note for HR"
                                             maxLength={500}
                                             rows={2}
                                         />
                                     </label>
                                 </section>
-                                <section className="hfdq-builder-panel">
-                                    <h4>2. Target scope</h4>
+
+                                <section className="f360-rules-builder-panel">
+                                    <h4>Scope</h4>
                                     <div className="hfd-grid-2">
                                         <label className="hfd-field">
-                                            <span className="hfd-label">Levels from</span>
-                                            <select className="hfd-input" value={form.targetLevelMinRank} onChange={e => patchForm({ targetLevelMinRank: Number(e.target.value) })}>
-                                                {LEVEL_OPTIONS.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
+                                            <span className="hfd-label">From level</span>
+                                            <select className="hfd-input" value={form.targetLevelMinRank} onChange={e => { const nextMin = Number(e.target.value); patchForm({ targetLevelMinRank: nextMin, targetLevelMaxRank: Math.max(nextMin, form.targetLevelMaxRank) }); }}>
+                                                {levelOptions.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
                                             </select>
                                         </label>
                                         <label className="hfd-field">
-                                            <span className="hfd-label">To</span>
-                                            <select className="hfd-input" value={form.targetLevelMaxRank} onChange={e => patchForm({ targetLevelMaxRank: Number(e.target.value) })}>
-                                                {LEVEL_OPTIONS.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
+                                            <span className="hfd-label">To level</span>
+                                            <select className="hfd-input" value={form.targetLevelMaxRank} onChange={e => { const nextMax = Number(e.target.value); patchForm({ targetLevelMaxRank: nextMax, targetLevelMinRank: Math.min(form.targetLevelMinRank, nextMax) }); }}>
+                                                {levelOptions.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
                                             </select>
                                         </label>
                                     </div>
@@ -1257,85 +1413,88 @@ export default function QuestionRulesTab() {
                                             <span className="hfd-label">Position</span>
                                             <select className="hfd-input" value={form.targetPositionId} onChange={e => patchForm({ targetPositionId: e.target.value ? Number(e.target.value) : '' })}>
                                                 <option value="">All positions</option>
-                                                {builderPositions.map(position => <option key={position.id} value={position.id}>{position.positionTitle}</option>)}
+                                                {builderPositions.map(position => <option key={position.id} value={position.id}>{position.positionTitle} · {position.levelCode}</option>)}
                                             </select>
                                         </label>
                                     </div>
+                                    <small className="f360-rules-inline-help">Leave department and position empty for a general rule set.</small>
                                 </section>
 
-                                <section className="hfdq-builder-panel">
-                                    <h4>3. Evaluator roles</h4>
-                                    <button type="button" className="hfdq-select-all" onClick={selectAllRoles}>{form.evaluatorRoles.length === EVALUATOR_ROLE_OPTIONS.length ? 'Clear all roles' : 'All Roles'}</button>
-                                    <div className="hfdq-role-panel compact">
+                                <section className="f360-rules-builder-panel f360-rules-builder-relationship-panel">
+                                    <div className="f360-rules-builder-panel-headline">
+                                        <h4>Evaluator relationships</h4>
+                                        <button type="button" className="f360-rules-text-btn" onClick={selectAllRoles}>{form.evaluatorRoles.length === EVALUATOR_ROLE_OPTIONS.length ? 'Clear all' : 'Select all'}</button>
+                                    </div>
+                                    <div className="f360-rules-role-panel prominent">
                                         {EVALUATOR_ROLE_OPTIONS.map(option => (
-                                            <label key={option.value} className="hfdq-role-check" title={option.help}>
+                                            <label key={option.value} className="f360-rules-role-check" title={option.help}>
                                                 <input type="checkbox" checked={form.evaluatorRoles.includes(option.value)} onChange={() => toggleRole(option.value)} />
                                                 <span>{option.label}</span>
+                                                <small>{option.help}</small>
                                             </label>
                                         ))}
                                     </div>
                                 </section>
 
-                                <section className="hfdq-builder-panel hfdq-builder-review-panel">
-                                    <h4>4. Review before saving</h4>
-                                    <div className="hfdq-builder-review-grid">
-                                        <span>Level range</span><strong>L{String(form.targetLevelMinRank).padStart(2, '0')}–L{String(form.targetLevelMaxRank).padStart(2, '0')}</strong>
+                                <section className="f360-rules-builder-panel f360-rules-builder-review-panel">
+                                    <h4>Review</h4>
+                                    <div className="f360-rules-builder-review-grid">
+                                        <span>Levels</span><strong>{getLevelRangeLabel(form.targetLevelMinRank, form.targetLevelMaxRank, levelOptions)}</strong>
                                         <span>Scope</span><strong>{form.targetPositionId ? getPositionName(Number(form.targetPositionId)) : form.targetDepartmentId ? getDepartmentName(Number(form.targetDepartmentId)) : 'All departments / positions'}</strong>
-                                        <span>Roles</span><strong>{form.evaluatorRoles.length || 0}</strong>
+                                        <span>Relationships</span><strong>{form.evaluatorRoles.length || 0}</strong>
                                         <span>Questions</span><strong>{form.questionBankIds.length}</strong>
                                     </div>
-                                    <label className="hfd-field hfdq-status-field">
+                                    <label className="hfd-field f360-rules-status-field">
                                         <span className="hfd-label">Status</span>
                                         <select className="hfd-input" value={form.ruleSetStatus} onChange={e => patchForm({ ruleSetStatus: e.target.value as RuleSetStatus })}>
-                                            <option value="DRAFT">Draft — save but do not use yet</option>
-                                            <option value="ACTIVE">Active — use in coverage, preview, and campaigns</option>
-                                            <option value="DISABLED">Disabled — keep but ignore</option>
-                                            <option value="ARCHIVED">Archived — hide from normal workflow</option>
+                                            <option value="DRAFT">Draft</option>
+                                            <option value="ACTIVE">Active</option>
+                                            <option value="DISABLED">Disabled</option>
+                                            <option value="ARCHIVED">Archived</option>
                                         </select>
                                     </label>
-                                    <span className="hfdq-rule-type-preview">{ruleSetTypeLabel(inferRuleSetType(formDepartmentId, formPositionId))}</span>
+                                    <span className="f360-rules-rule-type-preview">{ruleSetTypeLabel(inferRuleSetType(formDepartmentId, formPositionId))}</span>
                                     {activeScopeOverlapGroup && form.ruleSetStatus === 'ACTIVE' && (
-                                        <small className="hfdq-builder-warning">Active overlap: {activeScopeOverlapGroup.ruleSetName || formatGroupLevelRange(activeScopeOverlapGroup)} already covers this exact scope and selected role.</small>
+                                        <small className="f360-rules-builder-warning">{activeScopeOverlapMessage}</small>
                                     )}
                                     {selectedInheritedQuestions.length > 0 && (
-                                        <small className="hfdq-builder-warning">{selectedInheritedQuestions.length} selected question(s) are already inherited from broader active Rule Sets. Remove them before saving.</small>
+                                        <small className="f360-rules-builder-warning">{selectedInheritedQuestions.length} selected question(s) are already inherited from broader active rule sets.</small>
                                     )}
-                                    <small>Active Rule Sets are used by Coverage Matrix, Dynamic Preview, and Campaign question resolution.</small>
                                 </section>
                             </div>
 
-                            <section className="hfdq-builder-panel hfdq-question-picker">
-                                <div className="hfdq-picker-title-row">
+                            <section className="f360-rules-builder-panel f360-rules-question-picker f360-rules-clean-question-picker">
+                                <div className="f360-rules-picker-title-row">
                                     <div>
-                                        <h4>5. Select questions</h4>
-                                        <p>Choose active Question Bank items. Campaigns will snapshot the exact active versions later.</p>
+                                        <h4>Questions</h4>
+                                        <p>Only active Question Bank items are selectable.</p>
                                     </div>
                                     <span>{form.questionBankIds.length} selected</span>
                                 </div>
-                                <div className="hfdq-question-picker-tools">
+                                <div className="f360-rules-question-picker-tools">
                                     <input
                                         className="hfd-input"
                                         value={builderQuestionSearch}
                                         onChange={e => setBuilderQuestionSearch(e.target.value)}
-                                        placeholder="Search questions, code, or competency..."
+                                        placeholder="Search questions, code, or competency"
                                     />
                                     <select className="hfd-input" value={builderCompetencyFilter} onChange={e => setBuilderCompetencyFilter(e.target.value)}>
                                         <option value="ALL">All competencies</option>
                                         {competencyBuckets.map(([competencyCode]) => <option key={competencyCode} value={competencyCode}>{getCompetencyLabel(competencyCode)}</option>)}
                                     </select>
-                                    <button type="button" className="hfd-btn hfd-btn-secondary hfd-btn-sm" onClick={clearSelectedQuestions} disabled={form.questionBankIds.length === 0}>Clear</button>
+                                    <button type="button" className="f360-rules-row-action" onClick={clearSelectedQuestions} disabled={form.questionBankIds.length === 0}>Clear</button>
                                 </div>
                                 {selectedQuestions.length > 0 && (
-                                    <div className="hfdq-selected-strip">
+                                    <div className="f360-rules-selected-strip">
                                         {selectedQuestions.slice(0, 4).map(question => <span key={question.id}>{question.questionCode || `Q-${question.id}`}</span>)}
                                         {selectedQuestions.length > 4 && <em>+{selectedQuestions.length - 4} more</em>}
                                     </div>
                                 )}
-                                <div className="hfdq-question-picker-scroll">
+                                <div className="f360-rules-question-picker-scroll">
                                     {filteredCompetencyBuckets.length === 0 ? (
-                                        <div className="hfdq-question-picker-empty">No active questions match the current search/filter.</div>
+                                        <div className="f360-rules-question-picker-empty">No active questions match the current search/filter.</div>
                                     ) : filteredCompetencyBuckets.map(([competencyCode, bucket]) => (
-                                        <div key={competencyCode} className="hfdq-question-bucket">
+                                        <div key={competencyCode} className="f360-rules-question-bucket">
                                             <div>
                                                 <strong>{getCompetencyLabel(competencyCode)} <em>{bucket.length}</em></strong>
                                                 <button type="button" onClick={() => selectQuestionsByCompetency(competencyCode)}>Select all</button>
@@ -1352,7 +1511,7 @@ export default function QuestionRulesTab() {
                                                             disabled={disabled}
                                                             onChange={() => toggleQuestion(question.id)}
                                                         />
-                                                        <span className="hfdq-question-option-text"><b>{question.questionCode}</b><em>{question.questionText}</em>{inheritedReason && <small>{inheritedReason}</small>}</span>
+                                                        <span className="f360-rules-question-option-text"><b>{question.questionCode}</b><em>{question.questionText}</em>{inheritedReason && <small>{inheritedReason}</small>}</span>
                                                     </label>
                                                 );
                                             })}
@@ -1361,16 +1520,17 @@ export default function QuestionRulesTab() {
                                 </div>
                             </section>
                         </div>
-                        <div className="hfdq-modal-actions">
-                            <div className="hfdq-builder-summary">
-                                {editingGroup ? 'Editing existing rule set · ' : ''}{form.questionBankIds.length} question{form.questionBankIds.length === 1 ? '' : 's'} · {form.evaluatorRoles.length} role{form.evaluatorRoles.length === 1 ? '' : 's'} selected · {ruleSetStatusLabel(form.ruleSetStatus)}
+                        <div className="f360-rules-modal-actions f360-rules-clean-modal-actions">
+                            <div className="f360-rules-builder-summary">
+                                {editingGroup ? 'Editing existing rule set · ' : ''}{form.questionBankIds.length} question{form.questionBankIds.length === 1 ? '' : 's'} · {form.evaluatorRoles.length} relationship{form.evaluatorRoles.length === 1 ? '' : 's'} · {ruleSetStatusLabel(form.ruleSetStatus)}
                             </div>
                             <button className="hfd-btn hfd-btn-secondary" onClick={closeBuilder} disabled={busy}>Cancel</button>
-                            <button className="hfd-btn hfd-btn-primary" onClick={submitRuleSet} disabled={busy}>{editingGroup ? 'Update Rule Set' : form.ruleSetStatus === 'ACTIVE' ? 'Save & Activate' : `Save as ${ruleSetStatusLabel(form.ruleSetStatus)}`}</button>
+                            <button className="hfd-btn hfd-btn-primary" onClick={submitRuleSet} disabled={busy}>{editingGroup ? 'Update rule set' : form.ruleSetStatus === 'ACTIVE' ? 'Save and activate' : `Save as ${ruleSetStatusLabel(form.ruleSetStatus)}`}</button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
     );
+
 }

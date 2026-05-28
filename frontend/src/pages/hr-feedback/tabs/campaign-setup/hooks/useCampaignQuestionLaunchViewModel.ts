@@ -98,14 +98,12 @@ export function useCampaignQuestionLaunchViewModel({
         .map(item => `${relationshipLabel(item.relationshipType)} ${item.assignmentCount}`);
 
     const anonymousRoleLabels = selectedCampaign ? [
-        selectedCampaign.managerFeedbackAnonymous ? 'Manager' : '',
         selectedCampaign.peerFeedbackAnonymous ? 'Peer' : '',
         selectedCampaign.subordinateFeedbackAnonymous ? 'Direct Report' : '',
-        selectedCampaign.selfFeedbackAnonymous ? 'Self' : '',
     ].filter(Boolean) : [];
     const privacySummary = anonymousRoleLabels.length > 0
-        ? `Anonymous feedback enabled for ${anonymousRoleLabels.join(', ')}.`
-        : 'Anonymous feedback is not enabled for this campaign.';
+        ? `Grouped feedback identity is hidden from recipients for ${anonymousRoleLabels.join(', ')}.`
+        : 'Grouped peer and direct report feedback identity is visible to recipients.';
 
     const launchChecklist = useMemo(() => {
         const checks = activationReadiness.checks.map(check => ({ ...check }));

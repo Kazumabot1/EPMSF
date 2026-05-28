@@ -6,13 +6,6 @@ import type {
     FeedbackTargetCandidate,
 } from '../../../../../types/feedbackCampaign';
 
-export const formatTimeLabel = (time: string) => {
-    const [hourRaw, minuteRaw] = time.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hourRaw, minuteRaw, 0, 0);
-    return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
-};
-
 export const formatDateTime = (value?: string | null) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -96,6 +89,7 @@ export const relationshipIcon = (type: FeedbackRelationshipType | string) => {
 
 export const assignmentSourceLabel = (assignment: FeedbackAssignmentDetailItem) => {
     if (assignment.selectionMethod === 'MANUAL') return 'Added by HR';
+    if (assignment.selectionMethod === 'AUTO_RANKED') return 'Ranked suggestion';
     if (assignment.relationshipType === 'PEER') return 'Suggested';
     return 'Included';
 };

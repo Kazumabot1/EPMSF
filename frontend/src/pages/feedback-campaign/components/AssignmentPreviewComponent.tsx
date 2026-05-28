@@ -44,6 +44,7 @@ const relationshipLabel = (relationship: FeedbackRelationshipType) => {
 };
 
 const methodLabel = (method: string) => {
+    if (method === 'AUTO_RANKED') return 'Ranked suggestion';
     if (method === 'AUTO_RANDOM') return 'Auto random';
     if (method === 'AUTO_RELATIONSHIP') return 'Auto relationship';
     if (method === 'MANUAL') return 'Manual';

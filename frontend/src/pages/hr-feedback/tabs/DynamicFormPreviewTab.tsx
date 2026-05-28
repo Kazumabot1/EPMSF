@@ -5,10 +5,9 @@ import { hrFeedbackApi, type DynamicFormPreview, type DynamicPreviewQuestion, ty
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { positionService } from '../../../services/positionService';
 import type { FeedbackDepartmentOption, FeedbackTargetCandidate } from '../../../types/feedbackCampaign';
-import type { PositionResponse } from '../../../types/position';
+import type { PositionLevelResponse, PositionResponse } from '../../../types/position';
 import {
     EVALUATOR_ROLE_OPTIONS,
-    LEVEL_OPTIONS,
     getCompetencyLabel,
     getRoleLabel,
     normalizeText,
@@ -18,8 +17,21 @@ import {
 const LONG_FORM_THRESHOLD = 30;
 const RECOMMENDED_MAX = 20;
 
+const FALLBACK_LEVEL_OPTIONS = [
+    { code: 'L01', rank: 1, label: 'L01 · Position level 1' },
+    { code: 'L02', rank: 2, label: 'L02 · Position level 2' },
+    { code: 'L03', rank: 3, label: 'L03 · Position level 3' },
+    { code: 'L04', rank: 4, label: 'L04 · Position level 4' },
+    { code: 'L05', rank: 5, label: 'L05 · Position level 5' },
+    { code: 'L06', rank: 6, label: 'L06 · Position level 6' },
+    { code: 'L07', rank: 7, label: 'L07 · Position level 7' },
+    { code: 'L08', rank: 8, label: 'L08 · Position level 8' },
+    { code: 'L09', rank: 9, label: 'L09 · Position level 9' },
+];
+
 type PreviewMode = 'criteria' | 'employee';
 type PreviewDisplayMode = 'evaluator' | 'trace';
+type LevelOption = { code: string; rank: number; label: string };
 
 const PreviewToast = ({ message, onClose }: { message: string; onClose: () => void }) => (
     <div className="hfdq-message-stack">
@@ -33,6 +45,72 @@ const PreviewToast = ({ message, onClose }: { message: string; onClose: () => vo
         </div>
     </div>
 );
+
+const rankFromLevelCode = (levelCode?: string | null) => {
+    const cleaned = (levelCode ?? '').toUpperCase().trim();
+    const digits = cleaned.match(/\d+/)?.[0];
+    if (!digits) return Number.MAX_SAFE_INTEGER;
+    return Number(digits);
+};
+
+const toLevelCodeFromRank = (rank: number) => `L${String(rank).padStart(2, '0')}`;
+
+const normalizeLevelCode = (levelCode?: string | null) => {
+    if (!levelCode) return '';
+    const cleaned = levelCode.toUpperCase().trim();
+    if (/^L\d{2,}$/.test(cleaned)) return cleaned;
+    const digits = cleaned.match(/\d+/)?.[0];
+    return digits ? toLevelCodeFromRank(Number(digits)) : '';
+};
+
+const formatGeneratedAt = (date: Date | null) => {
+    if (!date) return 'Not generated yet';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const buildLevelOptions = (
+    positionLevels: PositionLevelResponse[],
+    positions: PositionResponse[],
+    targetCandidates: FeedbackTargetCandidate[],
+    rules: QuestionRuleItem[],
+): LevelOption[] => {
+    const levelCodes = new Map<string, number>();
+
+    const addLevelCode = (value?: string | null) => {
+        const normalized = normalizeLevelCode(value);
+        if (!normalized) return;
+        levelCodes.set(normalized, rankFromLevelCode(normalized));
+    };
+
+    positionLevels
+        .filter(level => level.active !== false)
+        .forEach(level => addLevelCode(level.levelCode));
+
+    positions.forEach(position => addLevelCode(position.levelCode));
+    targetCandidates.forEach(candidate => addLevelCode(candidate.levelCode));
+    rules.forEach(rule => {
+        addLevelCode(toLevelCodeFromRank(rule.targetLevelMinRank));
+        addLevelCode(toLevelCodeFromRank(rule.targetLevelMaxRank));
+    });
+
+    const source = levelCodes.size > 0
+        ? Array.from(levelCodes.entries()).map(([code, rank]) => ({ code, rank }))
+        : FALLBACK_LEVEL_OPTIONS.map(({ code, rank }) => ({ code, rank }));
+
+    return source
+        .sort((a, b) => a.rank - b.rank || a.code.localeCompare(b.code))
+        .map(level => {
+            const relatedPositions = positions
+                .filter(position => normalizeLevelCode(position.levelCode) === level.code)
+                .map(position => position.positionTitle)
+                .filter(Boolean);
+            const uniqueTitles = Array.from(new Set(relatedPositions));
+            const titlePreview = uniqueTitles.length > 0
+                ? `${uniqueTitles.slice(0, 2).join(' / ')}${uniqueTitles.length > 2 ? ` +${uniqueTitles.length - 2}` : ''}`
+                : `Position level ${level.rank}`;
+            return { ...level, label: `${level.code} · ${titlePreview}` };
+        });
+};
 
 const ruleSpecificityLabel = (rule: Pick<QuestionRuleItem, 'targetPositionId' | 'targetDepartmentId'>) => {
     if (rule.targetPositionId != null) return 'Position add-on';
@@ -81,23 +159,11 @@ const comparePreviewRules = (a: QuestionRuleItem, b: QuestionRuleItem) => {
     return (a.id ?? 0) - (b.id ?? 0);
 };
 
-const levelLabelFor = (levelCode: string) => LEVEL_OPTIONS.find(level => level.code === levelCode)?.label ?? levelCode;
-
-const normalizeCandidateLevel = (levelCode?: string | null) => {
-    if (!levelCode) return '';
-    const cleaned = levelCode.toUpperCase().trim();
-    const exact = LEVEL_OPTIONS.find(level => level.code === cleaned);
-    if (exact) return exact.code;
-    const digits = cleaned.replace(/[^0-9]/g, '');
-    if (!digits) return '';
-    const padded = `L${digits.padStart(2, '0')}`;
-    return LEVEL_OPTIONS.some(level => level.code === padded) ? padded : '';
-};
-
 export default function DynamicFormPreviewTab() {
     const navigate = useNavigate();
     const [departments, setDepartments] = useState<FeedbackDepartmentOption[]>([]);
     const [positions, setPositions] = useState<PositionResponse[]>([]);
+    const [positionLevels, setPositionLevels] = useState<PositionLevelResponse[]>([]);
     const [targetCandidates, setTargetCandidates] = useState<FeedbackTargetCandidate[]>([]);
     const [levelCode, setLevelCode] = useState('L06');
     const [relationshipType, setRelationshipType] = useState<QuestionRuleRole>('MANAGER');
@@ -112,26 +178,49 @@ export default function DynamicFormPreviewTab() {
     const [error, setError] = useState('');
     const [previewSearch, setPreviewSearch] = useState('');
     const [rules, setRules] = useState<QuestionRuleItem[]>([]);
+    const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
+    const [lastGeneratedScenarioKey, setLastGeneratedScenarioKey] = useState('');
+
+    const levelOptions = useMemo(
+        () => buildLevelOptions(positionLevels, positions, targetCandidates, rules),
+        [positionLevels, positions, targetCandidates, rules],
+    );
+
+    const scenarioKey = useMemo(() => JSON.stringify({
+        levelCode,
+        relationshipType,
+        targetDepartmentId: targetDepartmentId === '' ? null : Number(targetDepartmentId),
+        targetPositionId: targetPositionId === '' ? null : Number(targetPositionId),
+    }), [levelCode, relationshipType, targetDepartmentId, targetPositionId]);
 
     const loadReferenceData = async () => {
         setBootLoading(true);
         try {
-            const [loadedDepartments, loadedPositions, loadedRules, loadedCandidates] = await Promise.all([
+            const [loadedDepartments, loadedPositions, loadedPositionLevels, loadedRules, loadedCandidates] = await Promise.all([
                 feedbackCampaignApi.getDepartments().catch(() => []),
                 positionService.getPositions().catch(() => []),
+                positionService.getPositionLevels().catch(() => []),
                 hrFeedbackApi.getQuestionRules().catch(() => []),
                 feedbackCampaignApi.getTargetCandidates({ readiness: 'ALL' }).catch(() => []),
             ]);
+            const limitedCandidates = loadedCandidates.slice(0, 150);
+            const derivedLevels = buildLevelOptions(loadedPositionLevels, loadedPositions, limitedCandidates, loadedRules);
+
             setDepartments(loadedDepartments);
             setPositions(loadedPositions);
+            setPositionLevels(loadedPositionLevels);
             setRules(loadedRules);
-            setTargetCandidates(loadedCandidates.slice(0, 150));
+            setTargetCandidates(limitedCandidates);
+            setLevelCode(current => derivedLevels.some(level => level.code === current)
+                ? current
+                : derivedLevels.find(level => level.code === 'L06')?.code ?? derivedLevels[0]?.code ?? 'L06');
         } finally {
             setBootLoading(false);
         }
     };
 
     const generatePreview = async () => {
+        if (!levelCode) return;
         setLoading(true);
         setError('');
         try {
@@ -142,6 +231,8 @@ export default function DynamicFormPreviewTab() {
                 targetPositionId: targetPositionId === '' ? null : Number(targetPositionId),
             });
             setPreview(result);
+            setLastGeneratedAt(new Date());
+            setLastGeneratedScenarioKey(scenarioKey);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to generate dynamic form preview.');
         } finally {
@@ -155,12 +246,18 @@ export default function DynamicFormPreviewTab() {
 
     useEffect(() => {
         if (!bootLoading) generatePreview();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [bootLoading]);
 
     const selectedEmployee = useMemo(
         () => targetCandidates.find(candidate => candidate.employeeId === Number(selectedEmployeeId)) ?? null,
         [selectedEmployeeId, targetCandidates],
     );
+
+    const normalizeCandidateLevel = (candidateLevelCode?: string | null) => {
+        const normalized = normalizeLevelCode(candidateLevelCode);
+        return levelOptions.some(level => level.code === normalized) ? normalized : '';
+    };
 
     const applyEmployeeScenario = (employeeId: number | '') => {
         setSelectedEmployeeId(employeeId);
@@ -199,12 +296,20 @@ export default function DynamicFormPreviewTab() {
     }, [questions]);
 
     const roleLabel = EVALUATOR_ROLE_OPTIONS.find(option => option.value === relationshipType)?.label ?? relationshipType;
-    const selectedLevelLabel = levelLabelFor(levelCode);
+    const selectedLevelLabel = levelOptions.find(level => level.code === levelCode)?.label ?? levelCode;
     const selectedDepartmentName = departments.find(department => department.id === Number(targetDepartmentId))?.name ?? 'All departments';
     const selectedPositionName = positions.find(position => position.id === Number(targetPositionId))?.positionTitle ?? 'All positions';
+    const previewIsStale = Boolean(preview) && lastGeneratedScenarioKey !== scenarioKey;
+
+    const scenarioChips = [
+        { label: 'Level', value: selectedLevelLabel },
+        { label: 'Evaluator', value: roleLabel },
+        { label: 'Department', value: selectedDepartmentName },
+        { label: 'Position', value: selectedPositionName },
+    ];
 
     const previewSourceByQuestionCode = useMemo(() => {
-        const levelRank = LEVEL_OPTIONS.find(level => level.code === levelCode)?.rank ?? 0;
+        const levelRank = rankFromLevelCode(levelCode);
         const departmentId = targetDepartmentId === '' ? null : Number(targetDepartmentId);
         const positionId = targetPositionId === '' ? null : Number(targetPositionId);
         const byQuestion = new Map<number, QuestionRuleItem>();
@@ -228,13 +333,21 @@ export default function DynamicFormPreviewTab() {
         if (!rule) {
             return `Resolved from active rules · ${selectedLevelLabel} · ${roleLabel} · ${selectedDepartmentName} · ${selectedPositionName}`;
         }
-        const levelRange = `L${String(rule.targetLevelMinRank).padStart(2, '0')}–L${String(rule.targetLevelMaxRank).padStart(2, '0')}`;
+        const levelRange = `${toLevelCodeFromRank(rule.targetLevelMinRank)}–${toLevelCodeFromRank(rule.targetLevelMaxRank)}`;
         const ruleSet = rule.ruleSetName || (rule.ruleSetId ? `Rule Set #${rule.ruleSetId}` : 'Rule Set');
         return `${ruleSet} · ${ruleSpecificityLabel(rule)} · ${getRoleLabel(rule.evaluatorRelationshipType as QuestionRuleRole)} · ${levelRange}`;
     };
 
     const warnings = useMemo(() => {
         const items: Array<{ tone: 'warning' | 'danger' | 'info'; icon: string; title: string; message: string }> = [];
+        if (previewIsStale) {
+            items.push({
+                tone: 'info',
+                icon: 'bi bi-arrow-repeat',
+                title: 'Scenario changed.',
+                message: 'Generate again to refresh the preview for the current criteria.',
+            });
+        }
         if (!preview) return items;
         if (metrics.total === 0) {
             items.push({
@@ -260,10 +373,21 @@ export default function DynamicFormPreviewTab() {
             });
         }
         return items;
-    }, [preview, metrics]);
+    }, [preview, metrics, previewIsStale]);
 
     const clearPreviewFilters = () => setPreviewSearch('');
     const goToRules = () => navigate('/hr/feedback/rules');
+
+    const renderScenarioChips = () => (
+        <div className="hfdq-scenario-chip-row" aria-label="Current preview scenario">
+            {scenarioChips.map(chip => (
+                <span key={chip.label}>
+                    <small>{chip.label}</small>
+                    <strong>{chip.value}</strong>
+                </span>
+            ))}
+        </div>
+    );
 
     const renderEvaluatorView = () => {
         let questionNumber = 0;
@@ -387,14 +511,14 @@ export default function DynamicFormPreviewTab() {
                     ) : (
                         <div className="hfdq-employee-empty-note">Choose an employee to auto-fill level, department, and position.</div>
                     )}
-                    <small className="hfd-field-hint">Employee mode locks target details from employee data. Switch to Criteria mode to test manually.</small>
+                    <small className="hfd-field-hint">Employee mode uses employee data for level, department, and position. Switch to Criteria mode to test manually.</small>
                 </>
             ) : (
                 <div className="hfdq-criteria-grid-final">
                     <label className="hfd-field">
                         <span className="hfd-label">Target Level</span>
                         <select className="hfd-input" value={levelCode} onChange={e => setLevelCode(e.target.value)}>
-                            {LEVEL_OPTIONS.map(level => <option key={level.code} value={level.code}>{level.label}</option>)}
+                            {levelOptions.map(level => <option key={level.code} value={level.code}>{level.label}</option>)}
                         </select>
                     </label>
                     <label className="hfd-field">
@@ -421,8 +545,8 @@ export default function DynamicFormPreviewTab() {
                         {EVALUATOR_ROLE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                 </label>
-                <button className="hfd-btn hfd-btn-primary" type="button" onClick={generatePreview} disabled={loading || bootLoading}>
-                    <i className="bi bi-lightning-charge" /> Generate
+                <button className="hfd-btn hfd-btn-primary" type="button" onClick={generatePreview} disabled={loading || bootLoading || !levelCode}>
+                    <i className="bi bi-lightning-charge" /> {previewIsStale ? 'Update Preview' : 'Generate'}
                 </button>
             </div>
         </aside>
@@ -457,8 +581,8 @@ export default function DynamicFormPreviewTab() {
                     <div className="hfdq-preview-stage-toolbar">
                         <div>
                             <span className="hfdq-kicker">Evaluator preview</span>
-                            <h3>{roleLabel} view · {selectedLevelLabel}</h3>
-                            <p>{filteredQuestions.length} visible of {metrics.total} final questions · {selectedDepartmentName} · {selectedPositionName}</p>
+                            <h3>{roleLabel} view · {levelCode}</h3>
+                            <p>{filteredQuestions.length} visible of {metrics.total} final questions · Last generated {formatGeneratedAt(lastGeneratedAt)}</p>
                         </div>
                         <div className="hfdq-mode-switch compact" role="tablist" aria-label="Preview display mode">
                             <button type="button" className={displayMode === 'evaluator' ? 'active' : ''} onClick={() => setDisplayMode('evaluator')}>Evaluator view</button>
@@ -466,12 +590,14 @@ export default function DynamicFormPreviewTab() {
                         </div>
                     </div>
 
+                    {renderScenarioChips()}
+
                     {(warnings.length > 0 || metrics.total > 0) && (
                         <div className="hfdq-preview-inline-health">
                             {warnings.length === 0 ? (
                                 <div className="ok"><i className="bi bi-check-circle" /> Preview is ready for this scenario.</div>
                             ) : warnings.map(item => (
-                                <div key={item.title} className={item.tone}><i className={item.icon} /> <strong>{item.title}</strong><span>{item.message}</span></div>
+                                <div key={`${item.title}-${item.tone}`} className={item.tone}><i className={item.icon} /> <strong>{item.title}</strong><span>{item.message}</span></div>
                             ))}
                         </div>
                     )}

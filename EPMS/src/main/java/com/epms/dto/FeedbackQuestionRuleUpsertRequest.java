@@ -1,6 +1,5 @@
 package com.epms.dto;
 
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
 
@@ -24,12 +23,10 @@ public class FeedbackQuestionRuleUpsertRequest {
     /** Preferred rule-set field. Backend creates one internal rule row per selected question and role. */
     private List<Long> questionBankIds;
 
-    @Min(value = 1, message = "Minimum level rank must be between 1 and 9")
-    @Max(value = 9, message = "Minimum level rank must be between 1 and 9")
+    @Min(value = 1, message = "Minimum level rank must be greater than zero")
     private Integer targetLevelMinRank = 1;
 
-    @Min(value = 1, message = "Maximum level rank must be between 1 and 9")
-    @Max(value = 9, message = "Maximum level rank must be between 1 and 9")
+    @Min(value = 1, message = "Maximum level rank must be greater than zero")
     private Integer targetLevelMaxRank = 9;
 
     private Long targetPositionId;

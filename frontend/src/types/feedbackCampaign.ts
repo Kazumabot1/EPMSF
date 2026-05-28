@@ -241,10 +241,10 @@ export const DEFAULT_EVALUATOR_CONFIG: EvaluatorConfigInput = {
   includePeers: true,
   includeSubordinates: true,
   includeSelf: true,
-  peerMinCount: 1,
+  peerMinCount: 2,
   peerMaxCount: 3,
   subordinateMinCount: 0,
-  subordinateMaxCount: 5,
+  subordinateMaxCount: 3,
   flexibleMode: true,
   includeTeamPeers: true,
   includeDepartmentPeers: true,
@@ -355,7 +355,7 @@ export interface FeedbackCampaignScoringConfigInput {
   redistributeMissingRelationshipWeight: boolean;
   relationshipWeights: Array<{ relationshipType: FeedbackRelationshipType | string; weightPercent: number }>;
 }
-export type EvaluatorSelectionMethod = 'AUTO_RANDOM' | 'AUTO_RELATIONSHIP' | 'MANUAL';
+export type EvaluatorSelectionMethod = 'AUTO_RANDOM' | 'AUTO_RANKED' | 'AUTO_RELATIONSHIP' | 'MANUAL';
 export type AssignmentStatus = 'PENDING' | 'IN_PROGRESS' | 'SUBMITTED' | 'DECLINED' | 'CANCELLED';
 
 export interface FeedbackAssignmentPreviewItem {
