@@ -62,11 +62,15 @@ public class UserAccountProvisioningService {
             String requestedDashboard
     ) {
         if (employee.getEmail() == null || !isValidWorkEmail(employee.getEmail())) {
-            return AccountProvisionResult.builder()
-                    .success(false)
-                    .message("A valid work email is required to create a login account.")
-                    .smtpErrorDetail(null)
-                    .build();
+            return result(
+                    null,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "A valid work email is required to create a login account.",
+                    null
+            );
         }
 
         String email = employee.getEmail().trim().toLowerCase();
@@ -85,15 +89,15 @@ public class UserAccountProvisioningService {
         }
 
         if (user.getEmployeeId() != null && !user.getEmployeeId().equals(employee.getId())) {
-            return AccountProvisionResult.builder()
-                    .userId(null)
-                    .success(false)
-                    .accountCreated(false)
-                    .accountLinked(false)
-                    .temporaryPasswordEmailSent(false)
-                    .message("This email is already linked to another employee.")
-                    .smtpErrorDetail(null)
-                    .build();
+            return result(
+                    null,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "This email is already linked to another employee.",
+                    null
+            );
         }
 
         user.setEmployeeId(employee.getId());
@@ -116,15 +120,15 @@ public class UserAccountProvisioningService {
             );
         }
 
-        return AccountProvisionResult.builder()
-                .userId(user.getId())
-                .success(true)
-                .accountCreated(false)
-                .accountLinked(true)
-                .temporaryPasswordEmailSent(false)
-                .message("Login account is linked. Enable “send temporary password email” to email a new password.")
-                .smtpErrorDetail(null)
-                .build();
+        return result(
+                user.getId(),
+                true,
+                false,
+                true,
+                false,
+                "Login account is linked. Enable “send temporary password email” to email a new password.",
+                null
+        );
     }
 
     @Transactional
@@ -132,15 +136,15 @@ public class UserAccountProvisioningService {
         User user = userRepository.findById(userId).orElseThrow();
 
         if (!isValidWorkEmail(user.getEmail())) {
-            return AccountProvisionResult.builder()
-                    .userId(user.getId())
-                    .success(false)
-                    .accountCreated(false)
-                    .accountLinked(true)
-                    .temporaryPasswordEmailSent(false)
-                    .message("Cannot send temporary password because user email is missing or invalid.")
-                    .smtpErrorDetail(null)
-                    .build();
+            return result(
+                    user.getId(),
+                    false,
+                    false,
+                    true,
+                    false,
+                    "Cannot send temporary password because user email is missing or invalid.",
+                    null
+            );
         }
 
         return applyRotationAndEmail(
@@ -196,30 +200,25 @@ public class UserAccountProvisioningService {
             }
         }
 
-        return AccountProvisionResult.builder()
-                .userId(user.getId())
-                .success(true)
-                .accountCreated(true)
-                .accountLinked(true)
-                .temporaryPasswordEmailSent(emailSent)
-                .smtpErrorDetail(smtpError)
-                .message(
-                        !sendTemporaryPasswordEmail
-                                ? "Login account created. Temporary password was not emailed."
-                                : (emailSent
-                                ? "Login account created. Temporary password has been sent by email." + SPAM_FOLDER_HINT
-                                : buildEmailFailureMessage("Login account was created, but the onboarding email could not be sent", smtpError))
-                )
-                .build();
+        String message = !sendTemporaryPasswordEmail
+                ? "Login account created. Temporary password was not emailed."
+                : (emailSent
+                ? "Login account created. Temporary password has been sent by email." + SPAM_FOLDER_HINT
+                : buildEmailFailureMessage("Login account was created, but the onboarding email could not be sent", smtpError));
+
+        return result(
+                user.getId(),
+                true,
+                true,
+                true,
+                emailSent,
+                message,
+                smtpError
+        );
     }
 
     private AccountProvisionResult applyRotationAndEmail(User user, String successWhenSent) {
         String temporaryPassword = temporaryPasswordService.generate();
-
-        user.setPassword(passwordEncoder.encode(temporaryPassword));
-        user.setMustChangePassword(true);
-        user.setAccountStatus("PENDING_PASSWORD_CHANGE");
-        user.setUpdatedAt(new Date());
 
         EmailSendResult sendResult = onboardingEmailService.sendTemporaryPasswordEmail(
                 user.getEmail(),
@@ -230,26 +229,38 @@ public class UserAccountProvisioningService {
         boolean emailSent = sendResult.isSent();
         String smtpError = sendResult.getSafeErrorDetail();
 
-        if (emailSent) {
-            user.setLastTemporaryPasswordSentAt(new Date());
+        if (!emailSent) {
+            return result(
+                    user.getId(),
+                    false,
+                    false,
+                    true,
+                    false,
+                    buildEmailFailureMessage(
+                            "Temporary password was not changed because the email could not be sent",
+                            smtpError
+                    ),
+                    smtpError
+            );
         }
+
+        user.setPassword(passwordEncoder.encode(temporaryPassword));
+        user.setMustChangePassword(true);
+        user.setAccountStatus("PENDING_PASSWORD_CHANGE");
+        user.setLastTemporaryPasswordSentAt(new Date());
+        user.setUpdatedAt(new Date());
 
         userRepository.save(user);
 
-        return AccountProvisionResult.builder()
-                .userId(user.getId())
-                .success(emailSent)
-                .accountCreated(false)
-                .accountLinked(true)
-                .temporaryPasswordEmailSent(emailSent)
-                .smtpErrorDetail(smtpError)
-                .message(emailSent
-                        ? successWhenSent
-                        : buildEmailFailureMessage(
-                        "Password was updated in the system, but the email could not be sent.",
-                        smtpError
-                ))
-                .build();
+        return result(
+                user.getId(),
+                true,
+                false,
+                true,
+                true,
+                successWhenSent,
+                null
+        );
     }
 
     public String resolveDashboardForEmployee(Position position, String roleName, String requestedDashboard) {
@@ -331,6 +342,26 @@ public class UserAccountProvisioningService {
             userRole.setRoleId(role.getId());
             userRoleRepository.save(userRole);
         }
+    }
+
+    private AccountProvisionResult result(
+            Integer userId,
+            boolean success,
+            boolean accountCreated,
+            boolean accountLinked,
+            boolean temporaryPasswordEmailSent,
+            String message,
+            String smtpErrorDetail
+    ) {
+        AccountProvisionResult result = new AccountProvisionResult();
+        result.setUserId(userId);
+        result.setSuccess(success);
+        result.setAccountCreated(accountCreated);
+        result.setAccountLinked(accountLinked);
+        result.setTemporaryPasswordEmailSent(temporaryPasswordEmailSent);
+        result.setMessage(message);
+        result.setSmtpErrorDetail(smtpErrorDetail);
+        return result;
     }
 
     private String buildEmailFailureMessage(String prefix, String smtpError) {
