@@ -24,6 +24,9 @@ public class Employee {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Column(name = "employee_code", length = 50, unique = true)
+    private String employeeCode;
+
     private String firstName;
     private String lastName;
     private String phoneNumber;
@@ -60,6 +63,22 @@ public class Employee {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id", nullable = true)
     private Position position;
+
+    /**
+     * Current working department shortcut used to keep employee and login account scope in sync.
+     * Source rule: working department = employee_department.parentDepartment when present,
+     * otherwise employee_department.currentDepartment. This column mirrors that value for
+     * fast dashboard/security/reporting lookups and to prevent users/employee mismatch.
+     */
+    @Column(name = "department_id")
+    private Integer departmentId;
+
+    /**
+     * Direct reporting manager user id. This mirrors users.manager_id so Manager, KPI,
+     * feedback, 1:1, and self-assessment review scopes read the same manager assignment.
+     */
+    @Column(name = "manager_id")
+    private Integer managerId;
 
     @OneToMany(mappedBy = "employee", fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude

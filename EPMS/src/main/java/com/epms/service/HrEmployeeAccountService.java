@@ -52,6 +52,7 @@ public class HrEmployeeAccountService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final UserAccountProvisioningService userAccountProvisioningService;
+    private final EmployeeCodeGeneratorService employeeCodeGeneratorService;
 
     public HrEmployeeAccountService(
             UserRepository userRepository,
@@ -61,7 +62,8 @@ public class HrEmployeeAccountService {
             UserRoleRepository userRoleRepository,
             EmployeeRepository employeeRepository,
             EmployeeDepartmentRepository employeeDepartmentRepository,
-            UserAccountProvisioningService userAccountProvisioningService
+            UserAccountProvisioningService userAccountProvisioningService,
+            EmployeeCodeGeneratorService employeeCodeGeneratorService
     ) {
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
@@ -71,6 +73,7 @@ public class HrEmployeeAccountService {
         this.employeeRepository = employeeRepository;
         this.employeeDepartmentRepository = employeeDepartmentRepository;
         this.userAccountProvisioningService = userAccountProvisioningService;
+        this.employeeCodeGeneratorService = employeeCodeGeneratorService;
     }
 
     /**
@@ -100,9 +103,13 @@ public class HrEmployeeAccountService {
 
         Department department = findDepartment(request);
         Position position = findPosition(request);
+        User manager = resolveManagerUser(request.getManagerId(), request.getEmployeeId());
         String normalizedRole = resolveRoleName(request.getRoleName(), position);
 
         Employee employee = findOrCreateEmployeeForAccount(request, email, fullName, employeeCode, position);
+        employeeCode = ensureEmployeeCodeForAccount(employee, position, normalizedRole, employeeCode);
+        employee.setDepartmentId(department == null ? null : department.getId());
+        employee.setManagerId(manager == null ? null : manager.getId());
         employee.setActive(true);
         employee = employeeRepository.save(employee);
 
@@ -126,6 +133,7 @@ public class HrEmployeeAccountService {
         user.setEmployeeCode(employeeCode);
         user.setFullName(fullName);
         user.setDepartmentId(department == null ? null : department.getId());
+        user.setManagerId(manager == null ? null : manager.getId());
         user.setPosition(position);
         user.setActive(true);
         user.setUpdatedAt(new Date());
@@ -157,6 +165,7 @@ public class HrEmployeeAccountService {
             String employeeCodeRaw,
             Integer departmentId,
             Integer positionId,
+            Integer managerId,
             String roleNameRaw,
             Boolean activeRaw
     ) {
@@ -193,9 +202,13 @@ public class HrEmployeeAccountService {
             position = positionRepository.findById(positionId)
                     .orElseThrow(() -> new BadRequestException("Position not found"));
         }
+        User manager = resolveManagerUser(managerId, user.getEmployeeId());
         String normalizedRole = resolveRoleName(roleNameRaw, position);
 
         Employee employee = findOrCreateEmployeeForUser(user, email, fullName, employeeCode, position);
+        employeeCode = ensureEmployeeCodeForAccount(employee, position, normalizedRole, employeeCode);
+        employee.setDepartmentId(department == null ? null : department.getId());
+        employee.setManagerId(manager == null ? null : manager.getId());
         employee.setActive(active);
         employee = employeeRepository.save(employee);
 
@@ -210,6 +223,7 @@ public class HrEmployeeAccountService {
         user.setEmployeeCode(employeeCode);
         user.setEmployeeId(employee.getId());
         user.setDepartmentId(department == null ? null : department.getId());
+        user.setManagerId(manager == null ? null : manager.getId());
         user.setPosition(position);
         user.setActive(active);
         user.setUpdatedAt(new Date());
@@ -348,6 +362,10 @@ public class HrEmployeeAccountService {
             }
 
             Employee employee = findOrCreateEmployeeForUser(user, email, fullName, employeeCode, position);
+            employeeCode = ensureEmployeeCodeForAccount(employee, position, resolveRoleName(null, position), employeeCode);
+            Integer managerId = user.getManagerId() != null ? user.getManagerId() : employee.getManagerId();
+            employee.setDepartmentId(department == null ? employee.getDepartmentId() : department.getId());
+            employee.setManagerId(managerId);
             employee.setActive(user.getActive() == null || user.getActive());
             employee = employeeRepository.save(employee);
 
@@ -361,8 +379,9 @@ public class HrEmployeeAccountService {
             user.setFullName(fullName);
             user.setEmployeeCode(employeeCode);
             user.setEmployeeId(employee.getId());
-            user.setDepartmentId(department == null ? null : department.getId());
-            user.setPosition(position);
+            user.setDepartmentId(employee.getDepartmentId());
+            user.setManagerId(employee.getManagerId());
+            user.setPosition(position != null ? position : employee.getPosition());
             user.setActive(user.getActive() == null || user.getActive());
             user.setUpdatedAt(new Date());
 
@@ -371,6 +390,51 @@ public class HrEmployeeAccountService {
         }
 
         return synced;
+    }
+
+    private String ensureEmployeeCodeForAccount(
+            Employee employee,
+            Position position,
+            String roleName,
+            String requestedEmployeeCode
+    ) {
+        String requested = clean(requestedEmployeeCode);
+
+        if (requested != null) {
+            employee.setEmployeeCode(requested);
+            return requested;
+        }
+
+        if (employee.getPosition() == null && position != null) {
+            employee.setPosition(position);
+        }
+
+        String dashboard = userAccountProvisioningService.resolveDashboardForEmployee(
+                employee.getPosition(),
+                roleName,
+                null
+        );
+
+        return employeeCodeGeneratorService.ensureEmployeeCode(employee, roleName, dashboard);
+    }
+
+    private User resolveManagerUser(Integer managerId, Integer employeeIdBeingEdited) {
+        if (managerId == null) {
+            return null;
+        }
+
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new BadRequestException("Assigned manager not found"));
+
+        if (manager.getActive() != null && !manager.getActive()) {
+            throw new BadRequestException("Assigned manager is inactive");
+        }
+
+        if (employeeIdBeingEdited != null && Objects.equals(manager.getEmployeeId(), employeeIdBeingEdited)) {
+            throw new BadRequestException("A user cannot be assigned as their own manager");
+        }
+
+        return manager;
     }
 
     private Department findDepartment(HrEmployeeAccountCreateRequest request) {
@@ -482,7 +546,9 @@ public class HrEmployeeAccountService {
         employee.setEmail(email);
         employee.setFirstName(deriveFirstName(fullName));
         employee.setLastName(deriveLastName(fullName));
-        employee.setStaffNrc(employeeCode);
+        if (employeeCode != null) {
+            employee.setEmployeeCode(employeeCode);
+        }
         employee.setPosition(position);
     }
 
@@ -492,9 +558,13 @@ public class HrEmployeeAccountService {
         }
 
         if (department == null) {
+            employee.setDepartmentId(null);
             closeActiveEmployeeDepartmentAssignments(employee);
+            employeeRepository.save(employee);
             return;
         }
+
+        employee.setDepartmentId(department.getId());
 
         List<EmployeeDepartment> activeAssignments = employeeDepartmentRepository
                 .findActiveAssignmentsForEmployeeId(employee.getId());
@@ -517,6 +587,7 @@ public class HrEmployeeAccountService {
                 }
                 assignment.setEnddate(null);
                 employeeDepartmentRepository.save(assignment);
+                employeeRepository.save(employee);
                 return;
             }
         }
@@ -532,6 +603,7 @@ public class HrEmployeeAccountService {
         newAssignment.setEnddate(null);
 
         employeeDepartmentRepository.save(newAssignment);
+        employeeRepository.save(employee);
     }
 
     private void closeActiveEmployeeDepartmentAssignments(Employee employee) {
