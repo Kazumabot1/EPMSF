@@ -16,15 +16,19 @@ import com.epms.security.SecurityUtils;
 import com.epms.service.NotificationService;
 import com.epms.service.OneOnOneMeetingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +39,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
     private final EmployeeRepository employeeRepo;
     private final UserRepository userRepo;
     private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("MMM dd, yyyy, hh:mm a");
@@ -81,6 +86,8 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
             saved.setReminder24hSent(true);
             saved = meetingRepo.save(saved);
         }
+
+        publishMeetingChanged(saved, "CREATED");
 
         return toDto(saved);
     }
@@ -141,6 +148,8 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
             }
         }
 
+        publishMeetingChanged(saved, "UPDATED");
+
         return toDto(saved);
     }
 
@@ -171,6 +180,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
                         + " at " + meetingTime + " was cancelled."
         );
 
+        publishMeetingChanged(meeting, "CANCELLED");
         meetingRepo.delete(meeting);
     }
 
@@ -275,7 +285,10 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
 
         meeting.setUpdatedAt(now);
 
-        return toDto(meetingRepo.save(meeting));
+        OneOnOneMeeting saved = meetingRepo.save(meeting);
+        publishMeetingChanged(saved, "FINISHED");
+
+        return toDto(saved);
     }
 
     @Override
@@ -329,6 +342,8 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
             saved = meetingRepo.save(saved);
         }
 
+        publishMeetingChanged(saved, "FOLLOW_UP_SET");
+
         return toDto(saved);
     }
 
@@ -345,6 +360,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         meetingRepo.saveAll(firstMeetings);
+        firstMeetings.forEach(meeting -> publishMeetingChanged(meeting, "AUTO_STATUS_CHANGED"));
 
         List<OneOnOneMeeting> followUpMeetings = meetingRepo.findFollowUpMeetingsToActivate(now);
 
@@ -354,6 +370,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         meetingRepo.saveAll(followUpMeetings);
+        followUpMeetings.forEach(meeting -> publishMeetingChanged(meeting, "AUTO_STATUS_CHANGED"));
 
         LocalDateTime eightHoursAgo = now.minusHours(8);
 
@@ -366,6 +383,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         meetingRepo.saveAll(oldFirstMeetings);
+        oldFirstMeetings.forEach(meeting -> publishMeetingChanged(meeting, "AUTO_STATUS_CHANGED"));
 
         List<OneOnOneMeeting> oldFollowUpMeetings = meetingRepo.findFollowUpOngoingMeetingsToAutoClose(eightHoursAgo);
 
@@ -376,6 +394,39 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         meetingRepo.saveAll(oldFollowUpMeetings);
+        oldFollowUpMeetings.forEach(meeting -> publishMeetingChanged(meeting, "AUTO_STATUS_CHANGED"));
+    }
+
+    private void publishMeetingChanged(OneOnOneMeeting meeting, String action) {
+        if (meeting == null) {
+            return;
+        }
+
+        Set<String> recipientEmails = new LinkedHashSet<>();
+
+        findUserByEmployee(meeting.getEmployee()).ifPresent(user -> addRecipientEmail(recipientEmails, user));
+
+        if (meeting.getCreatedByUser() != null) {
+            addRecipientEmail(recipientEmails, meeting.getCreatedByUser());
+        } else {
+            findUserByEmployee(meeting.getManager()).ifPresent(user -> addRecipientEmail(recipientEmails, user));
+        }
+
+        Map<String, Object> payload = Map.of(
+                "eventType", "ONE_ON_ONE_MEETINGS_CHANGED",
+                "meetingId", meeting.getId(),
+                "action", action
+        );
+
+        recipientEmails.forEach(email ->
+                messagingTemplate.convertAndSendToUser(email, "/queue/events", payload)
+        );
+    }
+
+    private void addRecipientEmail(Set<String> recipientEmails, User user) {
+        if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+            recipientEmails.add(user.getEmail().trim());
+        }
     }
 
     private void sendCreationNotifications(OneOnOneMeeting meeting, boolean followUpStage) {

@@ -158,6 +158,11 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/continuous-feedback" element={<ContinuousFeedbackPage />} />
+              </Route>
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={['HR', 'Manager', 'DepartmentHead']} />}>
+              <Route element={<AppLayout />}>
                 <Route path="/pip/create" element={<PipCreatePage />} />
               </Route>
             </Route>
@@ -372,7 +377,8 @@ function App() {
                   <Route path="/pip-updates" element={<PipUpdates />} />
                 </Route>
 
-                <Route path="/notification-templates" element={<NotificationTemplates />} />
+                <Route path="/announcements" element={<NotificationTemplates />} />
+                <Route path="/notification-templates" element={<Navigate to="/announcements" replace />} />
 
                 <Route element={<PositionPermissionRoute permission="positionPermission" fallbackPath="/dashboard" />}>
                   <Route path="/hr/position/create" element={<PositionCreate />} />

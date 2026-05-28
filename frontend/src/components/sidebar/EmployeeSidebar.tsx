@@ -127,11 +127,23 @@ const EmployeeSidebar = ({
     const onNotificationsUpdated = () => {
       void loadUnreadCount();
     };
+    const onNotificationsReadStateChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ unreadCount?: number }>).detail;
+
+      if (typeof detail?.unreadCount === 'number') {
+        setUnreadCount(detail.unreadCount);
+        return;
+      }
+
+      void loadUnreadCount();
+    };
 
     window.addEventListener('epms:notifications-updated', onNotificationsUpdated);
+    window.addEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
 
     return () => {
       window.removeEventListener('epms:notifications-updated', onNotificationsUpdated);
+      window.removeEventListener('epms:notifications-read-state-changed', onNotificationsReadStateChanged);
     };
   }, [loadUnreadCount]);
 

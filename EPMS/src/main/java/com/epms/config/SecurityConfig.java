@@ -519,6 +519,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/dashboard",
                                 "/api/dashboard/**",
+                                "/api/announcements",
+                                "/api/announcements/**",
                                 "/api/notification-templates",
                                 "/api/notification-templates/**"
                         ).access((authentication, context) ->
@@ -725,7 +727,11 @@ public class SecurityConfig {
         }
 
         if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
-            return new AuthorizationDecision(currentPositionHasPermission("pipViewAll"));
+            return new AuthorizationDecision(
+                    currentPositionHasPermission("pipViewAll")
+                            || currentPositionHasPermission("pipCreate")
+                            || currentPositionHasPermission("pipEdit")
+            );
         }
 
         if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))

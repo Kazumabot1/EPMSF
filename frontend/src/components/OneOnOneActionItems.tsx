@@ -11,6 +11,7 @@ import {
   updateMeeting,
 } from '../services/oneOnOneService';
 import type { Meeting } from '../services/oneOnOneService';
+import { useNotificationsWebSocket } from '../hooks/useNotificationsWebSocket';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -144,6 +145,22 @@ const OneOnOneActionItems: React.FC = () => {
 
   useEffect(() => {
     loadAll();
+  }, [loadAll]);
+
+  useNotificationsWebSocket(() => {
+    /* This page listens for meeting events; notification payloads are handled by shared layout UI. */
+  });
+
+  useEffect(() => {
+    const onOneOnOneMeetingsChanged = () => {
+      void loadAll();
+    };
+
+    window.addEventListener('epms:one-on-one-meetings-changed', onOneOnOneMeetingsChanged);
+
+    return () => {
+      window.removeEventListener('epms:one-on-one-meetings-changed', onOneOnOneMeetingsChanged);
+    };
   }, [loadAll]);
 
   const openUpcomingModal = (m: Meeting) => {

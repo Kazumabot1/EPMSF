@@ -13,6 +13,15 @@ export type WsNotificationPayload = {
   referenceId?: number | null;
 };
 
+export type WsRealtimeEventPayload = {
+  eventType: 'NOTIFICATIONS_READ_STATE_CHANGED' | 'ONE_ON_ONE_MEETINGS_CHANGED' | string;
+  unreadCount?: number;
+  notificationIds?: number[];
+  allRead?: boolean;
+  meetingId?: number;
+  action?: 'CREATED' | 'UPDATED' | 'CANCELLED' | 'FINISHED' | 'FOLLOW_UP_SET' | 'AUTO_STATUS_CHANGED' | string;
+};
+
 type NotificationHandler = (n: WsNotificationPayload) => void;
 
 const subscribers = new Set<NotificationHandler>();
@@ -88,6 +97,21 @@ function emitNotification(payload: WsNotificationPayload) {
   );
 }
 
+function emitRealtimeEvent(payload: WsRealtimeEventPayload) {
+  const eventName =
+    payload.eventType === 'NOTIFICATIONS_READ_STATE_CHANGED'
+      ? 'epms:notifications-read-state-changed'
+      : payload.eventType === 'ONE_ON_ONE_MEETINGS_CHANGED'
+        ? 'epms:one-on-one-meetings-changed'
+        : 'epms:realtime-event';
+
+  window.dispatchEvent(
+    new CustomEvent(eventName, {
+      detail: payload,
+    }),
+  );
+}
+
 function scheduleReconnect() {
   if (retryTimer != null || subscribers.size === 0 || retryCount >= MAX_RETRIES) {
     return;
@@ -135,6 +159,15 @@ function ensureClient() {
         try {
           const body = JSON.parse(message.body) as WsNotificationPayload;
           emitNotification(body);
+        } catch {
+          /* ignore malformed frames */
+        }
+      });
+
+      nextClient.subscribe('/user/queue/events', (message: IMessage) => {
+        try {
+          const body = JSON.parse(message.body) as WsRealtimeEventPayload;
+          emitRealtimeEvent(body);
         } catch {
           /* ignore malformed frames */
         }

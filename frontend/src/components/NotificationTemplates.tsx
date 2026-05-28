@@ -101,7 +101,7 @@ const NotificationTemplates = () => {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/notification-templates');
+      const response = await api.get('/announcements');
       setTemplates(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching notification templates:', error);
@@ -180,10 +180,10 @@ const NotificationTemplates = () => {
       };
 
       if (editing) {
-        await api.put(`/notification-templates/${editing.id}`, payload);
+        await api.put(`/announcements/${editing.id}`, payload);
         toast.success('Notification template updated.');
       } else {
-        await api.post('/notification-templates', payload);
+        await api.post('/announcements', payload);
         toast.success('Notification template created.');
       }
 
@@ -202,7 +202,7 @@ const NotificationTemplates = () => {
 
     setLoading(true);
     try {
-      await api.delete(`/notification-templates/${id}`);
+      await api.delete(`/announcements/${id}`);
       toast.success('Notification template deleted.');
       await fetchTemplates();
     } catch (error) {
@@ -243,7 +243,7 @@ const NotificationTemplates = () => {
 
     try {
       const endpoint = channel === 'email' ? 'send-email' : 'send-in-app';
-      const response = await api.post<DeliveryResult>(`/notification-templates/${template.id}/${endpoint}`);
+      const response = await api.post<DeliveryResult>(`/announcements/${template.id}/${endpoint}`);
       const result = response.data;
 
       if (result.sentCount > 0) {
@@ -269,7 +269,7 @@ const NotificationTemplates = () => {
     <div className="nt-page">
       <div className="nt-page-header">
         <div>
-          <h1>Notification Templates</h1>
+          <h1>Announcements</h1>
         </div>
 
         <button type="button" className="nt-primary-button" onClick={openCreate}>
@@ -358,7 +358,7 @@ const NotificationTemplates = () => {
         <div className="nt-modal-backdrop" role="presentation">
           <section className="nt-modal" role="dialog" aria-modal="true" aria-label="Notification template form">
             <div className="nt-modal-head">
-              <h2>{editing ? 'Edit Notification Template' : 'Create Notification Template'}</h2>
+              <h2>{editing ? 'Edit Announcement' : 'Create Announcement'}</h2>
               <button type="button" className="nt-icon-button" onClick={closeForm} aria-label="Close">
                 <i className="bi bi-x-lg" aria-hidden />
               </button>

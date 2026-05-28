@@ -211,6 +211,7 @@ public class TeamAccessService {
 
         return employeeRepository.findActiveDropdownEmployeesByDepartmentId(allowedDepartmentId)
                 .stream()
+                .filter(employee -> !isCurrentUserEmployee(employee))
                 .map(this::toEmployeeOption)
                 .sorted(Comparator
                         .comparing(TeamEmployeeOptionResponseDto::getFirstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
@@ -225,6 +226,10 @@ public class TeamAccessService {
         }
 
         assertCanCreateOneOnOne();
+
+        if (isCurrentUserEmployeeId(request.getEmployeeId())) {
+            throw new UnauthorizedActionException("You cannot create a one-on-one meeting with yourself.");
+        }
 
         if (request.getTeamId() != null) {
             Team team = requireTeamWithinOneOnOneScope(request.getTeamId(), request.getDepartmentId());
@@ -507,6 +512,7 @@ public class TeamAccessService {
 
     private List<TeamEmployeeOptionResponseDto> getActiveEmployeeOptions(Team team) {
         return getActiveEmployeesFromTeam(team).stream()
+                .filter(employee -> !isCurrentUserEmployee(employee))
                 .map(employee -> {
                     User user = findUserByEmployeeId(team, employee.getId());
 
@@ -524,6 +530,27 @@ public class TeamAccessService {
                         .comparing(TeamEmployeeOptionResponseDto::getFirstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                         .thenComparing(TeamEmployeeOptionResponseDto::getLastName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
+    }
+
+    private boolean isCurrentUserEmployee(Employee employee) {
+        return employee != null && isCurrentUserEmployeeId(employee.getId());
+    }
+
+    private boolean isCurrentUserEmployeeId(Integer employeeId) {
+        if (employeeId == null) {
+            return false;
+        }
+
+        Integer currentUserId = SecurityUtils.currentUserId();
+        if (currentUserId == null) {
+            return false;
+        }
+
+        return userRepository.findById(currentUserId)
+                .map(User::getEmployeeId)
+                .filter(Objects::nonNull)
+                .map(currentEmployeeId -> Objects.equals(currentEmployeeId, employeeId))
+                .orElse(false);
     }
 
     private List<Employee> getActiveEmployeesFromTeam(Team team) {

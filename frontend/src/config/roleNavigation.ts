@@ -196,7 +196,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/notifications',
       icon: 'bi-bell',
       children: [
-        { label: 'Notification Template', path: '/notification-templates', icon: 'bi-file-earmark-text' },
+        { label: 'Announcement', path: '/announcements', icon: 'bi-file-earmark-text' },
         { label: 'System Notification', path: '/notifications', icon: 'bi-bell' },
       ],
     },

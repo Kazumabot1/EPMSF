@@ -370,6 +370,7 @@ public class TeamServiceImpl implements TeamService {
 
         return employeeDepartmentRepository.findActiveUsersByWorkingDepartmentId(departmentId)
                 .stream()
+                .filter(user -> !isBlockedTeamCandidate(user))
                 .filter(this::isTeamLeaderCandidate)
                 .map(user -> {
                     Team activeLeaderTeam = getFirstActiveLeaderTeam(user.getId());
@@ -392,6 +393,7 @@ public class TeamServiceImpl implements TeamService {
 
         return employeeDepartmentRepository.findActiveUsersByWorkingDepartmentId(departmentId)
                 .stream()
+                .filter(user -> !isBlockedTeamCandidate(user))
                 .filter(this::isTeamMemberCandidate)
                 .map(user -> {
                     Team activeMemberTeam = getFirstActiveMemberTeam(user.getId());
@@ -415,6 +417,7 @@ public class TeamServiceImpl implements TeamService {
 
         return employeeDepartmentRepository.findActiveUsersByWorkingDepartmentId(departmentId)
                 .stream()
+                .filter(user -> !isBlockedTeamCandidate(user))
                 .filter(this::isProjectManagerCandidate)
                 .map(user -> {
                     CandidateResponseDto dto = toCandidate(user, "Project Manager", true);
@@ -627,6 +630,8 @@ public class TeamServiceImpl implements TeamService {
 
         User projectManager = getActiveUserOrThrow(projectManagerId, "Project Manager");
 
+        assertAssignableTeamUser(projectManager, "Project Manager");
+
         if (sameUser(projectManager, teamLeader)) {
             throw new BusinessValidationException("Project Manager cannot be the same as Team Leader.");
         }
@@ -683,6 +688,8 @@ public class TeamServiceImpl implements TeamService {
             User member = getActiveUserOrThrow(memberId, "Team member");
             boolean unchangedExistingMember = existingMemberIds != null && existingMemberIds.contains(memberId);
 
+            assertAssignableTeamUser(member, "Team member");
+
             if (!unchangedExistingMember && !isTeamMemberCandidate(member)) {
                 throw new BusinessValidationException("Selected Team member must have the team member permission.");
             }
@@ -692,6 +699,8 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private void validateTeamLeaderPermission(User teamLeader) {
+        assertAssignableTeamUser(teamLeader, "Team Leader");
+
         if (!isTeamLeaderCandidate(teamLeader)) {
             throw new BusinessValidationException("Selected Team Leader must have the team leader permission.");
         }
@@ -833,7 +842,8 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return hasRole(currentUser, "DEPARTMENT_HEAD")
+        return hasDashboard(currentUser, "DEPARTMENT_HEAD_DASHBOARD")
+                || hasRole(currentUser, "DEPARTMENT_HEAD")
                 || hasRole(currentUser, "DEPARTMENTHEAD")
                 || hasRole(currentUser, "DEPT_HEAD")
                 || hasRole(currentUser, "HEAD_OF_DEPARTMENT");
@@ -914,59 +924,33 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private boolean isTeamLeaderCandidate(User user) {
-        if (!isActiveUser(user)) {
+        if (isBlockedTeamCandidate(user)) {
             return false;
         }
 
         PositionPermission permissions = getPositionPermissions(user);
 
-        if (permissions != null) {
-            return "teamAssignAsLeader".equals(resolveTeamAssignmentPermission(permissions));
-        }
-
-        return !hasRole(user, "MANAGER")
-                && !hasRole(user, "PROJECT_MANAGER")
-                && !hasRole(user, "PM")
-                && !hasRole(user, "HR")
-                && !hasRole(user, "ADMIN");
+        return permissions != null && "teamAssignAsLeader".equals(resolveTeamAssignmentPermission(permissions));
     }
 
     private boolean isProjectManagerCandidate(User user) {
-        if (!isActiveUser(user)) {
+        if (isBlockedTeamCandidate(user)) {
             return false;
         }
 
         PositionPermission permissions = getPositionPermissions(user);
 
-        if (permissions != null) {
-            String assignment = resolveTeamAssignmentPermission(permissions);
-
-            if ("teamAssignAsPm".equals(assignment)) {
-                return true;
-            }
-        }
-
-        return hasRole(user, "MANAGER")
-                || hasRole(user, "PROJECT_MANAGER")
-                || hasRole(user, "PM");
+        return permissions != null && "teamAssignAsPm".equals(resolveTeamAssignmentPermission(permissions));
     }
 
     private boolean isTeamMemberCandidate(User user) {
-        if (!isActiveUser(user)) {
+        if (isBlockedTeamCandidate(user)) {
             return false;
         }
 
         PositionPermission permissions = getPositionPermissions(user);
 
-        if (permissions != null) {
-            return "teamAssignAsMember".equals(resolveTeamAssignmentPermission(permissions));
-        }
-
-        return !hasRole(user, "MANAGER")
-                && !hasRole(user, "PROJECT_MANAGER")
-                && !hasRole(user, "PM")
-                && !hasRole(user, "HR")
-                && !hasRole(user, "ADMIN");
+        return permissions != null && "teamAssignAsMember".equals(resolveTeamAssignmentPermission(permissions));
     }
 
     private boolean hasPositionPermission(User user, String permissionField) {
@@ -985,6 +969,43 @@ public class TeamServiceImpl implements TeamService {
                     permissionField.equals(resolveTeamAssignmentPermission(permissions));
             default -> false;
         };
+    }
+
+    private void assertAssignableTeamUser(User user, String label) {
+        if (user == null || user.getId() == null) {
+            throw new BusinessValidationException(label + " is invalid.");
+        }
+
+        if (isCurrentUser(user)) {
+            throw new BusinessValidationException("You cannot assign yourself as " + label + ".");
+        }
+
+        if (isDepartmentHeadUser(user)) {
+            throw new BusinessValidationException("Department Heads cannot be assigned as " + label + ".");
+        }
+    }
+
+    private boolean isBlockedTeamCandidate(User user) {
+        return !isActiveUser(user) || isCurrentUser(user) || isDepartmentHeadUser(user);
+    }
+
+    private boolean isCurrentUser(User user) {
+        return user != null && Objects.equals(user.getId(), SecurityUtils.currentUserId());
+    }
+
+    private boolean isDepartmentHeadUser(User user) {
+        return hasDashboard(user, "DEPARTMENT_HEAD_DASHBOARD")
+                || hasRole(user, "DEPARTMENT_HEAD")
+                || hasRole(user, "DEPARTMENTHEAD")
+                || hasRole(user, "DEPT_HEAD")
+                || hasRole(user, "HEAD_OF_DEPARTMENT");
+    }
+
+    private boolean hasDashboard(User user, String dashboard) {
+        return user != null
+                && user.getDashboard() != null
+                && dashboard != null
+                && normalizeRole(user.getDashboard()).equals(normalizeRole(dashboard));
     }
 
     private PositionPermission getPositionPermissions(User user) {
