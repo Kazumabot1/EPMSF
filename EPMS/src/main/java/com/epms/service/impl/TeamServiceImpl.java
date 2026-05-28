@@ -111,7 +111,7 @@ public class TeamServiceImpl implements TeamService {
         team.setCreatedByUser(resolveCreatedBy(request.getCreatedById()));
         team.setCreatedDate(new Date());
         team.setTeamGoal(cleanNullable(request.getTeamGoal()));
-        team.setStatus(cleanStatus(request.getStatus()));
+        team.setStatus("Active");
 
         List<Integer> memberIds = safeIds(request.getEffectiveMemberUserIds());
         validateMembers(memberIds, department, teamLeader, projectManager, null, Set.of());
@@ -151,11 +151,20 @@ public class TeamServiceImpl implements TeamService {
         return toDto(saved);
     }
 
+
     @Override
     @Transactional
     public TeamResponseDto updateTeam(Integer id, TeamRequestDto request) {
         assertCurrentUserCanEditTeams();
+
         Team team = getTeamOrThrow(id);
+
+        if ("inactive".equalsIgnoreCase(team.getStatus())) {
+            throw new BusinessValidationException(
+                    "Inactive teams are history records and cannot be edited. Please create a new team instead."
+            );
+        }
+
         validateUpdateRequest(request);
 
         User editor = getCurrentUserOrNull();
@@ -178,11 +187,11 @@ public class TeamServiceImpl implements TeamService {
         Set<Integer> oldMemberIds = activeMemberIds(team);
         Set<Integer> extraRecipients = new HashSet<>();
 
-        if (oldLeader != null) {
+        if (oldLeader != null && oldLeader.getId() != null) {
             extraRecipients.add(oldLeader.getId());
         }
 
-        if (oldProjectManager != null) {
+        if (oldProjectManager != null && oldProjectManager.getId() != null) {
             extraRecipients.add(oldProjectManager.getId());
         }
 
@@ -194,25 +203,53 @@ public class TeamServiceImpl implements TeamService {
             throw new BusinessValidationException("Team Leader is required.");
         }
 
-        User newProjectManager = resolveProjectManager(
-                request.getProjectManagerId(),
-                department,
-                newLeader
-        );
+        boolean leaderChanged = !sameUser(oldLeader, newLeader);
 
-        validateDepartmentHeadDoesNotAssignSelf(newLeader, "Team Leader");
-        validateDepartmentHeadDoesNotAssignSelf(newProjectManager, "Project Manager");
-        validateTeamLeaderPermission(newLeader);
-        validateUserInWorkingDepartment(newLeader, department.getId(), "Team Leader");
-        validateTeamLeaderAvailability(newLeader, team.getId());
+        if (leaderChanged) {
+            validateDepartmentHeadDoesNotAssignSelf(newLeader, "Team Leader");
+            validateTeamLeaderPermission(newLeader);
+            validateUserInWorkingDepartment(newLeader, department.getId(), "Team Leader");
+            validateTeamLeaderAvailability(newLeader, team.getId());
+        }
+
+        User newProjectManager = request.getProjectManagerId() != null
+                ? getActiveUserOrThrow(request.getProjectManagerId(), "Project Manager")
+                : null;
+
+        boolean projectManagerChanged = !sameUser(oldProjectManager, newProjectManager);
+
+        if (newProjectManager != null && sameUser(newProjectManager, newLeader)) {
+            throw new BusinessValidationException("Project Manager cannot be the same as Team Leader.");
+        }
+
+        if (projectManagerChanged && newProjectManager != null) {
+            validateDepartmentHeadDoesNotAssignSelf(newProjectManager, "Project Manager");
+            validateProjectManagerPermission(newProjectManager);
+            validateUserInWorkingDepartment(newProjectManager, department.getId(), "Project Manager");
+        }
 
         List<Integer> newMemberIdsList = safeIds(request.getEffectiveMemberUserIds());
-        validateMembers(newMemberIdsList, department, newLeader, newProjectManager, team.getId(), oldMemberIds);
+
+        validateMembers(
+                newMemberIdsList,
+                department,
+                newLeader,
+                newProjectManager,
+                team.getId(),
+                oldMemberIds
+        );
+
         Set<Integer> newMemberIds = new LinkedHashSet<>(newMemberIdsList);
 
         String newName = cleanRequired(request.getTeamName(), "Team name");
         String newGoal = cleanNullable(request.getTeamGoal());
-        String newStatus = cleanStatus(request.getStatus());
+
+        /*
+         * Status is automatic:
+         * - at least one active member = Active
+         * - zero active members = Inactive
+         */
+        String newStatus = newMemberIds.isEmpty() ? "Inactive" : "Active";
 
         team.setTeamName(newName);
         team.setDepartment(department);
@@ -276,9 +313,13 @@ public class TeamServiceImpl implements TeamService {
             recordHistory(saved, "STATUS_CHANGED", "Status", oldStatus, newStatus, reason, editor);
 
             if ("inactive".equalsIgnoreCase(newStatus)) {
-                notificationParts.add("Team " + saved.getTeamName() + " has gone Inactive");
+                notificationParts.add(
+                        "Team "
+                                + saved.getTeamName()
+                                + " has been closed because all members were removed"
+                );
             } else {
-                notificationParts.add("Team " + saved.getTeamName() + " has gone Active");
+                notificationParts.add("Team " + saved.getTeamName() + " is Active");
             }
         }
 
@@ -300,7 +341,7 @@ public class TeamServiceImpl implements TeamService {
 
             notificationParts.add(displayUser(member) + " has been added to the team");
 
-            if (member != null) {
+            if (member != null && member.getId() != null) {
                 extraRecipients.add(member.getId());
             }
         }
@@ -323,7 +364,7 @@ public class TeamServiceImpl implements TeamService {
 
             notificationParts.add(displayUser(member) + " has been removed from the team");
 
-            if (member != null) {
+            if (member != null && member.getId() != null) {
                 extraRecipients.add(member.getId());
             }
         }
@@ -568,10 +609,29 @@ public class TeamServiceImpl implements TeamService {
         }
     }
 
+
     private void validateUpdateRequest(TeamRequestDto request) {
-        validateCreateRequest(request);
+        if (request == null) {
+            throw new BusinessValidationException("Team request is required.");
+        }
+
+        cleanRequired(request.getTeamName(), "Team name");
+
+        if (request.getDepartmentId() == null) {
+            throw new BusinessValidationException("Department is required.");
+        }
+
+        if (request.getTeamLeaderId() == null) {
+            throw new BusinessValidationException("Team Leader is required.");
+        }
+
         cleanRequired(request.getReason(), "Reason");
         validateReason(request.getReason());
+
+        /*
+         * Do not require members here.
+         * During edit, removing all members is the official way to close/inactivate a team.
+         */
     }
 
     private Team getTeamOrThrow(Integer id) {
@@ -647,7 +707,6 @@ public class TeamServiceImpl implements TeamService {
             }
 
             User member = getActiveUserOrThrow(memberId, "Team member");
-            validateDepartmentHeadDoesNotAssignSelf(member, "Team member");
 
             if (teamLeader != null && Objects.equals(teamLeader.getId(), memberId)) {
                 throw new BusinessValidationException("Team Leader cannot be selected as a normal member.");
@@ -656,6 +715,19 @@ public class TeamServiceImpl implements TeamService {
             if (projectManager != null && Objects.equals(projectManager.getId(), memberId)) {
                 throw new BusinessValidationException("Project Manager cannot be selected as a normal member.");
             }
+
+            boolean unchangedExistingMember =
+                    existingMemberIds != null && existingMemberIds.contains(memberId);
+
+            /*
+             * Existing members should not become blockers when Admin changes their
+             * position assignment permission later.
+             */
+            if (unchangedExistingMember) {
+                continue;
+            }
+
+            validateDepartmentHeadDoesNotAssignSelf(member, "Team member");
 
             Team activeMemberTeam = getFirstActiveMemberTeam(memberId);
             if (activeMemberTeam != null
@@ -666,34 +738,47 @@ public class TeamServiceImpl implements TeamService {
                 );
             }
 
-            boolean unchangedExistingMember = existingMemberIds != null && existingMemberIds.contains(memberId);
-
-            if (!unchangedExistingMember && !isTeamMemberCandidate(member)) {
+            if (!isTeamMemberCandidate(member)) {
                 throw new BusinessValidationException("Selected Team member must have the team member permission.");
             }
 
             validateUserInWorkingDepartment(member, department.getId(), "Team member");
-            validateTeamHierarchy(teamLeader, member);
+
+            /*
+             * Hierarchy-level validation removed by product rule.
+             * Team assignment now depends on Team Assignment Eligibility only.
+             */
         }
     }
 
     private void validateTeamLeaderPermission(User teamLeader) {
+        if (teamLeader == null) {
+            return;
+        }
+
         if (!isTeamLeaderCandidate(teamLeader)) {
             throw new BusinessValidationException("Selected Team Leader must have the team leader permission.");
         }
     }
 
-    private void validateTeamHierarchy(User teamLeader, User member) {
-        Integer leaderRank = levelRank(teamLeader);
-        Integer memberRank = levelRank(member);
-
-        if (leaderRank == null || memberRank == null) {
+    private void validateProjectManagerPermission(User projectManager) {
+        if (projectManager == null) {
             return;
         }
 
-        if (memberRank <= leaderRank) {
-            throw new BusinessValidationException("Team members must be below the Team Leader in the position hierarchy.");
+        if (!isProjectManagerCandidate(projectManager)) {
+            throw new BusinessValidationException("Selected Project Manager must have the project manager permission.");
         }
+    }
+
+    private void validateTeamHierarchy(User teamLeader, User member) {
+        /*
+         * Removed from Team validation.
+         *
+         * Team assignment must not depend on hierarchy level code such as L01/L05/L09.
+         * The valid source of truth is Admin → Position Permissions →
+         * Team Assignment Eligibility.
+         */
     }
 
     private Integer levelRank(User user) {
@@ -741,42 +826,29 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private void assertCurrentUserCanManageTeams() {
-        if (currentUserIsHr() || currentUserIsAdmin()) {
-            return;
-        }
-
         if (currentUserIsDepartmentHead()
                 && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        throw new AccessDeniedException("Only HR, Admin, or Department Heads with Create Team permission can manage teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can manage team setup.");
     }
-
     private void assertCurrentUserCanCreateTeams() {
-        if (currentUserIsHr() || currentUserIsAdmin()) {
-            return;
-        }
-
         if (currentUserIsDepartmentHead()
                 && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        throw new AccessDeniedException("Only HR, Admin, or Department Heads with Create Team permission can create teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can create teams.");
     }
 
     private void assertCurrentUserCanEditTeams() {
-        if (currentUserIsHr() || currentUserIsAdmin()) {
-            return;
-        }
-
         if (currentUserIsDepartmentHead()
                 && positionPermissionService.currentUserHasPermission("teamCreate")) {
             return;
         }
 
-        throw new AccessDeniedException("Only HR, Admin, or Department Heads with Create Team permission can edit teams.");
+        throw new AccessDeniedException("Only Department Heads with Create Team permission can edit teams.");
     }
 
     private void assertCurrentUserCanDeleteTeams() {
@@ -962,21 +1034,9 @@ public class TeamServiceImpl implements TeamService {
         }
 
         PositionPermission permissions = getPositionPermissions(user);
-        String assignment = resolveTeamAssignmentPermission(permissions);
-
-        if ("teamAssignAsLeader".equals(assignment)) {
-            return true;
-        }
-
-        if ("teamAssignAsPm".equals(assignment) || "teamAssignAsMember".equals(assignment)) {
-            return false;
-        }
-
-        return isTeamLeadRoleOrPosition(user)
-                || hasRole(user, "MANAGER")
-                || hasRole(user, "PROJECT_MANAGER")
-                || hasRole(user, "PM");
+        return "teamAssignAsLeader".equals(resolveTeamAssignmentPermission(permissions));
     }
+
 
     private boolean isProjectManagerCandidate(User user) {
         if (!isActiveUser(user)) {
@@ -984,18 +1044,7 @@ public class TeamServiceImpl implements TeamService {
         }
 
         PositionPermission permissions = getPositionPermissions(user);
-
-        if (permissions != null) {
-            String assignment = resolveTeamAssignmentPermission(permissions);
-
-            if ("teamAssignAsPm".equals(assignment)) {
-                return true;
-            }
-        }
-
-        return hasRole(user, "MANAGER")
-                || hasRole(user, "PROJECT_MANAGER")
-                || hasRole(user, "PM");
+        return "teamAssignAsPm".equals(resolveTeamAssignmentPermission(permissions));
     }
 
     private boolean isTeamMemberCandidate(User user) {
@@ -1004,25 +1053,7 @@ public class TeamServiceImpl implements TeamService {
         }
 
         PositionPermission permissions = getPositionPermissions(user);
-        String assignment = resolveTeamAssignmentPermission(permissions);
-
-        if ("teamAssignAsMember".equals(assignment)) {
-            return true;
-        }
-
-        if ("teamAssignAsLeader".equals(assignment) || "teamAssignAsPm".equals(assignment)) {
-            return false;
-        }
-
-        return !isTeamLeadRoleOrPosition(user)
-                && !hasRole(user, "MANAGER")
-                && !hasRole(user, "PROJECT_MANAGER")
-                && !hasRole(user, "PM")
-                && !hasRole(user, "HR")
-                && !hasRole(user, "ADMIN")
-                && !hasRole(user, "DEPARTMENT_HEAD")
-                && !hasRole(user, "DEPARTMENTHEAD")
-                && !hasRole(user, "DEPT_HEAD");
+        return "teamAssignAsMember".equals(resolveTeamAssignmentPermission(permissions));
     }
 
 

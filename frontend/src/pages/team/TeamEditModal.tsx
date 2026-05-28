@@ -51,7 +51,7 @@ const TeamEditModal: React.FC<Props> = ({
   const [departmentId, setDepartmentId] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamGoal, setTeamGoal] = useState('');
-  const [status, setStatus] = useState('Active');
+const currentStatus = team?.status || 'Active';
   const [teamLeaderId, setTeamLeaderId] = useState('');
   const [projectManagerId, setProjectManagerId] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
@@ -73,7 +73,7 @@ const TeamEditModal: React.FC<Props> = ({
     setDepartmentId(team.departmentId ? String(team.departmentId) : '');
     setTeamName(team.teamName ?? '');
     setTeamGoal(team.teamGoal ?? '');
-    setStatus(team.status ?? 'Active');
+
     setTeamLeaderId(team.teamLeaderId ? String(team.teamLeaderId) : '');
     setProjectManagerId(team.projectManagerId ? String(team.projectManagerId) : '');
     setSelectedMemberIds(
@@ -337,20 +337,30 @@ const memberRows = useMemo(() => {
       return;
     }
 
+if (selectedMemberIds.length === 0) {
+  const confirmed = window.confirm(
+    'Removing all members will close this team and mark it Inactive. This team will become a read-only history record and cannot be reactivated. Do you want to continue?',
+  );
+
+  if (!confirmed) {
+    return;
+  }
+}
+
     setSaving(true);
 
     try {
-      const request: TeamRequest = {
-        teamName: teamName.trim(),
-        departmentId: isDepartmentHead ? team.departmentId : Number(departmentId),
-        teamLeaderId: Number(teamLeaderId),
-        projectManagerId: projectManagerId ? Number(projectManagerId) : null,
-        teamGoal: teamGoal.trim(),
-        status,
-        reason: reason.trim(),
-        memberUserIds: selectedMemberIds,
-        memberEmployeeIds: selectedMemberIds,
-      };
+const request: TeamRequest = {
+  teamName: teamName.trim(),
+  departmentId: isDepartmentHead ? 0 : Number(departmentId),
+  teamLeaderId: Number(teamLeaderId),
+  projectManagerId: projectManagerId ? Number(projectManagerId) : null,
+  teamGoal: teamGoal.trim(),
+  status: selectedMemberIds.length === 0 ? 'Inactive' : 'Active',
+  reason: reason.trim(),
+  memberUserIds: selectedMemberIds,
+  memberEmployeeIds: selectedMemberIds,
+};
 
       if (isDepartmentHead) {
         await updateMyDepartmentTeam(team.id, request);
@@ -438,13 +448,15 @@ const memberRows = useMemo(() => {
             />
           </div>
 
-          <div className="team-field">
-            <label>Status</label>
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
+      <div className="team-field">
+        <label>Status</label>
+        <div className={`team-pill ${String(currentStatus).toLowerCase() === 'active' ? 'active' : 'inactive'}`}>
+          {currentStatus}
+        </div>
+        <small className="team-muted">
+          Team status is automatic. Removing all members will close this team and mark it Inactive.
+        </small>
+      </div>
 
           <div className="team-field">
             <label>Team Leader</label>
