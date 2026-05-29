@@ -77,8 +77,8 @@ const emptyForm: EmployeeFormState = {
   gender: '',
   dateOfBirth: '',
 
-  createLoginAccount: true,
-  sendTemporaryPasswordEmail: true,
+  createLoginAccount: false,
+  sendTemporaryPasswordEmail: false,
 
   race: '',
   religion: '',
@@ -329,48 +329,49 @@ const EmployeeFormModal = ({
     const dateOfBirthValidation = validateAdultDateOfBirth(form.dateOfBirth);
     if (dateOfBirthValidation) return dateOfBirthValidation;
 
-    if (form.createLoginAccount && !form.email.trim()) {
-      return 'Work email is required when creating a login account.';
-    }
-
     return '';
   };
 
-  const buildPayload = () => ({
-    firstName: form.firstName.trim(),
-    lastName: form.lastName.trim(),
+  const buildPayload = () => {
+    const email = form.email.trim();
+    const createLoginAccount = Boolean(email);
 
-    positionId: form.positionId ? Number(form.positionId) : null,
-    currentDepartmentId: form.currentDepartmentId
-        ? Number(form.currentDepartmentId)
-        : null,
-    departmentId: form.currentDepartmentId ? Number(form.currentDepartmentId) : null,
-    parentDepartmentId: form.parentDepartmentId
-        ? Number(form.parentDepartmentId)
-        : null,
+    return {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
 
-    phoneNumber: form.phoneNumber.trim() || null,
-    phone: form.phoneNumber.trim() || null,
-    email: form.email.trim() || null,
-    workEmail: form.email.trim() || null,
-    staffNrc: form.staffNrc.trim() || null,
-    nrc: form.staffNrc.trim() || null,
-    gender: form.gender || null,
-    dateOfBirth: form.dateOfBirth || null,
+      positionId: form.positionId ? Number(form.positionId) : null,
+      currentDepartmentId: form.currentDepartmentId
+          ? Number(form.currentDepartmentId)
+          : null,
+      departmentId: form.currentDepartmentId ? Number(form.currentDepartmentId) : null,
+      parentDepartmentId: form.parentDepartmentId
+          ? Number(form.parentDepartmentId)
+          : null,
 
-    createLoginAccount: form.createLoginAccount,
-    sendTemporaryPasswordEmail: form.sendTemporaryPasswordEmail,
+      phoneNumber: form.phoneNumber.trim() || null,
+      phone: form.phoneNumber.trim() || null,
+      email: email || null,
+      workEmail: email || null,
+      staffNrc: form.staffNrc.trim() || null,
+      nrc: form.staffNrc.trim() || null,
+      gender: form.gender || null,
+      dateOfBirth: form.dateOfBirth || null,
 
-    race: form.race.trim() || null,
-    religion: form.religion.trim() || null,
-    contactAddress: form.contactAddress.trim() || null,
-    permanentAddress: form.permanentAddress.trim() || null,
-    maritalStatus: form.maritalStatus || null,
-    spouseName: form.spouseName.trim() || null,
-    spouseNrc: form.spouseNrc.trim() || null,
-    fatherName: form.fatherName.trim() || null,
-    fatherNrc: form.fatherNrc.trim() || null,
-  });
+      createLoginAccount,
+      sendTemporaryPasswordEmail: createLoginAccount,
+
+      race: form.race.trim() || null,
+      religion: form.religion.trim() || null,
+      contactAddress: form.contactAddress.trim() || null,
+      permanentAddress: form.permanentAddress.trim() || null,
+      maritalStatus: form.maritalStatus || null,
+      spouseName: form.spouseName.trim() || null,
+      spouseNrc: form.spouseNrc.trim() || null,
+      fatherName: form.fatherName.trim() || null,
+      fatherNrc: form.fatherNrc.trim() || null,
+    };
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -601,9 +602,8 @@ const EmployeeFormModal = ({
                         setForm((prev) => ({
                           ...prev,
                           email: event.target.value,
-                          createLoginAccount: event.target.value.trim()
-                              ? prev.createLoginAccount
-                              : false,
+                          createLoginAccount: Boolean(event.target.value.trim()),
+                          sendTemporaryPasswordEmail: Boolean(event.target.value.trim()),
                         }))
                     }
                 />
@@ -647,59 +647,6 @@ const EmployeeFormModal = ({
                         setForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))
                     }
                 />
-              </div>
-            </div>
-
-            <div className="employee-login-box">
-              <label className="employee-checkbox">
-                <input
-                    type="checkbox"
-                    checked={form.createLoginAccount}
-                    disabled={!form.email.trim()}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          createLoginAccount: event.target.checked,
-                        }))
-                    }
-                />
-                Create login account automatically when email is provided
-              </label>
-
-              <label className="employee-checkbox">
-                <input
-                    type="checkbox"
-                    checked={form.sendTemporaryPasswordEmail}
-                    disabled={!form.createLoginAccount}
-                    onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          sendTemporaryPasswordEmail: event.target.checked,
-                        }))
-                    }
-                />
-                Send temporary password onboarding email
-              </label>
-
-              <div className="employee-field" style={{ marginTop: 12 }}>
-                <label>Login dashboard</label>
-                <div
-                    className="employee-input"
-                    style={{
-                      minHeight: 44,
-                      display: 'flex',
-                      alignItems: 'center',
-                      background: '#f8fafc',
-                      fontWeight: 800,
-                    }}
-                >
-                  {selectedPosition && positionHasRole(selectedPosition)
-                      ? dashboardDisplayName(derivedDashboard, selectedRoleName)
-                      : 'Dashboard will appear after selecting a position with a connected role.'}
-                </div>
-                <small>
-                  HR cannot manually choose a dashboard here. The selected position decides it.
-                </small>
               </div>
             </div>
 
