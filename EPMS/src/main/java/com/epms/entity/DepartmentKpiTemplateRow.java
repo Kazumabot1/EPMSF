@@ -17,6 +17,7 @@ public class DepartmentKpiTemplateRow {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
     @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private DepartmentKpiTemplate template;
 
     @ManyToOne(fetch = FetchType.LAZY)

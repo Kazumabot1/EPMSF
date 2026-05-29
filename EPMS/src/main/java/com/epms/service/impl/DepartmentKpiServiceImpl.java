@@ -86,7 +86,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         applyTemplateDepartments(template, request.getDepartmentIds());
 
         DepartmentKpiTemplate saved = templateRepository.saveAndFlush(template);
-        return toTemplateDto(templateRepository.findDetailById(saved.getId()).orElse(saved));
+        return toTemplateDto(saved);
     }
 
     @Override
@@ -921,6 +921,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 ? new ArrayList<>()
                 : template.getDepartments().stream()
                 .filter(link -> link.getDepartment() != null)
+                .sorted(Comparator
+                        .comparing((DepartmentKpiTemplateDepartment link) -> firstNonBlank(link.getDepartment().getDepartmentName(), ""))
+                        .thenComparing(link -> link.getDepartment().getId() == null ? Integer.MAX_VALUE : link.getDepartment().getId()))
                 .map(link -> {
                     DepartmentKpiTemplateResponseDto.DepartmentSummary summary = new DepartmentKpiTemplateResponseDto.DepartmentSummary();
                     summary.setId(link.getDepartment().getId());
@@ -1042,7 +1045,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (template == null || template.getRows() == null) {
             return List.of();
         }
+        Set<Integer> seenIds = new LinkedHashSet<>();
         return template.getRows().stream()
+                .filter(row -> row.getId() == null || seenIds.add(row.getId()))
                 .sorted(Comparator.comparing(row -> row.getSortOrder() == null ? Integer.MAX_VALUE : row.getSortOrder()))
                 .toList();
     }
