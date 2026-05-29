@@ -265,15 +265,19 @@ export const fetchMyDepartmentTeamHistory = async (
 };
 
 export const formatCandidateLabel = (candidate: CandidateUser): string => {
-  if (!candidate.currentTeamNames) {
+  const teamNames = candidate.currentTeamNames || candidate.currentTeamName;
+
+  if (!teamNames) {
     return candidate.name;
   }
 
-  if (String(candidate.type ?? '').toLowerCase().includes('project manager')) {
-    return `${candidate.name} (Also Project Manager in: ${candidate.currentTeamNames})`;
-  }
+  return `${candidate.name} (Already in ${teamNames})`;
+};
 
-  return `${candidate.name} (Already in ${candidate.currentTeamNames})`;
+export const getCandidateTeamWarning = (candidate: CandidateUser): string => {
+  const teamNames = candidate.currentTeamNames || candidate.currentTeamName;
+
+  return teamNames ? `Already in ${teamNames}` : 'Already in another team';
 };
 
 export const countReasonWords = (reason: string): number => {

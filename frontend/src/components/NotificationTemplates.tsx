@@ -104,8 +104,8 @@ const NotificationTemplates = () => {
       const response = await api.get('/announcements');
       setTemplates(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error('Error fetching notification templates:', error);
-      toast.error('Failed to load notification templates.');
+      console.error('Error fetching announcements:', error);
+      toast.error('Failed to load announcements.');
     } finally {
       setLoading(false);
     }
@@ -181,33 +181,33 @@ const NotificationTemplates = () => {
 
       if (editing) {
         await api.put(`/announcements/${editing.id}`, payload);
-        toast.success('Notification template updated.');
+        toast.success('Announcement updated.');
       } else {
         await api.post('/announcements', payload);
-        toast.success('Notification template created.');
+        toast.success('Announcement created.');
       }
 
       closeForm();
       await fetchTemplates();
     } catch (error) {
-      console.error('Error saving notification template:', error);
-      toast.error('Failed to save notification template.');
+      console.error('Error saving announcement:', error);
+      toast.error('Failed to save announcement.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this notification template?')) return;
+    if (!window.confirm('Delete this announcement?')) return;
 
     setLoading(true);
     try {
       await api.delete(`/announcements/${id}`);
-      toast.success('Notification template deleted.');
+      toast.success('Announcement deleted.');
       await fetchTemplates();
     } catch (error) {
-      console.error('Error deleting notification template:', error);
-      toast.error('Failed to delete notification template.');
+      console.error('Error deleting announcement:', error);
+      toast.error('Failed to delete announcement.');
     } finally {
       setLoading(false);
     }
@@ -234,7 +234,7 @@ const NotificationTemplates = () => {
       ? template.targetRoles.map((role) => (role === 'DepartmentHead' ? 'Department Head' : role)).join(', ')
       : 'configured target roles';
 
-    if (!window.confirm(`Send this ${label} template to ${roles}?`)) {
+    if (!window.confirm(`Send this ${label} announcement to ${roles}?`)) {
       return;
     }
 
@@ -258,7 +258,7 @@ const NotificationTemplates = () => {
         window.dispatchEvent(new Event('epms:notifications-updated'));
       }
     } catch (error) {
-      console.error(`Error sending ${channel} template:`, error);
+      console.error(`Error sending ${channel} announcement:`, error);
       toast.error(`Failed to send ${label}.`);
     } finally {
       setSendingKey(null);
@@ -274,14 +274,14 @@ const NotificationTemplates = () => {
 
         <button type="button" className="nt-primary-button" onClick={openCreate}>
           <i className="bi bi-plus-lg" aria-hidden />
-          <span>Create Template</span>
+          <span>Create Announcement</span>
         </button>
       </div>
 
       {loading && !showForm ? (
-        <div className="nt-empty">Loading notification templates...</div>
+        <div className="nt-empty">Loading announcements...</div>
       ) : sortedTemplates.length === 0 ? (
-        <div className="nt-empty">No notification templates yet.</div>
+        <div className="nt-empty">No announcements yet.</div>
       ) : (
         <div className="nt-grid">
           {sortedTemplates.map((template) => {
@@ -302,7 +302,7 @@ const NotificationTemplates = () => {
                   </span>
                 </div>
 
-                <div className="nt-chip-row" aria-label="Template channels">
+                <div className="nt-chip-row" aria-label="Announcement channels">
                   {channels.includes('email') && (
                     <button
                       type="button"
@@ -320,7 +320,7 @@ const NotificationTemplates = () => {
                     <button
                       type="button"
                       className="nt-chip nt-chip-button"
-                      title="Send to system notification center"
+                      title="Send announcement to notification center"
                       disabled={sendingKey === `${template.id}:in_app`}
                       onClick={() => void sendTemplate(template, 'in_app')}
                     >
@@ -356,7 +356,7 @@ const NotificationTemplates = () => {
 
       {showForm && (
         <div className="nt-modal-backdrop" role="presentation">
-          <section className="nt-modal" role="dialog" aria-modal="true" aria-label="Notification template form">
+          <section className="nt-modal" role="dialog" aria-modal="true" aria-label="Announcement form">
             <div className="nt-modal-head">
               <h2>{editing ? 'Edit Announcement' : 'Create Announcement'}</h2>
               <button type="button" className="nt-icon-button" onClick={closeForm} aria-label="Close">
@@ -366,7 +366,7 @@ const NotificationTemplates = () => {
 
             <form onSubmit={handleSubmit} className="nt-form">
               <label className="nt-field">
-                <span>Template Name</span>
+                <span>Announcement Name</span>
                 <input
                   type="text"
                   value={form.subjectTemplate}
@@ -425,7 +425,7 @@ const NotificationTemplates = () => {
                   Cancel
                 </button>
                 <button type="submit" className="nt-primary-button" disabled={saving}>
-                  {saving ? 'Saving...' : editing ? 'Update' : 'Create Template'}
+                  {saving ? 'Saving...' : editing ? 'Update' : 'Create Announcement'}
                 </button>
               </div>
             </form>
