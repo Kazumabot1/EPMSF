@@ -70,6 +70,32 @@ const uniqueScoreBands = <T extends ScoreBandLike>(bands: T[]) => {
   return Array.from(unique.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 };
 
+const validateScoreBands = (bands?: ScoreBandLike[] | null) => {
+  const activeBands = (bands?.length ? bands : defaultScoreBands())
+    .filter((band) => band.active !== false);
+
+  if (!activeBands.length) return 'At least one active score range is required.';
+
+  for (const band of activeBands) {
+    if (Number.isNaN(Number(band.minScore)) || Number.isNaN(Number(band.maxScore))) return 'Score range values must be numbers.';
+    if (Number(band.minScore) < 0 || Number(band.maxScore) > 100 || Number(band.minScore) > Number(band.maxScore)) {
+      return 'Score ranges must be valid values between 0 and 100.';
+    }
+    if (!band.label?.trim()) return 'Score rating label is required.';
+  }
+
+  const sortedBands = [...activeBands].sort((left, right) => Number(left.minScore) - Number(right.minScore));
+  for (let index = 1; index < sortedBands.length; index += 1) {
+    const previous = sortedBands[index - 1];
+    const current = sortedBands[index];
+    if (Number(current.minScore) <= Number(previous.maxScore)) {
+      return `Score ranges cannot overlap: ${previous.minScore}-${previous.maxScore} overlaps with ${current.minScore}-${current.maxScore}.`;
+    }
+  }
+
+  return '';
+};
+
 const makeCriteria = (criteriaText: string, sortOrder: number): AppraisalCriterionRequest => ({
   criteriaText,
   description: '',
@@ -781,14 +807,7 @@ const AppraisalTemplateRecordsPage = () => {
         if (!criteria.criteriaText.trim()) return 'Criteria text is required.';
       }
     }
-    const bands = uniqueScoreBands(form.scoreBands?.length ? form.scoreBands : defaultScoreBands());
-    for (const band of bands) {
-      if (Number.isNaN(Number(band.minScore)) || Number.isNaN(Number(band.maxScore))) return 'Score range values must be numbers.';
-      if (Number(band.minScore) < 0 || Number(band.maxScore) > 100 || Number(band.minScore) > Number(band.maxScore)) {
-        return 'Score ranges must be valid values between 0 and 100.';
-      }
-    }
-    return '';
+    return validateScoreBands(form.scoreBands);
   };
 
   const createTemplate = async () => {
