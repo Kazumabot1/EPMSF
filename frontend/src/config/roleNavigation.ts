@@ -29,13 +29,9 @@ export const disabledFeatureMessage = (positionName?: string | null) =>
 const feedbackChildren: NavItem[] = [
   { label: 'Question Bank', path: '/hr/feedback/questions', icon: 'bi-question-circle' },
   { label: 'Question Rules', path: '/hr/feedback/question-rules', icon: 'bi-sliders' },
-  { label: 'Dynamic Preview', path: '/hr/feedback/dynamic-preview', icon: 'bi-eye' },
   { label: 'Campaign Setup', path: '/hr/feedback/campaigns', icon: 'bi-calendar-plus' },
-  { label: 'Targets & Evaluators', path: '/hr/feedback/targets', icon: 'bi-people' },
-  { label: 'Assignment Preview', path: '/hr/feedback/assignment-preview', icon: 'bi-diagram-3' },
   { label: 'Monitoring', path: '/hr/feedback/monitoring', icon: 'bi-activity' },
   { label: 'Analytics', path: '/hr/feedback/analytics', icon: 'bi-graph-up' },
-  { label: 'Audit Log', path: '/hr/feedback/audit', icon: 'bi-clock-history' },
 ];
 
 const hrReportsChildren: NavItem[] = [
@@ -197,7 +193,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-bell',
       children: [
         { label: 'Announcement', path: '/announcements', icon: 'bi-file-earmark-text' },
-        { label: 'System Notification', path: '/notifications', icon: 'bi-bell' },
+        { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
       ],
     },
     {
@@ -406,7 +402,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    { label: 'My KPIs', path: '/executive/kpis', icon: 'bi-bullseye' },
     {
       label: 'KPI Management',
       path: '/executive/kpi-scoring',
@@ -414,8 +409,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       children: [
         { label: 'KPI Scoring', path: '/executive/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
         { label: 'KPI History', path: '/executive/kpi/history', icon: 'bi-clock-history' },
-        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-shield-check' },
-        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check' },
       ],
     },
     {

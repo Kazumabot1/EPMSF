@@ -415,13 +415,9 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             end: true,
           },
           { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
-          { to: '/hr/feedback/dynamic-preview', label: 'Dynamic Preview', icon: 'bi bi-eye' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
-          { to: '/hr/feedback/targets', label: 'Targets & Evaluators', icon: 'bi bi-people' },
-          { to: '/hr/feedback/assignment-preview', label: 'Assignment Preview', icon: 'bi bi-diagram-3' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
-          { to: '/hr/feedback/audit', label: 'Audit Log', icon: 'bi bi-shield-check' },
         ],
       },
 
@@ -452,7 +448,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             label: 'Announcement',
             icon: 'bi bi-file-earmark-text',
           },
-          { to: '/notifications', label: 'System Notification', icon: 'bi bi-bell' },
+          { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
         ],
       },
 
@@ -686,7 +682,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         children: [
           {
             to: '/notifications',
-            label: 'System Notification',
+            label: 'Notifications',
             icon: 'bi bi-bell',
           },
         ],
@@ -696,7 +692,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-      { to: '/executive/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
       {
         to: '/executive/kpi-scoring',
         label: 'KPI Management',
@@ -704,12 +699,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         children: [
           { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
           { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
-          { to: '/executive/approval/kpi', label: 'KPI Approval', icon: 'bi bi-shield-check' },
-          {
-            to: '/executive/approval/department-kpi',
-            label: 'Department KPI Approval',
-            icon: 'bi bi-building-check',
-          },
         ],
       },
       {
@@ -919,7 +908,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         children: [
           {
             to: '/notifications',
-            label: 'System Notification',
+            label: 'Notifications',
             icon: 'bi bi-bell',
           },
         ],

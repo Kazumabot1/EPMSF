@@ -148,6 +148,48 @@ const toDateInput = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
+const formatDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+const getLatestAdultBirthDate = () => {
+  const today = new Date();
+  const latestAdultBirthDate = new Date(
+      today.getFullYear() - 18,
+      today.getMonth(),
+      today.getDate(),
+  );
+
+  return formatDateInputValue(latestAdultBirthDate);
+};
+
+const validateAdultDateOfBirth = (value: string) => {
+  if (!value) return '';
+
+  const parsed = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime()) || formatDateInputValue(parsed) !== value) {
+    return 'Date of birth must be a valid date.';
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (parsed > today) {
+    return 'Date of birth cannot be in the future.';
+  }
+
+  if (value > getLatestAdultBirthDate()) {
+    return 'Employee must be at least 18 years old.';
+  }
+
+  return '';
+};
+
 const firstValue = (...values: any[]) => {
   for (const value of values) {
     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -183,6 +225,7 @@ const EmployeeFormModal = ({
   const derivedDashboard = selectedRoleName
       ? defaultDashboardForRole(selectedRoleName)
       : null;
+  const latestAdultBirthDate = useMemo(() => getLatestAdultBirthDate(), []);
 
   const parentDepartmentOptions = useMemo(() => {
     if (!form.currentDepartmentId) return [];
@@ -282,6 +325,9 @@ const EmployeeFormModal = ({
       return 'This position does not have a role connected yet. Please connect this position with a role before assigning it to an employee.';
     }
     if (!form.currentDepartmentId) return 'Current Department is required.';
+
+    const dateOfBirthValidation = validateAdultDateOfBirth(form.dateOfBirth);
+    if (dateOfBirthValidation) return dateOfBirthValidation;
 
     if (form.createLoginAccount && !form.email.trim()) {
       return 'Work email is required when creating a login account.';
@@ -595,6 +641,7 @@ const EmployeeFormModal = ({
                 <input
                     className="employee-input"
                     type="date"
+                    max={latestAdultBirthDate}
                     value={form.dateOfBirth}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))
