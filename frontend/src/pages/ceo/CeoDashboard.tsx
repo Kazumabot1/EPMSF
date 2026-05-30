@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { DashboardShell, DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import api from '../../services/api';
 import './ceo-dashboard.css';
 
@@ -144,6 +145,35 @@ const CeoDashboard = () => {
     [reviews],
   );
 
+  const reviewStatusData = useMemo(
+    () => [
+      { label: 'Manager draft', value: summary.draft, color: '#64748b' },
+      { label: 'Dept Head pending', value: summary.deptPending, color: '#d97706' },
+      { label: 'HR pending', value: summary.hrPending, color: '#2563eb' },
+      { label: 'Completed', value: summary.completed, color: '#16a34a' },
+    ],
+    [summary],
+  );
+
+  const scoreBandData = useMemo(() => {
+    const bands = [
+      { label: '86-100 Outstanding', min: 86, max: 100, color: '#16a34a' },
+      { label: '71-85 Strong', min: 71, max: 85.99, color: '#0284c7' },
+      { label: '60-70 Meets', min: 60, max: 70.99, color: '#2563eb' },
+      { label: '40-59 Watch', min: 40, max: 59.99, color: '#d97706' },
+      { label: '0-39 Risk', min: 0, max: 39.99, color: '#dc2626' },
+    ];
+
+    return bands.map((band) => ({
+      label: band.label,
+      value: reviews.filter((review) => {
+        const score = Number(review.scorePercent ?? 0);
+        return score >= band.min && score <= band.max;
+      }).length,
+      color: band.color,
+    }));
+  }, [reviews]);
+
   const filtered = reviews.filter((review) => {
     const q = search.trim().toLowerCase();
 
@@ -166,51 +196,20 @@ const CeoDashboard = () => {
   });
 
   return (
-    <div
-      className="executive-fluxen-dashboard"
-      style={{
-        padding: '2rem',
-        maxWidth: '1200px',
-        margin: '0 auto',
-        fontFamily: 'Inter, sans-serif',
-      }}
-    >
-      <div style={{ marginBottom: '2rem' }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '.4rem',
-            background: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
-            color: '#fff',
-            fontSize: '.75rem',
-            fontWeight: 700,
-            padding: '.3rem .8rem',
-            borderRadius: '999px',
-            marginBottom: '.75rem',
-            textTransform: 'uppercase',
-            letterSpacing: '.05em',
-          }}
-        >
-          <i className="bi bi-eye" /> Executive · Read-Only
+    <DashboardShell
+      eyebrow="Executive Dashboard"
+      title="Executive Dashboard"
+      description="Executive view of appraisal reports, performance summaries, and organization-level reporting."
+      metaLabel="Access"
+      metaValue="Read-only"
+      metaDetail="Executive summary"
+      actions={
+        <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.05em] text-blue-700">
+          <i className="bi bi-eye" /> Read-only
         </span>
-
-        <h1
-          style={{
-            fontSize: '1.8rem',
-            fontWeight: 800,
-            color: '#1e293b',
-            margin: '0 0 .25rem',
-          }}
-        >
-          Executive Dashboard
-        </h1>
-
-        <p style={{ color: '#64748b', margin: 0 }}>
-          Executive view of appraisal reports, performance summaries, and organization-level reporting.
-        </p>
-      </div>
-
+      }
+      className="executive-fluxen-dashboard dashboard-page-shell"
+    >
       <div
         style={{
           display: 'flex',
@@ -296,6 +295,34 @@ const CeoDashboard = () => {
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="executive-fluxen-charts">
+        <DashboardChartCard
+          title="Fluxen Review Status"
+          subtitle="Executive snapshot of appraisal review movement."
+        >
+          <DonutSummaryChart
+            data={reviewStatusData}
+            totalLabel="Reviews"
+            emptyTitle="No review status data"
+            emptyDescription="Review status data appears after appraisal review records are available."
+            height={220}
+          />
+        </DashboardChartCard>
+
+        <DashboardChartCard
+          title="Performance Band Comparison"
+          subtitle="Employees grouped by latest appraisal score band."
+        >
+          <HorizontalBarChart
+            data={scoreBandData}
+            emptyTitle="No score band data"
+            emptyDescription="Score comparison appears when appraisal scores are available."
+            height={220}
+            maxBars={5}
+          />
+        </DashboardChartCard>
       </div>
 
       <div
@@ -857,7 +884,7 @@ const CeoDashboard = () => {
           )}
         </div>
       )}
-    </div>
+    </DashboardShell>
   );
 };
 

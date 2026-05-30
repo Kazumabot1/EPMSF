@@ -4,6 +4,7 @@ import {
     DashboardChartCard,
     DashboardMetricCard,
     DashboardShell,
+    ComparisonColumnChart,
     DonutSummaryChart,
     EmptyChartState,
     HorizontalBarChart,
@@ -987,6 +988,20 @@ const buildReportingAnalytics = (dashboard: ReportingDashboard) => {
         8,
     );
 
+    const departmentDistributionBars = dashboard.departmentPerformance
+        .filter((row) => toDashboardNumber(row.employeeCount) > 0 || toDashboardNumber(row.assessmentCount) > 0)
+        .slice(0, 8)
+        .map((row, index) => ({
+            label: row.departmentName || 'Department',
+            value: toDashboardNumber(row.employeeCount),
+            compareValue: toDashboardNumber(row.assessmentCount),
+            compareLabel: 'Assessments',
+            detail: `${formatNumber(row.assessmentCount)} assessment(s)`,
+            color: '#7657f4',
+            compareColor: index % 2 === 0 ? '#9fd3ff' : '#b7d8ff',
+            raw: row,
+        }));
+
     const employeeScoreBands = buildScoreBands(dashboard.employeePerformance, (row) => row.scorePercent);
 
     const topEmployeeBars = buildTopValueBars(
@@ -1065,6 +1080,7 @@ const buildReportingAnalytics = (dashboard: ReportingDashboard) => {
         departmentAverageBars,
         departmentPendingBars,
         departmentPipBars,
+        departmentDistributionBars,
         employeeScoreBands,
         topEmployeeBars,
         assessmentStatus,
@@ -1083,6 +1099,19 @@ const ReportVisuals = ({ reportType, analytics }: { reportType: ReportType; anal
     if (reportType === 'departments') {
         return (
             <section className="dashboard-grid dashboard-grid--two reporting-visual-grid" aria-label="Department analytics charts">
+                <DashboardChartCard
+                    title="Department Distribution"
+                    subtitle="Employee count grouped by department, compared with assessment volume."
+                >
+                    <ComparisonColumnChart
+                        data={analytics.departmentDistributionBars}
+                        height={320}
+                        primaryLabel="Employees"
+                        comparisonLabel="Assessments"
+                        emptyTitle="No department distribution data"
+                        emptyDescription="Employee counts grouped by department will appear here after department data is available."
+                    />
+                </DashboardChartCard>
                 <DashboardChartCard title="Department Average Score" subtitle="Top departments by appraisal score.">
                     <HorizontalBarChart
                         data={analytics.departmentAverageBars}
@@ -1090,13 +1119,6 @@ const ReportVisuals = ({ reportType, analytics }: { reportType: ReportType; anal
                         emptyDescription="Approved assessment results are needed before department score comparison appears."
                         valueFormatter={(value) => formatDashboardPercent(value)}
                         xAxisSuffix="%"
-                    />
-                </DashboardChartCard>
-                <DashboardChartCard title="Pending Reviews by Department" subtitle="Departments with remaining review work.">
-                    <HorizontalBarChart
-                        data={analytics.departmentPendingBars}
-                        emptyTitle="No pending review data"
-                        emptyDescription="Pending department review counts will appear here."
                     />
                 </DashboardChartCard>
                 <DashboardChartCard title="Assessment Status" subtitle="Current appraisal workflow distribution.">
@@ -1107,6 +1129,13 @@ const ReportVisuals = ({ reportType, analytics }: { reportType: ReportType; anal
                         data={analytics.departmentPipBars}
                         emptyTitle="No active PIP load"
                         emptyDescription="No department-level active PIP count is currently reported."
+                    />
+                </DashboardChartCard>
+                <DashboardChartCard title="Pending Reviews by Department" subtitle="Departments with remaining review work.">
+                    <HorizontalBarChart
+                        data={analytics.departmentPendingBars}
+                        emptyTitle="No pending review data"
+                        emptyDescription="Pending department review counts will appear here."
                     />
                 </DashboardChartCard>
             </section>

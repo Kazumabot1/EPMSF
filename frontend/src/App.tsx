@@ -3,7 +3,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import HrEmployeeAccountImport from './pages/employee/HrEmployeeAccountImport';
-import Home from './components/Home';
+import RolePerformanceDashboard from './components/dashboard/RolePerformanceDashboard';
 import Login from './components/Login';
 import Register from './components/Register';
 import PositionPermissions from './pages/admin/PositionPermissions';
@@ -18,7 +18,6 @@ import OneOnOneRouteGate from './routes/OneOnOneRouteGate';
 import AppLayout from './layouts/AppLayout';
 
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
-import EmployeeMyDashboard from './pages/employee/EmployeeMyDashboard';
 import EmployeeManagement from './pages/employee/EmployeeManagement';
 import EmployeeRoutePlaceholder from './pages/employee/EmployeeRoutePlaceholder';
 import EmployeeKpiResultsPage from './pages/employee/EmployeeKpiResultsPage';
@@ -34,15 +33,12 @@ import TeamHistoryPage from './pages/team/TeamHistoryPage';
 import DepartmentManagement from './pages/department/DepartmentManagement';
 import DepartmentComparisonPage from './pages/department/DepartmentComparisonPage';
 
-import ManagerDashboard from './pages/manager/ManagerDashboard';
 import ManagerAssessmentReviewPage from './pages/manager/ManagerAssessmentReviewPage';
 import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
-import CeoDashboard from './pages/ceo/CeoDashboard';
 import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
-import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -177,7 +173,7 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
               <Route element={<AppLayout />}>
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/dashboard" element={<RolePerformanceDashboard view="admin" />} />
                 <Route path="/admin/users" element={<AdminDashboard />} />
                 <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
                 <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
@@ -187,7 +183,7 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={['Employee']} />}>
               <Route element={<AppLayout />}>
-                <Route path="/employee/dashboard" element={<EmployeeMyDashboard />} />
+                <Route path="/employee/dashboard" element={<RolePerformanceDashboard view="employee" />} />
                 <Route path="/employee/my-team" element={<Navigate to="/my-team" replace />} />
                 <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/employee/dashboard" />}>
                   <Route path="/employee/team-management" element={<TeamManagement />} />
@@ -214,7 +210,7 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={['Manager']} />}>
               <Route element={<AppLayout />}>
-                <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+                <Route path="/manager/dashboard" element={<RolePerformanceDashboard view="manager" />} />
                 <Route path="/manager/my-team" element={<Navigate to="/my-team" replace />} />
                 <Route path="/manager/kpis" element={<EmployeeKpiResultsPage />} />
                 <Route path="/manager/self-assessment" element={<Navigate to="/manager/assessment-review" replace />} />
@@ -241,7 +237,7 @@ function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['Executive']} />}>
             <Route element={<AppLayout />}>
-              <Route path="/executive/dashboard" element={<CeoDashboard />} />
+              <Route path="/executive/dashboard" element={<RolePerformanceDashboard view="ceo" />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
               <Route path="/executive/approval/kpi" element={<KpiApprovalPage />} />
               <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
@@ -270,7 +266,7 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
               <Route element={<AppLayout />}>
-                <Route path="/department-head/dashboard" element={<DepartmentHeadDashboard />} />
+                <Route path="/department-head/dashboard" element={<RolePerformanceDashboard view="departmentHead" />} />
                 <Route path="/department-head/my-team" element={<Navigate to="/my-team" replace />} />
                 <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
                 <Route path="/department-head/self-assessment" element={<Navigate to="/department-head/self-assessment-forms" replace />} />
@@ -314,7 +310,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['HR']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Home />} />
+                <Route path="/dashboard" element={<RolePerformanceDashboard view="hr" />} />
                 <Route path="/hr/profile" element={<ProfilePage />} />
                 <Route path="/hr/kpis" element={<EmployeeKpiResultsPage />} />
 
