@@ -21,6 +21,8 @@ public interface AppraisalCycleService {
 
     AppraisalCycleResponse activateCycle(Integer cycleId);
 
+    AppraisalCycleResponse deactivateCycle(Integer cycleId);
+
     AppraisalCycleResponse lockCycle(Integer cycleId);
 
     AppraisalCycleResponse completeCycle(Integer cycleId);

@@ -1,7 +1,7 @@
 import EmptyChartState from './EmptyChartState';
 import {
-    DASHBOARD_CHART_COLORS,
     formatDashboardNumber,
+    resolveDashboardChartColor,
     formatDashboardPercent,
     hasDashboardChartData,
     toDashboardNumber,
@@ -30,7 +30,13 @@ const DonutSummaryChart = ({
                                height = 260,
                                valueFormatter,
                            }: DonutSummaryChartProps) => {
-    const chartData = withDashboardPercentages(data).filter((item) => toDashboardNumber(item.value) > 0);
+    const usedColors = new Set<string>();
+    const chartData = withDashboardPercentages(data)
+        .filter((item) => toDashboardNumber(item.value) > 0)
+        .map((item, index) => ({
+            ...item,
+            chartColor: resolveDashboardChartColor(index, item.color, usedColors),
+        }));
     const total = chartData.reduce((sum, item) => sum + toDashboardNumber(item.value), 0);
 
     if (!hasDashboardChartData(chartData)) {
@@ -59,7 +65,7 @@ const DonutSummaryChart = ({
                                     cx="50"
                                     cy="50"
                                     r={CIRCLE_RADIUS}
-                                    stroke={item.color || DASHBOARD_CHART_COLORS[index % DASHBOARD_CHART_COLORS.length]}
+                                    stroke={item.chartColor}
                                     strokeDasharray={`${segmentLength} ${CIRCLE_CIRCUMFERENCE - segmentLength}`}
                                     strokeDashoffset={dashOffset}
                                 >
@@ -85,7 +91,7 @@ const DonutSummaryChart = ({
                         <span className="dashboard-chart-legend__item" key={`${item.label}-${index}`}>
               <span
                   className="dashboard-chart-legend__dot"
-                  style={{ background: item.color || DASHBOARD_CHART_COLORS[index % DASHBOARD_CHART_COLORS.length] }}
+                  style={{ background: item.chartColor }}
               />
                             {item.label} · {formatDashboardPercent(item.percentage)}
             </span>
@@ -97,3 +103,4 @@ const DonutSummaryChart = ({
 };
 
 export default DonutSummaryChart;
+/*Z*/

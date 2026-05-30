@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import ProfileNameCell from '../../components/ProfileNameCell';
 import {
   createDepartmentHeadTeam,
@@ -276,6 +277,24 @@ const DepartmentHeadDashboard = () => {
   const teamManagementAvailable = !teamPermissionMessage;
   const totalAssignedMembers = teams.reduce((sum, team) => sum + getTeamMemberCount(team), 0);
   const departmentDisplay = departmentName || dashboard?.departmentName || 'Your Department';
+  const teamStatusDistribution = useMemo(
+      () => [
+        { label: 'Active teams', value: activeTeams, color: '#16a34a' },
+        { label: 'Inactive teams', value: Math.max(teams.length - activeTeams, 0), color: '#64748b' },
+        { label: 'Pending reviews', value: reviewQueueCount, color: '#d97706' },
+      ],
+      [activeTeams, reviewQueueCount, teams.length],
+  );
+  const teamReadinessBars = useMemo(
+      () =>
+          teamRows.slice(0, 6).map((row, index) => ({
+            label: row.team.teamName || `Team ${index + 1}`,
+            value: row.score,
+            detail: `${formatNumber(row.memberCount)} member${row.memberCount === 1 ? '' : 's'} - ${row.active ? 'Active' : 'Inactive'}`,
+            color: ['#2563eb', '#0284c7', '#0891b2', '#16a34a', '#d97706', '#64748b'][index % 6],
+          })),
+      [teamRows],
+  );
 
   const loadTeamCandidates = async () => {
     try {
@@ -577,6 +596,35 @@ const DepartmentHeadDashboard = () => {
                 action="Check coverage"
                 onClick={() => document.getElementById('department-teams')?.scrollIntoView({ behavior: 'smooth' })}
             />
+          </section>
+
+          <section className="dashboard-grid dashboard-grid--two">
+            <DashboardChartCard
+                title="Fluxen Department Mix"
+                subtitle="Teams, inactive team slots, and pending department review load."
+            >
+              <DonutSummaryChart
+                  data={teamStatusDistribution}
+                  totalLabel="Signals"
+                  emptyTitle="No department mix yet"
+                  emptyDescription="Team and review data will appear here after department records are available."
+                  height={220}
+              />
+            </DashboardChartCard>
+
+            <DashboardChartCard
+                title="Team Readiness Comparison"
+                subtitle="Highest-readiness department teams based on leader, goal, members, and status."
+            >
+              <HorizontalBarChart
+                  data={teamReadinessBars}
+                  emptyTitle="No team readiness data"
+                  emptyDescription="Create or load teams to compare readiness."
+                  height={220}
+                  maxBars={6}
+                  valueFormatter={(value) => `${Math.round(value)}%`}
+              />
+            </DashboardChartCard>
           </section>
 
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">

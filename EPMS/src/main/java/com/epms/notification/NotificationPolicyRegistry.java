@@ -31,7 +31,10 @@ public class NotificationPolicyRegistry {
         registerRequired(policies, NotificationEventKey.DEPARTMENT_KPI_FINALIZED, NotificationCategory.KPI_WORKFLOW);
 
         registerRequired(policies, NotificationEventKey.APPRAISAL_CYCLE_ACTIVATED, NotificationCategory.APPRAISAL_WORKFLOW);
+        registerRequired(policies, NotificationEventKey.APPRAISAL_CYCLE_DEACTIVATED, NotificationCategory.APPRAISAL_WORKFLOW);
+        registerRequired(policies, NotificationEventKey.APPRAISAL_MANAGER_REVIEW_STARTED, NotificationCategory.APPRAISAL_WORKFLOW);
         registerRequired(policies, NotificationEventKey.APPRAISAL_DEADLINE_REMINDER, NotificationCategory.APPRAISAL_WORKFLOW);
+        registerRequired(policies, NotificationEventKey.APPRAISAL_DEADLINE_OVERDUE, NotificationCategory.APPRAISAL_WORKFLOW);
         registerRequired(policies, NotificationEventKey.APPRAISAL_REVIEW_SUBMITTED, NotificationCategory.APPRAISAL_WORKFLOW);
         registerRequired(policies, NotificationEventKey.APPRAISAL_RESULT_PUBLISHED, NotificationCategory.APPRAISAL_WORKFLOW);
         registerRequired(policies, NotificationEventKey.APPRAISAL_CYCLE_LOCKED, NotificationCategory.APPRAISAL_WORKFLOW);

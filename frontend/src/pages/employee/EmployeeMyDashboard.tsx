@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode, SVGProps } from 'react';
 import { Link } from 'react-router-dom';
+import { DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import { appraisalWorkflowService } from '../../services/appraisalService';
 import { feedbackService } from '../../services/feedbackService';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
@@ -409,6 +410,34 @@ const EmployeeMyDashboard = () => {
     },
   ];
 
+  const focusDistribution = [
+    { label: 'KPI progress', value: Math.round(kpiPercent), color: '#2563eb' },
+    { label: 'Appraisal progress', value: latestAppraisal ? clampPercent(latestAppraisal.scorePercent ?? 45) : 0, color: '#16a34a' },
+    { label: 'Feedback received', value: feedbackReceived, color: '#0284c7' },
+    { label: 'Feedback pending', value: feedbackPending, color: '#d97706' },
+  ];
+
+  const personalProgressBars = [
+    {
+      label: 'KPI completion',
+      value: kpiTotal ? (kpiCompleted / kpiTotal) * 100 : kpiPercent,
+      detail: kpiTotal ? `${kpiCompleted} of ${kpiTotal} KPI items recorded` : 'Latest KPI score progress',
+      color: '#2563eb',
+    },
+    {
+      label: 'Appraisal score',
+      value: latestAppraisal ? clampPercent(latestAppraisal.scorePercent ?? 0) : 0,
+      detail: latestAppraisal ? prettyStatus(latestAppraisal.status) : 'No active appraisal form',
+      color: '#16a34a',
+    },
+    {
+      label: 'Feedback activity',
+      value: feedbackReceived + feedbackPending,
+      detail: `${feedbackReceived} received, ${feedbackPending} pending`,
+      color: '#0284c7',
+    },
+  ];
+
   const recentActivities: ActivityItem[] = [
     ...data.notifications.slice(0, 4).map((notification, index) => ({
       id: `notification-${notification.id ?? index}-${notification.createdAt ?? index}`,
@@ -438,7 +467,7 @@ const EmployeeMyDashboard = () => {
   ].slice(0, 5);
 
   return (
-      <div className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-hidden bg-slate-50 pb-6 text-slate-950">
+      <div className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-hidden bg-slate-50 pb-6 text-slate-950 dashboard-page-shell">
         <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 overflow-hidden">
           <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
             <div className="absolute inset-y-0 right-0 hidden w-[31%] bg-gradient-to-l from-blue-50 via-indigo-50/80 to-transparent xl:block" />
@@ -506,6 +535,37 @@ const EmployeeMyDashboard = () => {
             {metricCards.map((card) => (
                 <MetricCardView key={card.title} card={card} />
             ))}
+          </section>
+
+          <section className="dashboard-grid dashboard-grid--two">
+            <DashboardChartCard
+                title="Fluxen Personal Mix"
+                subtitle="KPI, appraisal, and feedback signals in one compact view."
+            >
+              <DonutSummaryChart
+                  data={focusDistribution}
+                  totalLabel="Signals"
+                  emptyTitle="No personal signals yet"
+                  emptyDescription="KPI, appraisal, and feedback data will appear as records are assigned."
+                  height={220}
+              />
+            </DashboardChartCard>
+
+            <DashboardChartCard
+                title="Progress Comparison"
+                subtitle="Current personal progress across active workflows."
+            >
+              <HorizontalBarChart
+                  data={personalProgressBars}
+                  emptyTitle="No progress data"
+                  emptyDescription="Your workflow progress appears here after activity is recorded."
+                  height={220}
+                  maxBars={4}
+                  valueFormatter={(value, item) =>
+                      item?.label === 'Feedback activity' ? String(Math.round(value)) : `${Math.round(value)}%`
+                  }
+              />
+            </DashboardChartCard>
           </section>
 
           <section className="grid min-w-0 gap-4">

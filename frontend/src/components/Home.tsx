@@ -1,6 +1,9 @@
+/*Z*/
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    ComparisonColumnChart,
+    type ComparisonColumnDatum,
     DashboardChartCard,
     DashboardMetricCard,
     DashboardShell,
@@ -123,9 +126,6 @@ const uniqueDepartmentCount = (employees: EmployeeRecord[]) => {
 
 const getUserDisplayName = (user?: DashboardUser) => String(user?.fullName ?? user?.name ?? user?.email ?? 'HR User');
 
-const getUserSubtitle = (user?: DashboardUser) =>
-    String(user?.position ?? user?.employeeCode ?? user?.email ?? 'Human Resources');
-
 const formatNumber = (value?: number | string | null) => numberValue(value).toLocaleString();
 
 const formatPercent = (value?: number | string | null) => `${numberValue(value).toFixed(1)}%`;
@@ -141,24 +141,6 @@ const makeRouteButton = (label: string, onClick: () => void, variant: 'primary' 
     </button>
 );
 
-const buildDepartmentBars = (employees: EmployeeRecord[]): DashboardChartDatum[] => {
-    const map = new Map<string, number>();
-
-    employees.forEach((employee) => {
-        const name = getDepartmentName(employee);
-        map.set(name, (map.get(name) || 0) + 1);
-    });
-
-    return Array.from(map.entries())
-        .map(([label, value], index) => ({
-            label,
-            value,
-            color: label === 'Unassigned Department' ? '#d97706' : '#2563eb',
-        }))
-        .sort((left, right) => right.value - left.value)
-        .slice(0, 8);
-};
-
 const buildPositionBars = (employees: EmployeeRecord[]): DashboardChartDatum[] => {
     const map = new Map<string, number>();
 
@@ -168,18 +150,44 @@ const buildPositionBars = (employees: EmployeeRecord[]): DashboardChartDatum[] =
     });
 
     return Array.from(map.entries())
-        .map(([label, value], index) => ({
+        .map(([label, value]) => ({
             label,
             value,
-            color: label === 'Unassigned Position' ? '#d97706' : '#2563eb',
+            color: label === 'Unassigned Position' ? '#ffbd72' : '#8ec5ff',
         }))
         .sort((left, right) => right.value - left.value)
         .slice(0, 6);
 };
 
+
+const buildDepartmentComparisonBars = (employees: EmployeeRecord[]): ComparisonColumnDatum[] => {
+    const map = new Map<string, { total: number; active: number }>();
+
+    employees.forEach((employee) => {
+        const name = getDepartmentName(employee);
+        const current = map.get(name) || { total: 0, active: 0 };
+        current.total += 1;
+        if (isEmployeeActive(employee)) current.active += 1;
+        map.set(name, current);
+    });
+
+    return Array.from(map.entries())
+        .map(([label, value]) => ({
+            label,
+            value: value.total,
+            compareValue: value.active,
+            compareLabel: 'Active',
+            detail: `${value.active} active of ${value.total}`,
+            color: label === 'Unassigned Department' ? '#ffbd72' : '#7c5cff',
+            compareColor: label === 'Unassigned Department' ? '#f6d365' : '#8ec5ff',
+        }))
+        .sort((left, right) => Number(right.value) - Number(left.value))
+        .slice(0, 8);
+};
+
 const buildEmployeeStatusData = (employees: EmployeeRecord[]): DashboardChartDatum[] => [
-    { label: 'Active', value: employees.filter(isEmployeeActive).length, color: '#16a34a' },
-    { label: 'Inactive', value: employees.filter((employee) => !isEmployeeActive(employee)).length, color: '#94a3b8' },
+    { label: 'Active', value: employees.filter(isEmployeeActive).length, color: '#62cdbb' },
+    { label: 'Inactive', value: employees.filter((employee) => !isEmployeeActive(employee)).length, color: '#cbd5e1' },
 ];
 
 const buildAssessmentStatusData = (dashboard: ReportingDashboard): DashboardChartDatum[] => {
@@ -192,9 +200,9 @@ const buildAssessmentStatusData = (dashboard: ReportingDashboard): DashboardChar
     }
 
     return [
-        { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#0284c7' },
-        { label: 'Approved', value: dashboard.summary.approvedAssessments, color: '#16a34a' },
-        { label: 'Pending', value: dashboard.summary.pendingAssessments, color: '#d97706' },
+        { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#8ec5ff' },
+        { label: 'Approved', value: dashboard.summary.approvedAssessments, color: '#62cdbb' },
+        { label: 'Pending', value: dashboard.summary.pendingAssessments, color: '#ffbd72' },
     ];
 };
 
@@ -235,9 +243,9 @@ const buildFeedbackSummary = (rows: FeedbackParticipationRow[], fallbackRate: nu
     };
 };
 
-const buildFeedbackCompletionData = (rows: FeedbackParticipationRow[]): DashboardChartDatum[] =>
+const buildFeedbackCompletionData = (rows: FeedbackParticipationRow[]): ComparisonColumnDatum[] =>
     rows
-        .map((row, index) => {
+        .map((row) => {
             const assigned = toDashboardNumber(row.assignedCount);
             const submitted = toDashboardNumber(row.submittedCount);
             const pending = toDashboardNumber(row.pendingCount);
@@ -245,9 +253,13 @@ const buildFeedbackCompletionData = (rows: FeedbackParticipationRow[]): Dashboar
 
             return {
                 label: textValue(row.campaignName, 'Feedback Campaign'),
-                value: calculatedRate,
+                value: submitted,
+                percentage: calculatedRate,
                 detail: `${formatNumber(submitted)} submitted · ${formatNumber(pending)} pending`,
-                color: '#0284c7',
+                color: '#7c5cff',
+                compareValue: pending,
+                compareLabel: 'Pending',
+                compareColor: '#8ec5ff',
                 raw: row,
             };
         })
@@ -368,7 +380,7 @@ const Home = () => {
     const recentNotifications = dashboardData?.recentNotifications ?? [];
 
     const workforceStatusData = useMemo(() => buildEmployeeStatusData(employees), [employees]);
-    const departmentBars = useMemo(() => buildDepartmentBars(employees), [employees]);
+    const departmentComparisonBars = useMemo(() => buildDepartmentComparisonBars(employees), [employees]);
     const positionBars = useMemo(() => buildPositionBars(employees), [employees]);
     const assessmentStatusData = useMemo(() => buildAssessmentStatusData(reportingDashboard), [reportingDashboard]);
     const feedbackCompletionData = useMemo(
@@ -391,8 +403,8 @@ const Home = () => {
     );
     const pipStatusData = useMemo(
         () => [
-            { label: 'Active PIPs', value: reportingDashboard.summary.activePips, color: '#dc2626' },
-            { label: 'Completed PIPs', value: reportingDashboard.summary.completedPips, color: '#16a34a' },
+            { label: 'Active PIPs', value: reportingDashboard.summary.activePips, color: '#f59aaa' },
+            { label: 'Completed PIPs', value: reportingDashboard.summary.completedPips, color: '#62cdbb' },
         ],
         [reportingDashboard.summary.activePips, reportingDashboard.summary.completedPips],
     );
@@ -412,7 +424,6 @@ const Home = () => {
     const unassignedPositionCount = employees.filter((employee) => getPositionName(employee) === 'Unassigned Position').length;
     const unassignedDepartmentCount = employees.filter((employee) => getDepartmentName(employee) === 'Unassigned Department').length;
     const positionSetupIncomplete = stats.employees > 0 && unassignedPositionCount >= stats.employees;
-    const departmentSetupIncomplete = stats.employees > 0 && unassignedDepartmentCount > 0;
     const setupIssueCount = unassignedPositionCount + unassignedDepartmentCount;
 
     const attentionCount = stats.pendingAssessments + stats.pips + stats.lowPerformers + setupIssueCount;
@@ -501,14 +512,16 @@ const Home = () => {
 
             <section className="dashboard-grid dashboard-grid--overview mb-4">
                 <DashboardChartCard
-                    title="Department Distribution"
-                    subtitle="Employee count grouped by department."
+                    title="Overall Results by Department"
+                    subtitle="Employee coverage compared with active headcount."
                     action={makeRouteButton('Departments', () => navigate('/hr/department'))}
                 >
-                    <HorizontalBarChart
-                        data={departmentBars}
-                        height={220}
+                    <ComparisonColumnChart
+                        data={departmentComparisonBars}
+                        height={370}
                         maxBars={8}
+                        primaryLabel="Total Employees"
+                        comparisonLabel="Active Employees"
                         emptyTitle="No department distribution yet"
                         emptyDescription="Assign employees to departments to show department coverage."
                     />
@@ -578,12 +591,12 @@ const Home = () => {
                     action={makeRouteButton('Feedback', () => navigate('/hr/feedback/analytics'))}
                     size="compact"
                 >
-                    <HorizontalBarChart
+                    <ComparisonColumnChart
                         data={feedbackCompletionData}
-                        height={185}
-                        valueFormatter={(value) => formatDashboardPercent(value)}
-                        xAxisSuffix="%"
+                        height={240}
                         maxBars={5}
+                        primaryLabel="Submitted"
+                        comparisonLabel="Pending"
                         emptyTitle="No campaign completion data"
                         emptyDescription="360 feedback participation will appear after campaign assignments are created."
                     />

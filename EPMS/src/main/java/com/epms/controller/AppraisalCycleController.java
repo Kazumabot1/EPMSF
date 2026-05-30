@@ -94,6 +94,17 @@ public class AppraisalCycleController {
         );
     }
 
+    @PatchMapping("/{cycleId}/deactivate")
+    public ResponseEntity<GenericApiResponse<AppraisalCycleResponse>> deactivateCycle(
+            @PathVariable Integer cycleId
+    ) {
+        AppraisalCycleResponse response = appraisalCycleService.deactivateCycle(cycleId);
+
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Appraisal cycle deactivated", response)
+        );
+    }
+
     @PatchMapping("/{cycleId}/lock")
     public ResponseEntity<GenericApiResponse<AppraisalCycleResponse>> lockCycle(
             @PathVariable Integer cycleId

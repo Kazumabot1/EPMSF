@@ -82,12 +82,20 @@ const DepartmentKpiTemplateEditorPage = () => {
     if (rows.length === 0) return 'Add at least one KPI row.';
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
-      if (row.kpiItemId == null && !row.kpiLabel.trim()) return `Row ${i + 1}: enter a KPI name.`;
+      if (row.kpiItemId == null && !row.kpiLabel.trim()) return `Row ${i + 1}: enter a KPI name or select a KPI item.`;
       if ((row.kpiCategoryId == null && !row.kpiCategoryLabel.trim()) || (row.kpiUnitId == null && !row.kpiUnitLabel.trim()) || row.target == null || row.weight == null) {
         return `Row ${i + 1}: category, unit, target, and weight are required.`;
       }
+      if (!Number.isFinite(row.target) || row.target < 1 || row.target > 100) {
+        return `Row ${i + 1}: target must be between 1 and 100.`;
+      }
+      if (!Number.isFinite(row.weight) || row.weight < 1 || row.weight > 100) {
+        return `Row ${i + 1}: weight must be between 1 and 100.`;
+      }
     }
-    if ((status === 'ACTIVE' || status === 'FINALIZED') && totalWeight !== 100) return 'Total weight must equal 100%.';
+    if ((status === 'ACTIVE' || status === 'FINALIZED') && totalWeight !== 100) {
+      return 'Total weight must equal 100% before status can be ACTIVE or FINALIZED.';
+    }
     return null;
   };
 

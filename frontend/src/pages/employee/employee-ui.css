@@ -1,5 +1,10 @@
-.employee-page {
+
+/*Z*/.employee-page {
   animation: fadeIn 0.35s ease-out;
+}
+
+.employee-fluxen-analytics {
+  margin-bottom: 24px;
 }
 
 @keyframes fadeIn {
@@ -10,10 +15,10 @@
 .employee-hero {
   background: white;
   padding: 32px;
-  border-radius: 20px;
-  border: 1px solid #eef2f6;
+  border-radius: 18px;
+  border: 1px solid var(--fluxen-border, #e2e8f0);
   margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--fluxen-shadow, 0 10px 28px rgba(15, 23, 42, 0.055));
 }
 
 .employee-hero-badge {
@@ -22,7 +27,7 @@
   gap: 8px;
   padding: 6px 12px;
   background: #eef2ff;
-  color: #4f46e5;
+  color: #2563eb;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -53,10 +58,10 @@
 
 .employee-stat-card {
   background: white;
-  border: 1px solid #eef2f6;
+  border: 1px solid var(--fluxen-border, #e2e8f0);
   border-radius: 18px;
   padding: 22px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--fluxen-shadow, 0 10px 28px rgba(15, 23, 42, 0.055));
 }
 
 .employee-stat-head {
@@ -93,7 +98,7 @@
 }
 
 .employee-stat-icon.blue { background: #dbeafe; color: #2563eb; }
-.employee-stat-icon.indigo { background: #e0e7ff; color: #4f46e5; }
+.employee-stat-icon.indigo { background: #e0e7ff; color: #2563eb; }
 .employee-stat-icon.pink { background: #fce7f3; color: #db2777; }
 .employee-stat-icon.green { background: #dcfce7; color: #15803d; }
 
@@ -106,9 +111,9 @@
 .employee-surface,
 .employee-detail-card {
   background: white;
-  border-radius: 20px;
-  border: 1px solid #eef2f6;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  border-radius: 18px;
+  border: 1px solid var(--fluxen-border, #e2e8f0);
+  box-shadow: var(--fluxen-shadow, 0 10px 28px rgba(15, 23, 42, 0.055));
 }
 
 .employee-surface-inner {
@@ -143,7 +148,7 @@
 
 .employee-toolbar input:focus,
 .employee-toolbar select:focus {
-  border-color: #6366f1;
+  border-color: #2563eb;
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
 }
 
@@ -205,7 +210,7 @@
 }
 
 .employee-btn.primary {
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: #fff;
   border: none;
   text-decoration: none;
@@ -240,7 +245,7 @@
 
 .employee-btn.ghost:hover {
   background: #f1f5f9;
-  color: #4f46e5;
+  color: #2563eb;
 }
 
 .employee-state {
@@ -310,7 +315,7 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: white;
   display: grid;
   place-items: center;
@@ -406,7 +411,7 @@
 }
 
 .employee-back-link:hover {
-  color: #4f46e5;
+  color: #2563eb;
 }
 
 .employee-form-section {
@@ -424,7 +429,7 @@
 }
 
 .employee-form-section-title i {
-  color: #6366f1;
+  color: #2563eb;
   font-size: 1.15rem;
 }
 
@@ -502,7 +507,7 @@
 .employee-form-input:focus,
 .employee-form-select:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #2563eb;
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
 }
 
@@ -589,7 +594,7 @@
 }
 
 .employee-container .filters button {
-  background: #4f46e5;
+  background: #2563eb;
   color: #fff;
   border: none;
   font-weight: 600;

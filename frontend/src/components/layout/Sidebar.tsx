@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/*Z*/import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
 import api from '../../services/api';
@@ -371,19 +371,9 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             end: true,
           },
           {
-            to: '/hr/appraisal/template-create',
-            label: 'Template Form Create',
-            icon: 'bi bi-file-earmark-plus',
-          },
-          {
             to: '/hr/appraisal/template-forms',
             label: 'Template Form Records',
             icon: 'bi bi-folder2-open',
-          },
-          {
-            to: '/hr/appraisal/create',
-            label: 'Create Appraisal',
-            icon: 'bi bi-calendar-plus',
           },
           {
             to: '/hr/appraisal/cycles',
@@ -726,11 +716,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         to: '/profile',
         label: 'Profile',
         icon: 'bi bi-person',
-      },
-      hasMyTeams && {
-        to: '/my-team',
-        label: 'My Team',
-        icon: 'bi bi-diagram-3',
       },
       {
         to: '/department-head/self-assessment-forms',

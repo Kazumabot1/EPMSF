@@ -1,4 +1,4 @@
-.dh-dashboard-page {
+/*Z*/.dh-dashboard-page {
   position: relative;
 }
 
@@ -145,7 +145,7 @@
   place-items: center;
   margin-bottom: 14px;
   border-radius: 15px;
-  color: #4f46e5;
+  color: #2563eb;
   background: #eef2ff;
   font-size: 18px;
 }
@@ -235,7 +235,7 @@
 }
 
 .dh-team-rank-head span {
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 950;
 }
@@ -267,7 +267,7 @@
 .dh-team-rank-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #6366f1, #06b6d4);
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
   box-shadow: 0 0 18px rgba(99, 102, 241, 0.36);
 }
 
@@ -322,7 +322,7 @@
 }
 
 .dh-summary-row em {
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 12px;
   font-style: normal;
   font-weight: 900;
@@ -348,7 +348,7 @@
 }
 
 .dh-table-score {
-  color: #4f46e5;
+  color: #2563eb;
   font-weight: 950;
 }
 

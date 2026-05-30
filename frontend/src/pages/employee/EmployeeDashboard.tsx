@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
+import { DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import { fetchEmployees, type EmployeeResponse } from '../../services/employeeService';
 import ProfileNameCell from '../../components/ProfileNameCell';
 import './employee-ui.css';
@@ -63,8 +64,36 @@ const EmployeeDashboard = () => {
     return { total, male, female, assigned };
   }, [employees]);
 
+  const genderDistribution = useMemo(
+    () => [
+      { label: 'Male', value: stats.male, color: '#2563eb' },
+      { label: 'Female', value: stats.female, color: '#db2777' },
+      { label: 'Unspecified', value: Math.max(stats.total - stats.male - stats.female, 0), color: '#64748b' },
+    ],
+    [stats],
+  );
+
+  const departmentBars = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    employees.forEach((employee) => {
+      const department = employee.currentDepartment || 'Unassigned';
+      counts.set(department, (counts.get(department) ?? 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([label, value], index) => ({
+        label,
+        value,
+        detail: `${value} employee${value === 1 ? '' : 's'}`,
+        color: ['#2563eb', '#0284c7', '#0891b2', '#16a34a', '#d97706', '#64748b'][index % 6],
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, [employees]);
+
   return (
-    <div className="employee-page">
+    <div className="employee-page dashboard-page-shell">
       <div className="employee-hero">
         <span className="employee-hero-badge">
           <i className="bi bi-person-badge" />
@@ -113,6 +142,34 @@ const EmployeeDashboard = () => {
           <h3>{stats.assigned}</h3>
           <small>Employees with current department</small>
         </article>
+      </section>
+
+      <section className="dashboard-grid dashboard-grid--two employee-fluxen-analytics">
+        <DashboardChartCard
+          title="Workforce Mix"
+          subtitle="Gender distribution from employee profile records."
+        >
+          <DonutSummaryChart
+            data={genderDistribution}
+            totalLabel="Employees"
+            emptyTitle="No workforce mix yet"
+            emptyDescription="Employee gender data will appear here after records are available."
+            height={220}
+          />
+        </DashboardChartCard>
+
+        <DashboardChartCard
+          title="Department Comparison"
+          subtitle="Largest current department assignments."
+        >
+          <HorizontalBarChart
+            data={departmentBars}
+            emptyTitle="No department data"
+            emptyDescription="Department assignment counts will appear here after employees are assigned."
+            height={220}
+            maxBars={8}
+          />
+        </DashboardChartCard>
       </section>
 
       <div className="employee-grid">

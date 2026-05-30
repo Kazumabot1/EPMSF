@@ -57,10 +57,12 @@ const ProfileHeaderAvatar = ({
 
     window.addEventListener('focus', refresh);
     window.addEventListener('profile-updated', refresh);
+    window.addEventListener('epms:profile-avatar-updated', refresh);
 
     return () => {
       window.removeEventListener('focus', refresh);
       window.removeEventListener('profile-updated', refresh);
+      window.removeEventListener('epms:profile-avatar-updated', refresh);
     };
   }, [loadProfile]);
 
@@ -70,14 +72,17 @@ const ProfileHeaderAvatar = ({
   const displayEmail = profile?.email || email || '';
 
   return (
-    <span className={className} aria-hidden>
+    <span className={`${className} profile-header-avatar-frame`} aria-hidden>
       {src ? (
         <img
           src={src}
           alt=""
+          className="profile-header-avatar-image"
           style={{
             width: '100%',
             height: '100%',
+            maxWidth: '100%',
+            maxHeight: '100%',
             borderRadius: 'inherit',
             objectFit: 'cover',
             display: 'block',
