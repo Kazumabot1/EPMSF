@@ -206,15 +206,7 @@ function App() {
                 <Route path="/employee/self-assessment" element={<EmployeeSelfAssessmentPage />} />
                 <Route path="/employee/feedback" element={<EmployeeFeedbackDashboardPage />} />
                 <Route path="/employee/feedback/assignments/:assignmentId" element={<FeedbackFormPage />} />
-                <Route
-                    path="/employee/one-on-ones"
-                    element={
-                      <EmployeeRoutePlaceholder
-                          title="One-on-Ones"
-                          description="Manage your one-on-one meetings and related notes."
-                      />
-                    }
-                />
+                <Route path="/employee/one-on-ones" element={<OneOnOneActionItems readOnly />} />
                 <Route path="/employee/pip" element={<PipPastPlansPage />} />
               </Route>
             </Route>

@@ -180,3 +180,289 @@ input:focus, select:focus, textarea:focus {
 .role-dashboard-chart-card--comparison .dashboard-comparison-chart__bar--primary {
   width: min(52%, 44px);
 }
+
+/* Final EPMS page consistency polish: same blue/white language across plain pages. */
+:root {
+  --epms-ui-blue: #2563eb;
+  --epms-ui-blue-dark: #1d4ed8;
+  --epms-ui-blue-soft: #eff6ff;
+  --epms-ui-cyan: #38bdf8;
+  --epms-ui-mint: #2dd4bf;
+  --epms-ui-amber: #f59e0b;
+  --epms-ui-red: #ef4444;
+  --epms-ui-ink: #0f172a;
+  --epms-ui-muted: #64748b;
+  --epms-ui-border: #dbe7f6;
+  --epms-ui-page: #f5f8fd;
+  --epms-ui-shadow: 0 18px 46px rgba(15, 23, 42, 0.07);
+}
+
+.epms-refined-page {
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: 28px 24px 44px;
+  color: var(--epms-ui-ink);
+}
+
+.epms-refined-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  border: 1px solid var(--epms-ui-border);
+  border-radius: 24px;
+  padding: 26px 28px;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(37, 99, 235, 0.11), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: var(--epms-ui-shadow);
+}
+
+.epms-refined-hero--light {
+  background:
+    radial-gradient(circle at 94% 0%, rgba(56, 189, 248, 0.16), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+}
+
+.epms-refined-eyebrow {
+  margin: 0 0 8px;
+  color: var(--epms-ui-blue);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.epms-refined-hero h1,
+.epms-refined-card h2 {
+  margin: 0;
+  color: var(--epms-ui-ink);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.epms-refined-hero h1 {
+  font-size: clamp(2rem, 3.2vw, 3rem);
+}
+
+.epms-refined-hero p,
+.epms-refined-card-header p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.epms-refined-hero-stat,
+.epms-refined-score-pill {
+  display: grid;
+  place-items: center;
+  min-width: 150px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  text-align: center;
+}
+
+.epms-refined-hero-stat strong,
+.epms-refined-score-pill strong {
+  color: var(--epms-ui-blue);
+  font-size: 2rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.epms-refined-hero-stat span,
+.epms-refined-score-pill span {
+  margin-top: 6px;
+  color: var(--epms-ui-muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.epms-refined-metric-grid {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.epms-refined-metric-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.epms-refined-metric-card,
+.epms-refined-card {
+  border: 1px solid var(--epms-ui-border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.055);
+}
+
+.epms-refined-metric-card {
+  padding: 18px;
+}
+
+.epms-refined-metric-card span {
+  display: block;
+  color: var(--epms-ui-muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.epms-refined-metric-card strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--epms-ui-ink);
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 950;
+  letter-spacing: -0.035em;
+}
+
+.epms-refined-metric-card small {
+  display: block;
+  margin-top: 6px;
+  color: #7b8aa0;
+  font-weight: 700;
+}
+
+.epms-refined-card {
+  padding: 20px;
+}
+
+.epms-refined-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.epms-refined-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.epms-refined-note {
+  margin-bottom: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 750;
+}
+
+.epms-refined-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e6edf7;
+  border-radius: 16px;
+}
+
+.epms-refined-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.epms-refined-table th {
+  padding: 13px 14px;
+  color: #334155;
+  background: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.76rem;
+  font-weight: 900;
+  border-bottom: 1px solid #e6edf7;
+}
+
+.epms-refined-table td {
+  padding: 13px 14px;
+  color: #1e293b;
+  border-bottom: 1px solid #eef3fa;
+}
+
+.epms-refined-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.epms-refined-empty {
+  color: var(--epms-ui-muted);
+  font-weight: 750;
+  text-align: center;
+}
+
+.text-end { text-align: right !important; }
+
+/* One-off cleanup for old pages that used oversized/alien gradients. */
+.appraisal-dashboard-hero,
+.appraisal-history-hero,
+.appraisal-template-hero,
+.hr-assessment-hero,
+.position-hero,
+.department-compare-hero,
+.pip-page-header,
+.oom-header {
+  border: 1px solid var(--epms-ui-border) !important;
+  border-radius: 24px !important;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(37, 99, 235, 0.12), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%) !important;
+  color: var(--epms-ui-ink) !important;
+  box-shadow: var(--epms-ui-shadow) !important;
+}
+
+.appraisal-dashboard-hero *,
+.appraisal-history-hero *,
+.appraisal-template-hero *,
+.hr-assessment-hero *,
+.position-hero *,
+.department-compare-hero *,
+.pip-page-header *,
+.oom-header * {
+  color: inherit;
+}
+
+.appraisal-dashboard-kicker,
+.pip-eyebrow,
+.oom-eyebrow,
+.department-compare-kicker,
+.position-kicker {
+  color: var(--epms-ui-blue) !important;
+}
+
+.appraisal-dashboard-orb,
+.appraisal-dashboard-hero .one,
+.appraisal-dashboard-hero .two,
+.hr-assessment-hero::before,
+.hr-assessment-hero::after {
+  opacity: 0.14 !important;
+}
+
+.appraisal-button,
+.pip-button,
+.oom-submit,
+.oom-calendar-btn,
+.oom-cal-btn,
+.oom-refresh-btn,
+.oom-secondary-btn,
+button[class*="btn"],
+a[class*="btn"] {
+  border-radius: 13px !important;
+  font-weight: 850 !important;
+}
+
+@media (max-width: 900px) {
+  .epms-refined-page { padding: 18px 14px 32px; }
+  .epms-refined-hero,
+  .epms-refined-card-header { display: grid; }
+  .epms-refined-metric-grid--three { grid-template-columns: 1fr; }
+  .epms-refined-hero-stat,
+  .epms-refined-score-pill { min-width: 0; width: 100%; }
+}

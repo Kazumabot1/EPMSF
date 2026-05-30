@@ -798,3 +798,82 @@
     gap: 4px;
   }
 }
+
+/* Final blue professional polish for one-on-one pages */
+.oom-page {
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: 28px 24px 44px;
+  background: transparent;
+}
+
+.oom-header,
+.oom-scope-card {
+  border: 1px solid #dbe7f6;
+  border-radius: 24px;
+  padding: 24px 26px;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(37, 99, 235, 0.12), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.07);
+}
+
+.oom-header h1 {
+  color: #0f172a;
+  font-size: clamp(1.9rem, 3vw, 2.7rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.oom-eyebrow,
+.oom-scope-pill {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.oom-card,
+.oom-meeting-card {
+  border-color: #dbe7f6;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.055);
+}
+
+.oom-tab {
+  border-color: #dbe7f6;
+  background: #ffffff;
+  color: #475569;
+}
+
+.oom-tab:hover,
+.oom-tab.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
+}
+
+.oom-select,
+.oom-input,
+.oom-textarea,
+.oom-date-part input,
+.oom-time-row input,
+.oom-time-row select {
+  border-color: #d7e4f5;
+  border-radius: 14px;
+}
+
+.oom-calendar-btn,
+.oom-cal-btn,
+.oom-submit {
+  background: #2563eb;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+}
+
+.oom-refresh-btn,
+.oom-secondary-btn {
+  border: 1px solid #dbe7f6;
+  background: #ffffff;
+  color: #1e293b;
+  box-shadow: none;
+}

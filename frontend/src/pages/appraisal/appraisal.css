@@ -2045,3 +2045,120 @@ tr.appraisal-audit-removed td {
   border-radius: 14px;
   text-align: center;
 }
+
+/* Final blue professional polish for appraisal pages */
+.appraisal-page,
+.appraisal-dashboard-page {
+  width: min(100%, 1260px);
+  padding: 28px 24px 44px;
+}
+
+.appraisal-dashboard-hero,
+.appraisal-history-hero,
+.appraisal-template-hero {
+  min-height: auto;
+  border: 1px solid #dbe7f6 !important;
+  border-radius: 24px !important;
+  padding: 26px 28px !important;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(37, 99, 235, 0.13), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%) !important;
+  color: #0f172a !important;
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.07) !important;
+}
+
+.appraisal-dashboard-hero-content {
+  align-items: center;
+}
+
+.appraisal-dashboard-hero h1,
+.appraisal-history-hero h1,
+.appraisal-template-hero h1 {
+  color: #0f172a !important;
+  font-size: clamp(1.9rem, 3vw, 2.8rem) !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.appraisal-dashboard-hero p,
+.appraisal-history-hero p,
+.appraisal-template-hero p {
+  color: #475569 !important;
+}
+
+.appraisal-dashboard-kicker,
+.appraisal-page-header .appraisal-dashboard-kicker {
+  color: #2563eb !important;
+}
+
+.appraisal-hero-stat-card {
+  border: 1px solid #bfdbfe !important;
+  border-radius: 18px !important;
+  background: rgba(255,255,255,0.74) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8) !important;
+}
+
+.appraisal-hero-stat-card strong {
+  color: #2563eb !important;
+}
+
+.appraisal-hero-stat-card span {
+  color: #64748b !important;
+}
+
+.appraisal-dashboard-orb,
+.appraisal-dashboard-orb.one,
+.appraisal-dashboard-orb.two {
+  opacity: 0.12 !important;
+}
+
+.appraisal-card,
+.appraisal-section-card,
+.appraisal-filter-panel,
+.appraisal-template-table-wrap {
+  border-color: #dbe7f6 !important;
+  border-radius: 22px !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.055) !important;
+}
+
+.appraisal-form-block-header,
+.appraisal-section-header,
+.appraisal-table th,
+.appraisal-template-table th {
+  background: #f8fafc !important;
+}
+
+.appraisal-button {
+  min-height: 40px;
+  border-radius: 13px !important;
+  padding: 0 16px !important;
+  box-shadow: none !important;
+}
+
+.appraisal-button.primary,
+.appraisal-button.success {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+.appraisal-button.secondary,
+.appraisal-button.ghost {
+  background: #fff !important;
+  color: #1e293b !important;
+  border: 1px solid #dbe7f6 !important;
+}
+
+.appraisal-button.danger {
+  background: #ef4444 !important;
+}
+
+.appraisal-template-table,
+.appraisal-modern-record-table {
+  border-collapse: collapse;
+}
+
+.appraisal-template-table td,
+.appraisal-modern-record-table td {
+  vertical-align: middle;
+}
