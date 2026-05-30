@@ -57,7 +57,7 @@ export const kpiTemplateCycleService = {
 
   async listPendingApprovals(): Promise<KpiTemplateCycleResponse[]> {
     try {
-      const response = await api.get<KpiTemplateCycleResponse[]>('/executive/kpi-approvals');
+      const response = await api.get<KpiTemplateCycleResponse[]>('/hradmin/kpi-approvals');
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to load KPI approval requests.'));
@@ -66,7 +66,7 @@ export const kpiTemplateCycleService = {
 
   async approveEarlyClose(id: number, reviewReason?: string): Promise<KpiTemplateCycleResponse> {
     try {
-      const response = await api.post<KpiTemplateCycleResponse>(`/executive/kpi-approvals/${id}/approve`, {
+      const response = await api.post<KpiTemplateCycleResponse>(`/hradmin/kpi-approvals/${id}/approve`, {
         reviewReason,
       });
       return response.data;
@@ -77,7 +77,7 @@ export const kpiTemplateCycleService = {
 
   async rejectEarlyClose(id: number, reviewReason?: string): Promise<KpiTemplateCycleResponse> {
     try {
-      const response = await api.post<KpiTemplateCycleResponse>(`/executive/kpi-approvals/${id}/reject`, {
+      const response = await api.post<KpiTemplateCycleResponse>(`/hradmin/kpi-approvals/${id}/reject`, {
         reviewReason,
       });
       return response.data;

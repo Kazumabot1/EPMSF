@@ -175,7 +175,7 @@ export const departmentKpiWorkflowService = {
   },
 };
 
-const APPROVAL_BASE = '/executive/department-kpi-approvals';
+const APPROVAL_BASE = '/hradmin/department-kpi-approvals';
 
 export const departmentKpiApprovalService = {
   async listPendingEarlyCloseRequests(): Promise<DepartmentKpiCycle[]> {

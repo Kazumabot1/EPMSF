@@ -87,25 +87,25 @@ async getEmployeeProfile(employeeId: number): Promise<EmployeeChangeProfile> {
     return unwrap<EmployeeChangeSummary>(response);
   },
 
-  async getCeoPendingRequests(): Promise<EmployeeChangeSummary[]> {
-    const response = await api.get('/employee-change-requests/ceo/pending');
+  async getHrAdminPendingRequests(): Promise<EmployeeChangeSummary[]> {
+    const response = await api.get('/employee-change-requests/hradmin/pending');
     return unwrapList<EmployeeChangeSummary>(response);
   },
 
-  async getCeoDetail(requestId: number): Promise<EmployeeChangeDetail> {
-    const response = await api.get(`/employee-change-requests/ceo/${requestId}`);
+  async getHrAdminDetail(requestId: number): Promise<EmployeeChangeDetail> {
+    const response = await api.get(`/employee-change-requests/hradmin/${requestId}`);
     return unwrap<EmployeeChangeDetail>(response);
   },
 
-  async approveByCeo(requestId: number, reason: string): Promise<EmployeeChangeSummary> {
-    const response = await api.post(`/employee-change-requests/ceo/${requestId}/approve`, {
+  async approveByHrAdmin(requestId: number, reason: string): Promise<EmployeeChangeSummary> {
+    const response = await api.post(`/employee-change-requests/hradmin/${requestId}/approve`, {
       reason,
     });
     return unwrap<EmployeeChangeSummary>(response);
   },
 
-  async rejectByCeo(requestId: number, reason: string): Promise<EmployeeChangeSummary> {
-    const response = await api.post(`/employee-change-requests/ceo/${requestId}/reject`, {
+  async rejectByHrAdmin(requestId: number, reason: string): Promise<EmployeeChangeSummary> {
+    const response = await api.post(`/employee-change-requests/hradmin/${requestId}/reject`, {
       reason,
     });
     return unwrap<EmployeeChangeSummary>(response);

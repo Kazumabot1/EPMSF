@@ -126,7 +126,7 @@ export default function Notifications() {
   const canTemplates =
       user?.roles?.some((r) => {
         const x = String(r).toUpperCase().replace(/^ROLE_/, '');
-        return x === 'HR' || x === 'ADMIN';
+        return x === 'HR' || x === 'HRADMIN';
       }) ?? false;
 
   const load = useCallback(async () => {

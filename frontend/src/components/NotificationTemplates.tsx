@@ -4,7 +4,7 @@ import api from '../api';
 import './notification-templates.css';
 
 type Channel = 'email' | 'in_app';
-type TargetRole = 'Employee' | 'Manager' | 'DepartmentHead' | 'HR' | 'Admin' | 'Executive';
+type TargetRole = 'Employee' | 'Manager' | 'DepartmentHead' | 'HR' | 'HRADMIN' | 'Executive';
 
 interface NotificationTemplate {
   id: number;
@@ -50,7 +50,7 @@ const TARGET_ROLES: Array<{ value: TargetRole; label: string }> = [
   { value: 'Manager', label: 'Manager' },
   { value: 'DepartmentHead', label: 'Department Head' },
   { value: 'HR', label: 'HR' },
-  { value: 'Admin', label: 'Admin' },
+  { value: 'HRADMIN', label: 'HR Admin' },
   { value: 'Executive', label: 'Executive' },
 ];
 
@@ -231,7 +231,7 @@ const NotificationTemplates = () => {
   const sendTemplate = async (template: NotificationTemplate, channel: Channel) => {
     const label = channel === 'email' ? 'email' : 'in-app notification';
     const roles = template.targetRoles?.length
-      ? template.targetRoles.map((role) => (role === 'DepartmentHead' ? 'Department Head' : role)).join(', ')
+      ? template.targetRoles.map((role) => (role === 'DepartmentHead' ? 'Department Head' : role === 'HRADMIN' ? 'HR Admin' : role)).join(', ')
       : 'configured target roles';
 
     if (!window.confirm(`Send this ${label} announcement to ${roles}?`)) {
@@ -334,7 +334,7 @@ const NotificationTemplates = () => {
                   <div className="nt-role-row" aria-label="Target roles">
                     {(template.targetRoles ?? []).map((role) => (
                       <span key={role} className="nt-role-chip">
-                        {role === 'DepartmentHead' ? 'Department Head' : role}
+                        {role === 'DepartmentHead' ? 'Department Head' : role === 'HRADMIN' ? 'HR Admin' : role}
                       </span>
                     ))}
                   </div>

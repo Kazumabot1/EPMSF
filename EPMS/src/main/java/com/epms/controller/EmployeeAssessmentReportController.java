@@ -22,9 +22,9 @@ public class EmployeeAssessmentReportController {
 
     @GetMapping("/{assessmentId}/pdf")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<byte[]> exportSelfAssessmentPdf(@PathVariable Long assessmentId) {
         byte[] pdf = employeeAssessmentReportService.generateSelfAssessmentPdf(assessmentId);

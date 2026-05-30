@@ -344,7 +344,7 @@ export function LaunchReadinessSection({
                             <span className="hfdq-kicker">Feedback visibility</span>
                             <h4>Recipient view</h4>
                             <p>{privacySummary}</p>
-                            <p>HR/Admin can still audit evaluator identity for assignment management.</p>
+                            <p>HR or HR Admin can still audit evaluator identity for assignment management.</p>
                         </article>
                     </div>
 

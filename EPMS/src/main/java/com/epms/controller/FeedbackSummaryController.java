@@ -129,9 +129,9 @@ public class FeedbackSummaryController {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
                 .map(this::normalizeRoleName)
-                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN"));
+                .anyMatch(role -> role.equals("HR") || role.equals("HRADMIN"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only HR/Admin can access feedback summaries.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can access feedback summaries.");
         }
     }
 

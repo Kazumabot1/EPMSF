@@ -1,4 +1,4 @@
-export type Role = 'CEO' | 'HR' | 'DEPARTMENT_HEAD' | 'MANAGER' | 'ADMIN' | 'EMPLOYEE';
+export type Role = 'CEO' | 'HR' | 'DEPARTMENT_HEAD' | 'MANAGER' | 'HRADMIN' | 'EMPLOYEE';
 
 export type SignatureSourceType = 'DRAWN' | 'UPLOADED';
 

@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignmentManagementService {
 
     private static final Set<String> HR_ADMIN_ROLE_NAMES = Set.of(
-            "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
+            "HRADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
     );
     private static final Set<String> EXECUTIVE_ROLE_NAMES = Set.of("CEO", "EXECUTIVE");
 
@@ -331,7 +331,7 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
                 throw new BusinessValidationException("A direct report cannot be added as a peer evaluator.");
             }
             if (hasHrAdminRole(evaluator)) {
-                throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
+                throw new BusinessValidationException("HR or HR Admin users cannot be added as peer evaluators.");
             }
             if (isExecutivePeerMismatch(resolvePeerLayer(target), evaluator)) {
                 throw new BusinessValidationException("Executive users are not peer evaluators for this recipient layer.");

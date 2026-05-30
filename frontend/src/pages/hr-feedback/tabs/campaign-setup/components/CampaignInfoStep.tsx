@@ -371,7 +371,7 @@ export function CampaignInfoStep({
                                         <span><strong>Direct report feedback anonymous</strong><small>Recipient will not see individual direct report names.</small></span>
                                     </label>
                                 </div>
-                                <p className="hfdc-visibility-note">HR/Admin can still view evaluator identity for audit and assignment management.</p>
+                                <p className="hfdc-visibility-note">HR or HR Admin can still view evaluator identity for audit and assignment management.</p>
                             </div>
                         </div>
                     </div>

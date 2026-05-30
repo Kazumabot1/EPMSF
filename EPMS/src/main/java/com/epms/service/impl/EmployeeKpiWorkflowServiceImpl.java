@@ -1452,7 +1452,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         if (!finalizedThisRun.isEmpty()) {
             List<User> hrUsers = userRepository.findActiveUsersByNormalizedRoleNames(
-                    List.of("HR", "ADMIN", "HR_MANAGER", "HR_ADMIN")
+                    List.of("HR", "HRADMIN", "HR_MANAGER", "HR_ADMIN")
             );
             String summary = finalizedThisRun.stream()
                     .map(ekf -> fullName(ekf.getEmployee()) + " (" + (ekf.getTotalWeightedScore() != null

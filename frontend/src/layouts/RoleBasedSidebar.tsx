@@ -53,7 +53,7 @@ const RoleBasedSidebar = ({
   collapsed,
   onToggleCollapse,
 }: RoleBasedSidebarProps) => {
-  if (role === 'Admin') {
+  if (role === 'HRAdmin') {
     return <Sidebar collapsed={collapsed} onToggle={onToggleCollapse} variant="admin" />;
   }
 

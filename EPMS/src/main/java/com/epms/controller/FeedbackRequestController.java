@@ -64,7 +64,7 @@ public class FeedbackRequestController {
     }
 
     private void ensureCanViewEmployeeRequests(Long employeeId) {
-        if (hasRole("HR") || hasRole("ADMIN")) {
+        if (hasRole("HR") || hasRole("HRADMIN")) {
             return;
         }
 

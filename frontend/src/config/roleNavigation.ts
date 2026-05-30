@@ -2,7 +2,7 @@ import type { PositionPermission } from '../types/positionPermission';
 
 export type UserRole =
     | 'Employee'
-    | 'Admin'
+    | 'HRAdmin'
     | 'HR'
     | 'DepartmentHead'
     | 'Manager'
@@ -77,11 +77,21 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Notifications', path: '/employee/notifications', icon: 'bi-bell' },
   ],
 
-  Admin: [
-    { label: 'Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
+  HRAdmin: [
+    { label: 'HR Admin Dashboard', path: '/hradmin/dashboard', icon: 'bi-shield-lock', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
-    { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
+    { label: 'User Accounts', path: '/hradmin/users', icon: 'bi-person-plus' },
+    { label: 'Import Accounts', path: '/hradmin/employee/import', icon: 'bi-upload' },
+    {
+      label: 'Approval',
+      path: '/hradmin/approval/kpi',
+      icon: 'bi-shield-check',
+      children: [
+        { label: 'KPI Approval', path: '/hradmin/approval/kpi', icon: 'bi-bullseye', end: true },
+        { label: 'Department KPI Approval', path: '/hradmin/approval/department-kpi', icon: 'bi-building-check' },
+        { label: 'Position & Department Changes', path: '/hradmin/approval/changes', icon: 'bi-arrow-left-right' },
+      ],
+    },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Access Control',
@@ -412,15 +422,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       ],
     },
     {
-      label: 'Approval',
-      path: '/executive/approval/kpi',
-      icon: 'bi-shield-check',
-      children: [
-        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
-        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check' },
-      ],
-    },
-    {
       label: 'Reports',
       path: '/executive/reports',
       icon: 'bi-bar-chart-line',
@@ -450,8 +451,8 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
   const dashboard = normalizeRoleName(user.dashboard ?? '');
   const normalizedPosition = normalizeRoleName(user.position ?? '');
 
-  if (normalizedRoles.includes('ADMIN') || dashboard === 'ADMIN_DASHBOARD') {
-    return 'Admin';
+  if (normalizedRoles.includes('HRADMIN') || normalizedRoles.includes('ADMIN') || dashboard === 'HRADMIN_DASHBOARD' || dashboard === 'ADMIN_DASHBOARD') {
+    return 'HRAdmin';
   }
 
   if (
@@ -498,7 +499,7 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
 
 export const dashboardPathByRole: Record<UserRole, string> = {
   Employee: '/employee/dashboard',
-  Admin: '/admin/dashboard',
+  HRAdmin: '/hradmin/dashboard',
   HR: '/dashboard',
   DepartmentHead: '/department-head/dashboard',
   Manager: '/manager/dashboard',
@@ -507,6 +508,7 @@ export const dashboardPathByRole: Record<UserRole, string> = {
 
 export const displayRoleName = (role: UserRole) => {
   if (role === 'DepartmentHead') return 'Department Head';
+  if (role === 'HRAdmin') return 'HR Admin';
   if (role === 'Executive') return 'CEO';
   return role;
 };

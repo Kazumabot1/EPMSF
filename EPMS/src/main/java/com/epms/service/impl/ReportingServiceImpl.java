@@ -624,7 +624,7 @@ public class ReportingServiceImpl implements ReportingService {
 
     private boolean canViewReports(Set<String> roles) {
         return roles.contains("HR")
-                || roles.contains("ADMIN")
+                || roles.contains("HRADMIN")
                 || roles.contains("EXECUTIVE")
                 || roles.contains("MANAGER")
                 || roles.contains("DEPARTMENT_HEAD")
@@ -632,7 +632,7 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private boolean canViewAllDepartments(Set<String> roles) {
-        return roles.contains("HR") || roles.contains("ADMIN") || roles.contains("EXECUTIVE");
+        return roles.contains("HR") || roles.contains("HRADMIN") || roles.contains("EXECUTIVE");
     }
 
     private String scopeLabel(UserPrincipal principal, Set<String> roles) {
@@ -652,7 +652,7 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private String primaryRole(Set<String> roles) {
-        if (roles.contains("ADMIN")) return "Admin";
+        if (roles.contains("HRADMIN")) return "HR Admin";
         if (roles.contains("HR")) return "HR";
         if (roles.contains("EXECUTIVE")) return "Executive";
         if (roles.contains("DEPARTMENT_HEAD")) return "Department Head";
@@ -688,8 +688,8 @@ public class ReportingServiceImpl implements ReportingService {
 
         roles.add(role);
 
-        if (role.equals("ADMIN")) {
-            roles.add("ADMIN");
+        if (role.equals("HRADMIN")) {
+            roles.add("HRADMIN");
         }
 
         if (role.equals("HR")
@@ -733,7 +733,7 @@ public class ReportingServiceImpl implements ReportingService {
         String normalized = canonicalRole(dashboard);
 
         return switch (normalized) {
-            case "ADMIN_DASHBOARD" -> "ADMIN";
+            case "HRADMIN_DASHBOARD" -> "HRADMIN";
             case "HR_DASHBOARD" -> "HR";
             case "MANAGER_DASHBOARD" -> "MANAGER";
             case "DEPARTMENT_HEAD_DASHBOARD", "DEPARTMENTHEAD_DASHBOARD", "DEPT_HEAD_DASHBOARD" -> "DEPARTMENT_HEAD";

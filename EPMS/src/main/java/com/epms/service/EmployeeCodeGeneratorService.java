@@ -61,7 +61,7 @@ public class EmployeeCodeGeneratorService {
 
         String title = normalize(position != null ? position.getPositionTitle() : null);
 
-        if (containsAny(role, "ADMIN") || containsAny(dashboard, "ADMIN")) {
+        if (containsAny(role, "HRADMIN") || containsAny(dashboard, "HRADMIN")) {
             return "ADM";
         }
         if (containsAny(role, "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES") || containsAny(dashboard, "HR")) {

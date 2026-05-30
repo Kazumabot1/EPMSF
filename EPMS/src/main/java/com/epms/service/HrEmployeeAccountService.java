@@ -77,10 +77,10 @@ public class HrEmployeeAccountService {
     }
 
     /**
-     * Admin/HR account creation must keep these tables in sync:
+     * HR or HR Admin account creation must keep these tables in sync:
      * users -> employee -> employee_department.
      *
-     * Before this fix, Admin could create a login user without a matching employee master row
+     * Before this fix, HR Admin could create a login user without a matching employee master row
      * or without an active employee_department assignment. HR pages read employee data, so those
      * users looked "missing" even though they existed in users.
      */
@@ -113,7 +113,7 @@ public class HrEmployeeAccountService {
         employee.setActive(true);
         employee = employeeRepository.save(employee);
 
-        syncEmployeeDepartment(employee, department, "Admin");
+        syncEmployeeDepartment(employee, department, "HR Admin");
 
         AccountProvisionResult provision = userAccountProvisioningService.provisionFromEmployee(
                 employee,
@@ -139,7 +139,7 @@ public class HrEmployeeAccountService {
         user.setUpdatedAt(new Date());
         user = userRepository.save(user);
 
-        replaceUserRole(user.getId(), normalizedRole, "Auto-created by Admin user management");
+        replaceUserRole(user.getId(), normalizedRole, "Auto-created by HR Admin user management");
 
         return AccountProvisionResult.builder()
                 .userId(user.getId())
@@ -153,7 +153,7 @@ public class HrEmployeeAccountService {
     }
 
     /**
-     * Used by Admin Dashboard edit. This intentionally updates both user login data and employee
+     * Used by HR Admin Dashboard edit. This intentionally updates both user login data and employee
      * master data so HR Employee, Manager, Department Head, and self-assessment pages all see the
      * same person.
      */
@@ -213,7 +213,7 @@ public class HrEmployeeAccountService {
         employee = employeeRepository.save(employee);
 
         if (active) {
-            syncEmployeeDepartment(employee, department, "Admin");
+            syncEmployeeDepartment(employee, department, "HR Admin");
         } else {
             closeActiveEmployeeDepartmentAssignments(employee);
         }
@@ -229,7 +229,7 @@ public class HrEmployeeAccountService {
         user.setUpdatedAt(new Date());
         user = userRepository.save(user);
 
-        replaceUserRole(user.getId(), normalizedRole, "Auto-created by Admin user edit");
+        replaceUserRole(user.getId(), normalizedRole, "Auto-created by HR Admin user edit");
 
         return user;
     }
@@ -468,7 +468,7 @@ public class HrEmployeeAccountService {
                     department.setDepartmentName(departmentName);
                     department.setStatus(true);
                     department.setCreatedAt(new Date());
-                    department.setCreatedBy("Admin/HR Import");
+                    department.setCreatedBy("HR or HR Admin Import");
                     return departmentRepository.save(department);
                 });
     }
@@ -581,7 +581,7 @@ public class HrEmployeeAccountService {
             if (Objects.equals(workingDepartmentId, department.getId())) {
                 assignment.setCurrentDepartment(department);
                 assignment.setParentDepartment(null);
-                assignment.setAssignBy(assignBy == null ? "Admin" : assignBy);
+                assignment.setAssignBy(assignBy == null ? "HR Admin" : assignBy);
                 if (assignment.getStartdate() == null) {
                     assignment.setStartdate(new Date());
                 }
@@ -598,7 +598,7 @@ public class HrEmployeeAccountService {
         newAssignment.setEmployee(employee);
         newAssignment.setCurrentDepartment(department);
         newAssignment.setParentDepartment(null);
-        newAssignment.setAssignBy(assignBy == null ? "Admin" : assignBy);
+        newAssignment.setAssignBy(assignBy == null ? "HR Admin" : assignBy);
         newAssignment.setStartdate(new Date());
         newAssignment.setEnddate(null);
 
@@ -699,7 +699,7 @@ public class HrEmployeeAccountService {
             case "PROJECT_MANAGER", "PROJECTMANAGER", "TEAM_MANAGER", "PM" -> "MANAGER";
             case "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT" -> "DEPARTMENT_HEAD";
             case "EXECUTIVE", "CEO" -> "CEO";
-            case "ADMIN" -> "ADMIN";
+            case "HRADMIN" -> "HRADMIN";
             case "HR" -> "HR";
             case "MANAGER" -> "MANAGER";
             case "DEPARTMENT_HEAD" -> "DEPARTMENT_HEAD";

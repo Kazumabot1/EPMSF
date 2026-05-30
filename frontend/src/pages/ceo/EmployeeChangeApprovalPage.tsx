@@ -83,7 +83,7 @@ const EmployeeChangeApprovalPage = () => {
     setIsError(false);
 
     try {
-      const data = await employeeChangeRequestService.getCeoPendingRequests();
+      const data = await employeeChangeRequestService.getHrAdminPendingRequests();
       setRequests(data);
     } catch (error) {
       setIsError(true);
@@ -103,7 +103,7 @@ const EmployeeChangeApprovalPage = () => {
     setIsError(false);
 
     try {
-      const data = await employeeChangeRequestService.getCeoDetail(request.id);
+      const data = await employeeChangeRequestService.getHrAdminDetail(request.id);
       setDetail(data);
     } catch (error) {
       setIsError(true);
@@ -137,10 +137,10 @@ const EmployeeChangeApprovalPage = () => {
 
     try {
       if (reviewAction === 'APPROVE') {
-        await employeeChangeRequestService.approveByCeo(selectedRequest.id, reason.trim());
+        await employeeChangeRequestService.approveByHrAdmin(selectedRequest.id, reason.trim());
         setMessage('Workforce change approved and applied.');
       } else {
-        await employeeChangeRequestService.rejectByCeo(selectedRequest.id, reason.trim());
+        await employeeChangeRequestService.rejectByHrAdmin(selectedRequest.id, reason.trim());
         setMessage('Workforce change rejected.');
       }
 
@@ -399,7 +399,7 @@ const EmployeeChangeApprovalPage = () => {
                   </section>
 
                   <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h3 className="font-black text-slate-950">CEO Review</h3>
+                    <h3 className="font-black text-slate-950">HR Admin Review</h3>
                     <div className="mt-3 flex flex-wrap gap-3">
                       <button
                         type="button"
@@ -428,11 +428,11 @@ const EmployeeChangeApprovalPage = () => {
                     <textarea
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
-                      placeholder="Write CEO approval/rejection reason..."
+                      placeholder="Write HR Admin approval/rejection reason..."
                       className="mt-4 min-h-28 w-full resize-y rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                     />
                     <p className="mt-2 text-xs font-bold text-slate-500">
-                      CEO review reason is required and must be at least 10 characters.
+                      HR Admin review reason is required and must be at least 10 characters.
                     </p>
                   </section>
                 </div>

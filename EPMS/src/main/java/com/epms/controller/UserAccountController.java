@@ -121,7 +121,7 @@ public class UserAccountController {
                 user,
                 oldDashboard,
                 dashboard,
-                "Dashboard assigned by Admin"
+                "Dashboard assigned by HR Admin"
         );
 
         AdminUserAccountResponse response = toResponse(user);
@@ -166,7 +166,7 @@ public class UserAccountController {
                 user,
                 oldDashboard,
                 dashboard,
-                "Dashboard changed by Admin"
+                "Dashboard changed by HR Admin"
         );
 
         return ResponseEntity.ok(
@@ -357,7 +357,7 @@ public class UserAccountController {
             case "PROJECT_MANAGER", "PROJECTMANAGER", "TEAM_MANAGER", "PM" -> "MANAGER";
             case "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT" -> "DEPARTMENT_HEAD";
             case "EXECUTIVE", "CEO" -> "CEO";
-            case "ADMIN" -> "ADMIN";
+            case "HRADMIN" -> "HRADMIN";
             case "HR" -> "HR";
             case "MANAGER" -> "MANAGER";
             case "DEPARTMENT_HEAD" -> "DEPARTMENT_HEAD";

@@ -44,7 +44,7 @@ import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
 import DepartmentHeadDashboard from './pages/department-head/DepartmentHeadDashboard';
 import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
+import HrAdminDashboard from './pages/admin/AdminDashboard';
 
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
 import SelfAssessmentFormRecordsPage from './pages/hr/SelfAssessmentFormRecordsPage';
@@ -175,12 +175,15 @@ function App() {
               </Route>
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['HRAdmin']} />}>
               <Route element={<AppLayout />}>
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                <Route path="/admin/users" element={<AdminDashboard />} />
-                <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
-                <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
+                <Route path="/hradmin/dashboard" element={<HrAdminDashboard />} />
+                <Route path="/hradmin/users" element={<HrAdminDashboard />} />
+                <Route path="/hradmin/employee/import" element={<HrEmployeeAccountImport />} />
+                <Route path="/hradmin/audit-logs" element={<AdminAuditLogsPage />} />
+                <Route path="/hradmin/approval/kpi" element={<KpiApprovalPage />} />
+                <Route path="/hradmin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
+                <Route path="/hradmin/approval/changes" element={<EmployeeChangeApprovalPage />} />
                 <Route path="/position-permissions" element={<PositionPermissions />} />
               </Route>
             </Route>
@@ -243,12 +246,12 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<CeoDashboard />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
-              <Route path="/executive/approval/kpi" element={<KpiApprovalPage />} />
-              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
-              <Route path="/executive/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
-              <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/approval/department-kpi" replace />} />
-             <Route path="/executive/approval/changes" element={<EmployeeChangeApprovalPage />} />
-<Route path="/ceo/approval/changes" element={<Navigate to="/executive/approval/changes" replace />} />
+              <Route path="/executive/approval/kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/approval/changes" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/ceo/approval/changes" element={<Navigate to="/executive/dashboard" replace />} />
 
               <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
               <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />

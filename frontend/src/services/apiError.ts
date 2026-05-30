@@ -114,7 +114,7 @@ export const extractApiErrorMessage = (error: unknown, fallback: string): string
 
   if (typeof status === 'number') {
     if (status === 403) {
-      return 'Access denied. You may need HR or ADMIN permissions.';
+      return 'Access denied. You may need HR or HRADMIN permissions.';
     }
     if (status === 401) {
       return 'Session expired or not logged in. Please sign in again.';

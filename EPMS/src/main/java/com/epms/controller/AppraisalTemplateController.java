@@ -20,9 +20,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 @PreAuthorize(
-        "hasAnyRole('HR', 'ADMIN') "
+        "hasAnyRole('HR', 'HRADMIN') "
                 + "or principal.dashboard == 'HR_DASHBOARD' "
-                + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                + "or principal.dashboard == 'HRADMIN_DASHBOARD'"
 )
 public class AppraisalTemplateController {
 

@@ -126,9 +126,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
                 COALESCE(NULLIF(u.full_name, ''), NULLIF(u.email, ''), CONCAT('User #', u.id)) AS displayName,
                 CASE
                     WHEN MAX(CASE
-                        WHEN UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_')) = 'ADMIN'
+                        WHEN UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_')) = 'HRADMIN'
                         THEN 1 ELSE 0 END) = 1
-                    THEN 'Admin'
+                    THEN 'HR Admin'
 
                     WHEN MAX(CASE
                         WHEN UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_'))

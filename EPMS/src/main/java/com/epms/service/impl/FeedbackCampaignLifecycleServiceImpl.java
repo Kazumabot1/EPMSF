@@ -181,7 +181,7 @@ public class FeedbackCampaignLifecycleServiceImpl implements FeedbackCampaignLif
         );
 
         FeedbackCampaign closed = closeCampaignInternal(campaign, actorUserId, true,
-                "Early close approved by Admin" + noteSuffix(reviewNote), false);
+                "Early close approved by HR Admin" + noteSuffix(reviewNote), false);
         feedbackOperationalService.notifyEarlyCloseReviewed(closed, true);
         return closed;
     }
@@ -287,7 +287,7 @@ public class FeedbackCampaignLifecycleServiceImpl implements FeedbackCampaignLif
             campaign.setEarlyCloseRequestStatus(FeedbackCampaignEarlyCloseStatus.REJECTED);
             campaign.setEarlyCloseReviewedAt(LocalDateTime.now());
             campaign.setEarlyCloseReviewedByUserId(actorUserId);
-            campaign.setEarlyCloseReviewReason("Campaign reached the scheduled deadline before Admin review.");
+            campaign.setEarlyCloseReviewReason("Campaign reached the scheduled deadline before HR Admin review.");
         }
         FeedbackCampaign saved = feedbackCampaignRepository.save(campaign);
 

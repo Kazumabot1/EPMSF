@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/executive/department-kpi-approvals")
+@RequestMapping({"/api/hradmin/department-kpi-approvals", "/api/executive/department-kpi-approvals"})
 @RequiredArgsConstructor
 public class DepartmentKpiApprovalController {
 

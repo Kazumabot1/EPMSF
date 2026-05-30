@@ -56,7 +56,7 @@
 //     return 'This form is already active/archived. Create a new version instead of editing it directly.';
 //   }
 //   if (lower.includes('only hr/admin') || lower.includes('forbidden') || lower.includes('403')) {
-//     return 'Your account must have HR/Admin permission for form changes. If you are logged in as HR, check whether PUT/POST form APIs allow the HR role in Spring Security.';
+//     return 'Your account must have HR or HR Admin permission for form changes. If you are logged in as HR, check whether PUT/POST form APIs allow the HR role in Spring Security.';
 //   }
 //   if (lower.includes('401') || lower.includes('unauthorized')) {
 //     return 'Your session may have expired. Please log in again and retry.';

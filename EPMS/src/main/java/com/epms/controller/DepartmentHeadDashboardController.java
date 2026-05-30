@@ -32,7 +32,7 @@ import java.util.List;
                 "or hasAuthority('ROLE_DEPARTMENTHEAD') " +
                 "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' " +
                 "or hasRole('HR') " +
-                "or hasRole('ADMIN')"
+                "or hasRole('HRADMIN')"
 )
 public class DepartmentHeadDashboardController {
 
@@ -204,7 +204,7 @@ import java.util.List;
                 "or hasAuthority('ROLE_DEPARTMENTHEAD') " +
                 "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' " +
                 "or hasRole('HR') " +
-                "or hasRole('ADMIN')"
+                "or hasRole('HRADMIN')"
 )
 public class DepartmentHeadDashboardController {
 

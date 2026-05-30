@@ -335,7 +335,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private String visibilityReason(com.epms.entity.FeedbackRequest request) {
         return isTargetResultPublished(request)
                 ? "HR published the 360 feedback summary"
-                : "Visible by HR/Admin role permission";
+                : "Visible by HR or HR Admin role permission";
     }
 
     private boolean shouldHideEvaluatorIdentity(FeedbackEvaluatorAssignment assignment, Long requestingEmployeeId) {
@@ -404,7 +404,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         }
         return roles.stream()
                 .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("ADMIN") || role.equals("HR") || role.equals("ROLE_ADMIN") || role.equals("ROLE_HR"));
+                .anyMatch(role -> role.equals("HRADMIN") || role.equals("HR") || role.equals("ROLE_ADMIN") || role.equals("ROLE_HR"));
     }
 
     private boolean isManagerOfTarget(Long targetEmployeeId, Long requestingEmployeeId) {

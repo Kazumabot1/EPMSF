@@ -859,7 +859,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         String title = "Dept Head Appraisal Submitted";
         String message = employeeName + " appraisal for " + cycleName + " is ready for HR final review.";
 
-        userRepository.findActiveUsersByNormalizedRoleNames(List.of("HR", "HUMAN_RESOURCES", "ADMIN"))
+        userRepository.findActiveUsersByNormalizedRoleNames(List.of("HR", "HUMAN_RESOURCES", "HRADMIN"))
                 .forEach(hrUser -> notificationService.sendEventOnce(hrUser.getId(), NotificationEventKey.APPRAISAL_REVIEW_SUBMITTED, title, message, "APPRAISAL"));
     }
 

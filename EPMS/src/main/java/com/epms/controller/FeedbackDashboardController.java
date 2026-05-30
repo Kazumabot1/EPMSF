@@ -53,10 +53,10 @@ public class FeedbackDashboardController {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
                 .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("MANAGER") || role.equals("HR") || role.equals("ADMIN")
+                .anyMatch(role -> role.equals("MANAGER") || role.equals("HR") || role.equals("HRADMIN")
                         || role.equals("ROLE_MANAGER") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only Manager/HR/Admin can access manager dashboard.");
+            throw new UnauthorizedActionException("Only Manager/HR or HR Admin can access manager dashboard.");
         }
     }
 
@@ -64,9 +64,9 @@ public class FeedbackDashboardController {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
                 .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+                .anyMatch(role -> role.equals("HR") || role.equals("HRADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only HR/Admin can access HR dashboard.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can access HR dashboard.");
         }
     }
 }

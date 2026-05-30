@@ -141,7 +141,7 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentSign',
     'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
   ],
-  ADMIN: [
+  HRADMIN: [
     'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
     'teamView', 'teamCreate', 'teamEdit', 'teamHistory', 'teamAssignAsLeader', 'teamAssignAsPm', 'teamAssignAsMember',
     'pipViewAll', 'pipCreate', 'pipEdit',

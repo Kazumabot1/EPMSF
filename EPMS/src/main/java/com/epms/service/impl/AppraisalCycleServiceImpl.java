@@ -1003,7 +1003,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
 
     private List<User> hrUsers() {
         return uniqueUsers(userRepository.findActiveUsersByNormalizedRoleNames(
-                List.of("HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN", "ADMIN")
+                List.of("HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN", "HRADMIN")
         ));
     }
 

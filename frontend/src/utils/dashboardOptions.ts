@@ -4,6 +4,7 @@ export type DashboardValue =
   | 'DEPARTMENT_HEAD_DASHBOARD'
   | 'HR_DASHBOARD'
   | 'EXECUTIVE_DASHBOARD'
+  | 'HRADMIN_DASHBOARD'
   | 'ADMIN_DASHBOARD';
 
 export type DashboardOption = {
@@ -39,8 +40,8 @@ export const DASHBOARD_OPTIONS: DashboardOption[] = [
     helper: 'Executive reporting and organization-level overview.',
   },
   {
-    value: 'ADMIN_DASHBOARD',
-    label: 'Admin Dashboard',
+    value: 'HRADMIN_DASHBOARD',
+    label: 'HR Admin Dashboard',
     helper: 'User accounts, access control, and admin-only settings.',
   },
 ];
@@ -76,6 +77,7 @@ export const normalizeRoleName = (role?: string | null) => {
   }
 
   if (
+    value === 'HRADMIN' ||
     value === 'ADMIN' ||
     value === 'HR' ||
     value === 'MANAGER' ||
@@ -93,8 +95,9 @@ export const defaultDashboardForRole = (role?: string | null): DashboardValue =>
   const normalized = normalizeRoleName(role);
 
   switch (normalized) {
+    case 'HRADMIN':
     case 'ADMIN':
-      return 'ADMIN_DASHBOARD';
+      return 'HRADMIN_DASHBOARD';
     case 'HR':
       return 'HR_DASHBOARD';
     case 'CEO':
@@ -121,9 +124,11 @@ export const normalizeDashboard = (
     .toUpperCase();
 
   switch (value) {
+    case 'HRADMIN':
     case 'ADMIN':
+    case 'HRADMIN_DASHBOARD':
     case 'ADMIN_DASHBOARD':
-      return 'ADMIN_DASHBOARD';
+      return 'HRADMIN_DASHBOARD';
 
     case 'HR':
     case 'HR_DASHBOARD':
@@ -179,8 +184,9 @@ export const roleDisplayName = (role?: string | null) => {
       return 'Employee';
     case 'MANAGER':
       return 'Manager';
+    case 'HRADMIN':
     case 'ADMIN':
-      return 'Admin';
+      return 'HR Admin';
     case 'HR':
       return 'HR';
     case 'CEO':

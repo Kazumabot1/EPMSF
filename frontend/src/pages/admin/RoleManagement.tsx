@@ -184,7 +184,7 @@ const RoleManagement = () => {
                   className="position-input"
                   value={form.name}
                   onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  placeholder="e.g. ADMIN, HR, MANAGER"
+                  placeholder="e.g. HRADMIN, HR, MANAGER"
                   required
                 />
               </div>

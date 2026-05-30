@@ -737,7 +737,7 @@ const DepartmentHeadDashboard = () => {
                 <EmptyState
                     icon="user"
                     title="No employees found"
-                    description="If an employee exists in Admin but does not appear here, check the department assignment and linked login user."
+                    description="If an employee exists in HR Admin but does not appear here, check the department assignment and linked login user."
                 />
             ) : (
                 <div className="overflow-x-auto">

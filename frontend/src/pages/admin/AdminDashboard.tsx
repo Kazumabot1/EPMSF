@@ -152,8 +152,8 @@ const dashboardOptions: DashboardOption[] = [
     helper: 'Executive reports and company overview.',
   },
   {
-    value: 'ADMIN_DASHBOARD',
-    label: 'Admin Dashboard',
+    value: 'HRADMIN_DASHBOARD',
+    label: 'HR Admin Dashboard',
     helper: 'User accounts, access control and admin settings.',
   },
 ];
@@ -161,7 +161,7 @@ const dashboardOptions: DashboardOption[] = [
 const coreRoles: RoleOption[] = [
   { id: 1, name: 'EMPLOYEE' },
   { id: 2, name: 'HR' },
-  { id: 3, name: 'ADMIN' },
+  { id: 3, name: 'HRADMIN' },
   { id: 4, name: 'MANAGER' },
   { id: 5, name: 'DEPARTMENT_HEAD' },
   { id: 6, name: 'CEO' },
@@ -240,7 +240,7 @@ const normalizeRoleName = (role?: string | null) => {
   }
 
   if (
-      value === 'ADMIN' ||
+      value === 'HRADMIN' ||
       value === 'HR' ||
       value === 'MANAGER' ||
       value === 'DEPARTMENT_HEAD' ||
@@ -257,8 +257,8 @@ const defaultDashboardForRole = (role?: string | null) => {
   const normalized = normalizeRoleName(role);
 
   switch (normalized) {
-    case 'ADMIN':
-      return 'ADMIN_DASHBOARD';
+    case 'HRADMIN':
+      return 'HRADMIN_DASHBOARD';
     case 'HR':
       return 'HR_DASHBOARD';
     case 'CEO':
@@ -282,9 +282,9 @@ const normalizeDashboard = (dashboard?: string | null, role?: string | null) => 
       .toUpperCase();
 
   switch (value) {
-    case 'ADMIN':
-    case 'ADMIN_DASHBOARD':
-      return 'ADMIN_DASHBOARD';
+    case 'HRADMIN':
+    case 'HRADMIN_DASHBOARD':
+      return 'HRADMIN_DASHBOARD';
     case 'HR':
     case 'HR_DASHBOARD':
       return 'HR_DASHBOARD';
@@ -324,8 +324,8 @@ const roleDisplayName = (role?: string | null) => {
       return 'Employee';
     case 'MANAGER':
       return 'Manager';
-    case 'ADMIN':
-      return 'Admin';
+    case 'HRADMIN':
+      return 'HR Admin';
     case 'HR':
       return 'HR';
     case 'CEO':
@@ -686,7 +686,7 @@ const selectClass =
 
 const AdminDashboard = () => {
   const location = useLocation();
-  const isUserAccountsPage = location.pathname === '/admin/users';
+  const isUserAccountsPage = location.pathname === '/hradmin/users';
 
   const [options, setOptions] = useState<CreateOptions>({
     departments: [],
@@ -808,7 +808,7 @@ const AdminDashboard = () => {
       }
     });
 
-    const order = ['EMPLOYEE', 'HR', 'ADMIN', 'MANAGER', 'DEPARTMENT_HEAD', 'CEO'];
+    const order = ['EMPLOYEE', 'HR', 'HRADMIN', 'MANAGER', 'DEPARTMENT_HEAD', 'CEO'];
 
     return Array.from(unique.values()).sort(
         (a, b) => order.indexOf(a.name) - order.indexOf(b.name),
@@ -1184,11 +1184,11 @@ const AdminDashboard = () => {
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-blue-700">
                 <Icon name="shield" className="h-4 w-4" />
-                {isUserAccountsPage ? 'Account Management' : 'Admin Workspace'}
+                {isUserAccountsPage ? 'Account Management' : 'HR Admin Workspace'}
               </div>
 
               <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
-                {isUserAccountsPage ? 'User Accounts' : 'Admin Dashboard'}
+                {isUserAccountsPage ? 'User Accounts' : 'HR Admin Dashboard'}
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
@@ -1247,7 +1247,7 @@ const AdminDashboard = () => {
 
               <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-2">
                 <Panel
-                    title="Admin Actions"
+                    title="HR Admin Actions"
                     subtitle="Create accounts, import records, and manage login account setup."
                     icon="spark"
                 >
@@ -1265,7 +1265,7 @@ const AdminDashboard = () => {
                         title="Import accounts"
                         description="Bulk import employee login accounts from Excel or CSV."
                         meta="Import"
-                        to="/admin/employee/import"
+                        to="/hradmin/employee/import"
                     />
 
                     <ActionRow
@@ -1273,7 +1273,7 @@ const AdminDashboard = () => {
                         title="Manage user accounts"
                         description="Search, edit, activate, and review all login accounts."
                         meta="Users"
-                        to="/admin/users"
+                        to="/hradmin/users"
                     />
 
                     <ActionRow
@@ -1651,7 +1651,7 @@ const AdminDashboard = () => {
                                     <td className="px-4 py-3 text-slate-600">{dashboardDisplayName(row.oldDashboard)}</td>
                                     <td className="px-4 py-3 text-slate-600">{dashboardDisplayName(row.newDashboard)}</td>
                                     <td className="px-4 py-3 text-slate-600">
-                                      {row.reason || 'Dashboard changed by Admin'}
+                                      {row.reason || 'Dashboard changed by HR Admin'}
                                     </td>
                                   </tr>
                               ))}
