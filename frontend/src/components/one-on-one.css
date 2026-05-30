@@ -3,8 +3,8 @@
   min-height: 100%;
   padding: 28px;
   background:
-    radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 30%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
   color: #0f172a;
 }
 
@@ -149,8 +149,8 @@
 .oom-select:focus,
 .oom-input:focus,
 .oom-textarea:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .oom-textarea {
@@ -261,7 +261,7 @@
   border: 0;
   border-radius: 16px;
   cursor: pointer;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
   color: #ffffff;
   font-size: 15px;
   font-weight: 800;
@@ -350,7 +350,7 @@
 .oom-status-pill {
   white-space: nowrap;
   border-radius: 999px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4338ca;
   padding: 6px 10px;
   font-size: 12px;
@@ -440,7 +440,7 @@
 
 .employee-submenu-link.active,
 .employee-submenu-link:hover {
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4f46e5;
 }
 
@@ -465,7 +465,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 18px 20px;
-  border: 1px solid rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.18);
   border-radius: 22px;
   background: linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(255, 255, 255, 0.96));
   box-shadow: 0 16px 40px rgba(79, 70, 229, 0.08);
@@ -507,7 +507,7 @@
   margin-left: 8px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4f46e5;
   font-size: 11px;
   font-weight: 800;
@@ -798,3 +798,4 @@
     gap: 4px;
   }
 }
+

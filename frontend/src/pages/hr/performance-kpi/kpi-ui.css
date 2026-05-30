@@ -7,7 +7,7 @@
   border-radius: 18px;
   padding: 20px;
   color: #fff;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 45%, #0ea5e9 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 45%, #0ea5e9 100%);
   box-shadow: 0 12px 36px rgba(67, 56, 202, 0.25);
 }
 
@@ -58,14 +58,14 @@
 
 .kpi-input:focus,
 .kpi-select:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
 }
 
 .kpi-btn-primary {
   border: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
   color: #fff;
   padding: 10px 14px;
   font-size: 0.88rem;
@@ -259,8 +259,8 @@
 
 .kpi-input-sm:focus,
 .kpi-select-sm:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .kpi-rows-head {
@@ -279,7 +279,7 @@
 .kpi-add-row {
   border: 1px solid #c7d2fe;
   border-radius: 10px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4338ca;
   padding: 8px 12px;
   font-size: 0.82rem;
@@ -342,7 +342,7 @@
 .kpi-total-score {
   border-radius: 12px;
   padding: 11px 14px;
-  background: linear-gradient(135deg, #eef2ff, #eff6ff);
+  background: linear-gradient(135deg, #eff6ff, #eff6ff);
   border: 1px solid #c7d2fe;
   color: #3730a3;
   font-size: 0.93rem;
@@ -390,3 +390,4 @@
     transform: translateY(0) scale(1);
   }
 }
+

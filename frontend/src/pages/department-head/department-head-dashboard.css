@@ -37,7 +37,7 @@
 .dh-hero-glow.one {
   top: -105px;
   right: 230px;
-  background: rgba(99, 102, 241, 0.48);
+  background: rgba(37, 99, 235, 0.48);
 }
 
 .dh-hero-glow.two {
@@ -54,7 +54,7 @@
 
 .dh-hero-badge {
   color: #c7d2fe;
-  background: rgba(99, 102, 241, 0.18);
+  background: rgba(37, 99, 235, 0.18);
 }
 
 .dh-hero h1 {
@@ -135,7 +135,7 @@
   width: 120px;
   height: 120px;
   border-radius: 999px;
-  background: rgba(99, 102, 241, 0.11);
+  background: rgba(37, 99, 235, 0.11);
 }
 
 .dh-metric-card > span {
@@ -146,7 +146,7 @@
   margin-bottom: 14px;
   border-radius: 15px;
   color: #4f46e5;
-  background: #eef2ff;
+  background: #eff6ff;
   font-size: 18px;
 }
 
@@ -267,8 +267,8 @@
 .dh-team-rank-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #6366f1, #06b6d4);
-  box-shadow: 0 0 18px rgba(99, 102, 241, 0.36);
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.36);
 }
 
 .dh-team-rank-meta {
@@ -284,7 +284,7 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.14), transparent 30%),
+    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.14), transparent 30%),
     rgba(255, 255, 255, 0.96);
 }
 
@@ -380,3 +380,4 @@
     flex-direction: column;
   }
 }
+

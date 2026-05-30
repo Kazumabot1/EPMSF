@@ -161,7 +161,7 @@
 }
 
 .notif-card-icon-meeting {
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4f46e5;
 }
 
@@ -232,7 +232,7 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #6366f1;
+  background: #2563eb;
   align-self: center;
 }
 
@@ -675,3 +675,4 @@
     justify-self: flex-start;
   }
 }
+

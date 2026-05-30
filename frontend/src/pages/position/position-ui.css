@@ -131,8 +131,8 @@
 .position-select:focus,
 .position-textarea:focus {
   outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
   transform: translateY(-1px);
 }
 
@@ -180,7 +180,7 @@
 
 .position-btn.primary {
   color: #ffffff;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
   box-shadow: 0 12px 24px rgba(79, 70, 229, 0.3);
 }
 
@@ -475,7 +475,7 @@
 
 .position-department-chip {
   border: 1px solid #c7d2fe;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #3730a3;
   border-radius: 999px;
   padding: 9px 13px;
@@ -515,12 +515,12 @@
 .position-department-card:hover,
 .position-department-card.selected {
   transform: translateY(-2px);
-  border-color: #818cf8;
+  border-color: #3b82f6;
   box-shadow: 0 16px 30px rgba(79, 70, 229, 0.16);
 }
 
 .position-department-card.selected {
-  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
 }
 
 .position-department-card-top {

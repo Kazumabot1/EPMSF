@@ -2,9 +2,9 @@
   min-height: 100%;
   padding: 1.5rem;
   background:
-    radial-gradient(circle at 5% 0%, rgba(16, 185, 129, 0.14), transparent 30%),
+    radial-gradient(circle at 5% 0%, rgba(37, 99, 235, 0.14), transparent 30%),
     radial-gradient(circle at 92% 8%, rgba(6, 182, 212, 0.12), transparent 28%),
-    linear-gradient(135deg, #f8fafc 0%, #ecfdf5 46%, #f8fafc 100%);
+    linear-gradient(135deg, #f8fafc 0%, #eff6ff 46%, #f8fafc 100%);
 }
 
 .manager-fluxen-hero {
@@ -20,9 +20,9 @@
   margin-bottom: 1.25rem;
   color: #ffffff;
   background:
-    linear-gradient(135deg, rgba(6, 78, 59, 0.98), rgba(15, 23, 42, 0.94)),
-    radial-gradient(circle at top right, rgba(16, 185, 129, 0.35), transparent 36%);
-  box-shadow: 0 26px 80px rgba(6, 78, 59, 0.2);
+    linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.94)),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.35), transparent 36%);
+  box-shadow: 0 26px 80px rgba(15, 23, 42, 0.2);
 }
 
 .manager-fluxen-hero::after {
@@ -47,7 +47,7 @@
 .manager-fluxen-orb--one {
   top: -112px;
   right: 220px;
-  background: rgba(16, 185, 129, 0.58);
+  background: rgba(37, 99, 235, 0.58);
 }
 
 .manager-fluxen-orb--two {
@@ -142,7 +142,7 @@
   width: 122px;
   height: 122px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .manager-fluxen-status-card > span,
@@ -154,7 +154,7 @@
   display: grid;
   place-items: center;
   border-radius: 1rem;
-  background: #ecfdf5;
+  background: #eff6ff;
   color: #047857;
   font-size: 1.1rem;
 }
@@ -233,7 +233,7 @@
 .manager-fluxen-link:hover .manager-fluxen-card {
   transform: translateY(-3px);
   border-color: #a7f3d0;
-  box-shadow: 0 24px 60px rgba(16, 185, 129, 0.13);
+  box-shadow: 0 24px 60px rgba(37, 99, 235, 0.13);
 }
 
 .manager-fluxen-card--sky .manager-fluxen-card-icon { background: #e0f2fe; color: #0284c7; }
@@ -271,7 +271,7 @@
   margin-top: 1rem;
   border-radius: 999px;
   padding: 0.28rem 0.7rem;
-  background: #ecfdf5;
+  background: #eff6ff;
   color: #047857;
   font-style: normal;
   font-size: 0.75rem;
@@ -305,3 +305,4 @@
     text-align: left;
   }
 }
+

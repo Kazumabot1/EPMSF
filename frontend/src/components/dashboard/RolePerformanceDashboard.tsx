@@ -307,12 +307,12 @@ const makeOrgDistribution = (dashboard: ReportingDashboard): DashboardChartDatum
   const bands = buildScoreBands(dashboard.employeePerformance, (row: EmployeePerformanceRow) => row.scorePercent);
 
   if (bands.some((item) => numberValue(item.value) > 0)) {
-    return bands.map((item, index) => ({ ...item, color: ['#8b5cf6', '#3b82f6', '#62cdbb', '#ffbd72', '#f59aaa'][index] }));
+    return bands.map((item, index) => ({ ...item, color: ['#2563eb', '#3b82f6', '#62cdbb', '#ffbd72', '#f59aaa'][index] }));
   }
 
   return [
     { label: 'Approved', value: dashboard.summary.approvedAssessments, color: '#62cdbb' },
-    { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#8b5cf6' },
+    { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#2563eb' },
     { label: 'Pending', value: dashboard.summary.pendingAssessments, color: '#ffbd72' },
     { label: 'Active PIPs', value: dashboard.summary.activePips, color: '#f59aaa' },
   ];
@@ -367,7 +367,7 @@ const makeEmployeeDistribution = (snapshot: EmployeeSnapshot): DashboardChartDat
   return [
     { label: 'Completed Reviews', value: completedAppraisals + completedFeedback, color: '#62cdbb' },
     { label: 'Pending Reviews', value: pendingAppraisals, color: '#ffbd72' },
-    { label: 'Feedback Pending', value: pendingFeedback, color: '#8b5cf6' },
+    { label: 'Feedback Pending', value: pendingFeedback, color: '#2563eb' },
     { label: 'Notifications', value: unreadNotifications, color: '#f59aaa' },
   ];
 };
@@ -709,3 +709,4 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
 };
 
 export default RolePerformanceDashboard;
+

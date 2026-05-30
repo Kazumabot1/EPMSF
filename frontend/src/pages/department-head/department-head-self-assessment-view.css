@@ -3,7 +3,7 @@
   padding: 28px;
   background:
     radial-gradient(circle at top left, rgba(79, 70, 229, 0.13), transparent 32%),
-    linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #faf5ff 100%);
+    linear-gradient(135deg, #f8fafc 0%, #eff6ff 50%, #faf5ff 100%);
   color: #0f172a;
 }
 
@@ -20,7 +20,7 @@
   margin-bottom: 18px;
   padding: 26px;
   border-radius: 30px;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #4f46e5, #2563eb);
   color: #fff;
   box-shadow: 0 24px 60px rgba(79, 70, 229, 0.25);
 }
@@ -126,7 +126,7 @@
   place-items: center;
   margin-bottom: 10px;
   border-radius: 13px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4f46e5;
   font-size: 15px;
   font-weight: 950;
@@ -441,7 +441,7 @@
   height: 30px;
   place-items: center;
   border-radius: 11px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #4f46e5;
   font-size: 13px;
   font-weight: 950;
@@ -487,7 +487,7 @@
 
 .dhsa-note {
   border-radius: 18px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #3730a3;
   padding: 13px 15px;
   font-size: 13px;
