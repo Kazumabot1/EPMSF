@@ -1,10 +1,10 @@
-.ess-page {
+/*Z*/.ess-page {
   min-height: 100vh;
   padding: 28px;
   background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 32%),
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.16), transparent 32%),
     radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 28%),
-    linear-gradient(135deg, #f8fafc 0%, #eff6ff 45%, #faf5ff 100%);
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 45%, #faf5ff 100%);
   color: #0f172a;
 }
 
@@ -23,7 +23,7 @@
   padding: 28px;
   margin-bottom: 18px;
   border-radius: 30px;
-  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 55%, #9333ea 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #2563eb 55%, #2563eb 100%);
   box-shadow: 0 24px 60px rgba(79, 70, 229, 0.28);
   color: #ffffff;
 }
@@ -90,7 +90,7 @@
   border-radius: 16px;
   padding: 10px 16px;
   background: #ffffff;
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 13px;
   font-weight: 900;
   cursor: pointer;
@@ -124,7 +124,7 @@
 }
 
 .ess-tabbar button.active {
-  background: #4f46e5;
+  background: #2563eb;
   color: #ffffff;
   box-shadow: 0 12px 24px rgba(79, 70, 229, 0.22);
 }
@@ -247,8 +247,8 @@
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 8px 12px;
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
   font-size: 13px;
   font-weight: 950;
 }
@@ -264,7 +264,7 @@
 .ess-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4f46e5, #2563eb);
+  background: linear-gradient(90deg, #2563eb, #2563eb);
   transition: width 0.2s ease;
 }
 
@@ -285,8 +285,8 @@
   height: 40px;
   place-items: center;
   border-radius: 15px;
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
   font-size: 14px;
   font-weight: 950;
 }
@@ -406,8 +406,8 @@
 
 .ess-yn-btn.yes.selected,
 .ess-rate-btn.selected {
-  border-color: #4f46e5;
-  background: #4f46e5;
+  border-color: #2563eb;
+  background: #2563eb;
   color: #ffffff;
 }
 
@@ -544,7 +544,7 @@
 }
 
 .ess-btn.primary {
-  background: #4f46e5;
+  background: #2563eb;
   color: #ffffff;
   box-shadow: 0 14px 28px rgba(79, 70, 229, 0.22);
 }
@@ -618,7 +618,7 @@
 }
 
 .ess-ring-fill {
-  stroke: #4f46e5;
+  stroke: #2563eb;
   stroke-linecap: round;
   stroke-dasharray: 314;
   transition: stroke-dashoffset 0.35s ease;
@@ -650,14 +650,14 @@
   justify-content: center;
   border-radius: 16px;
   padding: 11px 12px;
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
   font-size: 15px;
   font-weight: 950;
 }
 
 .ess-score-band.received {
-  background: #eff6ff;
+  background: #eef2ff;
   color: #3730a3;
 }
 
@@ -738,7 +738,7 @@
 .ess-band-info em {
   border-radius: 999px;
   padding: 3px 7px;
-  background: #4f46e5;
+  background: #2563eb;
   color: #ffffff;
   font-size: 10px;
   font-style: normal;
@@ -795,8 +795,8 @@
   border-radius: 999px;
   background:
     radial-gradient(circle at center, #ffffff 58%, transparent 59%),
-    conic-gradient(#4f46e5 var(--progress, 0%), #e2e8f0 0);
-  box-shadow: inset 0 0 0 12px #eff6ff;
+    conic-gradient(#2563eb var(--progress, 0%), #e2e8f0 0);
+  box-shadow: inset 0 0 0 12px #eef2ff;
 }
 
 .ess-progress-circle span {
@@ -911,7 +911,7 @@
   margin-bottom: 16px;
   padding: 14px;
   border-radius: 18px;
-  background: #eff6ff;
+  background: #eef2ff;
   color: #3730a3;
 }
 
@@ -978,8 +978,8 @@
   place-items: center;
   margin-bottom: 14px;
   border-radius: 25px;
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
   font-size: 34px;
 }
 
@@ -1073,8 +1073,8 @@
   place-items: center;
   margin: 0 auto 14px;
   border-radius: 24px;
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
   font-size: 30px;
 }
 
@@ -1118,7 +1118,7 @@
 
 .ess-modal-kicker {
   margin: 0 0 5px;
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 950;
   text-transform: uppercase;

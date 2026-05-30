@@ -1,10 +1,10 @@
-.fluxen-dashboard {
+/*Z*/.fluxen-dashboard {
   min-height: 100%;
   padding: 1.5rem;
   background:
-    radial-gradient(circle at 5% 0%, rgba(37, 99, 235, 0.14), transparent 28%),
+    radial-gradient(circle at 5% 0%, rgba(99, 102, 241, 0.14), transparent 28%),
     radial-gradient(circle at 90% 10%, rgba(6, 182, 212, 0.11), transparent 30%),
-    linear-gradient(135deg, #f8fafc 0%, #eff6ff 42%, #f8fafc 100%);
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 42%, #f8fafc 100%);
 }
 
 .fluxen-hero {
@@ -21,7 +21,7 @@
   color: #ffffff;
   background:
     linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.94)),
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.34), transparent 36%);
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.34), transparent 36%);
   box-shadow: 0 26px 80px rgba(15, 23, 42, 0.22);
 }
 
@@ -47,7 +47,7 @@
 .fluxen-orb--one {
   top: -112px;
   right: 225px;
-  background: rgba(37, 99, 235, 0.58);
+  background: rgba(99, 102, 241, 0.58);
 }
 
 .fluxen-orb--two {
@@ -170,7 +170,7 @@
   width: 122px;
   height: 122px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.11);
+  background: rgba(99, 102, 241, 0.11);
 }
 
 .fluxen-metric-card--sky::after { background: rgba(14, 165, 233, 0.13); }
@@ -187,8 +187,8 @@
   display: grid;
   place-items: center;
   border-radius: 1rem;
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
   font-size: 1.1rem;
 }
 
@@ -269,7 +269,7 @@
   align-items: center;
   gap: 0.4rem;
   margin-top: 0.9rem;
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 0.82rem;
   font-style: normal;
   font-weight: 950;
@@ -317,7 +317,7 @@
 
 .fluxen-list-item span {
   flex-shrink: 0;
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 0.76rem;
   font-weight: 950;
 }
@@ -360,4 +360,3 @@
     grid-template-columns: 1fr;
   }
 }
-

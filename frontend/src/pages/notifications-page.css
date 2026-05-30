@@ -161,8 +161,8 @@
 }
 
 .notif-card-icon-meeting {
-  background: #eff6ff;
-  color: #4f46e5;
+  background: #eef2ff;
+  color: #2563eb;
 }
 
 .notif-card-icon-pip {
@@ -675,4 +675,3 @@
     justify-self: flex-start;
   }
 }
-
