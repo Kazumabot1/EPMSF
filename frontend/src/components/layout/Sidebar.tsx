@@ -371,19 +371,9 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             end: true,
           },
           {
-            to: '/hr/appraisal/template-create',
-            label: 'Template Form Create',
-            icon: 'bi bi-file-earmark-plus',
-          },
-          {
             to: '/hr/appraisal/template-forms',
             label: 'Template Form Records',
             icon: 'bi bi-folder2-open',
-          },
-          {
-            to: '/hr/appraisal/create',
-            label: 'Create Appraisal',
-            icon: 'bi bi-calendar-plus',
           },
           {
             to: '/hr/appraisal/cycles',

@@ -84,6 +84,32 @@ const uniqueScoreBands = <T extends ScoreBandLike>(bands: T[]) => {
   return Array.from(unique.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 };
 
+const validateScoreBands = (bands?: ScoreBandLike[] | null) => {
+  const activeBands = (bands?.length ? bands : defaultScoreBands())
+    .filter((band) => band.active !== false);
+
+  if (!activeBands.length) return 'At least one active score range is required.';
+
+  for (const band of activeBands) {
+    if (Number.isNaN(Number(band.minScore)) || Number.isNaN(Number(band.maxScore))) return 'Score range values must be numbers.';
+    if (Number(band.minScore) < 0 || Number(band.maxScore) > 100 || Number(band.minScore) > Number(band.maxScore)) {
+      return 'Score ranges must be valid values between 0 and 100.';
+    }
+    if (!band.label?.trim()) return 'Score rating label is required.';
+  }
+
+  const sortedBands = [...activeBands].sort((left, right) => Number(left.minScore) - Number(right.minScore));
+  for (let index = 1; index < sortedBands.length; index += 1) {
+    const previous = sortedBands[index - 1];
+    const current = sortedBands[index];
+    if (Number(current.minScore) <= Number(previous.maxScore)) {
+      return `Score ranges cannot overlap: ${previous.minScore}-${previous.maxScore} overlaps with ${current.minScore}-${current.maxScore}.`;
+    }
+  }
+
+  return '';
+};
+
 const clampScore = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 
 const displayDate = (value?: string | null) => formatDisplayDate(value);
@@ -419,6 +445,8 @@ const formatIsoDateFromLocal = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const todayIsoDate = () => formatIsoDateFromLocal(new Date());
+
 const SignatureDisplayBlock = ({ label, signature, dateText }: SignatureDisplayBlockProps) => {
   const src = getSignatureImageSrc(signature);
   return (
@@ -475,9 +503,18 @@ const hasCycleEndDateReached = (cycle: AppraisalCycleResponse) => {
   return endDate.getTime() <= startOfLocalDay(new Date()).getTime();
 };
 
+const hasCycleStartDateInFuture = (cycle: AppraisalCycleResponse) => {
+  const startDate = toLocalDateOnly(cycle.startDate);
+  if (!startDate) return false;
+  return startDate.getTime() > startOfLocalDay(new Date()).getTime();
+};
+
 const canCompleteCycle = (cycle: AppraisalCycleResponse) => Boolean(cycle.locked) || cycle.status === 'LOCKED';
 
 const canEditCycleDraft = (cycle: AppraisalCycleResponse) => cycle.status === 'DRAFT';
+
+const canDeactivateCycle = (cycle: AppraisalCycleResponse) =>
+  cycle.status === 'ACTIVE' && !cycle.locked && hasCycleStartDateInFuture(cycle);
 
 const canLockCycle = (cycle: AppraisalCycleResponse) =>
   cycle.status === 'ACTIVE' && !cycle.locked && hasCycleEndDateReached(cycle);
@@ -1188,6 +1225,7 @@ const AppraisalCyclesPage = () => {
     if (!parseDisplayDate(dates.managerSubmissionDeadline)) return 'Manager submission deadline must use a valid date format.';
     if (!parseDisplayDate(dates.deptHeadSubmissionDeadline)) return 'Dept Head submission deadline must use a valid date format.';
     const computedDates = getComputedDates(form.cycleType, year, form.startDate, form.endDate);
+    if (computedDates.startDate < todayIsoDate()) return 'Start date cannot be a past date.';
     if (form.cycleType === 'CUSTOM' && form.startDate && form.endDate && form.endDate < form.startDate) return 'End date cannot be before start date.';
     const managerDeadline = form.managerSubmissionDeadline || form.submissionDeadline;
     const deptHeadDeadline = form.deptHeadSubmissionDeadline || form.submissionDeadline;
@@ -1210,11 +1248,7 @@ const AppraisalCyclesPage = () => {
         if (!criteria.criteriaText.trim()) return 'Criteria text is required.';
       }
     }
-    const bands = uniqueScoreBands(reuseTemplateForm.scoreBands?.length ? reuseTemplateForm.scoreBands : defaultScoreBands());
-    for (const band of bands) {
-      if (Number(band.minScore) < 0 || Number(band.maxScore) > 100 || Number(band.minScore) > Number(band.maxScore)) return 'Score ranges must be between 0 and 100.';
-    }
-    return '';
+    return validateScoreBands(reuseTemplateForm.scoreBands);
   };
 
   const runAction = async (action: () => Promise<unknown>, doneMessage: string) => {
@@ -1238,6 +1272,17 @@ const AppraisalCyclesPage = () => {
       confirmText: 'Submit',
       cancelText: 'Cancel',
       onConfirm: () => runAction(() => appraisalCycleService.activate(cycle.id), 'Cycle activated.'),
+    });
+  };
+
+  const askDeactivateCycle = (cycle: AppraisalCycleResponse) => {
+    showPopup({
+      title: 'Confirm Inactive Cycle',
+      message: `Inactive "${cycle.cycleName}" and return it to Draft? Managers will be notified and it will disappear from their appraisal list.`,
+      type: 'confirm',
+      confirmText: 'Inactive',
+      cancelText: 'Cancel',
+      onConfirm: () => runAction(() => appraisalCycleService.deactivate(cycle.id), 'Cycle returned to Draft.'),
     });
   };
 
@@ -1930,6 +1975,7 @@ const AppraisalCyclesPage = () => {
                       <button className="appraisal-button ghost" type="button" onClick={() => void openCycleView(cycle)}>View Cycle</button>
                       {canEditCycleDraft(cycle) && <button className="appraisal-button secondary" type="button" onClick={() => void openEditCycle(cycle)}>Edit</button>}
                       {canEditCycleDraft(cycle) && <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>Active</button>}
+                      {canDeactivateCycle(cycle) && <button className="appraisal-button warning" type="button" onClick={() => askDeactivateCycle(cycle)}>Inactive</button>}
                       {canLockCycle(cycle) && <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>Lock</button>}
                       {canCompleteCycle(cycle) && cycle.status !== 'COMPLETED' && <button className="appraisal-button secondary" type="button" onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>Complete</button>}
                       {canEditCycleDraft(cycle) && <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(cycle)}>Edit Records</button>}

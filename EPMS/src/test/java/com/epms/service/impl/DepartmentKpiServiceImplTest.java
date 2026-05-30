@@ -2,6 +2,9 @@ package com.epms.service.impl;
 
 import com.epms.dto.DepartmentKpiCycleRequestDto;
 import com.epms.dto.DepartmentKpiResultDto;
+import com.epms.dto.DepartmentKpiTemplateRequestDto;
+import com.epms.dto.DepartmentKpiTemplateResponseDto;
+import com.epms.dto.KpiFormItemDTO;
 import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
 import com.epms.dto.UpdateDepartmentKpiScoresRequest;
 import com.epms.entity.Department;
@@ -11,7 +14,11 @@ import com.epms.entity.DepartmentKpiCycleTemplate;
 import com.epms.entity.DepartmentKpiResult;
 import com.epms.entity.DepartmentKpiScore;
 import com.epms.entity.DepartmentKpiTemplate;
+import com.epms.entity.DepartmentKpiTemplateDepartment;
 import com.epms.entity.DepartmentKpiTemplateRow;
+import com.epms.entity.KpiCategory;
+import com.epms.entity.KpiItem;
+import com.epms.entity.KpiUnit;
 import com.epms.entity.User;
 import com.epms.entity.enums.DepartmentKpiResultStatus;
 import com.epms.entity.enums.KpiEarlyCloseReviewDecision;
@@ -106,6 +113,80 @@ class DepartmentKpiServiceImplTest {
             assertThat(line.getScore()).isEqualTo(100.0);
             assertThat(line.getWeightedScore()).isEqualTo(40.0);
         });
+    }
+
+    @Test
+    void listTemplatesDeduplicatesFetchedRowsAndSortsDepartments() {
+        DepartmentKpiTemplateRow delivery = row(501, 80.0, 60, 2);
+        DepartmentKpiTemplateRow quality = row(502, 95.0, 40, 1);
+        DepartmentKpiTemplate template = DepartmentKpiTemplate.builder()
+                .id(100)
+                .title("Department scorecard")
+                .status(KpiFormStatus.ACTIVE)
+                .build();
+        template.addRow(delivery);
+        template.addRow(quality);
+        template.getRows().add(delivery);
+        template.getRows().add(quality);
+        template.addDepartment(departmentLink(department(2, "Operations")));
+        template.addDepartment(departmentLink(department(1, "Finance")));
+        when(templateRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(template));
+
+        List<DepartmentKpiTemplateResponseDto> templates = service.listTemplates();
+
+        assertThat(templates).singleElement().satisfies(dto -> {
+            assertThat(dto.getItems()).extracting("id").containsExactly(502, 501);
+            assertThat(dto.getDepartments()).extracting("departmentName").containsExactly("Finance", "Operations");
+        });
+    }
+
+    @Test
+    void createTemplateReturnsSavedDtoWithoutDetailRefetch() {
+        User hr = user(1);
+        KpiCategory category = kpiCategory(20, "Quality Assurance");
+        KpiItem item = kpiItem(30, "Project margin", category);
+        KpiUnit unit = kpiUnit(40, "Total count");
+        Department department = department(2, "Operations");
+        DepartmentKpiTemplateRequestDto request = DepartmentKpiTemplateRequestDto.builder()
+                .title("Operations scorecard")
+                .status(KpiFormStatus.DRAFT)
+                .departmentIds(List.of(department.getId()))
+                .items(List.of(KpiFormItemDTO.builder()
+                        .kpiItemId(item.getId())
+                        .kpiCategoryId(category.getId())
+                        .kpiUnitId(unit.getId())
+                        .target(90.0)
+                        .weight(100)
+                        .sortOrder(0)
+                        .build()))
+                .build();
+        authenticate(hr);
+        when(userRepository.findById(hr.getId())).thenReturn(Optional.of(hr));
+        when(kpiItemRepository.findWithKpiCategoryById(item.getId())).thenReturn(Optional.of(item));
+        when(kpiUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
+        when(departmentRepository.findById(department.getId())).thenReturn(Optional.of(department));
+        when(templateRepository.saveAndFlush(any(DepartmentKpiTemplate.class))).thenAnswer(invocation -> {
+            DepartmentKpiTemplate template = invocation.getArgument(0);
+            template.setId(100);
+            template.getRows().forEach(row -> row.setId(501));
+            return template;
+        });
+
+        DepartmentKpiTemplateResponseDto saved = service.createTemplate(request);
+
+        assertThat(saved.getId()).isEqualTo(100);
+        assertThat(saved.getTitle()).isEqualTo("Operations scorecard");
+        assertThat(saved.getItems()).singleElement().satisfies(row -> {
+            assertThat(row.getKpiItemId()).isEqualTo(item.getId());
+            assertThat(row.getKpiItemName()).isEqualTo("Project margin");
+            assertThat(row.getKpiCategoryId()).isEqualTo(category.getId());
+            assertThat(row.getKpiUnitId()).isEqualTo(unit.getId());
+            assertThat(row.getTarget()).isEqualTo(90.0);
+        });
+        assertThat(saved.getDepartments()).singleElement()
+                .extracting(DepartmentKpiTemplateResponseDto.DepartmentSummary::getDepartmentName)
+                .isEqualTo("Operations");
+        verify(templateRepository, never()).findDetailById(anyInt());
     }
 
     @Test
@@ -291,6 +372,41 @@ class DepartmentKpiServiceImplTest {
                 .weight(weight)
                 .sortOrder(sortOrder)
                 .build();
+    }
+
+    private static Department department(Integer id, String name) {
+        Department department = new Department();
+        department.setId(id);
+        department.setDepartmentName(name);
+        return department;
+    }
+
+    private static DepartmentKpiTemplateDepartment departmentLink(Department department) {
+        DepartmentKpiTemplateDepartment link = new DepartmentKpiTemplateDepartment();
+        link.setDepartment(department);
+        return link;
+    }
+
+    private static KpiCategory kpiCategory(Integer id, String name) {
+        KpiCategory category = new KpiCategory();
+        category.setId(id);
+        category.setName(name);
+        return category;
+    }
+
+    private static KpiItem kpiItem(Integer id, String name, KpiCategory category) {
+        KpiItem item = new KpiItem();
+        item.setId(id);
+        item.setName(name);
+        item.setKpiCategory(category);
+        return item;
+    }
+
+    private static KpiUnit kpiUnit(Integer id, String name) {
+        KpiUnit unit = new KpiUnit();
+        unit.setId(id);
+        unit.setName(name);
+        return unit;
     }
 
     private static User user(Integer id) {

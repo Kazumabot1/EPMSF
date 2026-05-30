@@ -146,6 +146,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
                 : cycle.getCycleYear() != null ? cycle.getCycleYear() : LocalDate.now().getYear();
         CycleDates dates = calculateCycleDatesForUpdate(request, cycle, cycleType, cycleYear);
         CycleDeadlines deadlines = resolveSubmissionDeadlinesForUpdate(cycle, request, dates);
+        validateResolvedCycleDates(dates, deadlines, true);
 
         String cycleName = request.getCycleName() != null && !request.getCycleName().isBlank()
                 ? request.getCycleName().trim()
@@ -231,9 +232,12 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
             if (cycle == null || Boolean.TRUE.equals(cycle.getLocked())) {
                 continue;
             }
+            sentCount += sendManagerReviewStartedIfDue(cycle);
             sentCount += sendManagerDeadlineReminderIfDue(cycle);
             sentCount += sendDeptHeadDeadlineReminderIfDue(cycle);
             sentCount += sendHrEndDateReminderIfDue(cycle);
+            sentCount += sendManagerDeadlineOverdueIfDue(cycle);
+            sentCount += sendDeptHeadDeadlineOverdueIfDue(cycle);
         }
 
         return sentCount;
@@ -252,6 +256,28 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         cycle.setActivatedAt(new Date());
         AppraisalCycle saved = cycleRepository.save(cycle);
         notifyManagersAboutActiveCycle(saved);
+        sendManagerReviewStartedIfDue(saved);
+        return mapCycle(saved);
+    }
+
+    @Override
+    public AppraisalCycleResponse deactivateCycle(Integer cycleId) {
+        AppraisalCycle cycle = getCycleEntity(cycleId);
+        if (cycle.getStatus() != AppraisalCycleStatus.ACTIVE) {
+            throw new BadRequestException("Only active appraisal cycles can be deactivated.");
+        }
+        if (Boolean.TRUE.equals(cycle.getLocked())) {
+            throw new BadRequestException("Locked appraisal cycles cannot be deactivated.");
+        }
+        if (cycle.getStartDate() == null || !LocalDate.now().isBefore(cycle.getStartDate())) {
+            throw new BadRequestException("Only appraisal cycles that have not reached the start date can be deactivated.");
+        }
+
+        cycle.setStatus(AppraisalCycleStatus.DRAFT);
+        cycle.setLocked(false);
+        cycle.setActivatedAt(null);
+        AppraisalCycle saved = cycleRepository.save(cycle);
+        notifyManagersAboutInactiveCycle(saved);
         return mapCycle(saved);
     }
 
@@ -917,6 +943,17 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         return value.substring(0, maxLength);
     }
 
+    private int sendManagerReviewStartedIfDue(AppraisalCycle cycle) {
+        if (cycle == null || cycle.getStartDate() == null || LocalDate.now().isBefore(cycle.getStartDate())) {
+            return 0;
+        }
+
+        String title = "Manager Review Available";
+        String message = cycleDisplayName(cycle)
+                + " appraisal cycle has reached the start date. Manager review can now be started.";
+        return notifyUsers(targetManagers(cycle), NotificationEventKey.APPRAISAL_MANAGER_REVIEW_STARTED, title, message, "APPRAISAL", cycle.getId());
+    }
+
     private int sendManagerDeadlineReminderIfDue(AppraisalCycle cycle) {
         LocalDate deadline = resolveManagerSubmissionDeadline(cycle);
         Integer daysLeft = daysLeftIfReminderWindow(deadline);
@@ -964,6 +1001,30 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         }
         long daysLeft = ChronoUnit.DAYS.between(LocalDate.now(), targetDate);
         return daysLeft >= 1 && daysLeft <= 3 ? (int) daysLeft : null;
+    }
+
+    private int sendManagerDeadlineOverdueIfDue(AppraisalCycle cycle) {
+        LocalDate deadline = resolveManagerSubmissionDeadline(cycle);
+        if (deadline == null || !LocalDate.now().isAfter(deadline)) {
+            return 0;
+        }
+
+        String title = "Manager Appraisal Deadline Overdue";
+        String message = cycleDisplayName(cycle)
+                + " manager review deadline passed on " + displayDate(deadline) + ". Reviews can still be submitted.";
+        return notifyUsers(targetManagers(cycle), NotificationEventKey.APPRAISAL_DEADLINE_OVERDUE, title, message, "APPRAISAL", cycle.getId());
+    }
+
+    private int sendDeptHeadDeadlineOverdueIfDue(AppraisalCycle cycle) {
+        LocalDate deadline = resolveDeptHeadSubmissionDeadline(cycle);
+        if (deadline == null || !LocalDate.now().isAfter(deadline)) {
+            return 0;
+        }
+
+        String title = "Dept Head Appraisal Deadline Overdue";
+        String message = cycleDisplayName(cycle)
+                + " Dept Head review deadline passed on " + displayDate(deadline) + ". Reviews can still be submitted.";
+        return notifyUsers(targetDepartmentHeads(cycle), NotificationEventKey.APPRAISAL_DEADLINE_OVERDUE, title, message, "APPRAISAL", cycle.getId());
     }
 
     private void notifyManagersAndDeptHeadsCycleLocked(AppraisalCycle cycle) {
@@ -1060,27 +1121,16 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
     }
 
     private void notifyManagersAboutActiveCycle(AppraisalCycle cycle) {
-        Set<Integer> targetDepartmentIds = cycle.getCycleDepartments() == null
-                ? Set.of()
-                : cycle.getCycleDepartments()
-                  .stream()
-                  .map(AppraisalCycleDepartment::getDepartment)
-                  .filter(Objects::nonNull)
-                  .map(Department::getId)
-                  .filter(Objects::nonNull)
-                  .collect(Collectors.toSet());
-
-        if (targetDepartmentIds.isEmpty()) {
-            return;
-        }
-
-        List<User> managers = userRepository.findActiveUsersByNormalizedRoleNames(List.of("MANAGER", "PROJECT_MANAGER", "PM"));
         String title = "Appraisal Cycle Activated";
-        String message = cycle.getCycleName() + " is now active. Please review your team employees.";
+        String message = cycleDisplayName(cycle) + " is now active. Please check the appraisal cycle record.";
+        notifyUsers(targetManagers(cycle), NotificationEventKey.APPRAISAL_CYCLE_ACTIVATED, title, message, "APPRAISAL", cycle.getId());
+    }
 
-        managers.stream()
-                .filter(manager -> manager.getDepartmentId() != null && targetDepartmentIds.contains(manager.getDepartmentId()))
-                .forEach(manager -> notificationService.sendEventOnce(manager.getId(), NotificationEventKey.APPRAISAL_CYCLE_ACTIVATED, title, message, "APPRAISAL"));
+    private void notifyManagersAboutInactiveCycle(AppraisalCycle cycle) {
+        String title = "Appraisal Cycle Inactivated";
+        String message = cycleDisplayName(cycle)
+                + " has been inactivated by HR before the start date. It is no longer available in Manager appraisals.";
+        notifyUsers(targetManagers(cycle), NotificationEventKey.APPRAISAL_CYCLE_DEACTIVATED, title, message, "APPRAISAL", cycle.getId());
     }
 
     private AppraisalCycle getCycleEntity(Integer cycleId) {
@@ -1121,8 +1171,30 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         }
 
         CycleDates dates = calculateCycleDates(request);
-        LocalDate managerDeadline = resolveManagerSubmissionDeadline(request);
-        LocalDate deptHeadDeadline = resolveDeptHeadSubmissionDeadline(request);
+        CycleDeadlines deadlines = new CycleDeadlines(
+                resolveManagerSubmissionDeadline(request),
+                resolveDeptHeadSubmissionDeadline(request),
+                request.getSubmissionDeadline()
+        );
+        validateResolvedCycleDates(dates, deadlines, true);
+    }
+
+    private void validateResolvedCycleDates(CycleDates dates, CycleDeadlines deadlines, boolean rejectPastStartDate) {
+        if (dates == null || dates.startDate() == null) {
+            throw new BadRequestException("Start date is required.");
+        }
+        if (dates.endDate() == null) {
+            throw new BadRequestException("End date is required.");
+        }
+        if (rejectPastStartDate && dates.startDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Start date cannot be a past date.");
+        }
+        if (dates.endDate().isBefore(dates.startDate())) {
+            throw new BadRequestException("End date cannot be before start date.");
+        }
+
+        LocalDate managerDeadline = deadlines != null ? deadlines.managerSubmissionDeadline() : null;
+        LocalDate deptHeadDeadline = deadlines != null ? deadlines.deptHeadSubmissionDeadline() : null;
         if (managerDeadline == null) {
             throw new BadRequestException("Manager submission deadline is required.");
         }
