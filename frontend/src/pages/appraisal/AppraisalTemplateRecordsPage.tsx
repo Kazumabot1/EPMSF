@@ -59,6 +59,8 @@ const defaultScoreBands = (): AppraisalScoreBandRequest[] => [
 
 const clampScore = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 
+const normalizeUniqueName = (value?: string | null) => (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 const uniqueScoreBands = <T extends ScoreBandLike>(bands: T[]) => {
   const unique = new Map<string, T>();
   for (const band of bands) {
@@ -798,6 +800,11 @@ const AppraisalTemplateRecordsPage = () => {
 
   const validateTemplateForm = () => {
     if (!form.templateName.trim()) return 'Template name is required.';
+    const normalizedTemplateName = normalizeUniqueName(form.templateName);
+    const duplicateTemplate = templates.find((template) =>
+      template.id !== editingTemplate?.id && normalizeUniqueName(template.templateName) === normalizedTemplateName,
+    );
+    if (duplicateTemplate) return 'Template name already exists. Please use a different template name.';
     if (!form.description?.trim()) return 'Description is required.';
     if (!form.sections.length || formTotalCriteria === 0) return 'At least one section and one criteria are required.';
     for (const section of form.sections) {

@@ -1,7 +1,7 @@
 import EmptyChartState from './EmptyChartState';
 import {
-    DASHBOARD_CHART_COLORS,
     formatDashboardNumber,
+    resolveDashboardChartColor,
     hasDashboardChartData,
     toDashboardNumber,
     type DashboardChartDatum,
@@ -27,9 +27,14 @@ const HorizontalBarChart = ({
                                 maxBars = 8,
                                 xAxisSuffix = '',
                             }: HorizontalBarChartProps) => {
+    const usedColors = new Set<string>();
     const chartData = data
         .filter((item) => toDashboardNumber(item.value) > 0)
-        .slice(0, maxBars);
+        .slice(0, maxBars)
+        .map((item, index) => ({
+            ...item,
+            chartColor: resolveDashboardChartColor(index, item.color, usedColors),
+        }));
 
     if (!hasDashboardChartData(chartData)) {
         return <EmptyChartState compact title={emptyTitle} description={emptyDescription} />;
@@ -42,7 +47,6 @@ const HorizontalBarChart = ({
             {chartData.map((item, index) => {
                 const value = toDashboardNumber(item.value);
                 const percentage = Math.max((value / maxValue) * 100, 2);
-                const color = item.color || DASHBOARD_CHART_COLORS[index % DASHBOARD_CHART_COLORS.length];
                 const formattedValue = valueFormatter ? valueFormatter(value, item) : `${formatDashboardNumber(value)}${xAxisSuffix}`;
 
                 return (
@@ -54,7 +58,7 @@ const HorizontalBarChart = ({
                         <div className="dashboard-horizontal-chart__track" aria-label={`${item.label}: ${formattedValue}`}>
                             <div
                                 className="dashboard-horizontal-chart__fill"
-                                style={{ width: `${percentage}%`, background: color }}
+                                style={{ width: `${percentage}%`, background: item.chartColor }}
                             />
                         </div>
                         {item.detail ? <span className="dashboard-horizontal-chart__detail">{item.detail}</span> : null}

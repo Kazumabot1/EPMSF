@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import { DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import EmployeeAvatar from '../../components/EmployeeAvatar';
 import { exportToExcel, todayStr } from '../../utils/exportExcel';
 
@@ -909,6 +910,26 @@ const AdminDashboard = () => {
         .sort((a, b) => b.count - a.count);
   }, [users]);
 
+  const accountStatusChart = useMemo(
+      () => [
+        { label: 'Active', value: activeUsers.length, color: '#16a34a' },
+        { label: 'Inactive', value: inactiveUsers.length, color: '#dc2626' },
+        { label: 'Needs attention', value: attentionUsers.length, color: '#d97706' },
+      ],
+      [activeUsers.length, attentionUsers.length, inactiveUsers.length],
+  );
+
+  const dashboardAssignmentBars = useMemo(
+      () =>
+          dashboardSummary.map((item, index) => ({
+            label: item.label,
+            value: item.count,
+            detail: item.helper,
+            color: ['#2563eb', '#0284c7', '#0891b2', '#16a34a', '#d97706', '#64748b'][index % 6],
+          })),
+      [dashboardSummary],
+  );
+
   const openCreate = () => {
     resetForm();
     setShowForm(true);
@@ -1245,6 +1266,34 @@ const AdminDashboard = () => {
                 />
               </div>
 
+              <div className="dashboard-grid dashboard-grid--two">
+                <DashboardChartCard
+                    title="Fluxen Account Health"
+                    subtitle="Active, inactive, and attention-needed login accounts."
+                >
+                  <DonutSummaryChart
+                      data={accountStatusChart}
+                      totalLabel="Accounts"
+                      emptyTitle="No account health data"
+                      emptyDescription="Account status data appears after users are loaded."
+                      height={220}
+                  />
+                </DashboardChartCard>
+
+                <DashboardChartCard
+                    title="Dashboard Assignment Comparison"
+                    subtitle="How accounts are distributed across assigned dashboards."
+                >
+                  <HorizontalBarChart
+                      data={dashboardAssignmentBars}
+                      emptyTitle="No dashboard assignments"
+                      emptyDescription="Dashboard assignment counts will appear after accounts are created."
+                      height={220}
+                      maxBars={8}
+                  />
+                </DashboardChartCard>
+              </div>
+
               <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-2">
                 <Panel
                     title="HR Admin Actions"
@@ -1390,6 +1439,36 @@ const AdminDashboard = () => {
                   icon="info"
                   tone={attentionUsers.length > 0 ? 'amber' : 'blue'}
               />
+            </div>
+        )}
+
+        {isUserAccountsPage && (
+            <div className="dashboard-grid dashboard-grid--two">
+              <DashboardChartCard
+                  title="Fluxen Account Health"
+                  subtitle="Account availability and setup quality for the filtered admin workspace."
+              >
+                <DonutSummaryChart
+                    data={accountStatusChart}
+                    totalLabel="Accounts"
+                    emptyTitle="No account health data"
+                    emptyDescription="Account status data appears after users are loaded."
+                    height={220}
+                />
+              </DashboardChartCard>
+
+              <DashboardChartCard
+                  title="Dashboard Assignment Comparison"
+                  subtitle="Assigned dashboards across all login accounts."
+              >
+                <HorizontalBarChart
+                    data={dashboardAssignmentBars}
+                    emptyTitle="No dashboard assignments"
+                    emptyDescription="Dashboard assignment counts will appear after accounts are created."
+                    height={220}
+                    maxBars={8}
+                />
+              </DashboardChartCard>
             </div>
         )}
 

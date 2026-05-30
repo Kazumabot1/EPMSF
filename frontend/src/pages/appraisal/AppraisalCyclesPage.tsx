@@ -118,6 +118,8 @@ const displayDateTime = (value?: string | null) => formatDisplayDateTime(value);
 
 const normalizeAuditKey = (value: string) => value.trim().toLowerCase();
 
+const normalizeUniqueName = (value?: string | null) => (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 const parseAuditSummary = (value?: string | null) => {
   const map = new Map<string, string>();
   if (!value) return map;
@@ -507,6 +509,12 @@ const hasCycleStartDateInFuture = (cycle: AppraisalCycleResponse) => {
   const startDate = toLocalDateOnly(cycle.startDate);
   if (!startDate) return false;
   return startDate.getTime() > startOfLocalDay(new Date()).getTime();
+};
+
+const hasCycleStartDatePassed = (cycle: AppraisalCycleResponse) => {
+  const startDate = toLocalDateOnly(cycle.startDate);
+  if (!startDate) return true;
+  return startDate.getTime() < startOfLocalDay(new Date()).getTime();
 };
 
 const canCompleteCycle = (cycle: AppraisalCycleResponse) => Boolean(cycle.locked) || cycle.status === 'LOCKED';
@@ -1214,7 +1222,7 @@ const AppraisalCyclesPage = () => {
     });
   };
 
-  const validateCyclePayload = (form: AppraisalCycleRequest, yearText: string, dates: DateTextState, allDepartments: boolean) => {
+  const validateCyclePayload = (form: AppraisalCycleRequest, yearText: string, dates: DateTextState, allDepartments: boolean, excludeCycleId?: number) => {
     const year = Number(yearText);
     if (!Number.isInteger(year)) return 'Cycle year must be a valid year.';
     if (year < currentYear) return 'Past years cannot be selected.';
@@ -1225,6 +1233,11 @@ const AppraisalCyclesPage = () => {
     if (!parseDisplayDate(dates.managerSubmissionDeadline)) return 'Manager submission deadline must use a valid date format.';
     if (!parseDisplayDate(dates.deptHeadSubmissionDeadline)) return 'Dept Head submission deadline must use a valid date format.';
     const computedDates = getComputedDates(form.cycleType, year, form.startDate, form.endDate);
+    const normalizedCycleName = normalizeUniqueName(form.cycleName);
+    const duplicateName = cycles.find((cycle) => cycle.id !== excludeCycleId && normalizeUniqueName(cycle.cycleName) === normalizedCycleName);
+    if (duplicateName) return 'Appraisal name already exists. Please use a different appraisal name.';
+    const duplicatePeriod = cycles.find((cycle) => cycle.id !== excludeCycleId && cycle.startDate === computedDates.startDate && cycle.endDate === computedDates.endDate);
+    if (duplicatePeriod) return 'Another appraisal cycle already uses this exact start and end date. Please choose a different appraisal period.';
     if (computedDates.startDate < todayIsoDate()) return 'Start date cannot be a past date.';
     if (form.cycleType === 'CUSTOM' && form.startDate && form.endDate && form.endDate < form.startDate) return 'End date cannot be before start date.';
     const managerDeadline = form.managerSubmissionDeadline || form.submissionDeadline;
@@ -1265,6 +1278,18 @@ const AppraisalCyclesPage = () => {
   };
 
   const askActivateCycle = (cycle: AppraisalCycleResponse) => {
+    if (hasCycleStartDatePassed(cycle)) {
+      showPopup({
+        title: 'Edit Dates Required',
+        message: `The start date for "${cycle.cycleName}" has already passed. Please edit the start date and end date before activating this draft cycle.`,
+        type: 'confirm',
+        confirmText: 'Edit Dates',
+        cancelText: 'Cancel',
+        onConfirm: () => openEditCycle(cycle),
+      });
+      return;
+    }
+
     showPopup({
       title: 'Confirm Active Cycle',
       message: `Are you sure you want to activate "${cycle.cycleName}"? Managers from the selected departments will receive a notification.`,
@@ -1326,7 +1351,13 @@ const AppraisalCyclesPage = () => {
   };
 
   const askReuseSubmit = () => {
-    const validationMessage = validateCyclePayload(reuseForm, reuseYearText, reuseDateText, reuseAllDepartments) || validateReusableTemplate();
+    const validationMessage = validateCyclePayload(
+      reuseForm,
+      reuseYearText,
+      reuseDateText,
+      reuseAllDepartments,
+      reuseMode === 'edit' ? reuseSourceCycle?.id : undefined,
+    ) || validateReusableTemplate();
     if (validationMessage) {
       showPopup({ title: 'Validation Error', message: validationMessage, type: 'error' });
       return;
@@ -1726,8 +1757,8 @@ const AppraisalCyclesPage = () => {
                     <label className="appraisal-field"><span>Cycle Type</span><select value={reuseForm.cycleType} onChange={(event) => setReuseCycleType(event.target.value as AppraisalCycleType)}><option value="ANNUAL">Annual</option><option value="SEMI_ANNUAL">Semi-Annual</option><option value="CUSTOM">Custom</option></select></label>
                   </div>
                   <div className="appraisal-inline-grid three">
-                    {renderDatePickerField({ label: 'Start Date', field: 'startDate', textValue: reuseForm.cycleType === 'ANNUAL' ? displayDate(reuseComputedDates.startDate) : reuseDateText.startDate, isoValue: reuseForm.cycleType === 'ANNUAL' ? reuseComputedDates.startDate : reuseForm.startDate, disabled: reuseForm.cycleType === 'ANNUAL', helper: reuseForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : 'Use 1 May 2026 or choose from calendar.', reuse: true })}
-                    {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: reuseForm.cycleType === 'CUSTOM' ? reuseDateText.endDate : displayDate(reuseComputedDates.endDate), isoValue: reuseForm.cycleType === 'CUSTOM' ? reuseForm.endDate : reuseComputedDates.endDate, disabled: reuseForm.cycleType !== 'CUSTOM', helper: reuseForm.cycleType === 'CUSTOM' ? 'Use 1 May 2026 or choose from calendar.' : 'System calculated.', reuse: true })}
+                    {renderDatePickerField({ label: 'Start Date', field: 'startDate', textValue: reuseForm.cycleType === 'ANNUAL' ? displayDate(reuseComputedDates.startDate) : reuseDateText.startDate, isoValue: reuseForm.cycleType === 'ANNUAL' ? reuseComputedDates.startDate : reuseForm.startDate, disabled: reuseForm.cycleType === 'ANNUAL', helper: reuseForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : undefined, reuse: true })}
+                    {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: reuseForm.cycleType === 'CUSTOM' ? reuseDateText.endDate : displayDate(reuseComputedDates.endDate), isoValue: reuseForm.cycleType === 'CUSTOM' ? reuseForm.endDate : reuseComputedDates.endDate, disabled: reuseForm.cycleType !== 'CUSTOM', helper: reuseForm.cycleType === 'CUSTOM' ? undefined : 'System calculated.', reuse: true })}
                     {renderDatePickerField({ label: 'Manager Deadline', field: 'managerSubmissionDeadline', textValue: reuseDateText.managerSubmissionDeadline, isoValue: reuseForm.managerSubmissionDeadline, reuse: true })}
                     {renderDatePickerField({ label: 'Dept Head Deadline', field: 'deptHeadSubmissionDeadline', textValue: reuseDateText.deptHeadSubmissionDeadline, isoValue: reuseForm.deptHeadSubmissionDeadline, reuse: true })}
                   </div>
@@ -2007,8 +2038,8 @@ const AppraisalCyclesPage = () => {
               </div>
               <div className="appraisal-inline-grid three">
                 <label className="appraisal-field"><span>Template Form</span><select value={cycleForm.templateId} onChange={(event) => setCycleForm({ ...cycleForm, templateId: Number(event.target.value) })}><option value={0}>Select template form record</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.templateName}</option>)}</select></label>
-                {renderDatePickerField({ label: 'Start Date', field: 'startDate', textValue: cycleForm.cycleType === 'ANNUAL' ? displayDate(computedDates.startDate) : dateText.startDate, isoValue: cycleForm.cycleType === 'ANNUAL' ? computedDates.startDate : cycleForm.startDate, disabled: cycleForm.cycleType === 'ANNUAL', helper: cycleForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : 'Use 1 May 2026 or choose from calendar.' })}
-                {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: cycleForm.cycleType === 'CUSTOM' ? dateText.endDate : displayDate(computedDates.endDate), isoValue: cycleForm.cycleType === 'CUSTOM' ? cycleForm.endDate : computedDates.endDate, disabled: cycleForm.cycleType !== 'CUSTOM', helper: cycleForm.cycleType === 'CUSTOM' ? 'Use 1 May 2026 or choose from calendar.' : 'System calculated.' })}
+                {renderDatePickerField({ label: 'Start Date', field: 'startDate', textValue: cycleForm.cycleType === 'ANNUAL' ? displayDate(computedDates.startDate) : dateText.startDate, isoValue: cycleForm.cycleType === 'ANNUAL' ? computedDates.startDate : cycleForm.startDate, disabled: cycleForm.cycleType === 'ANNUAL', helper: cycleForm.cycleType === 'ANNUAL' ? 'System calculated from cycle year.' : undefined })}
+                {renderDatePickerField({ label: 'End Date', field: 'endDate', textValue: cycleForm.cycleType === 'CUSTOM' ? dateText.endDate : displayDate(computedDates.endDate), isoValue: cycleForm.cycleType === 'CUSTOM' ? cycleForm.endDate : computedDates.endDate, disabled: cycleForm.cycleType !== 'CUSTOM', helper: cycleForm.cycleType === 'CUSTOM' ? undefined : 'System calculated.' })}
                 {renderDatePickerField({ label: 'Manager Deadline', field: 'managerSubmissionDeadline', textValue: dateText.managerSubmissionDeadline, isoValue: cycleForm.managerSubmissionDeadline })}
                 {renderDatePickerField({ label: 'Dept Head Deadline', field: 'deptHeadSubmissionDeadline', textValue: dateText.deptHeadSubmissionDeadline, isoValue: cycleForm.deptHeadSubmissionDeadline })}
               </div>

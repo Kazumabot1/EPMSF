@@ -18,6 +18,14 @@ public interface AppraisalCycleRepository extends JpaRepository<AppraisalCycle, 
 
     boolean existsByCycleTypeAndCycleYearAndPeriodNo(AppraisalCycleType cycleType, Integer cycleYear, Integer periodNo);
 
+    boolean existsByCycleNameIgnoreCase(String cycleName);
+
+    boolean existsByCycleNameIgnoreCaseAndIdNot(String cycleName, Integer id);
+
+    boolean existsByStartDateAndEndDate(LocalDate startDate, LocalDate endDate);
+
+    boolean existsByStartDateAndEndDateAndIdNot(LocalDate startDate, LocalDate endDate, Integer id);
+
     Optional<AppraisalCycle> findByCycleTypeAndCycleYearAndPeriodNo(AppraisalCycleType cycleType, Integer cycleYear, Integer periodNo);
 
     List<AppraisalCycle> findByStatus(AppraisalCycleStatus status);

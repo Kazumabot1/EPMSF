@@ -89,7 +89,7 @@ public class ReportingServiceImpl implements ReportingService {
         List<EmployeeAssessment> assessments = safeList(() -> scopedAssessments(principal, roles));
         List<Pip> pips = safeList(() -> scopedPips(principal, roles));
         List<FeedbackCampaign> campaigns = safeList(feedbackCampaignRepository::findAllByOrderByStartDateDesc);
-        List<FeedbackParticipationRow> feedbackRows = safeList(() -> feedbackRows(campaigns));
+        List<FeedbackParticipationRow> feedbackRows = safeList(() -> feedbackRows(campaigns, principal, roles));
 
         ReportingAccessResponse access = ReportingAccessResponse.builder()
                 .userId(principal.getId())
@@ -378,15 +378,26 @@ public class ReportingServiceImpl implements ReportingService {
                 .toList();
     }
 
-    private List<FeedbackParticipationRow> feedbackRows(List<FeedbackCampaign> campaigns) {
+    private List<FeedbackParticipationRow> feedbackRows(
+            List<FeedbackCampaign> campaigns,
+            UserPrincipal principal,
+            Set<String> roles
+    ) {
         List<FeedbackParticipationRow> rows = new ArrayList<>();
 
         for (FeedbackCampaign campaign : campaigns) {
             List<FeedbackEvaluatorAssignment> assignments = safeList(
                     () -> feedbackEvaluatorAssignmentRepository.findByCampaignIdWithRequest(campaign.getId())
-            );
+            )
+                    .stream()
+                    .filter(assignment -> canViewFeedbackAssignment(assignment, principal, roles))
+                    .toList();
 
             long assigned = assignments.size();
+
+            if (!canViewAllDepartments(roles) && assigned == 0) {
+                continue;
+            }
 
             long submitted = assignments.stream()
                     .filter(assignment -> AssignmentStatus.SUBMITTED.equals(assignment.getStatus()))
@@ -408,6 +419,49 @@ public class ReportingServiceImpl implements ReportingService {
         }
 
         return rows;
+    }
+
+    private boolean canViewFeedbackAssignment(
+            FeedbackEvaluatorAssignment assignment,
+            UserPrincipal principal,
+            Set<String> roles
+    ) {
+        if (assignment == null) {
+            return false;
+        }
+
+        if (canViewAllDepartments(roles)) {
+            return true;
+        }
+
+        if (principal == null) {
+            return false;
+        }
+
+        Integer userId = principal.getId();
+        Integer departmentId = principal.getDepartmentId();
+
+        if (roles.contains("DEPARTMENT_HEAD")) {
+            if (departmentId == null || assignment.getFeedbackRequest() == null) {
+                return false;
+            }
+
+            return Objects.equals(assignment.getFeedbackRequest().getTargetParentDepartmentId(), departmentId)
+                    || Objects.equals(assignment.getFeedbackRequest().getTargetCurrentDepartmentId(), departmentId);
+        }
+
+        if (roles.contains("MANAGER")) {
+            if (assignment.getFeedbackRequest() == null) {
+                return false;
+            }
+
+            return Objects.equals(assignment.getFeedbackRequest().getTargetManagerUserId(), userId)
+                    || Objects.equals(assignment.getFeedbackRequest().getTargetUserId(), userId);
+        }
+
+        return Objects.equals(assignment.getEvaluatorUserId(), userId)
+                || (assignment.getFeedbackRequest() != null
+                && Objects.equals(assignment.getFeedbackRequest().getTargetUserId(), userId));
     }
 
     private List<RecommendationRow> recommendations(List<EmployeeAssessment> assessments) {

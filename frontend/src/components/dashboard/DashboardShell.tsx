@@ -17,7 +17,7 @@ type DashboardShellProps = {
 };
 
 const DashboardShell = ({
-                            eyebrow = 'Dashboard',
+                            eyebrow = 'Fluxen Dashboard',
                             title,
                             description,
                             metaLabel,

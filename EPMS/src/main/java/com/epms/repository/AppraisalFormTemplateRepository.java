@@ -27,6 +27,10 @@ public interface AppraisalFormTemplateRepository extends JpaRepository<Appraisal
 
     boolean existsByTemplateNameIgnoreCaseAndIdNot(String templateName, Integer id);
 
+    boolean existsByTemplateNameIgnoreCaseAndCycleSpecificCopyFalse(String templateName);
+
+    boolean existsByTemplateNameIgnoreCaseAndCycleSpecificCopyFalseAndIdNot(String templateName, Integer id);
+
     @EntityGraph(attributePaths = {"targetDepartments", "targetDepartments.department"})
     @Query("SELECT t FROM AppraisalFormTemplate t WHERE t.id = :templateId")
     Optional<AppraisalFormTemplate> findWithTargetDepartmentsById(@Param("templateId") Integer templateId);

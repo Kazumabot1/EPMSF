@@ -7,3 +7,6 @@ export { default as DonutSummaryChart } from './DonutSummaryChart';
 export { default as HorizontalBarChart } from './HorizontalBarChart';
 export { default as StatusDistributionChart } from './StatusDistributionChart';
 export { default as TrendLineChart } from './TrendLineChart';
+
+export { default as ComparisonColumnChart } from './ComparisonColumnChart';
+export type { ComparisonColumnDatum } from './ComparisonColumnChart';

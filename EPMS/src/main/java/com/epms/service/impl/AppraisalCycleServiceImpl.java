@@ -86,6 +86,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         AppraisalFormTemplate template = templateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Appraisal template not found with id: " + request.getTemplateId()));
         CycleDates dates = calculateCycleDates(request);
+        ensureUniqueCycleIdentityForCreate(request.getCycleName(), dates);
 
         AppraisalCycle cycle = new AppraisalCycle();
         cycle.setCycleName(request.getCycleName().trim());
@@ -154,6 +155,7 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         if (cycleName == null || cycleName.isBlank()) {
             cycleName = "Appraisal Cycle #" + cycleId;
         }
+        ensureUniqueCycleIdentityForUpdate(cycleId, cycleName, dates);
 
         List<Integer> departmentIds = resolveCycleDepartmentIds(request, template);
         AppraisalCycle saved;
@@ -251,6 +253,12 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
         }
         if (cycle.getStatus() != AppraisalCycleStatus.DRAFT) {
             throw new BadRequestException("Only draft cycle can be activated.");
+        }
+        if (cycle.getStartDate() == null || cycle.getStartDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Start date has already passed. Please edit the start date and end date before activating this draft cycle.");
+        }
+        if (cycle.getEndDate() == null || cycle.getEndDate().isBefore(cycle.getStartDate())) {
+            throw new BadRequestException("End date must be updated before activating this draft cycle.");
         }
         cycle.setStatus(AppraisalCycleStatus.ACTIVE);
         cycle.setActivatedAt(new Date());
@@ -1177,6 +1185,36 @@ public class AppraisalCycleServiceImpl implements AppraisalCycleService {
                 request.getSubmissionDeadline()
         );
         validateResolvedCycleDates(dates, deadlines, true);
+    }
+
+
+    private void ensureUniqueCycleIdentityForCreate(String cycleName, CycleDates dates) {
+        validateUniqueCycleIdentity(null, cycleName, dates);
+    }
+
+    private void ensureUniqueCycleIdentityForUpdate(Integer currentCycleId, String cycleName, CycleDates dates) {
+        validateUniqueCycleIdentity(currentCycleId, cycleName, dates);
+    }
+
+    private void validateUniqueCycleIdentity(Integer currentCycleId, String cycleName, CycleDates dates) {
+        String normalizedName = cycleName == null ? "" : cycleName.trim();
+        if (!normalizedName.isBlank()) {
+            boolean nameExists = currentCycleId == null
+                    ? cycleRepository.existsByCycleNameIgnoreCase(normalizedName)
+                    : cycleRepository.existsByCycleNameIgnoreCaseAndIdNot(normalizedName, currentCycleId);
+            if (nameExists) {
+                throw new BadRequestException("Appraisal name already exists. Please use a different appraisal name.");
+            }
+        }
+
+        if (dates != null && dates.startDate() != null && dates.endDate() != null) {
+            boolean periodExists = currentCycleId == null
+                    ? cycleRepository.existsByStartDateAndEndDate(dates.startDate(), dates.endDate())
+                    : cycleRepository.existsByStartDateAndEndDateAndIdNot(dates.startDate(), dates.endDate(), currentCycleId);
+            if (periodExists) {
+                throw new BadRequestException("Another appraisal cycle already uses this exact start and end date. Please choose a different appraisal period.");
+            }
+        }
     }
 
     private void validateResolvedCycleDates(CycleDates dates, CycleDeadlines deadlines, boolean rejectPastStartDate) {

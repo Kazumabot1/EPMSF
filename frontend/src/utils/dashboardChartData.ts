@@ -14,31 +14,63 @@ export type DashboardCompletionDatum = DashboardChartDatum & {
 };
 
 export const DASHBOARD_CHART_COLORS = [
-    '#2563eb',
-    '#0284c7',
-    '#0891b2',
-    '#4f46e5',
-    '#0369a1',
-    '#1d4ed8',
-    '#0f766e',
-    '#64748b',
+    '#7c5cff',
+    '#8ec5ff',
+    '#62cdbb',
+    '#ffbd72',
+    '#f6d365',
+    '#f59aaa',
+    '#a78bfa',
+    '#94a3b8',
 ];
 
+
+export const resolveDashboardChartColor = (
+    index: number,
+    preferredColor?: string,
+    usedColors?: Set<string>,
+) => {
+    const fallbackColor = DASHBOARD_CHART_COLORS[index % DASHBOARD_CHART_COLORS.length];
+    const requestedColor = preferredColor || fallbackColor;
+
+    if (!usedColors) return requestedColor;
+
+    const normalize = (color: string) => color.trim().toLowerCase();
+    const normalizedRequested = normalize(requestedColor);
+
+    if (!usedColors.has(normalizedRequested)) {
+        usedColors.add(normalizedRequested);
+        return requestedColor;
+    }
+
+    for (let offset = 1; offset <= DASHBOARD_CHART_COLORS.length; offset += 1) {
+        const candidate = DASHBOARD_CHART_COLORS[(index + offset) % DASHBOARD_CHART_COLORS.length];
+        const normalizedCandidate = normalize(candidate);
+
+        if (!usedColors.has(normalizedCandidate)) {
+            usedColors.add(normalizedCandidate);
+            return candidate;
+        }
+    }
+
+    return requestedColor;
+};
+
 const STATUS_COLOR_MAP: Record<string, string> = {
-    active: '#16a34a',
-    approved: '#16a34a',
-    completed: '#16a34a',
-    submitted: '#0284c7',
-    pending: '#d97706',
-    draft: '#64748b',
-    inactive: '#94a3b8',
-    disabled: '#94a3b8',
-    archived: '#94a3b8',
-    rejected: '#dc2626',
-    overdue: '#dc2626',
-    failed: '#dc2626',
-    inprogress: '#2563eb',
-    in_progress: '#2563eb',
+    active: '#35b79d',
+    approved: '#35b79d',
+    completed: '#35b79d',
+    submitted: '#8ec5ff',
+    pending: '#ffbd72',
+    draft: '#94a3b8',
+    inactive: '#cbd5e1',
+    disabled: '#cbd5e1',
+    archived: '#cbd5e1',
+    rejected: '#ef6678',
+    overdue: '#ef6678',
+    failed: '#ef6678',
+    inprogress: '#7c5cff',
+    in_progress: '#7c5cff',
 };
 
 export const toDashboardNumber = (value?: number | string | null) => {
@@ -146,11 +178,11 @@ export const buildScoreBands = <T,>(
     getScore: (row: T) => number | string | null | undefined,
 ): DashboardChartDatum[] => {
     const bands = [
-        { label: 'Outstanding', min: 86, max: 100, color: '#16a34a' },
-        { label: 'Exceeds Requirements', min: 71, max: 85.999, color: '#15803d' },
-        { label: 'Meets Requirements', min: 60, max: 70.999, color: '#2563eb' },
-        { label: 'Needs Improvement', min: 40, max: 59.999, color: '#d97706' },
-        { label: 'Unsatisfactory', min: 0, max: 39.999, color: '#dc2626' },
+        { label: 'Outstanding', min: 86, max: 100, color: '#62cdbb' },
+        { label: 'Exceeds Requirements', min: 71, max: 85.999, color: '#7c5cff' },
+        { label: 'Meets Requirements', min: 60, max: 70.999, color: '#8ec5ff' },
+        { label: 'Needs Improvement', min: 40, max: 59.999, color: '#ffbd72' },
+        { label: 'Unsatisfactory', min: 0, max: 39.999, color: '#f59aaa' },
     ];
 
     const data = bands.map((band) => ({
