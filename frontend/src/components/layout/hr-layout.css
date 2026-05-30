@@ -1,7 +1,7 @@
 /* ==========================================================================
    HR Layout Shell
    Cleaned and consolidated for maintainability.
-   ========================================================================== */
+   ==========================================================================  Z*/
 
 .hr-shell {
   --hr-sidebar-width: 272px;
@@ -83,7 +83,7 @@
   place-items: center;
   flex-shrink: 0;
   border-radius: 9px;
-  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: #ffffff;
   font-size: 0.75rem;
   font-weight: 800;
@@ -741,7 +741,7 @@
 }
 
 .hr-notif-popover__item-icon.bi-calendar-event {
-  color: #4f46e5;
+  color: #2563eb;
 }
 
 .hr-notif-popover__item-icon.bi-clipboard2-pulse {
@@ -799,7 +799,7 @@
   flex-shrink: 0;
   margin-top: 6px;
   border-radius: 999px;
-  background: #6366f1;
+  background: #2563eb;
 }
 
 .hr-notif-popover__item-dot.is-read {
@@ -879,7 +879,7 @@
 
 .hr-user-chip:focus-visible {
   outline: none;
-  border-color: #818cf8;
+  border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
@@ -1116,7 +1116,7 @@
 
 .hr-stat-icon.blue {
   background: #e0e7ff;
-  color: #4f46e5;
+  color: #2563eb;
 }
 
 .hr-stat-icon.amber {
@@ -1177,8 +1177,8 @@
 }
 
 .hr-list-item .review {
-  background: #ede9fe;
-  color: #7c3aed;
+  background: #dbeafe;
+  color: #2563eb;
 }
 
 .hr-list-item .pending {
@@ -1216,7 +1216,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: #6366f1;
+  background: #2563eb;
 }
 
 .hr-task-btn {
@@ -1291,4 +1291,33 @@
   .hr-profile-span-2 {
     grid-column: auto;
   }
+}
+/* Profile avatar safety: prevents tall uploaded photos from escaping the HR header chip. */
+.hr-user-avatar.profile-header-avatar-frame,
+.hr-user-avatar {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  min-height: 34px !important;
+  max-height: 34px !important;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  line-height: 1;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.hr-user-avatar .profile-header-avatar-image,
+.hr-user-avatar img,
+.profile-header-avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+  border-radius: inherit !important;
 }

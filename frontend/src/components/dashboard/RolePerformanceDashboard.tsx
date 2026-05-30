@@ -1,3 +1,4 @@
+/*Z*/
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -120,7 +121,8 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
     return [
       { icon: 'bi-people', title: 'Employees', description: 'Manage employee records', to: '/hr/employee' },
       { icon: 'bi-building', title: 'Departments', description: 'Department setup', to: '/hr/department' },
-      { icon: 'bi-diagram-3', title: 'Teams', description: 'Team structure', to: '/hr/team' },
+      { icon: 'bi-grid', title: 'Department Comparison', description: 'Department performance', to: '/hr/department-comparison' },
+      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Company team structure', to: '/hr/team' },
       { icon: 'bi-clipboard-data', title: 'Appraisals', description: 'Review workflow', to: '/hr/appraisal' },
       { icon: 'bi-bullseye', title: 'KPI Templates', description: 'KPI setup', to: '/hr/kpi-template' },
       { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Feedback setup', to: '/hr/feedback/questions' },
@@ -156,7 +158,7 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
       { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review' },
       { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review' },
       { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary' },
-      { icon: 'bi-diagram-3', title: 'Teams', description: 'Team management', to: '/department-head/teams' },
+      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams' },
       { icon: 'bi-bullseye', title: 'Department KPIs', description: 'Department KPI results', to: '/department-head/department-kpis' },
       { icon: 'bi-graph-up', title: 'Reports', description: 'Scoped reports', to: '/department-head/reports/performance' },
     ];
@@ -283,7 +285,7 @@ const makeDepartmentComparison = (dashboard: ReportingDashboard, view: RoleDashb
         value: averageScore,
         compareValue: approvedRate,
         detail: `${formatNumber(row.employeeCount)} employees`,
-        color: '#7657f4',
+        color: '#2563eb',
         compareColor: '#9dccff',
         raw: row,
         percentage: averageScore,
@@ -296,7 +298,7 @@ const makeDepartmentComparison = (dashboard: ReportingDashboard, view: RoleDashb
     value: numberValue(row.scorePercent),
     compareValue: dashboard.summary.averageAssessmentScore || numberValue(row.scorePercent),
     detail: row.departmentName || 'Scoped employee',
-    color: '#7657f4',
+    color: '#2563eb',
     compareColor: '#9dccff',
     raw: row,
     percentage: numberValue(row.scorePercent),
@@ -307,14 +309,14 @@ const makeOrgDistribution = (dashboard: ReportingDashboard): DashboardChartDatum
   const bands = buildScoreBands(dashboard.employeePerformance, (row: EmployeePerformanceRow) => row.scorePercent);
 
   if (bands.some((item) => numberValue(item.value) > 0)) {
-    return bands.map((item, index) => ({ ...item, color: ['#8b5cf6', '#3b82f6', '#62cdbb', '#ffbd72', '#f59aaa'][index] }));
+    return bands.map((item, index) => ({ ...item, color: ['#2563eb', '#38bdf8', '#2dd4bf', '#f59e0b', '#fb7185'][index] }));
   }
 
   return [
-    { label: 'Approved', value: dashboard.summary.approvedAssessments, color: '#62cdbb' },
-    { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#8b5cf6' },
-    { label: 'Pending', value: dashboard.summary.pendingAssessments, color: '#ffbd72' },
-    { label: 'Active PIPs', value: dashboard.summary.activePips, color: '#f59aaa' },
+    { label: 'Approved', value: dashboard.summary.approvedAssessments, color: '#2dd4bf' },
+    { label: 'Submitted', value: dashboard.summary.submittedAssessments, color: '#2563eb' },
+    { label: 'Pending', value: dashboard.summary.pendingAssessments, color: '#f59e0b' },
+    { label: 'Active PIPs', value: dashboard.summary.activePips, color: '#fb7185' },
   ];
 };
 
@@ -351,9 +353,9 @@ const makeEmployeeComparison = (snapshot: EmployeeSnapshot): ComparisonColumnDat
     : 0;
 
   return [
-    { label: 'Appraisal', value: latestAppraisalScore, compareValue: 70, color: '#7657f4', compareColor: '#9dccff' },
-    { label: 'KPI', value: latestKpiScore, compareValue: 70, color: '#7657f4', compareColor: '#9dccff' },
-    { label: '360 Feedback', value: feedbackScore, compareValue: responseRate, color: '#7657f4', compareColor: '#9dccff' },
+    { label: 'Appraisal', value: latestAppraisalScore, compareValue: 70, color: '#2563eb', compareColor: '#9dccff' },
+    { label: 'KPI', value: latestKpiScore, compareValue: 70, color: '#2563eb', compareColor: '#9dccff' },
+    { label: '360 Feedback', value: feedbackScore, compareValue: responseRate, color: '#2563eb', compareColor: '#9dccff' },
   ].filter((item) => item.value > 0 || item.compareValue > 0);
 };
 
@@ -365,10 +367,10 @@ const makeEmployeeDistribution = (snapshot: EmployeeSnapshot): DashboardChartDat
   const unreadNotifications = snapshot.notifications.filter((notification: any) => !notification.read).length;
 
   return [
-    { label: 'Completed Reviews', value: completedAppraisals + completedFeedback, color: '#62cdbb' },
-    { label: 'Pending Reviews', value: pendingAppraisals, color: '#ffbd72' },
-    { label: 'Feedback Pending', value: pendingFeedback, color: '#8b5cf6' },
-    { label: 'Notifications', value: unreadNotifications, color: '#f59aaa' },
+    { label: 'Completed Reviews', value: completedAppraisals + completedFeedback, color: '#2dd4bf' },
+    { label: 'Pending Reviews', value: pendingAppraisals, color: '#f59e0b' },
+    { label: 'Feedback Pending', value: pendingFeedback, color: '#2563eb' },
+    { label: 'Notifications', value: unreadNotifications, color: '#fb7185' },
   ];
 };
 
@@ -474,7 +476,7 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
         value: summary.submittedAssessments > 0 ? formatPercent(summary.averageAssessmentScore) : '—',
         detail: summary.submittedAssessments > 0 ? 'Latest finalized appraisal average' : 'No finalized score yet',
         icon: <i className="bi bi-star" aria-hidden="true" />,
-        tone: 'violet' as const,
+        tone: 'blue' as const,
         trend: { label: summary.averageAssessmentScore >= 70 ? 'Healthy' : summary.averageAssessmentScore > 0 ? 'Needs review' : 'No data', direction: summary.averageAssessmentScore >= 70 ? 'up' as const : 'flat' as const },
       },
       {
@@ -514,7 +516,7 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
     const participation = feedback?.totalRequests ? (numberValue(feedback.totalResponses) / numberValue(feedback.totalRequests)) * 100 : 0;
 
     return [
-      { title: 'My Overall Score', value: overall > 0 ? formatPercent(overall) : '—', detail: 'Combined available KPI, appraisal, and feedback score', icon: <i className="bi bi-star" />, tone: 'violet' as const, trend: { label: overall >= 70 ? 'Healthy' : 'Needs review', direction: overall >= 70 ? 'up' as const : 'flat' as const } },
+      { title: 'My Overall Score', value: overall > 0 ? formatPercent(overall) : '—', detail: 'Combined available KPI, appraisal, and feedback score', icon: <i className="bi bi-star" />, tone: 'blue' as const, trend: { label: overall >= 70 ? 'Healthy' : 'Needs review', direction: overall >= 70 ? 'up' as const : 'flat' as const } },
       { title: '360 Participation', value: formatPercent(participation), detail: `${formatNumber(feedback?.totalResponses)} submitted of ${formatNumber(feedback?.totalRequests)} request(s)`, icon: <i className="bi bi-people" />, tone: 'cyan' as const, trend: { label: 'Personal feedback', direction: participation >= 70 ? 'up' as const : 'flat' as const } },
       { title: 'Completed Reviews', value: formatNumber(employeeSnapshot.appraisalForms.filter((row) => ['COMPLETED', 'APPROVED', 'HR_APPROVED'].includes(String(row.status))).length), detail: `${formatNumber(employeeSnapshot.appraisalForms.length)} appraisal form(s)`, icon: <i className="bi bi-check2-circle" />, tone: 'emerald' as const, trend: { label: `${formatNumber(employeeSnapshot.kpiRows.length)} KPI result(s)`, direction: 'flat' as const } },
       { title: 'Pending Actions', value: formatNumber(pendingFeedback + unread), detail: 'Feedback assignments and unread notifications', icon: <i className="bi bi-clock" />, tone: pendingFeedback + unread > 0 ? 'rose' as const : 'emerald' as const, trend: { label: pendingFeedback > 0 ? `${formatNumber(pendingFeedback)} feedback pending` : 'Clear', direction: pendingFeedback > 0 ? 'down' as const : 'up' as const } },

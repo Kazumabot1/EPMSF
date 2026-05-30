@@ -253,7 +253,7 @@ const CeoDashboard = () => {
           {
             label: 'Avg. Score',
             value: `${Number(summary.averageScore || 0).toFixed(0)}%`,
-            color: '#7c3aed',
+            color: '#2563eb',
             icon: 'bi-graph-up-arrow',
           },
           { label: 'High Performers', value: summary.highPerformers, color: '#15803d', icon: 'bi-stars' },
@@ -513,7 +513,7 @@ const CeoDashboard = () => {
               display: 'grid',
               placeItems: 'center',
               background: '#faf5ff',
-              color: '#7c3aed',
+              color: '#2563eb',
               fontSize: 20,
               marginBottom: 10,
             }}
@@ -664,7 +664,7 @@ const CeoDashboard = () => {
       </div>
 
       {loading && (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#7c3aed' }}>
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#2563eb' }}>
           <i
             className="bi bi-arrow-repeat"
             style={{ fontSize: '1.5rem', display: 'block', marginBottom: '.5rem' }}
@@ -735,7 +735,7 @@ const CeoDashboard = () => {
             <Link
               to="/executive/reports"
               style={{
-                color: '#7c3aed',
+                color: '#2563eb',
                 fontWeight: 900,
                 textDecoration: 'none',
                 fontSize: '.86rem',
@@ -889,3 +889,4 @@ const CeoDashboard = () => {
 };
 
 export default CeoDashboard;
+

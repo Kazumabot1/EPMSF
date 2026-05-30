@@ -25,7 +25,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class UserProfileService {
 
-    private static final int MAX_IMAGE_LENGTH = 7_000_000;
+    private static final int MAX_IMAGE_LENGTH = 7_100_000;
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int MAX_PASSWORD_LENGTH = 128;
 

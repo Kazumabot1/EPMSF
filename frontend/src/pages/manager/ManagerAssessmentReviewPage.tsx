@@ -1,4 +1,4 @@
-
+/*Z*/
 import { useEffect, useMemo, useState } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
 import type {
@@ -110,7 +110,7 @@ const statusBadgeClass = (status?: string) => {
     case 'PENDING_HR':
       return 'border-sky-200 bg-sky-50 text-sky-700';
     case 'APPROVED':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      return 'border-emerald-200 bg-emerald-50 text-blue-700';
     case 'DECLINED':
     case 'REJECTED':
         case 'CLOSED_REJECTED':
@@ -434,7 +434,7 @@ const handleManagerDecline = async () => {
 )}
 
               {actionMessage && (
-                <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-blue-700">
                   {actionMessage}
                 </p>
               )}
@@ -521,7 +521,7 @@ const ManagerAssessmentReviewPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/40 to-teal-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/60 to-slate-50 p-6">
       {selectedAssessment && (
         <ReviewModal
           assessment={selectedAssessment}
@@ -531,7 +531,7 @@ const ManagerAssessmentReviewPage = () => {
       )}
 
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 shadow-xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-sky-700 p-6 shadow-xl">
           <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-center">
             <div>
               <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
@@ -541,7 +541,7 @@ const ManagerAssessmentReviewPage = () => {
 
               <h1 className="text-3xl font-bold text-white">Assessment Review</h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">
                 Review self-assessments assigned to you. Manager signature is removed; you may add optional remarks only.
               </p>
             </div>
@@ -549,7 +549,7 @@ const ManagerAssessmentReviewPage = () => {
             <button
               type="button"
               onClick={() => void loadRows()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-emerald-700 shadow-lg shadow-emerald-900/20 transition hover:-translate-y-0.5 hover:bg-emerald-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-blue-700 shadow-lg shadow-blue-950/20 transition hover:-translate-y-0.5 hover:bg-blue-50"
             >
               <i className={`bi bi-arrow-repeat ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -565,7 +565,7 @@ const ManagerAssessmentReviewPage = () => {
 
           <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
             <p className="text-sm font-medium text-slate-500">Can Add Remarks</p>
-            <p className="mt-2 text-3xl font-bold text-emerald-600">{remarkableRows.length}</p>
+            <p className="mt-2 text-3xl font-bold text-blue-600">{remarkableRows.length}</p>
           </div>
 
           <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
@@ -600,7 +600,7 @@ const ManagerAssessmentReviewPage = () => {
               <p className="text-sm text-slate-500">Open a record to review answers and add optional manager remarks.</p>
             </div>
 
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-blue-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Manager view · read-only
             </span>
@@ -608,12 +608,12 @@ const ManagerAssessmentReviewPage = () => {
 
           {loading ? (
             <div className="p-12 text-center text-sm text-slate-500">
-              <i className="bi bi-arrow-repeat mb-3 block animate-spin text-3xl text-emerald-600" />
+              <i className="bi bi-arrow-repeat mb-3 block animate-spin text-3xl text-blue-600" />
               Loading assessment review queue...
             </div>
           ) : filteredRows.length === 0 ? (
             <div className="p-12 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-3xl text-emerald-600">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-3xl text-blue-600">
                 <i className="bi bi-clipboard-check" />
               </div>
               <h3 className="font-bold text-slate-900">No assigned assessments found</h3>
@@ -640,7 +640,7 @@ const ManagerAssessmentReviewPage = () => {
 
                 <tbody className="divide-y divide-slate-100">
                   {filteredRows.map((row) => (
-                    <tr key={`${row.id}-${row.employeeId ?? row.employeeCode ?? row.employeeName}`} className="transition hover:bg-emerald-50/40">
+                    <tr key={`${row.id}-${row.employeeId ?? row.employeeCode ?? row.employeeName}`} className="transition hover:bg-blue-50/40">
                       <td className="px-6 py-5">
                         <div className="font-bold text-slate-900">{row.employeeName || 'Unknown Employee'}</div>
                         <div className="mt-1 text-xs text-slate-500">{row.employeeCode || 'No employee code'}</div>
