@@ -1292,32 +1292,35 @@
     grid-column: auto;
   }
 }
-/* Profile avatar safety: prevents tall uploaded photos from escaping the HR header chip. */
-.hr-user-avatar.profile-header-avatar-frame,
-.hr-user-avatar {
-  width: 34px !important;
-  height: 34px !important;
-  min-width: 34px !important;
-  max-width: 34px !important;
-  min-height: 34px !important;
-  max-height: 34px !important;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  line-height: 1;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 999px;
+
+/* Compact header profile chip: keep details on profile page, not in the mini icon. */
+.hr-user-chip,
+.employee-user-chip,
+.profile-mini-button {
+  max-width: 220px;
+  min-width: 0;
 }
 
-.hr-user-avatar .profile-header-avatar-image,
-.hr-user-avatar img,
-.profile-header-avatar-image {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  object-fit: cover !important;
-  object-position: center !important;
-  display: block !important;
-  border-radius: inherit !important;
+.hr-user-chip-meta,
+.employee-user-meta,
+.profile-mini-text {
+  min-width: 0;
+}
+
+.hr-user-chip-meta strong,
+.employee-user-meta span,
+.profile-mini-text strong {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hr-user-chip-meta small,
+.employee-user-meta small,
+.profile-mini-text small {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

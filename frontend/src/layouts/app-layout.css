@@ -902,64 +902,35 @@
 }
 
 
-/* Profile avatar safety: keep every header/list avatar square-cropped even when users upload tall images. */
-.profile-header-avatar-frame,
-.employee-user-avatar,
-.employee-avatar-image,
-.employee-avatar-initials,
-.profile-mini-avatar,
-.profile-mini-initials {
-  aspect-ratio: 1 / 1;
+
+/* Compact header profile chip: keep details on profile page, not in the mini icon. */
+.hr-user-chip,
+.employee-user-chip,
+.profile-mini-button {
+  max-width: 220px;
+  min-width: 0;
+}
+
+.hr-user-chip-meta,
+.employee-user-meta,
+.profile-mini-text {
+  min-width: 0;
+}
+
+.hr-user-chip-meta strong,
+.employee-user-meta span,
+.profile-mini-text strong {
+  max-width: 132px;
   overflow: hidden;
-  line-height: 1;
-  box-sizing: border-box;
-  flex-shrink: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.employee-user-avatar.profile-header-avatar-frame,
-.employee-user-avatar {
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  min-height: 36px !important;
-  max-height: 36px !important;
-}
-
-.profile-mini-avatar,
-.profile-mini-initials {
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  min-height: 36px !important;
-  max-height: 36px !important;
-}
-
-.profile-header-avatar-image,
-.profile-mini-avatar,
-.employee-avatar-image {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  object-fit: cover !important;
-  object-position: center !important;
-  border-radius: inherit !important;
-  display: block !important;
-}
-
-.employee-avatar-sm { width: 32px !important; height: 32px !important; }
-.employee-avatar-md { width: 40px !important; height: 40px !important; }
-.employee-avatar-lg { width: 56px !important; height: 56px !important; }
-.employee-avatar-xl { width: 80px !important; height: 80px !important; }
-
-.profile-mini-avatar {
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  min-height: 36px !important;
-  max-height: 36px !important;
-  object-fit: cover !important;
+.hr-user-chip-meta small,
+.employee-user-meta small,
+.profile-mini-text small {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

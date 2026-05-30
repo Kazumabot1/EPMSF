@@ -154,11 +154,10 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
 
   if (view === 'departmentHead') {
     return [
-      { icon: 'bi-people', title: 'My Team', description: 'Department employees', to: '/department-head/my-team' },
+      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams' },
       { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review' },
       { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review' },
       { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary' },
-      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams' },
       { icon: 'bi-bullseye', title: 'Department KPIs', description: 'Department KPI results', to: '/department-head/department-kpis' },
       { icon: 'bi-graph-up', title: 'Reports', description: 'Scoped reports', to: '/department-head/reports/performance' },
     ];
@@ -611,6 +610,7 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
                   maxBars={8}
                   primaryLabel={isEmployeeView(view) ? 'Current Result' : 'Score'}
                   comparisonLabel={isEmployeeView(view) ? 'Target / Completion' : 'Completion / Average'}
+                  showComparison={false}
                   valueFormatter={(value) => formatPercent(value)}
                 />
               ) : (

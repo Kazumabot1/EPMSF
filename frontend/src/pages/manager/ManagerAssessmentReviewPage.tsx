@@ -294,6 +294,13 @@ const handleManagerDecline = async () => {
               </div>
             </div>
 
+            {assessment.declineReason && (
+              <div className="rounded-3xl border border-red-200 bg-red-50 p-5 mb-5">
+                <h4 className="mb-2 text-base font-black text-red-800">Rejection Reason</h4>
+                <p className="m-0 text-sm font-semibold leading-6 text-red-700">{assessment.declineReason}</p>
+              </div>
+            )}
+
             <section className="appraisal-section-card">
               <div className="appraisal-section-header">
                 <strong>Assessment Subjects</strong>

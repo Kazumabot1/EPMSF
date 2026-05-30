@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../../components/one-on-one.css';
 import { extractErrorMessage } from '../../services/apiError';
+import { profileService, type UserProfile } from '../../services/profileService';
 import {
   createContinuousFeedback,
   getContinuousFeedbackEmployees,
@@ -27,6 +28,7 @@ const ContinuousFeedbackPage = () => {
 
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [employees, setEmployees] = useState<TeamEmployeeOption[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [history, setHistory] = useState<ContinuousFeedback[]>([]);
 
   const [selectedTeamId, setSelectedTeamId] = useState('');
@@ -41,6 +43,14 @@ const ContinuousFeedbackPage = () => {
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const currentEmployeeId = profile?.employeeId ?? null;
+
+  const removeCurrentUser = useMemo(
+    () => (items: TeamEmployeeOption[]) =>
+      currentEmployeeId == null ? items : items.filter((employee) => employee.employeeId !== currentEmployeeId),
+    [currentEmployeeId],
+  );
 
   const selectedTeam = useMemo(
     () => teams.find((team) => String(team.id) === selectedTeamId) ?? null,
@@ -64,13 +74,17 @@ const ContinuousFeedbackPage = () => {
 
       try {
         if (!isEmployeeView) {
-          const [teamData, employeeData] = await Promise.all([
+          const [teamData, employeeData, profileData] = await Promise.all([
             getContinuousFeedbackTeams(),
             getContinuousFeedbackEmployees(null),
+            profileService.getMyProfile().catch(() => null),
           ]);
           if (mounted) {
             setTeams(Array.isArray(teamData) ? teamData : []);
-            setEmployees(Array.isArray(employeeData) ? employeeData : []);
+            setProfile(profileData);
+            const currentId = profileData?.employeeId ?? null;
+            const safeEmployees = Array.isArray(employeeData) ? employeeData.filter((employee) => employee.employeeId !== currentId) : [];
+            setEmployees(safeEmployees);
           }
         }
 
@@ -110,7 +124,7 @@ const ContinuousFeedbackPage = () => {
       try {
         const teamId = selectedTeamId ? Number(selectedTeamId) : null;
         const data = await getContinuousFeedbackEmployees(teamId);
-        if (mounted) setEmployees(Array.isArray(data) ? data : []);
+        if (mounted) setEmployees(Array.isArray(data) ? removeCurrentUser(data) : []);
       } catch (err) {
         if (mounted) setError(extractErrorMessage(err, 'Failed to load eligible employees.'));
       } finally {
@@ -123,7 +137,7 @@ const ContinuousFeedbackPage = () => {
     return () => {
       mounted = false;
     };
-  }, [isEmployeeView, selectedTeamId]);
+  }, [isEmployeeView, selectedTeamId, removeCurrentUser]);
 
   const resetForm = () => {
     setSelectedEmployeeId('');
@@ -177,13 +191,13 @@ const ContinuousFeedbackPage = () => {
   };
 
   return (
-    <div className="oom-page">
-      <div className="oom-header">
+    <div className="oom-page continuous-feedback-page">
+      <div className="oom-header continuous-feedback-hero">
         <h1>Continuous Feedback</h1>
         <p>
           {isEmployeeView
             ? 'View continuous feedback you received.'
-            : 'Give feedback to eligible employees in your department. Select a team first to narrow the employee list.'}
+            : 'Give feedback to eligible employees in your department. Your own account is excluded automatically.'}
         </p>
       </div>
 
