@@ -322,7 +322,7 @@ public class NotificationTemplateServiceImpl implements NotificationTemplateServ
             case "MANAGER", "PROJECT_MANAGER", "TEAM_MANAGER" -> "Manager";
             case "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT" -> "DepartmentHead";
             case "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN" -> "HR";
-            case "ADMIN" -> "Admin";
+            case "HRADMIN", "ADMIN" -> "HRADMIN";
             case "CEO", "EXECUTIVE" -> "Executive";
             default -> null;
         };

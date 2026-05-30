@@ -24,9 +24,9 @@ public class AppraisalReportController {
 
     @GetMapping("/hr/forms/{formId}/pdf")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<byte[]> exportEmployeeAppraisalPdf(@PathVariable Integer formId) {
         byte[] pdf = appraisalReportService.generateEmployeeAppraisalPdf(formId);

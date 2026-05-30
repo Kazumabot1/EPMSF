@@ -42,7 +42,7 @@ public class AuditLogController {
         boolean hr = isHr();
 
         if (!admin && !hr) {
-            throw new UnauthorizedActionException("Only HR/Admin can access audit logs.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can access audit logs.");
         }
 
         Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
@@ -109,9 +109,21 @@ public class AuditLogController {
     }
 
     private boolean isAdmin() {
-        return SecurityUtils.currentUser().getRoles().stream()
+        var user = SecurityUtils.currentUser();
+
+        String dashboard = normalizeRole(user.getDashboard());
+        if (dashboard.equals("HRADMIN_DASHBOARD") || dashboard.equals("ADMIN_DASHBOARD")) {
+            return true;
+        }
+
+        String position = normalizeRole(user.getPosition());
+        if (position.equals("HRADMIN") || position.equals("ADMIN")) {
+            return true;
+        }
+
+        return user.getRoles().stream()
                 .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN"));
+                .anyMatch(role -> role.equals("HRADMIN") || role.equals("ADMIN"));
     }
 
     private boolean isHr() {
@@ -181,7 +193,7 @@ public class AuditLogController {
         boolean hr = isHr();
 
         if (!admin && !hr) {
-            throw new UnauthorizedActionException("Only HR/Admin can access audit logs.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can access audit logs.");
         }
 
         Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
@@ -248,9 +260,21 @@ public class AuditLogController {
     }
 
     private boolean isAdmin() {
-        return SecurityUtils.currentUser().getRoles().stream()
+        var user = SecurityUtils.currentUser();
+
+        String dashboard = normalizeRole(user.getDashboard());
+        if (dashboard.equals("HRADMIN_DASHBOARD") || dashboard.equals("ADMIN_DASHBOARD")) {
+            return true;
+        }
+
+        String position = normalizeRole(user.getPosition());
+        if (position.equals("HRADMIN") || position.equals("ADMIN")) {
+            return true;
+        }
+
+        return user.getRoles().stream()
                 .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN"));
+                .anyMatch(role -> role.equals("HRADMIN") || role.equals("ADMIN"));
     }
 
     private boolean isHr() {
@@ -328,7 +352,7 @@ public class AuditLogController {
         boolean hr = isHr();
 
         if (!admin && !hr) {
-            throw new UnauthorizedActionException("Only HR/Admin can access audit logs.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can access audit logs.");
         }
 
         Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
@@ -366,7 +390,7 @@ public class AuditLogController {
     @GetMapping("/editors")
     public ResponseEntity<GenericApiResponse<List<AuditLogEditorResponse>>> getAuditLogEditors() {
         if (!isAdmin()) {
-            throw new UnauthorizedActionException("Only Admin can view audit log editor list.");
+            throw new UnauthorizedActionException("Only HR Admin can view audit log editor list.");
         }
 
         List<Integer> editorIds = auditLogService.getEditorUserIdsForEntityTypes(ADMIN_ENTITY_TYPES);
@@ -471,9 +495,21 @@ public class AuditLogController {
     }
 
     private boolean isAdmin() {
-        return SecurityUtils.currentUser().getRoles().stream()
+        var user = SecurityUtils.currentUser();
+
+        String dashboard = normalizeRole(user.getDashboard());
+        if (dashboard.equals("HRADMIN_DASHBOARD") || dashboard.equals("ADMIN_DASHBOARD")) {
+            return true;
+        }
+
+        String position = normalizeRole(user.getPosition());
+        if (position.equals("HRADMIN") || position.equals("ADMIN")) {
+            return true;
+        }
+
+        return user.getRoles().stream()
                 .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN"));
+                .anyMatch(role -> role.equals("HRADMIN") || role.equals("ADMIN"));
     }
 
     private boolean isHr() {

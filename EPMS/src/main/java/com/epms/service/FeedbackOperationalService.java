@@ -244,7 +244,7 @@ public class FeedbackOperationalService {
 
     @Transactional
     public NotificationDeliveryResult notifyEarlyCloseRequested(FeedbackCampaign campaign, long totalAssignments, long submittedAssignments) {
-        List<User> admins = userRepository.findActiveUsersByNormalizedRoleNames(List.of("ADMIN", "SUPER_ADMIN"));
+        List<User> admins = userRepository.findActiveUsersByNormalizedRoleNames(List.of("HRADMIN", "SUPER_ADMIN"));
         int sent = 0;
         for (User admin : admins) {
             String message = "HR requested early close for " + campaign.getName()

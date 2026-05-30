@@ -17,7 +17,7 @@ export const FIXED_ROLE_OPTIONS: FixedRoleOption[] = [
   'DEPARTMENT_HEAD',
   'HR',
   'CEO',
-  'ADMIN',
+  'HRADMIN',
 ].map((role) => ({
   id: role,
   name: role,

@@ -132,7 +132,7 @@ const SAMPLE_TEMPLATE_ROW = [
     'EMPLOYEE_DASHBOARD',
 ];
 
-const VALID_ROLES = ['EMPLOYEE', 'HR', 'ADMIN', 'MANAGER', 'DEPARTMENT_HEAD', 'CEO'];
+const VALID_ROLES = ['EMPLOYEE', 'HR', 'HRADMIN', 'MANAGER', 'DEPARTMENT_HEAD', 'CEO'];
 
 const VALID_DASHBOARDS = [
     'EMPLOYEE_DASHBOARD',
@@ -140,7 +140,7 @@ const VALID_DASHBOARDS = [
     'DEPARTMENT_HEAD_DASHBOARD',
     'HR_DASHBOARD',
     'EXECUTIVE_DASHBOARD',
-    'ADMIN_DASHBOARD',
+    'HRADMIN_DASHBOARD',
 ];
 
 const COLUMN_ALIASES: Record<string, string[]> = {
@@ -842,7 +842,7 @@ const EmptyState = ({ title, message }: { title: string; message: string }) => (
 
 function HrEmployeeAccountImport() {
     const location = useLocation();
-    const isAdminRoute = location.pathname.startsWith('/admin');
+    const isAdminRoute = location.pathname.startsWith('/hradmin');
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -857,7 +857,7 @@ function HrEmployeeAccountImport() {
     const [previewSearchTerm, setPreviewSearchTerm] = useState('');
     const [resultSearchTerm, setResultSearchTerm] = useState('');
 
-    const accountsPath = isAdminRoute ? '/admin/users' : '/hr/employee';
+    const accountsPath = isAdminRoute ? '/hradmin/users' : '/hr/employee';
 
     const canImport = Boolean(
         selectedFile && validation && validation.status === 'valid' && !validating && !uploading,

@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
 public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService {
 
     private static final Set<String> HR_ADMIN_ROLE_NAMES = Set.of(
-            "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
+            "HRADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
     );
     private static final Set<String> EXECUTIVE_ROLE_NAMES = Set.of("CEO", "EXECUTIVE");
 
@@ -526,7 +526,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 throw new BusinessValidationException("A direct report cannot be added as a peer evaluator.");
             }
             if (hasHrAdminRole(evaluator)) {
-                throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
+                throw new BusinessValidationException("HR or HR Admin users cannot be added as peer evaluators.");
             }
             if (isExecutivePeerMismatch(resolvePeerLayer(target), evaluator)) {
                 throw new BusinessValidationException("Executive users are not peer evaluators for this recipient layer.");
@@ -957,7 +957,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         if (targetWarnings != null && originalSize > eligible.size()) {
-            targetWarnings.add("Some peer candidates were excluded because they were inactive, HR/Admin users, direct managers, direct reports, outside the recipient department, or not at the same organization layer.");
+            targetWarnings.add("Some peer candidates were excluded because they were inactive, HR or HR Admin users, direct managers, direct reports, outside the recipient department, or not at the same organization layer.");
         }
         return eligible;
     }

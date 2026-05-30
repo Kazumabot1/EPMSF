@@ -126,7 +126,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional(readOnly = true)
-    public List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForCeo() {
+    public List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForHrAdmin() {
         return requestRepository.findByStatusOrderByRequestedAtDesc(EmployeeChangeRequestStatus.PENDING)
                 .stream()
                 .map(this::toSummary)
@@ -283,13 +283,13 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional
-    public EmployeeChangeRequestDtos.SummaryResponse approveByCeo(
+    public EmployeeChangeRequestDtos.SummaryResponse approveByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest reviewRequest
     ) {
         String reason = cleanRequiredReason(
                 reviewRequest == null ? null : reviewRequest.getReason(),
-                "CEO approval reason is required."
+                "HR Admin approval reason is required."
         );
 
         EmployeeChangeRequest request = findRequest(requestId);
@@ -300,16 +300,16 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
         /*
          * Re-check blockers at approval time.
-         * This prevents CEO from approving a request that became unsafe after HR submitted it.
+         * This prevents HR Admin from approving a request that became unsafe after HR submitted it.
          */
         ValidationResult validation = validateChangeAllowed(request.getEmployee(), request.getRequestType());
 
-        User ceo = currentUser();
+        User hrAdmin = currentUser();
 
         EmployeeChangeRequestStatus oldStatus = request.getStatus();
 
         request.setStatus(EmployeeChangeRequestStatus.APPROVED);
-        request.setReviewedByUser(ceo);
+        request.setReviewedByUser(hrAdmin);
         request.setReviewedAt(java.time.LocalDateTime.now());
         request.setCeoReviewReason(reason);
         request.setValidationSummary(validation.validationSummary());
@@ -319,15 +319,15 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "APPROVED",
                 oldStatus,
                 EmployeeChangeRequestStatus.APPROVED,
-                ceo,
+                hrAdmin,
                 reason,
-                "CEO approved this workforce change request."
+                "HR Admin approved this workforce change request."
         );
 
         if (request.getRequestType() == EmployeeChangeRequestType.POSITION_CHANGE) {
-            applyApprovedPositionChange(request, ceo, reason);
+            applyApprovedPositionChange(request, hrAdmin, reason);
         } else if (request.getRequestType() == EmployeeChangeRequestType.DEPARTMENT_CHANGE) {
-            applyApprovedDepartmentChange(request, ceo, reason);
+            applyApprovedDepartmentChange(request, hrAdmin, reason);
         }
 
         EmployeeChangeRequestStatus approvedStatus = request.getStatus();
@@ -338,7 +338,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "APPLIED",
                 approvedStatus,
                 EmployeeChangeRequestStatus.APPLIED,
-                ceo,
+                hrAdmin,
                 reason,
                 "Approved workforce change was applied to the employee profile."
         );
@@ -351,13 +351,13 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional
-    public EmployeeChangeRequestDtos.SummaryResponse rejectByCeo(
+    public EmployeeChangeRequestDtos.SummaryResponse rejectByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest reviewRequest
     ) {
         String reason = cleanRequiredReason(
                 reviewRequest == null ? null : reviewRequest.getReason(),
-                "CEO rejection reason is required."
+                "HR Admin rejection reason is required."
         );
 
         EmployeeChangeRequest request = findRequest(requestId);
@@ -366,11 +366,11 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
             throw new BadRequestException("Only pending employee change requests can be rejected.");
         }
 
-        User ceo = currentUser();
+        User hrAdmin = currentUser();
         EmployeeChangeRequestStatus oldStatus = request.getStatus();
 
         request.setStatus(EmployeeChangeRequestStatus.REJECTED);
-        request.setReviewedByUser(ceo);
+        request.setReviewedByUser(hrAdmin);
         request.setReviewedAt(java.time.LocalDateTime.now());
         request.setCeoReviewReason(reason);
 
@@ -379,9 +379,9 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "REJECTED",
                 oldStatus,
                 EmployeeChangeRequestStatus.REJECTED,
-                ceo,
+                hrAdmin,
                 reason,
-                "CEO rejected this workforce change request."
+                "HR Admin rejected this workforce change request."
         );
 
         EmployeeChangeRequest saved = requestRepository.save(request);
@@ -392,7 +392,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     private void applyApprovedPositionChange(
             EmployeeChangeRequest request,
-            User ceo,
+            User hrAdmin,
             String reason
     ) {
         Employee employee = request.getEmployee();
@@ -416,7 +416,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "position",
                 positionName(oldPosition),
                 positionName(newPosition),
-                ceo.getId(),
+                hrAdmin.getId(),
                 reason
         );
 
@@ -425,7 +425,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "position_level",
                 positionLevelCode(oldPosition),
                 positionLevelCode(newPosition),
-                ceo.getId(),
+                hrAdmin.getId(),
                 reason
         );
 
@@ -434,7 +434,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "role",
                 roleName(oldPosition),
                 roleName(newPosition),
-                ceo.getId(),
+                hrAdmin.getId(),
                 reason
         );
 
@@ -456,7 +456,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     private void applyApprovedDepartmentChange(
             EmployeeChangeRequest request,
-            User ceo,
+            User hrAdmin,
             String reason
     ) {
         Employee employee = request.getEmployee();
@@ -489,7 +489,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
         newAssignment.setParentDepartment(newParentDepartment);
         newAssignment.setStartdate(new Date());
         newAssignment.setEnddate(null);
-        newAssignment.setAssignBy("CEO Approval");
+        newAssignment.setAssignBy("HR Admin Approval");
 
         employeeDepartmentRepository.save(newAssignment);
 
@@ -502,7 +502,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "current_department",
                 departmentName(oldCurrentDepartment),
                 departmentName(newCurrentDepartment),
-                ceo.getId(),
+                hrAdmin.getId(),
                 reason
         );
 
@@ -511,7 +511,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "parent_department",
                 departmentName(oldParentDepartment),
                 departmentName(newParentDepartment),
-                ceo.getId(),
+                hrAdmin.getId(),
                 reason
         );
 
@@ -520,7 +520,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "working_department",
                 departmentName(oldWorkingDepartment),
                 departmentName(newWorkingDepartment),
-                ceo.getId(),
+                hrAdmin.getId(),
                 reason
         );
 
@@ -593,8 +593,8 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 : "Workforce change rejected";
 
         String message = approved
-                ? employeeLabel + "'s " + typeLabel + " request was approved by CEO and applied."
-                : employeeLabel + "'s " + typeLabel + " request was rejected by CEO. Reason: "
+                ? employeeLabel + "'s " + typeLabel + " request was approved by HR Admin and applied."
+                : employeeLabel + "'s " + typeLabel + " request was rejected by HR Admin. Reason: "
                 + nullToBlank(request.getCeoReviewReason());
 
         Integer referenceId = request.getId() == null ? null : request.getId().intValue();
@@ -792,7 +792,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
         }
 
         return new ValidationResult(
-                "Ready for CEO approval. No active KPI, PIP, appraisal, self-assessment, or active team blockers were found."
+                "Ready for HR Admin approval. No active KPI, PIP, appraisal, self-assessment, or active team blockers were found."
         );
     }
 

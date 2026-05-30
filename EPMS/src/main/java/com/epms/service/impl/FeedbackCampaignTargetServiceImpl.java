@@ -48,7 +48,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
 
     private static final Set<String> TARGET_LEVEL_CODES = Set.of("L05", "L06", "L07");
     private static final Set<String> TARGET_EXCLUDED_ROLES = Set.of(
-            "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN",
+            "HRADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN",
             "CEO", "EXECUTIVE", "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT"
     );
 
@@ -289,7 +289,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             blockReasons.add("This employee is outside the selected campaign audience.");
         }
         if (user != null && hasTargetExcludedRole(user)) {
-            blockReasons.add("Department heads, HR, Admin, and CEO users can give feedback when assigned, but they are not included as feedback recipients.");
+            blockReasons.add("Department heads, HR, HR Admin, and CEO users can give feedback when assigned, but they are not included as feedback recipients.");
         }
         if (excludedTargetUserId != null && user != null && user.getId() != null
                 && Objects.equals(user.getId().longValue(), excludedTargetUserId)) {

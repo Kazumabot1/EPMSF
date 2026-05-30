@@ -299,7 +299,7 @@ public class UserAccountProvisioningService {
             case "PROJECT_MANAGER", "PROJECTMANAGER", "TEAM_MANAGER", "PM" -> "MANAGER";
             case "DEPARTMENTHEAD", "DEPT_HEAD", "DEPTHEAD", "HEAD_OF_DEPARTMENT" -> "DEPARTMENT_HEAD";
             case "CEO", "EXECUTIVE" -> "CEO";
-            case "ADMIN" -> "ADMIN";
+            case "HRADMIN" -> "HRADMIN";
             case "HR" -> "HR";
             case "MANAGER" -> "MANAGER";
             case "DEPARTMENT_HEAD" -> "DEPARTMENT_HEAD";

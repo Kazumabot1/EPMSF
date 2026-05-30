@@ -105,8 +105,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
   const normalizedDashboard = normalizeRoleName(dashboard);
 
-  const isAdmin =
+  const isHrAdmin =
+      normalizedRoles.includes('HRADMIN') ||
       normalizedRoles.includes('ADMIN') ||
+      normalizedDashboard === 'HRADMIN_DASHBOARD' ||
       normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isHr =
@@ -133,7 +135,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       normalizedDashboard === 'EXECUTIVE_DASHBOARD';
 
   const isEmployee =
-      !isAdmin &&
+      !isHrAdmin &&
       !isHr &&
       !isDepartmentHead &&
       !isManager &&
@@ -146,11 +148,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
   const roleLabel =
       variant === 'admin'
-          ? 'Admin'
+          ? 'HR Admin'
           : variant === 'hr'
               ? 'HR'
-              : isAdmin
-                  ? 'Admin'
+              : isHrAdmin
+                  ? 'HR Admin'
                   : isHr
                       ? 'HR'
                       : isDepartmentHead
@@ -219,10 +221,21 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ]
         : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
-    const adminNavItems: NavItem[] = [
-      { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
-      { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
-      { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
+    const hrAdminNavItems: NavItem[] = [
+      { to: '/hradmin/dashboard', label: 'HR Admin Dashboard', icon: 'bi bi-shield-lock' },
+      { to: '/hradmin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
+      { to: '/hradmin/employee/import', label: 'Import Accounts', icon: 'bi bi-upload' },
+      {
+        to: '/hradmin/approval/kpi',
+        label: 'Approval',
+        icon: 'bi bi-shield-check',
+        children: [
+          { to: '/hradmin/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+          { to: '/hradmin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
+          { to: '/hradmin/approval/changes', label: 'Position & Department Changes', icon: 'bi bi-arrow-left-right' },
+        ],
+      },
+      { to: '/hradmin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -505,6 +518,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
       { to: '/employee/feedback', label: '360 Feedback', icon: 'bi bi-chat-dots' },
+      { to: '/employee/continuous-feedback', label: 'Continuous Feedback', icon: 'bi bi-chat-square-text' },
       { to: '/employee/one-on-ones', label: 'One-on-Ones', icon: 'bi bi-calendar-check' },
       {
         to: '/pip',
@@ -905,9 +919,9 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-    if (variant === 'admin') return adminNavItems;
+    if (variant === 'admin') return hrAdminNavItems;
     if (variant === 'hr') return hrNavItems;
-    if (isAdmin) return adminNavItems;
+    if (isHrAdmin) return hrAdminNavItems;
     if (isHr) return hrNavItems;
     if (isDepartmentHead) return departmentHeadNavItems;
     if (isExecutive) return executiveNavItems;
@@ -917,7 +931,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     return hrNavItems;
   }, [
     variant,
-    isAdmin,
+    isHrAdmin,
     isHr,
     isDepartmentHead,
     isExecutive,

@@ -51,10 +51,10 @@ public class User {
     private Integer departmentId;
 
     /*
-     * Admin-selected dashboard override.
+     * HR Admin-selected dashboard override.
      *
      * Supported values:
-     * ADMIN_DASHBOARD
+     * HRADMIN_DASHBOARD
      * HR_DASHBOARD
      * EXECUTIVE_DASHBOARD
      * DEPARTMENT_HEAD_DASHBOARD

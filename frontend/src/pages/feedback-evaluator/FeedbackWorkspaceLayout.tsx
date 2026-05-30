@@ -5,7 +5,7 @@
 // const FeedbackWorkspaceLayout = () => {
 //   const { user, logout } = useAuth();
 //   const roleSet = new Set((user?.roles ?? []).map((role) => role.toUpperCase()));
-//   const canViewTeamSummary = ['MANAGER', 'HR', 'ADMIN', 'ROLE_MANAGER', 'ROLE_HR', 'ROLE_ADMIN'].some((role) =>
+//   const canViewTeamSummary = ['MANAGER', 'HR', 'HRADMIN', 'ROLE_MANAGER', 'ROLE_HR', 'ROLE_ADMIN'].some((role) =>
 //     roleSet.has(role),
 //   );
 //

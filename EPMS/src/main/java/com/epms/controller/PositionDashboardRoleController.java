@@ -29,7 +29,7 @@ public class PositionDashboardRoleController {
             "DEPARTMENT_HEAD", 3,
             "HR", 4,
             "CEO", 5,
-            "ADMIN", 6
+            "HRADMIN", 6
     );
 
     @GetMapping
@@ -90,7 +90,7 @@ public class PositionDashboardRoleController {
             case "PROJECT_MANAGER", "PROJECTMANAGER", "TEAM_MANAGER", "PM" -> "MANAGER";
             case "DEPARTMENTHEAD", "DEPT_HEAD", "DEPTHEAD", "HEAD_OF_DEPARTMENT" -> "DEPARTMENT_HEAD";
             case "EXECUTIVE", "CEO" -> "CEO";
-            case "ADMIN" -> "ADMIN";
+            case "HRADMIN" -> "HRADMIN";
             case "HR" -> "HR";
             case "MANAGER" -> "MANAGER";
             case "DEPARTMENT_HEAD" -> "DEPARTMENT_HEAD";
@@ -101,7 +101,7 @@ public class PositionDashboardRoleController {
 
     private String displayRoleName(String roleName) {
         return switch (roleName) {
-            case "ADMIN" -> "Admin";
+            case "HRADMIN" -> "HR Admin";
             case "HR" -> "HR";
             case "CEO" -> "CEO / Executive";
             case "DEPARTMENT_HEAD" -> "Department Head";
@@ -113,7 +113,7 @@ public class PositionDashboardRoleController {
 
     private String dashboardForRole(String roleName) {
         return switch (roleName) {
-            case "ADMIN" -> "ADMIN_DASHBOARD";
+            case "HRADMIN" -> "HRADMIN_DASHBOARD";
             case "HR" -> "HR_DASHBOARD";
             case "CEO" -> "EXECUTIVE_DASHBOARD";
             case "DEPARTMENT_HEAD" -> "DEPARTMENT_HEAD_DASHBOARD";

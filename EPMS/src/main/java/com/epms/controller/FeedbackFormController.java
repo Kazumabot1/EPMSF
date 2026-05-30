@@ -200,13 +200,13 @@ public class FeedbackFormController {
                 .filter(role -> role != null && !role.isBlank())
                 .map(this::normalizeRole)
                 .anyMatch(role -> role.equals("HR")
-                        || role.equals("ADMIN")
+                        || role.equals("HRADMIN")
                         || role.equals("HR_ADMIN")
                         || role.equals("HR_MANAGER")
                         || role.equals("HUMAN_RESOURCES")
                         || role.equals("HUMAN_RESOURCE"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only HR/Admin can manage feedback forms.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can manage feedback forms.");
         }
     }
 

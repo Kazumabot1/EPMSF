@@ -52,9 +52,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<AppraisalCycleResponse>>> getActiveCyclesForPm() {
         List<AppraisalCycleResponse> reviewCycles = new java.util.ArrayList<>();
@@ -87,9 +87,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<AppraisalTemplateResponse>> getPmCycleTemplate(@PathVariable Integer cycleId) {
         AppraisalCycleResponse cycle = appraisalCycleService.getCycle(cycleId);
@@ -102,9 +102,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<AppraisalEmployeeOptionResponse>>> getPmEligibleEmployees(
             @PathVariable Integer cycleId
@@ -118,9 +118,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> createPmDraft(
             @PathVariable Integer cycleId,
@@ -136,9 +136,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> savePmDraft(
             @PathVariable Integer formId,
@@ -153,9 +153,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> submitPmReview(
             @PathVariable Integer formId,
@@ -170,9 +170,9 @@ public class AppraisalWorkflowController {
             "hasRole('MANAGER') "
                     + "or hasAuthority('ROLE_MANAGER') "
                     + "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getPmHistory() {
         List<EmployeeAppraisalFormResponse> response = workflowService.getPmHistory(SecurityUtils.currentUserId());
@@ -186,9 +186,9 @@ public class AppraisalWorkflowController {
                     + "or hasAuthority('ROLE_DEPARTMENT_HEAD') "
                     + "or hasAuthority('ROLE_DEPARTMENTHEAD') "
                     + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getDeptHeadQueue(
             @RequestParam(required = false) Integer departmentId
@@ -208,9 +208,9 @@ public class AppraisalWorkflowController {
                     + "or hasAuthority('ROLE_DEPARTMENT_HEAD') "
                     + "or hasAuthority('ROLE_DEPARTMENTHEAD') "
                     + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> saveDeptHeadDraft(
             @PathVariable Integer formId,
@@ -227,9 +227,9 @@ public class AppraisalWorkflowController {
                     + "or hasAuthority('ROLE_DEPARTMENT_HEAD') "
                     + "or hasAuthority('ROLE_DEPARTMENTHEAD') "
                     + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> submitDeptHeadReview(
             @PathVariable Integer formId,
@@ -247,9 +247,9 @@ public class AppraisalWorkflowController {
                     + "or hasAuthority('ROLE_DEPARTMENT_HEAD') "
                     + "or hasAuthority('ROLE_DEPARTMENTHEAD') "
                     + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getDeptHeadHistory() {
         List<EmployeeAppraisalFormResponse> response = workflowService.getDeptHeadHistory(SecurityUtils.currentUserId());
@@ -258,9 +258,9 @@ public class AppraisalWorkflowController {
 
     @GetMapping("/hr/queue")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getHrReviewQueue() {
         List<EmployeeAppraisalFormResponse> response = workflowService.getHrReviewQueue();
@@ -269,9 +269,9 @@ public class AppraisalWorkflowController {
 
     @GetMapping("/hr/reviews")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getHrReviewedRecords() {
         List<EmployeeAppraisalFormResponse> response = workflowService.getHrReviewedRecords();
@@ -280,9 +280,9 @@ public class AppraisalWorkflowController {
 
     @PostMapping("/hr/forms/{formId}/draft")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> saveHrDraft(
             @PathVariable Integer formId,
@@ -294,9 +294,9 @@ public class AppraisalWorkflowController {
 
     @PostMapping("/hr/forms/{formId}/approve")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> approveByHr(
             @PathVariable Integer formId,
@@ -313,9 +313,9 @@ public class AppraisalWorkflowController {
                     + "or hasAuthority('ROLE_DEPARTMENT_HEAD') "
                     + "or hasAuthority('ROLE_DEPARTMENTHEAD') "
                     + "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeAppraisalFormResponse>> returnToPm(
             @PathVariable Integer formId,
@@ -339,9 +339,9 @@ public class AppraisalWorkflowController {
     @PreAuthorize(
             "hasRole('EMPLOYEE') "
                     + "or authentication.principal.dashboard == 'EMPLOYEE_DASHBOARD' "
-                    + "or hasAnyRole('HR', 'ADMIN') "
+                    + "or hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getMyCompletedForms() {
         Integer employeeId = userRepository.findById(SecurityUtils.currentUserId())
@@ -368,9 +368,9 @@ public class AppraisalWorkflowController {
         if (user == null) {
             return false;
         }
-        boolean isHrOrAdmin = hasRole(user, "HR") || hasRole(user, "ADMIN")
+        boolean isHrOrAdmin = hasRole(user, "HR") || hasRole(user, "HRADMIN")
                 || "HR_DASHBOARD".equalsIgnoreCase(user.getDashboard())
-                || "ADMIN_DASHBOARD".equalsIgnoreCase(user.getDashboard());
+                || "HRADMIN_DASHBOARD".equalsIgnoreCase(user.getDashboard());
         boolean isManager = hasRole(user, "MANAGER")
                 || hasRole(user, "PROJECT_MANAGER")
                 || "MANAGER_DASHBOARD".equalsIgnoreCase(user.getDashboard());
@@ -391,9 +391,9 @@ public class AppraisalWorkflowController {
 
     @GetMapping("/employee/{employeeId}/forms")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or authentication.principal.dashboard == 'HR_DASHBOARD' "
-                    + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeAppraisalFormResponse>>> getEmployeeCompletedForms(
             @PathVariable Integer employeeId

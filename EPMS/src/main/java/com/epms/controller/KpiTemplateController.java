@@ -23,7 +23,7 @@ import java.util.List;
  * Authorization for this API is enforced in {@link com.epms.config.SecurityConfig}
  * on {@code /api/hr/kpi-templates/**} (HR-like roles, HR dashboards, and position checks).
  * {@code POST …/use-for-department} uses {@link com.epms.security.HrKpiTemplateAuthority} in the filter chain only.
- * Do not narrow access again with {@code @PreAuthorize(hasAnyRole('HR','ADMIN'))}: many HR users
+ * Do not narrow access again with {@code @PreAuthorize(hasAnyRole('HR','HRADMIN'))}: many HR users
  * carry roles such as PEOPLE_OPS or HR_MANAGER that match the filter chain but not that expression,
  * which causes HTTP 403 after the request already passed gateway security.
  */

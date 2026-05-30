@@ -82,8 +82,8 @@ function Login() {
   const resolveRoute = (dashboard?: string, roles: string[] = []) => {
     const normalizedRoles = roles.map(normalizeRoleName);
 
-    if (normalizedRoles.includes('ADMIN') || dashboard === 'ADMIN_DASHBOARD') {
-      return '/admin/dashboard';
+    if (normalizedRoles.includes('HRADMIN') || normalizedRoles.includes('ADMIN') || dashboard === 'HRADMIN_DASHBOARD' || dashboard === 'ADMIN_DASHBOARD') {
+      return '/hradmin/dashboard';
     }
 
     switch (dashboard) {

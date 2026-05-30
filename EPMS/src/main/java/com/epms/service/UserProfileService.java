@@ -114,7 +114,7 @@ public class UserProfileService {
         User user = currentUser();
 
         if (user.getPassword() == null || user.getPassword().isBlank()) {
-            throw new BadRequestException("Your account password is not set. Please contact HR/Admin.");
+            throw new BadRequestException("Your account password is not set. Please contact HR or HR Admin.");
         }
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {

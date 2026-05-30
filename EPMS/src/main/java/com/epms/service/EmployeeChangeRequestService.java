@@ -8,7 +8,7 @@ public interface EmployeeChangeRequestService {
 
     List<EmployeeChangeRequestDtos.SummaryResponse> getAllForHr();
 
-    List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForCeo();
+    List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForHrAdmin();
 
     EmployeeChangeRequestDtos.DetailResponse getDetail(Long requestId);
 
@@ -20,12 +20,12 @@ public interface EmployeeChangeRequestService {
             EmployeeChangeRequestDtos.DepartmentChangeCreateRequest request
     );
 
-    EmployeeChangeRequestDtos.SummaryResponse approveByCeo(
+    EmployeeChangeRequestDtos.SummaryResponse approveByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest request
     );
 
-    EmployeeChangeRequestDtos.SummaryResponse rejectByCeo(
+    EmployeeChangeRequestDtos.SummaryResponse rejectByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest request
     );

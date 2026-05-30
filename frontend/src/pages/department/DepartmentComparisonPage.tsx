@@ -10,6 +10,7 @@ import {
   type DepartmentComparisonSummary,
   type DepartmentComparisonTeam,
 } from '../../services/departmentComparisonService';
+import { exportToExcel, todayStr } from '../../utils/exportExcel';
 import './department-comparison.css';
 
 type Side = 'left' | 'right';
@@ -301,6 +302,102 @@ const DepartmentComparisonPage = () => {
     }
   };
 
+  const exportDepartmentComparison = () => {
+    const rows = performanceRows.map((row, index) => ({
+      no: index + 1,
+      departmentName: row.department.departmentName,
+      departmentCode: row.department.departmentCode ?? '',
+      status: isDepartmentActive(row.department.status) ? 'Active' : 'Inactive',
+      performanceScore: `${row.score}%`,
+      totalEmployees: row.totalEmployees,
+      currentDepartmentEmployees: row.currentEmployees,
+      parentDepartmentEmployees: row.parentEmployees,
+      teams: row.teamCount,
+      activeTeams: row.activeTeams,
+      teamMembers: row.teamMembers,
+      teamCoverage: `${row.teamCoverage}%`,
+      activeTeamRate: `${row.activeTeamRate}%`,
+      createdAt: formatDate(row.department.createdAt),
+      createdBy: row.department.createdBy ?? '',
+    }));
+
+    exportToExcel(
+      rows,
+      [
+        { header: 'No.', key: 'no' },
+        { header: 'Department Name', key: 'departmentName' },
+        { header: 'Department Code', key: 'departmentCode' },
+        { header: 'Status', key: 'status' },
+        { header: 'Performance Score', key: 'performanceScore' },
+        { header: 'Total Employees', key: 'totalEmployees' },
+        { header: 'Current Department Employees', key: 'currentDepartmentEmployees' },
+        { header: 'Parent Department Employees', key: 'parentDepartmentEmployees' },
+        { header: 'Teams', key: 'teams' },
+        { header: 'Active Teams', key: 'activeTeams' },
+        { header: 'Team Members', key: 'teamMembers' },
+        { header: 'Team Coverage', key: 'teamCoverage' },
+        { header: 'Active Team Rate', key: 'activeTeamRate' },
+        { header: 'Created At', key: 'createdAt' },
+        { header: 'Created By', key: 'createdBy' },
+      ],
+      `department-comparison-${todayStr()}`,
+    );
+  };
+
+  const exportSelectedDepartmentComparison = () => {
+    if (!leftDepartment || !rightDepartment) {
+      return;
+    }
+
+    const selectedRows = [
+      { side: 'Left', row: getDepartmentPerformance(leftDepartment, departmentDetails) },
+      { side: 'Right', row: getDepartmentPerformance(rightDepartment, departmentDetails) },
+    ].map(({ side, row }, index) => ({
+      no: index + 1,
+      compareSide: side,
+      departmentName: row.department.departmentName,
+      departmentCode: row.department.departmentCode ?? '',
+      status: isDepartmentActive(row.department.status) ? 'Active' : 'Inactive',
+      performanceScore: `${row.score}%`,
+      totalEmployees: row.totalEmployees,
+      currentDepartmentEmployees: row.currentEmployees,
+      parentDepartmentEmployees: row.parentEmployees,
+      teams: row.teamCount,
+      activeTeams: row.activeTeams,
+      teamMembers: row.teamMembers,
+      teamCoverage: `${row.teamCoverage}%`,
+      activeTeamRate: `${row.activeTeamRate}%`,
+      createdAt: formatDate(row.department.createdAt),
+      createdBy: row.department.createdBy ?? '',
+    }));
+
+    exportToExcel(
+      selectedRows,
+      [
+        { header: 'No.', key: 'no' },
+        { header: 'Compare Side', key: 'compareSide' },
+        { header: 'Department Name', key: 'departmentName' },
+        { header: 'Department Code', key: 'departmentCode' },
+        { header: 'Status', key: 'status' },
+        { header: 'Performance Score', key: 'performanceScore' },
+        { header: 'Total Employees', key: 'totalEmployees' },
+        { header: 'Current Department Employees', key: 'currentDepartmentEmployees' },
+        { header: 'Parent Department Employees', key: 'parentDepartmentEmployees' },
+        { header: 'Teams', key: 'teams' },
+        { header: 'Active Teams', key: 'activeTeams' },
+        { header: 'Team Members', key: 'teamMembers' },
+        { header: 'Team Coverage', key: 'teamCoverage' },
+        { header: 'Active Team Rate', key: 'activeTeamRate' },
+        { header: 'Created At', key: 'createdAt' },
+        { header: 'Created By', key: 'createdBy' },
+      ],
+      `selected-department-comparison-${leftDepartment.departmentName}-${rightDepartment.departmentName}-${todayStr()}`
+        .replace(/[^a-z0-9-_]+/gi, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, ''),
+    );
+  };
+
   return (
     <div className="dept-compare-page">
       <section className="dept-compare-hero">
@@ -320,6 +417,14 @@ const DepartmentComparisonPage = () => {
           <span>Organization Score</span>
           <strong>{formatPercent(overview.averageScore)}</strong>
           <small>{formatNumber(overview.totalDepartments)} department(s) tracked</small>
+          <button
+            type="button"
+            className="dept-compare-btn dept-compare-btn-primary"
+            onClick={exportDepartmentComparison}
+            disabled={performanceRows.length === 0 || detailLoading}
+          >
+            Export Excel
+          </button>
         </div>
       </section>
 
@@ -477,6 +582,23 @@ const DepartmentComparisonPage = () => {
             : rightDepartment && !leftDepartment
               ? 'Right side is selected. Search or choose another department and add it to the left side.'
               : 'Select a department for the left side and another department for the right side to compare.'}
+        </section>
+      )}
+
+      {leftDepartment && rightDepartment && (
+        <section className="dept-compare-help-card">
+          <div>
+            <strong>Compared departments are ready.</strong>
+            <p>Export only the selected left and right departments, not the full department list.</p>
+          </div>
+
+          <button
+            type="button"
+            className="dept-compare-btn dept-compare-btn-primary"
+            onClick={exportSelectedDepartmentComparison}
+          >
+            Export Excel for two compare department
+          </button>
         </section>
       )}
 
@@ -744,7 +866,6 @@ const DepartmentComparePanel = ({
         <InfoRow label="Created At" value={formatDate(department.createdAt)} />
         <InfoRow label="Created By" value={department.createdBy} />
         <InfoRow label="ID" value={department.id} />
-        <InfoRow label="Head Employee" value={department.headEmployee} />
       </div>
 
       <div className="dept-compare-mini-section">
@@ -828,7 +949,6 @@ const DepartmentDetailModal = ({
             <InfoRow label="Created At" value={formatDate(department.createdAt)} />
             <InfoRow label="Created By" value={department.createdBy} />
             <InfoRow label="ID" value={department.id} />
-            <InfoRow label="Head Employee" value={department.headEmployee} />
           </div>
 
           <div className="dept-compare-metric-grid">

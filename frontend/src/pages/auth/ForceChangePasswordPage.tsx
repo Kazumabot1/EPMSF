@@ -28,8 +28,8 @@ const resolveRoute = (dashboard?: string) => {
       return '/department-head/dashboard';
     case 'EXECUTIVE_DASHBOARD':
       return '/executive/dashboard';
-    case 'ADMIN_DASHBOARD':
-      return '/admin/dashboard';
+    case 'HRADMIN_DASHBOARD':
+      return '/hradmin/dashboard';
     case 'HR_DASHBOARD':
     default:
       return '/dashboard';
@@ -72,7 +72,7 @@ const ForceChangePasswordPage = () => {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const currentRole = resolveUserRole(user);
-  const currentRoleLabel = currentRole === 'DepartmentHead' ? 'Department Head Dashboard' : `${currentRole} Dashboard`;
+  const currentRoleLabel = currentRole === 'DepartmentHead' ? 'Department Head Dashboard' : currentRole === 'HRAdmin' ? 'HR Admin Dashboard' : `${currentRole} Dashboard`;
 
   const passwordRules = useMemo(() => getPasswordRules(newPassword), [newPassword]);
   const passwordWarning = useMemo(() => getPasswordWarning(newPassword), [newPassword]);

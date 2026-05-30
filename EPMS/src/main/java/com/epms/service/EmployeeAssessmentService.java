@@ -303,7 +303,7 @@ public class EmployeeAssessmentService {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
 
-        if (!roles.contains("HR") && !roles.contains("ADMIN")) {
+        if (!roles.contains("HR") && !roles.contains("HRADMIN")) {
             throw new UnauthorizedActionException("Only HR can approve this self-assessment.");
         }
 
@@ -336,7 +336,7 @@ public class EmployeeAssessmentService {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
 
-        if (!roles.contains("HR") && !roles.contains("ADMIN")) {
+        if (!roles.contains("HR") && !roles.contains("HRADMIN")) {
             throw new UnauthorizedActionException("Only HR can reject this self-assessment.");
         }
 
@@ -380,7 +380,7 @@ public class EmployeeAssessmentService {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
 
-        if (roles.contains("HR") || roles.contains("ADMIN")) {
+        if (roles.contains("HR") || roles.contains("HRADMIN")) {
             return assessmentRepository
                     .findByStatusInOrderBySubmittedAtDesc(REVIEW_TABLE_STATUSES)
                     .stream()
@@ -945,8 +945,8 @@ public class EmployeeAssessmentService {
             roles.add("HR");
         }
 
-        if (role.equals("ADMIN")) {
-            roles.add("ADMIN");
+        if (role.equals("HRADMIN")) {
+            roles.add("HRADMIN");
         }
 
         if (role.equals("EMPLOYEE")) {
@@ -1176,7 +1176,7 @@ public class EmployeeAssessmentService {
 
         Set<String> roles = currentUserTargetRoles(principal);
 
-        if (roles.contains("HR") || roles.contains("ADMIN")) {
+        if (roles.contains("HR") || roles.contains("HRADMIN")) {
             return;
         }
 
@@ -1236,7 +1236,7 @@ public class EmployeeAssessmentService {
         }
 
         return switch (dashboard) {
-            case "ADMIN_DASHBOARD" -> "ADMIN";
+            case "HRADMIN_DASHBOARD" -> "HRADMIN";
             case "HR_DASHBOARD" -> "HR";
             case "MANAGER_DASHBOARD" -> "MANAGER";
             case "DEPARTMENT_HEAD_DASHBOARD" -> "DEPARTMENT_HEAD";

@@ -85,11 +85,11 @@ const getCurrentRoleFlags = (): RoleFlags => {
     isHr:
       !isDepartmentHeadRoute &&
       (roles.includes('HR') ||
-        roles.includes('ADMIN') ||
+        roles.includes('HRADMIN') ||
         dashboard.includes('HR') ||
-        dashboard.includes('ADMIN') ||
+        dashboard.includes('HRADMIN') ||
         currentRole.includes('HR') ||
-        currentRole.includes('ADMIN') ||
+        currentRole.includes('HRADMIN') ||
         isHrRoute),
     isDepartmentHead,
     isDepartmentHeadRoute,

@@ -61,7 +61,7 @@ const normalizeRole = (role: unknown) => String(role ?? '')
 const currentUserCanReviewEarlyClose = () => {
   const user = authStorage.getUser();
   const roles: string[] = Array.isArray(user?.roles) ? user.roles : [];
-  return roles.map(normalizeRole).some(role => ['ADMIN', 'SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(role));
+  return roles.map(normalizeRole).some(role => ['HRADMIN', 'SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(role));
 };
 
 const progressFilterMatches = (row: FeedbackCompletionItem, filter: ProgressFilter) => {
@@ -294,7 +294,7 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
   const requestEarlyClose = async () => {
     if (!selectedId || !selectedCampaign) return;
     const reason = window.prompt(
-        'All evaluators have submitted. Enter a reason to request Admin approval for early campaign close.',
+        'All evaluators have submitted. Enter a reason to request HR Admin approval for early campaign close.',
         'All evaluators submitted earlier than the scheduled deadline. Requesting early close to proceed with analytics review.',
     );
     if (!reason?.trim()) return;
@@ -304,7 +304,7 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
     try {
       const updated = await hrFeedbackApi.requestEarlyClose(selectedId as number, reason.trim());
       updateCampaignInList(updated);
-      setNotice('Early close request sent to Admin. The campaign remains active until approval.');
+      setNotice('Early close request sent to HR Admin. The campaign remains active until approval.');
       refreshDashboard();
       refreshEarlyCloseRequests();
     } catch (e) {
@@ -319,7 +319,7 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
         ? 'Approved. All evaluators have submitted final feedback.'
         : 'Rejected. Campaign should remain active until the scheduled deadline.';
     const reviewNote = window.prompt(
-        decision === 'approve' ? 'Add an Admin approval note before closing this campaign.' : 'Add a rejection reason. The campaign will remain active.',
+        decision === 'approve' ? 'Add an HR Admin approval note before closing this campaign.' : 'Add a rejection reason. The campaign will remain active.',
         defaultNote,
     );
     if (reviewNote === null) return;
@@ -431,7 +431,7 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
             <div className="hfd-monitor-review-panel">
               <div>
                 <strong>Early close requests</strong>
-                <p>{earlyCloseLoading ? 'Loading requests…' : `${earlyCloseRequests.length} campaign(s) need Admin review.`}</p>
+                <p>{earlyCloseLoading ? 'Loading requests…' : `${earlyCloseRequests.length} campaign(s) need HR Admin review.`}</p>
               </div>
               <div className="hfd-monitor-review-list">
                 {earlyCloseRequests.map(request => (

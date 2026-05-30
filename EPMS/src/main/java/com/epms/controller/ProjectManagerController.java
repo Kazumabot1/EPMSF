@@ -28,7 +28,7 @@ import java.util.Map;
                 "or hasAuthority('ROLE_MANAGER') " +
                 "or authentication.principal.dashboard == 'MANAGER_DASHBOARD' " +
                 "or hasRole('HR') " +
-                "or hasRole('ADMIN')"
+                "or hasRole('HRADMIN')"
 )
 public class ProjectManagerController {
 

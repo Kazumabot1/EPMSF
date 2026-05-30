@@ -89,9 +89,9 @@ public class FeedbackAnalyticsController {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
                 .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
+                .anyMatch(role -> role.equals("HR") || role.equals("HRADMIN") || role.equals("ROLE_HR") || role.equals("ROLE_ADMIN"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only HR/Admin can access feedback analytics dashboards.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can access feedback analytics dashboards.");
         }
     }
 }

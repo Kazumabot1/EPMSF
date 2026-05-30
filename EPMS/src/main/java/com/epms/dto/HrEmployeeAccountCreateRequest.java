@@ -23,9 +23,9 @@ public class HrEmployeeAccountCreateRequest {
     private String roleName;
 
     /*
-     * Admin-selected dashboard override.
+     * HR Admin-selected dashboard override.
      *
-     * ADMIN_DASHBOARD
+     * HRADMIN_DASHBOARD
      * HR_DASHBOARD
      * EXECUTIVE_DASHBOARD
      * DEPARTMENT_HEAD_DASHBOARD

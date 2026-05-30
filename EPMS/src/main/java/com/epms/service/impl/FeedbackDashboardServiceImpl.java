@@ -397,6 +397,6 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
         }
         return roles.stream()
                 .map(String::toUpperCase)
-                .anyMatch(role -> role.equals("ADMIN") || role.equals("HR") || role.equals("ROLE_ADMIN") || role.equals("ROLE_HR"));
+                .anyMatch(role -> role.equals("HRADMIN") || role.equals("HR") || role.equals("ROLE_ADMIN") || role.equals("ROLE_HR"));
     }
 }

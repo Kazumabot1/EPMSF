@@ -161,7 +161,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                     : FeedbackSummaryVisibilityStatus.HIDDEN);
             summary.setPublishedAt(null);
             summary.setPublishedByUserId(null);
-            summary.setPublishNote("Unpublished by HR/Admin.");
+            summary.setPublishNote("Unpublished by HR or HR Admin.");
             feedbackSummaryRepository.save(summary);
         }
 
@@ -703,7 +703,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
             included.add("score explanation");
         }
         String includedText = included.isEmpty() ? "no optional result sections selected" : String.join(", ", included);
-        return "Published by HR/Admin after campaign close. Included: " + includedText + ".";
+        return "Published by HR or HR Admin after campaign close. Included: " + includedText + ".";
     }
 
 

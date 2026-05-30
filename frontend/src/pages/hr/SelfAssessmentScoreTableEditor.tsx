@@ -55,42 +55,37 @@ const applyEditedBand = (
 
   sorted[index] = { ...editedBand };
 
-  const aboveIndex = index - 1;
-  const belowIndex = index + 1;
+  /*
+   * Keep the table continuous without resetting affected rows to 00-00.
+   * Rows are sorted from highest score band to lowest score band.
+   *
+   * Example:
+   * 70-100 edited to 50-100
+   * 40-69 automatically becomes 40-49
+   * lower rows remain unchanged when they still fit.
+   */
+  for (let upperIndex = index - 1; upperIndex >= 0; upperIndex -= 1) {
+    const rowBelow = sorted[upperIndex + 1];
+    const current = sorted[upperIndex];
+    const nextMin = rowBelow.maxScore + 1;
 
-  if (aboveIndex >= 0) {
-    const above = sorted[aboveIndex];
-    const tooWideAbove = index >= 2 && editedBand.maxScore >= sorted[index - 2].minScore;
-    const nextAboveMin = editedBand.maxScore + 1;
-
-    if (tooWideAbove || nextAboveMin > above.maxScore) {
-      for (let i = 0; i < index; i += 1) {
-        sorted[i] = { ...sorted[i], minScore: 0, maxScore: 0 };
-      }
-    } else {
-      sorted[aboveIndex] = {
-        ...above,
-        minScore: nextAboveMin,
-      };
-    }
+    sorted[upperIndex] = {
+      ...current,
+      minScore: nextMin,
+      maxScore: Math.max(current.maxScore, nextMin),
+    };
   }
 
-  if (belowIndex < sorted.length) {
-    const below = sorted[belowIndex];
-    const tooWideBelow =
-      belowIndex + 1 < sorted.length && editedBand.minScore <= sorted[belowIndex + 1].maxScore;
-    const nextBelowMax = editedBand.minScore - 1;
+  for (let lowerIndex = index + 1; lowerIndex < sorted.length; lowerIndex += 1) {
+    const rowAbove = sorted[lowerIndex - 1];
+    const current = sorted[lowerIndex];
+    const nextMax = rowAbove.minScore - 1;
 
-    if (tooWideBelow || nextBelowMax < below.minScore) {
-      for (let i = belowIndex; i < sorted.length; i += 1) {
-        sorted[i] = { ...sorted[i], minScore: 0, maxScore: 0 };
-      }
-    } else {
-      sorted[belowIndex] = {
-        ...below,
-        maxScore: nextBelowMax,
-      };
-    }
+    sorted[lowerIndex] = {
+      ...current,
+      minScore: Math.min(current.minScore, nextMax),
+      maxScore: nextMax,
+    };
   }
 
   return sorted;
@@ -425,7 +420,7 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
               <div>
                 <h3>Edit Score Row</h3>
                 <p>
-                  Editing one row may automatically adjust the adjacent row. If the new range covers too much, affected rows reset to 00-00 and must be fixed before saving.
+                  Editing one row automatically adjusts affected neighboring rows so the table stays continuous. If the new range leaves too little space for another row, saving is blocked until the range is corrected.
                 </p>
               </div>
 

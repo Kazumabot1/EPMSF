@@ -795,7 +795,7 @@ public class TeamServiceImpl implements TeamService {
             return;
         }
 
-        throw new AccessDeniedException("Only Admin can delete teams.");
+        throw new AccessDeniedException("Only HR Admin can delete teams.");
     }
 
     private void assertCurrentUserCanViewTeamHistory() {
@@ -855,7 +855,7 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return hasRole(currentUser, "ADMIN");
+        return hasRole(currentUser, "HRADMIN");
     }
 
     private boolean currentUserIsDepartmentHead() {

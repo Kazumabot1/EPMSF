@@ -193,8 +193,8 @@ public class SignatureServiceImpl implements SignatureService {
             String normalized = normalizeRole(role);
 
             switch (normalized) {
-                case "ADMIN":
-                    return SignatureRole.ADMIN;
+                case "HRADMIN":
+                    return SignatureRole.HRADMIN;
                 case "HR":
                     return SignatureRole.HR;
                 case "MANAGER":

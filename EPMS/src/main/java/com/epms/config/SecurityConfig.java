@@ -38,7 +38,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final PositionPermissionService positionPermissionService;
 
-    private static final Set<String> ADMIN_ROLES = Set.of("ADMIN");
+    private static final Set<String> ADMIN_ROLES = Set.of("HRADMIN", "ADMIN");
 
     private static final Set<String> HR_ROLES = Set.of(
             "HR",
@@ -49,7 +49,7 @@ public class SecurityConfig {
             "PEOPLE",
             "PEOPLE_OPS",
             "TALENT",
-            "ADMIN"
+            "HRADMIN"
     );
 
     private static final Set<String> MANAGER_ROLES = Set.of(
@@ -91,7 +91,7 @@ public class SecurityConfig {
             "PEOPLE",
             "PEOPLE_OPS",
             "TALENT",
-            "ADMIN",
+            "HRADMIN",
             "MANAGER",
             "PROJECT_MANAGER",
             "TEAM_MANAGER",
@@ -110,18 +110,17 @@ public class SecurityConfig {
             "PEOPLE",
             "PEOPLE_OPS",
             "TALENT",
-            "ADMIN",
-            "CEO",
-            "EXECUTIVE"
+            "HRADMIN"
     );
 
-    private static final Set<String> ADMIN_DASHBOARDS = Set.of(
+    private static final Set<String> HRADMIN_DASHBOARDS = Set.of(
+            "HRADMIN_DASHBOARD",
             "ADMIN_DASHBOARD"
     );
 
     private static final Set<String> HR_DASHBOARDS = Set.of(
             "HR_DASHBOARD",
-            "ADMIN_DASHBOARD"
+            "HRADMIN_DASHBOARD"
     );
 
     private static final Set<String> MANAGER_DASHBOARDS = Set.of(
@@ -150,7 +149,7 @@ public class SecurityConfig {
 
     private static final Set<String> SCORE_TABLE_DASHBOARDS = Set.of(
             "HR_DASHBOARD",
-            "ADMIN_DASHBOARD",
+            "HRADMIN_DASHBOARD",
             "MANAGER_DASHBOARD",
             "DEPARTMENT_HEAD_DASHBOARD",
             "DEPARTMENTHEAD_DASHBOARD",
@@ -159,9 +158,7 @@ public class SecurityConfig {
 
     private static final Set<String> WORKFORCE_CHANGE_REVIEW_DASHBOARDS = Set.of(
             "HR_DASHBOARD",
-            "ADMIN_DASHBOARD",
-            "EXECUTIVE_DASHBOARD",
-            "CEO_DASHBOARD"
+            "HRADMIN_DASHBOARD"
     );
 
     @Bean
@@ -225,12 +222,12 @@ public class SecurityConfig {
                                 "/api/user-roles",
                                 "/api/user-roles/**"
                         ).access((authentication, context) ->
-                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, HRADMIN_DASHBOARDS)
                         )
 
                         /*
                          * Workforce Changes.
-                         * Keep these above broad HR/CEO/common API rules.
+                         * Keep these above broad HR/common API rules.
                          */
                         .requestMatchers(
                                 "/api/employee-change-requests/employees/*/profile"
@@ -243,12 +240,29 @@ public class SecurityConfig {
                         )
 
                         .requestMatchers(
+                                "/api/employee-change-requests/hradmin/pending",
+                                "/api/employee-change-requests/hradmin/*",
+                                "/api/employee-change-requests/hradmin/*/approve",
+                                "/api/employee-change-requests/hradmin/*/reject",
                                 "/api/employee-change-requests/ceo/pending",
                                 "/api/employee-change-requests/ceo/*",
                                 "/api/employee-change-requests/ceo/*/approve",
                                 "/api/employee-change-requests/ceo/*/reject"
                         ).access((authentication, context) ->
-                                hasRoleDashboardOrPosition(authentication.get(), EXECUTIVE_ROLES, EXECUTIVE_DASHBOARDS)
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, HRADMIN_DASHBOARDS)
+                        )
+
+                        .requestMatchers(
+                                "/api/hradmin/kpi-approvals",
+                                "/api/hradmin/kpi-approvals/**",
+                                "/api/hradmin/department-kpi-approvals",
+                                "/api/hradmin/department-kpi-approvals/**",
+                                "/api/executive/kpi-approvals",
+                                "/api/executive/kpi-approvals/**",
+                                "/api/executive/department-kpi-approvals",
+                                "/api/executive/department-kpi-approvals/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, HRADMIN_DASHBOARDS)
                         )
 
                         .requestMatchers(
@@ -316,7 +330,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE,
                                 "/api/teams/**"
                         ).access((authentication, context) ->
-                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, HRADMIN_DASHBOARDS)
                         )
 
                         .requestMatchers(HttpMethod.GET,
@@ -340,14 +354,14 @@ public class SecurityConfig {
                                 hasHrPermissionOrNonHrRole(authentication.get(), "departmentCrud")
                         )
 
-                      /*  .requestMatchers(
-                                "/api/employees",
-                                "/api/employees/**",
-                                "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                        )*/
+                        /*  .requestMatchers(
+                                  "/api/employees",
+                                  "/api/employees/**",
+                                  "/api/hr/employee-accounts",
+                                  "/api/hr/employee-accounts/**"
+                          ).access((authentication, context) ->
+                                  hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
+                          )*/
                         .requestMatchers(HttpMethod.GET, "/api/employees")
                         .access((authentication, context) ->
                                 hasHrDashboardOrNonHrRole(authentication.get())
@@ -535,7 +549,7 @@ public class SecurityConfig {
                                         authentication.get(),
                                         Set.of(
                                                 "HR",
-                                                "ADMIN",
+                                                "HRADMIN",
                                                 "MANAGER",
                                                 "PROJECT_MANAGER",
                                                 "TEAM_MANAGER",
@@ -548,7 +562,7 @@ public class SecurityConfig {
                                         ),
                                         Set.of(
                                                 "HR_DASHBOARD",
-                                                "ADMIN_DASHBOARD",
+                                                "HRADMIN_DASHBOARD",
                                                 "MANAGER_DASHBOARD",
                                                 "DEPARTMENT_HEAD_DASHBOARD",
                                                 "DEPARTMENTHEAD_DASHBOARD",
@@ -670,7 +684,7 @@ public class SecurityConfig {
             return new AuthorizationDecision(false);
         }
 
-        if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted())) {
+        if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, HRADMIN_DASHBOARDS).isGranted())) {
             return new AuthorizationDecision(true);
         }
 
@@ -692,7 +706,7 @@ public class SecurityConfig {
             return new AuthorizationDecision(false);
         }
 
-        if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted())) {
+        if (Boolean.TRUE.equals(hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, HRADMIN_DASHBOARDS).isGranted())) {
             return new AuthorizationDecision(true);
         }
 
@@ -994,7 +1008,7 @@ public class SecurityConfig {
 
     private boolean isCurrentAuthenticationAdmin(Authentication authentication) {
         return Boolean.TRUE.equals(
-                hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, ADMIN_DASHBOARDS).isGranted()
+                hasRoleDashboardOrPosition(authentication, ADMIN_ROLES, HRADMIN_DASHBOARDS).isGranted()
         );
     }
 
@@ -1116,6 +1130,11 @@ public class SecurityConfig {
 
             String normalizedPosition = normalizeAuthorityName(userPrincipal.getPosition());
 
+            if (normalizedAllowedRoles.contains(normalizedPosition)
+                    || normalizedAllowedDashboards.contains(normalizedPosition)) {
+                return new AuthorizationDecision(true);
+            }
+
             if (normalizedAllowedRoles.contains("HR") && isHrLike(normalizedPosition)) {
                 return new AuthorizationDecision(true);
             }
@@ -1170,6 +1189,7 @@ public class SecurityConfig {
         }
 
         return normalizedValue.equals("HR")
+                || normalizedValue.equals("HRADMIN")
                 || normalizedValue.equals("HUMAN_RESOURCE")
                 || normalizedValue.equals("HUMAN_RESOURCES")
                 || normalizedValue.equals("HR_MANAGER")

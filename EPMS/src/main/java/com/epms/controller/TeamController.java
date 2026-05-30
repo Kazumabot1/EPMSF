@@ -142,7 +142,7 @@ public class TeamController {
 
     @GetMapping("/{teamId}/history")
     @PreAuthorize(
-            "hasRole('HR') or hasRole('ADMIN') " +
+            "hasRole('HR') or hasRole('HRADMIN') " +
                     "or hasRole('DEPARTMENT_HEAD') or hasRole('DEPARTMENTHEAD') " +
                     "or hasAuthority('ROLE_DEPARTMENT_HEAD') or hasAuthority('ROLE_DEPARTMENTHEAD') " +
                     "or authentication.principal.dashboard == 'DEPARTMENT_HEAD_DASHBOARD'"

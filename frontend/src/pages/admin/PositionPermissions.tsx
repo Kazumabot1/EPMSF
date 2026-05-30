@@ -111,6 +111,8 @@ const allGroups: PermissionGroup[] = [
   },
 ];
 
+const CONFIGURABLE_POSITION_ROLES = new Set(['HR', 'DEPARTMENTHEAD', 'MANAGER']);
+
 const allowedByRole: Record<string, PermissionField[]> = {
   HR: [
     'oneOnOneCreate', 'oneOnOneDeptSelection',
@@ -135,23 +137,6 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'kpiInput', 'kpiScore',
     'selfAssessmentSign', 'continuousFeedbackGive', 'feedbackSend',
   ],
-  EMPLOYEE: [
-    'teamView', 'teamAssignAsLeader', 'teamAssignAsMember',
-    'oneOnOneCreate', 'appraisalView', 'kpiView',
-    'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentSign',
-    'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
-  ],
-  ADMIN: [
-    'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
-    'teamView', 'teamCreate', 'teamEdit', 'teamHistory', 'teamAssignAsLeader', 'teamAssignAsPm', 'teamAssignAsMember',
-    'pipViewAll', 'pipCreate', 'pipEdit',
-    'appraisalView', 'appraisalReview', 'appraisalApprove', 'appraisalScoreInput', 'appraisalSign',
-    'kpiView', 'kpiCreate', 'kpiEdit', 'kpiInput', 'kpiScore',
-    'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentLock', 'selfAssessmentSign',
-    'feedbackFormCreate', 'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
-    'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
-  ],
-  CEO: ['appraisalView', 'departmentComparisonView', 'kpiView'],
 };
 
 const teamAssignmentOptions: Array<{
@@ -173,6 +158,9 @@ const normalizeRoleName = (role?: string | null) =>
     .replace(/^_+|_+$/g, '')
     .toUpperCase()
     .replace('DEPARTMENT_HEAD', 'DEPARTMENTHEAD');
+
+const isConfigurablePositionRole = (role?: string | null) =>
+  CONFIGURABLE_POSITION_ROLES.has(normalizeRoleName(role));
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '-';
@@ -232,9 +220,14 @@ const PositionPermissions = () => {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
+  const configurablePositions = useMemo(
+    () => positions.filter((position) => isConfigurablePositionRole(position.roleName)),
+    [positions],
+  );
+
   const selectedPosition = useMemo(
-    () => positions.find((position) => position.id === selectedPositionId) ?? null,
-    [positions, selectedPositionId],
+    () => configurablePositions.find((position) => position.id === selectedPositionId) ?? null,
+    [configurablePositions, selectedPositionId],
   );
 
   const roleKey = normalizeRoleName(selectedPosition?.roleName);
@@ -252,13 +245,13 @@ const PositionPermissions = () => {
 
   const filteredPositions = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return positions;
-    return positions.filter((position) =>
+    if (!q) return configurablePositions;
+    return configurablePositions.filter((position) =>
       [position.positionTitle, position.levelCode, position.roleName, position.description]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q)),
     );
-  }, [positions, query]);
+  }, [configurablePositions, query]);
 
   const teamAssignmentMode = useMemo(() => getTeamAssignmentMode(permissions), [permissions]);
   const hasChanges = useMemo(
@@ -272,8 +265,9 @@ const PositionPermissions = () => {
     setIsError(false);
     try {
       const data = await positionService.getPositions();
+      const configurable = data.filter((item) => isConfigurablePositionRole(item.roleName));
       setPositions(data);
-      setSelectedPositionId((prev) => (prev && data.some((item) => item.id === prev) ? prev : data[0]?.id ?? null));
+      setSelectedPositionId((prev) => (prev && configurable.some((item) => item.id === prev) ? prev : configurable[0]?.id ?? null));
     } catch (error) {
       setIsError(true);
       setMessage(error instanceof Error ? error.message : 'Failed to load positions.');
@@ -361,10 +355,13 @@ const PositionPermissions = () => {
           Access Control
         </span>
         <h1>Position Permissions</h1>
-        <p>Role controls dashboard. Position permissions control enabled actions.</p>
+        <p>Position permissions apply only to HR, Department Head, and Manager positions. HR Admin, CEO, and Employee use default access.</p>
       </div>
 
       {message && <div className={`position-alert ${isError ? 'error' : 'success'}`}>{message}</div>}
+      <div className="position-alert" style={{ marginBottom: 18 }}>
+        HR Admin, CEO, and Employee positions are intentionally hidden here because their sidebars and URL access now use fixed default access instead of configurable position permissions.
+      </div>
 
       <div className="position-surface">
         <div className="position-surface-inner" style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 24 }}>
@@ -381,7 +378,7 @@ const PositionPermissions = () => {
               {loading ? (
                 <div className="position-state">Loading positions...</div>
               ) : filteredPositions.length === 0 ? (
-                <div className="position-state">No positions found.</div>
+                <div className="position-state">No configurable HR, Department Head, or Manager positions found.</div>
               ) : (
                 <div style={{ display: 'grid' }}>
                   {filteredPositions.map((position) => {

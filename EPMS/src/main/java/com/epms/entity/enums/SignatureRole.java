@@ -5,6 +5,6 @@ public enum SignatureRole {
     HR,
     DEPARTMENT_HEAD,
     MANAGER,
-    ADMIN,
+    HRADMIN,
     EMPLOYEE
 }

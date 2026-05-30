@@ -34,7 +34,7 @@ public class ForgotPasswordService {
 
     private static final String OTP_SENT_MESSAGE = "OTP sent successfully. Please check your email.";
     private static final String ACCOUNT_NOT_FOUND_MESSAGE = "No active account was found for this email address.";
-    private static final String INACTIVE_MESSAGE = "This account is inactive for now. Please contact HR or Admin to verify.";
+    private static final String INACTIVE_MESSAGE = "This account is inactive for now. Please contact HR or HR Admin to verify.";
     private static final int OTP_EXPIRE_MINUTES = 10;
     private static final int MAX_FAILED_ATTEMPTS = 5;
 

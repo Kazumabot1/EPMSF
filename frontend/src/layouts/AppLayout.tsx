@@ -18,7 +18,7 @@ const AppLayout = () => {
         return <Navigate to="/login" replace />;
     }
 
-    const usesHrShell = role === 'HR' || role === 'Admin';
+    const usesHrShell = role === 'HR' || role === 'HRAdmin';
     const contentOffsetClass = usesHrShell ? '' : collapsed ? 'employee-collapsed' : '';
     const shellClassName = usesHrShell ? 'hr-shell' : `app-shell ${contentOffsetClass}`;
 

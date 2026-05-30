@@ -24,9 +24,9 @@ public class DashboardController {
      */
     @GetMapping("/summary")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'HRADMIN') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD'"
     )
     public ResponseEntity<DashboardSummaryResponse> getDashboardSummary() {
         String email = SecurityUtils.currentUser().getUsername();

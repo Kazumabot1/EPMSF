@@ -299,7 +299,7 @@ public class FeedbackCampaignController {
                 request.getReason()
         );
         return ResponseEntity.ok(GenericApiResponse.success(
-                "Early close request sent for Admin approval",
+                "Early close request sent for HR Admin approval",
                 mapCampaign(campaign)
         ));
     }
@@ -442,14 +442,14 @@ public class FeedbackCampaignController {
     private void ensureHrOrAdmin() {
         boolean authorized = currentNormalizedRoleNames().stream().anyMatch(this::isHrOrAdminRole);
         if (!authorized) {
-            throw new UnauthorizedActionException("Only HR/Admin can manage feedback campaigns.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can manage feedback campaigns.");
         }
     }
 
     private void ensureAdmin() {
         boolean authorized = currentNormalizedRoleNames().stream().anyMatch(this::isAdminRole);
         if (!authorized) {
-            throw new UnauthorizedActionException("Only Admin can review feedback early-close requests.");
+            throw new UnauthorizedActionException("Only HR Admin can review feedback early-close requests.");
         }
     }
 
@@ -500,7 +500,7 @@ public class FeedbackCampaignController {
                 || role.equals("HUMAN_RESOURCE_MANAGER")
                 || role.equals("HR_MANAGER")
                 || role.equals("HR_DASHBOARD")
-                || role.equals("ADMIN_DASHBOARD")
+                || role.equals("HRADMIN_DASHBOARD")
                 || role.equals("PEOPLE")
                 || role.equals("PEOPLE_OPS")
                 || role.equals("TALENT")
@@ -512,7 +512,7 @@ public class FeedbackCampaignController {
     }
 
     private boolean isAdminRole(String role) {
-        return role.equals("ADMIN") || role.equals("SUPER_ADMIN") || role.equals("SYSTEM_ADMIN") || role.equals("ADMIN_DASHBOARD");
+        return role.equals("HRADMIN") || role.equals("SUPER_ADMIN") || role.equals("SYSTEM_ADMIN") || role.equals("HRADMIN_DASHBOARD");
     }
 
     private String normalizeRole(String role) {

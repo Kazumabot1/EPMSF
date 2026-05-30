@@ -51,7 +51,7 @@ const ENTITY_OPTIONS = [
 
 const ROLE_OPTIONS = [
   ['', 'All Roles'],
-  ['ADMIN', 'Admin'],
+  ['HRADMIN', 'HR Admin'],
   ['HR', 'HR'],
   ['MANAGER', 'Manager'],
   ['DEPARTMENT_HEAD', 'Department Head'],

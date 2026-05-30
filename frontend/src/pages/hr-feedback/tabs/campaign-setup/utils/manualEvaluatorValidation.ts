@@ -63,7 +63,7 @@ const peerLayerCompatible = (target?: FeedbackTargetCandidate | null, employee?:
 
 const isHrOrAdminLike = (employee?: ManualEvaluatorCandidate | null) => {
     const title = normalizeLabel(candidateTitle(employee));
-    return hasAny(title, ['HR', 'HUMAN_RESOURCE', 'HUMAN_RESOURCES', 'ADMIN']);
+    return hasAny(title, ['HR', 'HUMAN_RESOURCE', 'HUMAN_RESOURCES', 'HRADMIN']);
 };
 
 const isExecutiveLike = (employee?: ManualEvaluatorCandidate | null) => {
@@ -111,7 +111,7 @@ export const manualEvaluatorEligibilityMessage = (
     }
 
     if (isHrOrAdminLike(employee)) {
-        return 'HR/Admin users cannot be added as peer evaluators.';
+        return 'HR or HR Admin users cannot be added as peer evaluators.';
     }
 
     if (isExecutiveLike(employee) && peerLayer(targetTitle(target)) !== 'EXECUTIVE') {

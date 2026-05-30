@@ -230,14 +230,14 @@ public class FeedbackQuestionBankController {
                 .filter(role -> role != null && !role.isBlank())
                 .map(this::normalizeRole)
                 .anyMatch(role -> role.equals("HR")
-                        || role.equals("ADMIN")
+                        || role.equals("HRADMIN")
                         || role.equals("HR_ADMIN")
                         || role.equals("HUMAN_RESOURCES")
                         || role.equals("HUMAN_RESOURCE")
                         || role.equals("HR_MANAGER")
                         || role.equals("SUPER_ADMIN"));
         if (!authorized) {
-            throw new UnauthorizedActionException("Only HR/Admin can manage dynamic feedback questions.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can manage dynamic feedback questions.");
         }
     }
 

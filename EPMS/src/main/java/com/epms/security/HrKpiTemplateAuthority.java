@@ -32,12 +32,12 @@ public final class HrKpiTemplateAuthority {
             "PEOPLE",
             "PEOPLE_OPS",
             "TALENT",
-            "ADMIN"
+            "HRADMIN"
     );
 
     private static final Set<String> HR_DASHBOARDS = Set.of(
             "HR_DASHBOARD",
-            "ADMIN_DASHBOARD"
+            "HRADMIN_DASHBOARD"
     );
 
     private HrKpiTemplateAuthority() {
@@ -128,14 +128,14 @@ public final class HrKpiTemplateAuthority {
 
         if (principal instanceof UserPrincipal userPrincipal) {
             String dashboard = normalizeAuthorityName(userPrincipal.getDashboard());
-            if ("HR_DASHBOARD".equals(dashboard) || "ADMIN_DASHBOARD".equals(dashboard)) {
+            if ("HR_DASHBOARD".equals(dashboard) || "HRADMIN_DASHBOARD".equals(dashboard)) {
                 return true;
             }
 
             if (userPrincipal.getRoles() != null) {
                 for (String role : userPrincipal.getRoles()) {
                     String normalizedRole = normalizeAuthorityName(role);
-                    if ("ADMIN".equals(normalizedRole) || isHrLike(normalizedRole)) {
+                    if ("HRADMIN".equals(normalizedRole) || isHrLike(normalizedRole)) {
                         return true;
                     }
                 }
@@ -152,7 +152,7 @@ public final class HrKpiTemplateAuthority {
                 continue;
             }
             String normalizedAuthority = normalizeAuthorityName(authority.getAuthority());
-            if ("ADMIN".equals(normalizedAuthority) || isHrLike(normalizedAuthority)) {
+            if ("HRADMIN".equals(normalizedAuthority) || isHrLike(normalizedAuthority)) {
                 return true;
             }
         }

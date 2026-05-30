@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 @Service
@@ -39,7 +40,17 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
     public PositionPermissionDto getMyPermissions() {
         User user = getCurrentUserOrNull();
 
-        if (user == null || user.getPosition() == null || user.getPosition().getId() == null) {
+        if (user == null) {
+            return new PositionPermissionDto();
+        }
+
+        PositionPermissionDto defaultAccess = defaultPermissionsForUser(user);
+        if (defaultAccess != null) {
+            attachPositionMeta(defaultAccess, user.getPosition());
+            return defaultAccess;
+        }
+
+        if (user.getPosition() == null || user.getPosition().getId() == null) {
             return new PositionPermissionDto();
         }
 
@@ -50,6 +61,13 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
     @Transactional(readOnly = true)
     public PositionPermissionDto getByPositionId(Integer positionId) {
         Position position = findPosition(positionId);
+
+        String roleKey = defaultAccessRoleKey(position);
+        if (roleKey != null) {
+            PositionPermissionDto dto = defaultPermissionsForRole(roleKey);
+            attachPositionMeta(dto, position);
+            return dto;
+        }
 
         PositionPermissionDto dto = permissionRepository.findByPositionId(positionId)
                 .map(this::toDto)
@@ -64,6 +82,13 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
     @Transactional
     public PositionPermissionDto save(Integer positionId, PositionPermissionDto dto) {
         Position position = findPosition(positionId);
+        String roleKey = defaultAccessRoleKey(position);
+        if (roleKey != null) {
+            PositionPermissionDto response = defaultPermissionsForRole(roleKey);
+            attachPositionMeta(response, position);
+            return response;
+        }
+
         Integer editorId = safeCurrentUserId();
         User editor = editorId == null ? null : userRepository.findById(editorId).orElse(null);
 
@@ -102,7 +127,10 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
     @Override
     @Transactional(readOnly = true)
     public List<PositionPermissionAuditDto> getAudit(Integer positionId) {
-        findPosition(positionId);
+        Position position = findPosition(positionId);
+        if (defaultAccessRoleKey(position) != null) {
+            return List.of();
+        }
 
         return auditRepository.findByPositionIdOrderByEditedAtDesc(positionId)
                 .stream()
@@ -126,7 +154,16 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
 
         User user = getCurrentUserOrNull();
 
-        if (user == null || user.getPosition() == null || user.getPosition().getId() == null) {
+        if (user == null) {
+            return false;
+        }
+
+        PositionPermissionDto defaultAccess = defaultPermissionsForUser(user);
+        if (defaultAccess != null) {
+            return hasPermission(defaultAccess, permissionField);
+        }
+
+        if (user.getPosition() == null || user.getPosition().getId() == null) {
             return false;
         }
 
@@ -146,6 +183,217 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
         if (!currentUserHasPermission(permissionField)) {
             throw new AccessDeniedException("Your position does not have permission: " + permissionField);
         }
+    }
+
+
+    private PositionPermissionDto defaultPermissionsForUser(User user) {
+        String roleKey = defaultAccessRoleKey(user);
+        return roleKey == null ? null : defaultPermissionsForRole(roleKey);
+    }
+
+    private String defaultAccessRoleKey(User user) {
+        if (user == null) {
+            return null;
+        }
+
+        String dashboard = normalizeName(user.getDashboard());
+        if ("HRADMIN_DASHBOARD".equals(dashboard) || "ADMIN_DASHBOARD".equals(dashboard)) {
+            return "HRADMIN";
+        }
+        if ("CEO_DASHBOARD".equals(dashboard) || "EXECUTIVE_DASHBOARD".equals(dashboard)) {
+            return "CEO";
+        }
+        if ("EMPLOYEE_DASHBOARD".equals(dashboard)) {
+            return "EMPLOYEE";
+        }
+
+        return defaultAccessRoleKey(user.getPosition());
+    }
+
+    private String defaultAccessRoleKey(Position position) {
+        String roleName = positionRoleName(position);
+        if (roleName == null) {
+            return null;
+        }
+
+        return switch (roleName) {
+            case "HRADMIN", "ADMIN", "HR_ADMIN" -> "HRADMIN";
+            case "CEO", "EXECUTIVE" -> "CEO";
+            case "EMPLOYEE" -> "EMPLOYEE";
+            default -> null;
+        };
+    }
+
+    private String positionRoleName(Position position) {
+        if (position == null || position.getRole() == null) {
+            return null;
+        }
+        return normalizeName(position.getRole().getName());
+    }
+
+    private String normalizeName(String value) {
+        return String.valueOf(value == null ? "" : value)
+                .replaceFirst("(?i)^ROLE_", "")
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private PositionPermissionDto defaultPermissionsForRole(String roleKey) {
+        return switch (roleKey) {
+            case "HRADMIN" -> allEnabledPermissions();
+            case "CEO" -> ceoDefaultPermissions();
+            case "EMPLOYEE" -> employeeDefaultPermissions();
+            default -> new PositionPermissionDto();
+        };
+    }
+
+    private PositionPermissionDto allEnabledPermissions() {
+        return PositionPermissionDto.builder()
+                .teamPermission(true)
+                .organizationPermission(true)
+                .assessmentPermission(true)
+                .appraisalPermission(true)
+                .feedback360Permission(true)
+                .oneOnOnePermission(true)
+                .positionPermission(true)
+                .kpiPermission(true)
+                .departmentKpiPermission(true)
+                .assessmentScoresView(true)
+                .assessmentFormCreate(true)
+                .oneOnOneCreate(true)
+                .oneOnOneDeptSelection(true)
+                .oneOnOneTeamSelection(true)
+                .teamCreate(true)
+                .teamEdit(true)
+                .teamHistory(true)
+                .teamView(true)
+                .teamAssignAsLeader(true)
+                .teamAssignAsPm(true)
+                .teamAssignAsMember(true)
+                .pipCreate(true)
+                .pipEdit(true)
+                .pipViewAll(true)
+                .appraisalReview(true)
+                .appraisalApprove(true)
+                .appraisalView(true)
+                .appraisalScoreInput(true)
+                .appraisalSign(true)
+                .kpiCreate(true)
+                .kpiEdit(true)
+                .kpiScore(true)
+                .kpiView(true)
+                .kpiInput(true)
+                .selfAssessmentView(true)
+                .selfAssessmentInput(true)
+                .selfAssessmentLock(true)
+                .selfAssessmentSign(true)
+                .feedbackFormCreate(true)
+                .feedbackSend(true)
+                .continuousFeedbackView(true)
+                .continuousFeedbackGive(true)
+                .departmentCrud(true)
+                .departmentComparisonView(true)
+                .positionCrud(true)
+                .employeeCrud(true)
+                .employeeExcelImport(true)
+                .build();
+    }
+
+    private PositionPermissionDto ceoDefaultPermissions() {
+        return PositionPermissionDto.builder()
+                .organizationPermission(true)
+                .appraisalPermission(true)
+                .kpiPermission(true)
+                .departmentKpiPermission(true)
+                .appraisalView(true)
+                .kpiView(true)
+                .pipViewAll(true)
+                .continuousFeedbackView(true)
+                .departmentComparisonView(true)
+                .build();
+    }
+
+    private PositionPermissionDto employeeDefaultPermissions() {
+        return PositionPermissionDto.builder()
+                .appraisalPermission(true)
+                .kpiPermission(true)
+                .assessmentPermission(true)
+                .appraisalView(true)
+                .kpiView(true)
+                .selfAssessmentView(true)
+                .selfAssessmentInput(true)
+                .selfAssessmentSign(true)
+                .continuousFeedbackView(true)
+                .pipViewAll(true)
+                .build();
+    }
+
+    private boolean hasPermission(PositionPermissionDto dto, String field) {
+        if (dto == null || field == null || field.isBlank()) {
+            return false;
+        }
+
+        return switch (field) {
+            case "teamPermission" -> safe(dto.getTeamPermission());
+            case "organizationPermission" -> safe(dto.getOrganizationPermission());
+            case "assessmentPermission" -> safe(dto.getAssessmentPermission());
+            case "appraisalPermission" -> safe(dto.getAppraisalPermission());
+            case "feedback360Permission" -> safe(dto.getFeedback360Permission());
+            case "oneOnOnePermission" -> safe(dto.getOneOnOnePermission());
+            case "positionPermission" -> safe(dto.getPositionPermission());
+            case "kpiPermission" -> safe(dto.getKpiPermission());
+            case "departmentKpiPermission" -> safe(dto.getDepartmentKpiPermission());
+            case "assessmentScoresView" -> safe(dto.getAssessmentScoresView());
+            case "assessmentFormCreate" -> safe(dto.getAssessmentFormCreate());
+
+            case "oneOnOneCreate" -> safe(dto.getOneOnOneCreate());
+            case "oneOnOneDeptSelection" -> safe(dto.getOneOnOneDeptSelection());
+            case "oneOnOneTeamSelection" -> safe(dto.getOneOnOneTeamSelection());
+
+            case "teamCreate" -> safe(dto.getTeamCreate());
+            case "teamEdit" -> safe(dto.getTeamEdit());
+            case "teamHistory" -> safe(dto.getTeamHistory());
+            case "teamView" -> safe(dto.getTeamView());
+            case "teamAssignAsLeader" -> safe(dto.getTeamAssignAsLeader());
+            case "teamAssignAsPm" -> safe(dto.getTeamAssignAsPm());
+            case "teamAssignAsMember" -> safe(dto.getTeamAssignAsMember());
+
+            case "pipCreate" -> safe(dto.getPipCreate());
+            case "pipEdit" -> safe(dto.getPipEdit());
+            case "pipViewAll" -> safe(dto.getPipViewAll());
+
+            case "appraisalReview" -> safe(dto.getAppraisalReview());
+            case "appraisalApprove" -> safe(dto.getAppraisalApprove());
+            case "appraisalView" -> safe(dto.getAppraisalView());
+            case "appraisalScoreInput" -> safe(dto.getAppraisalScoreInput());
+            case "appraisalSign" -> safe(dto.getAppraisalSign());
+
+            case "kpiCreate" -> safe(dto.getKpiCreate());
+            case "kpiEdit" -> safe(dto.getKpiEdit());
+            case "kpiScore" -> safe(dto.getKpiScore());
+            case "kpiView" -> safe(dto.getKpiView());
+            case "kpiInput" -> safe(dto.getKpiInput());
+
+            case "selfAssessmentView" -> safe(dto.getSelfAssessmentView());
+            case "selfAssessmentInput" -> safe(dto.getSelfAssessmentInput());
+            case "selfAssessmentLock" -> safe(dto.getSelfAssessmentLock());
+            case "selfAssessmentSign" -> safe(dto.getSelfAssessmentSign());
+
+            case "feedbackFormCreate" -> safe(dto.getFeedbackFormCreate());
+            case "feedbackSend" -> safe(dto.getFeedbackSend());
+            case "continuousFeedbackView" -> safe(dto.getContinuousFeedbackView());
+            case "continuousFeedbackGive" -> safe(dto.getContinuousFeedbackGive());
+
+            case "departmentCrud" -> safe(dto.getDepartmentCrud());
+            case "departmentComparisonView" -> safe(dto.getDepartmentComparisonView());
+            case "positionCrud" -> safe(dto.getPositionCrud());
+            case "employeeCrud" -> safe(dto.getEmployeeCrud());
+            case "employeeExcelImport" -> safe(dto.getEmployeeExcelImport());
+
+            default -> false;
+        };
     }
 
     private Position findPosition(Integer positionId) {
