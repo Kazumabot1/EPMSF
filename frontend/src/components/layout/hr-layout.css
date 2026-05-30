@@ -1288,3 +1288,32 @@
     grid-column: auto;
   }
 }
+/* Profile avatar safety: prevents tall uploaded photos from escaping the HR header chip. */
+.hr-user-avatar.profile-header-avatar-frame,
+.hr-user-avatar {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  min-height: 34px !important;
+  max-height: 34px !important;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  line-height: 1;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.hr-user-avatar .profile-header-avatar-image,
+.hr-user-avatar img,
+.profile-header-avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+  border-radius: inherit !important;
+}

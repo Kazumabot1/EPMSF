@@ -3,6 +3,7 @@ import {
   profileService,
   type UserProfile,
 } from '../../services/profileService';
+import { profileImageService } from '../../services/profileImageService';
 
 const getApiErrorMessage = (err: any) => {
   return (
@@ -35,20 +36,294 @@ const imageSrc = (profile: UserProfile) => {
   return `data:${profile.profileImageType};base64,${profile.profileImageData}`;
 };
 
-const fileToBase64 = (file: File) =>
+const MAX_PROFILE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const PROFILE_IMAGE_OUTPUT_SIZE = 512;
+const PROFILE_IMAGE_PREVIEW_SIZE = 280;
+const ALLOWED_PROFILE_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+type CropSettings = {
+  zoom: number;
+  rotation: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+type ImageSize = {
+  width: number;
+  height: number;
+};
+
+const normalizeImageType = (type: string) => (type === 'image/jpg' ? 'image/jpeg' : type);
+
+const fileToDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const commaIndex = result.indexOf(',');
-
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-
+    reader.onload = () => resolve(String(reader.result || ''));
     reader.onerror = () => reject(new Error('Failed to read image file.'));
     reader.readAsDataURL(file);
   });
+
+const base64FromDataUrl = (dataUrl: string) => {
+  const commaIndex = dataUrl.indexOf(',');
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+};
+
+const imageTypeFromDataUrl = (dataUrl: string, fallbackType: string) => {
+  const match = dataUrl.match(/^data:([^;]+);base64,/i);
+  return normalizeImageType(match?.[1] || fallbackType || 'image/png');
+};
+
+const loadImageElement = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Could not load image for cropping.'));
+    image.src = src;
+  });
+
+const createCroppedProfileImage = async (
+  src: string,
+  imageType: string,
+  crop: CropSettings,
+  imageSize: ImageSize,
+) => {
+  const image = await loadImageElement(src);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('Your browser could not prepare the cropped image.');
+  }
+
+  const outputSize = PROFILE_IMAGE_OUTPUT_SIZE;
+  const previewSize = PROFILE_IMAGE_PREVIEW_SIZE;
+  const baseScale = Math.max(
+    previewSize / Math.max(imageSize.width, 1),
+    previewSize / Math.max(imageSize.height, 1),
+  );
+  const outputScale = outputSize / previewSize;
+  const targetType = normalizeImageType(imageType || 'image/png');
+
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+
+  context.clearRect(0, 0, outputSize, outputSize);
+  context.save();
+  context.translate(
+    outputSize / 2 + crop.offsetX * outputScale,
+    outputSize / 2 + crop.offsetY * outputScale,
+  );
+  context.rotate((crop.rotation * Math.PI) / 180);
+  context.scale(baseScale * crop.zoom * outputScale, baseScale * crop.zoom * outputScale);
+  context.drawImage(image, -imageSize.width / 2, -imageSize.height / 2);
+  context.restore();
+
+  return canvas.toDataURL(targetType, targetType === 'image/png' ? undefined : 0.92);
+};
+
+type ImageCropModalProps = {
+  source: string;
+  fileType: string;
+  onCancel: () => void;
+  onApply: (base64: string, imageType: string) => void;
+  onError: (message: string) => void;
+};
+
+const ImageCropModal = ({
+  source,
+  fileType,
+  onCancel,
+  onApply,
+  onError,
+}: ImageCropModalProps) => {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [imageSize, setImageSize] = useState<ImageSize>({ width: 1, height: 1 });
+  const [applying, setApplying] = useState(false);
+
+  const baseScale = Math.max(
+    PROFILE_IMAGE_PREVIEW_SIZE / Math.max(imageSize.width, 1),
+    PROFILE_IMAGE_PREVIEW_SIZE / Math.max(imageSize.height, 1),
+  );
+
+  const resetCrop = () => {
+    setZoom(1);
+    setRotation(0);
+    setOffsetX(0);
+    setOffsetY(0);
+  };
+
+  const applyCrop = async () => {
+    try {
+      setApplying(true);
+      const dataUrl = await createCroppedProfileImage(source, fileType, {
+        zoom,
+        rotation,
+        offsetX,
+        offsetY,
+      }, imageSize);
+
+      onApply(base64FromDataUrl(dataUrl), imageTypeFromDataUrl(dataUrl, fileType));
+    } catch (err) {
+      onError(getApiErrorMessage(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-900">Crop & Rotate Profile Image</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Adjust the image so it fits cleanly inside every dashboard header avatar.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-xl font-black text-slate-500 transition hover:bg-slate-50"
+            aria-label="Close image editor"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+          <div className="flex flex-col items-center">
+            <div className="rounded-[2rem] bg-slate-100 p-5 shadow-inner">
+              <div
+                className="relative overflow-hidden rounded-full border-4 border-indigo-100 bg-white shadow-lg"
+                style={{ width: PROFILE_IMAGE_PREVIEW_SIZE, height: PROFILE_IMAGE_PREVIEW_SIZE }}
+              >
+                <img
+                  src={source}
+                  alt="Crop preview"
+                  className="absolute left-1/2 top-1/2 max-w-none select-none"
+                  draggable={false}
+                  onLoad={(event) => {
+                    const img = event.currentTarget;
+                    setImageSize({
+                      width: img.naturalWidth || 1,
+                      height: img.naturalHeight || 1,
+                    });
+                  }}
+                  style={{
+                    width: imageSize.width * baseScale,
+                    height: imageSize.height * baseScale,
+                    transform: `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg) scale(${zoom})`,
+                    transformOrigin: 'center',
+                  }}
+                />
+              </div>
+            </div>
+
+            <p className="mt-3 text-center text-xs font-bold text-slate-500">
+              This circle is what will be saved and shown in the header.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm font-black text-slate-700">Zoom</span>
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="0.05"
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
+                className="w-full accent-indigo-600"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">Move Left / Right</span>
+                <input
+                  type="range"
+                  min="-140"
+                  max="140"
+                  step="1"
+                  value={offsetX}
+                  onChange={(event) => setOffsetX(Number(event.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">Move Up / Down</span>
+                <input
+                  type="range"
+                  min="-140"
+                  max="140"
+                  step="1"
+                  value={offsetY}
+                  onChange={(event) => setOffsetY(Number(event.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-2 block text-sm font-black text-slate-700">Rotate</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRotation((value) => value - 90)}
+                  className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Rotate Left
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRotation((value) => value + 90)}
+                  className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Rotate Right
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={resetCrop}
+                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                Reset
+              </button>
+
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={applying}
+                onClick={() => void applyCrop()}
+                className="rounded-2xl bg-indigo-600 px-5 py-2 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {applying ? 'Applying...' : 'Apply Crop'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const passwordRules = (password: string) => ({
   hasMinLength: password.length >= 8,
@@ -69,6 +344,8 @@ const ProfilePage = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [profileImageData, setProfileImageData] = useState('');
   const [profileImageType, setProfileImageType] = useState('');
+  const [cropSource, setCropSource] = useState('');
+  const [cropFileType, setCropFileType] = useState('');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -148,13 +425,13 @@ const ProfilePage = () => {
   const onImageSelected = async (file?: File) => {
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Profile image must be smaller than 2MB.');
+    if (file.size > MAX_PROFILE_IMAGE_SIZE_BYTES) {
+      setError('Profile image must be smaller than 5MB.');
       setMessage('');
       return;
     }
 
-    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) {
+    if (!ALLOWED_PROFILE_IMAGE_TYPES.includes(file.type)) {
       setError('Only PNG, JPG, JPEG, or WEBP images are allowed.');
       setMessage('');
       return;
@@ -164,14 +441,28 @@ const ProfilePage = () => {
       setError('');
       setMessage('');
 
-      const base64 = await fileToBase64(file);
+      const dataUrl = await fileToDataUrl(file);
 
-      setProfileImageData(base64);
-      setProfileImageType(file.type);
+      setCropSource(dataUrl);
+      setCropFileType(normalizeImageType(file.type));
     } catch (err) {
       setError(getApiErrorMessage(err));
       setMessage('');
     }
+  };
+
+  const cancelCrop = () => {
+    setCropSource('');
+    setCropFileType('');
+  };
+
+  const applyCrop = (base64: string, imageType: string) => {
+    setProfileImageData(base64);
+    setProfileImageType(imageType);
+    setCropSource('');
+    setCropFileType('');
+    setError('');
+    setMessage('');
   };
 
   const removeImage = () => {
@@ -226,8 +517,10 @@ const ProfilePage = () => {
       setProfileImageData(updated.profileImageData ?? '');
       setProfileImageType(updated.profileImageType ?? '');
 
-    setMessage('Profile updated successfully.');
-    window.dispatchEvent(new Event('profile-updated'));
+      profileImageService.clearCache();
+      setMessage('Profile updated successfully.');
+      window.dispatchEvent(new Event('profile-updated'));
+      window.dispatchEvent(new Event('epms:profile-avatar-updated'));
     } catch (err) {
       setError(getApiErrorMessage(err));
       setMessage('');
@@ -468,7 +761,10 @@ const ProfilePage = () => {
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp"
               className="hidden"
-              onChange={(e) => void onImageSelected(e.target.files?.[0])}
+              onChange={(e) => {
+                void onImageSelected(e.target.files?.[0]);
+                e.currentTarget.value = '';
+              }}
             />
 
             <div className="mt-6 flex justify-center gap-2">
@@ -490,7 +786,7 @@ const ProfilePage = () => {
             </div>
 
             <p className="mt-3 text-xs font-semibold text-slate-500">
-              PNG, JPG, JPEG, or WEBP. Max 2MB.
+              PNG, JPG, JPEG, or WEBP. Max 5MB.
             </p>
           </div>
         </div>
@@ -595,6 +891,19 @@ const ProfilePage = () => {
           </button>
         </div>
       </div>
+
+      {cropSource && (
+        <ImageCropModal
+          source={cropSource}
+          fileType={cropFileType}
+          onCancel={cancelCrop}
+          onApply={applyCrop}
+          onError={(messageText) => {
+            setError(messageText);
+            setMessage('');
+          }}
+        />
+      )}
     </div>
   );
 };
