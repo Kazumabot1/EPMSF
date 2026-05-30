@@ -134,13 +134,25 @@ public class FeedbackOperationalService {
         List<FeedbackEvaluatorAssignment> assignments = assignmentRepository.findByCampaignIdWithRequest(campaign.getId()).stream()
                 .filter(this::isPendingEvaluatorAssignment)
                 .toList();
+        return notifyEvaluatorReminders(campaign, assignments, kind);
+    }
+
+    @Transactional
+    public NotificationDeliveryResult notifyEvaluatorReminders(
+            FeedbackCampaign campaign,
+            List<FeedbackEvaluatorAssignment> assignments,
+            FeedbackReminderKind kind
+    ) {
+        List<FeedbackEvaluatorAssignment> reminderCandidates = assignments == null ? List.of() : assignments.stream()
+                                                                                                 .filter(this::isPendingEvaluatorAssignment)
+                                                                                                 .toList();
 
         int sent = 0;
         int skipped = 0;
         List<String> warnings = new ArrayList<>();
         Set<Integer> notifiedUsers = new LinkedHashSet<>();
 
-        for (FeedbackEvaluatorAssignment assignment : assignments) {
+        for (FeedbackEvaluatorAssignment assignment : reminderCandidates) {
             Optional<User> maybeUser = findActiveUserByEmployeeId(assignment.getEvaluatorEmployeeId());
             if (maybeUser.isEmpty()) {
                 skipped++;
@@ -165,11 +177,13 @@ public class FeedbackOperationalService {
             )) {
                 sent++;
                 notifiedUsers.add(user.getId());
+            } else {
+                skipped++;
             }
         }
 
         return NotificationDeliveryResult.builder()
-                .candidateCount(assignments.size())
+                .candidateCount(reminderCandidates.size())
                 .sentCount(sent)
                 .skippedCount(skipped)
                 .uniqueUserCount(notifiedUsers.size())

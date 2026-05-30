@@ -527,3 +527,34 @@
     padding: 18px;
   }
 }
+
+/* Monitoring responsive cleanup: keep the workspace inside the available HR layout width. */
+.feedback-page,
+.feedback-page-subnav-mode {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.feedback-page-subnav-mode {
+  width: min(100%, 1180px);
+}
+
+.feedback-page-subnav-mode .feedback-hero.compact {
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.feedback-page-subnav-mode .feedback-hero.compact .feedback-eyebrow {
+  color: #64748b;
+}
+
+.feedback-page-subnav-mode .feedback-hero.compact h1 {
+  color: #0f172a;
+}
+
+.feedback-page-subnav-mode .feedback-hero.compact p {
+  color: #475569;
+}
