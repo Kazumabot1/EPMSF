@@ -93,6 +93,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Position & Department Changes', path: '/hradmin/approval/changes', icon: 'bi-arrow-left-right' },
       ],
     },
+    {
+      label: 'Oversight',
+      path: '/continuous-feedback/view',
+      icon: 'bi-eye',
+      children: [
+        { label: 'View Continuous Feedback', path: '/continuous-feedback/view', icon: 'bi-chat-square-text' },
+        { label: 'View PIP', path: '/pip/view', icon: 'bi-clipboard2-pulse' },
+      ],
+    },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
       label: 'Access Control',
@@ -132,6 +141,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
           icon: 'bi-columns-gap',
           permissionField: 'departmentComparisonView',
         },
+        { label: 'Workforce Changes', path: '/hr/workforce-changes', icon: 'bi-arrow-left-right', permissionField: 'employeeCrud' },
       ],
     },
     {
@@ -211,8 +221,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       label: 'PIP',
       path: '/pip',
       icon: 'bi-clipboard2-pulse',
-      children: [{ label: 'Past Plans', path: '/pip/past-plans', icon: 'bi-clock-history' }],
+      children: [
+        { label: 'View PIP', path: '/pip/view', icon: 'bi-eye' },
+        { label: 'Past Plans', path: '/pip/past-plans', icon: 'bi-clock-history' },
+      ],
     },
+    { label: 'View Continuous Feedback', path: '/continuous-feedback/view', icon: 'bi-chat-square-text' },
     {
       label: 'Positions',
       path: '/hr/position/create',
@@ -265,6 +279,11 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/continuous-feedback',
       icon: 'bi-chat-dots',
       permissionField: 'continuousFeedbackGive',
+    },
+    {
+      label: 'View Continuous Feedback',
+      path: '/continuous-feedback/view',
+      icon: 'bi-chat-square-text',
     },
     {
       label: 'Assessment Review',
@@ -334,6 +353,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-clipboard2-pulse',
       children: [
         { label: 'Create', path: '/pip/create', icon: 'bi-plus-square' },
+        { label: 'View PIP', path: '/pip/view', icon: 'bi-eye' },
         { label: 'Past Plans', path: '/pip/past-plans', icon: 'bi-clock-history' },
       ],
     },

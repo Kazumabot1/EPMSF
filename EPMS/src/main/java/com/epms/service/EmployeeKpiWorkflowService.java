@@ -18,6 +18,8 @@ public interface EmployeeKpiWorkflowService {
 
     UseKpiTemplateResultDto useCycleForAllActiveDepartments(Integer cycleId);
 
+    void prepareCyclePeriods(Integer cycleId);
+
     UseKpiTemplateResultDto useCyclePeriodForAllActiveDepartments(Integer cycleId, Integer cyclePeriodId);
 
     List<ManagerKpiTemplateSummaryDto> listKpiTemplatesForManagerDepartment();

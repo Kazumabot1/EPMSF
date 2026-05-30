@@ -58,7 +58,11 @@ function trimToWordLimit(value: string): string {
 
 type TabKey = "ongoing" | "past";
 
-export default function PipPastPlansPage() {
+type PipPastPlansPageProps = {
+  readOnly?: boolean;
+};
+
+export default function PipPastPlansPage({ readOnly = false }: PipPastPlansPageProps) {
   const [tab, setTab] = useState<TabKey>("ongoing");
   const [ongoing, setOngoing] = useState<PipDetail[]>([]);
   const [past, setPast] = useState<PipDetail[]>([]);
@@ -398,7 +402,7 @@ export default function PipPastPlansPage() {
                         <span className="pip-badge">{phaseStatusLabel(phase.status)}</span>
                       </div>
 
-                      {selected.canEdit ? (
+                      {selected.canEdit && !readOnly ? (
                         <>
                           <div className="pip-grid two">
                             <label className="pip-field">
@@ -492,7 +496,7 @@ export default function PipPastPlansPage() {
               </div>
             )}
 
-            {selected.canEdit && selected.status && (
+            {selected.canEdit && !readOnly && selected.status && (
               <div className="pip-finish-area">
                 <label className="pip-field">
                   <span>Final Comments</span>

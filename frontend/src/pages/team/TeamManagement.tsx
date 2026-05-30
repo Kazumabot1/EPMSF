@@ -119,6 +119,7 @@ const TeamManagement: React.FC = () => {
   const [error, setError] = useState('');
 
   const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
+  const [viewingTeam, setViewingTeam] = useState<TeamResponse | null>(null);
   const [inactivatingTeam, setInactivatingTeam] = useState<TeamResponse | null>(null);
   const [inactivateReason, setInactivateReason] = useState('');
   const [inactivateError, setInactivateError] = useState('');
@@ -422,7 +423,11 @@ const TeamManagement: React.FC = () => {
                   const isActiveTeam = team.status?.toLowerCase() === 'active';
 
                   return (
-                  <tr key={team.id}>
+                  <tr
+                    key={team.id}
+                    onClick={() => isHr && setViewingTeam(team)}
+                    style={isHr ? { cursor: 'pointer' } : undefined}
+                  >
                     <td>{index + 1}</td>
 
                     <td>
@@ -492,7 +497,10 @@ const TeamManagement: React.FC = () => {
                               <button
                                 type="button"
                                 className="team-action-btn"
-                                onClick={() => setEditingTeam(team)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setEditingTeam(team);
+                                }}
                               >
                                 Edit
                               </button>
@@ -500,7 +508,10 @@ const TeamManagement: React.FC = () => {
                               <button
                                 type="button"
                                 className="team-action-btn team-action-btn-danger"
-                                onClick={() => openInactivateModal(team)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openInactivateModal(team);
+                                }}
                               >
                                 Inactivate
                               </button>
@@ -530,6 +541,62 @@ const TeamManagement: React.FC = () => {
         onClose={() => setEditingTeam(null)}
         onSaved={loadTeams}
       />
+
+      {viewingTeam && (
+        <div className="team-modal-overlay" onClick={() => setViewingTeam(null)}>
+          <div
+            className="team-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="team-modal-header">
+              <div>
+                <p className="team-eyebrow">Team Details</p>
+                <h2>{viewingTeam.teamName}</h2>
+              </div>
+
+              <button
+                type="button"
+                className="team-modal-close"
+                onClick={() => setViewingTeam(null)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="team-modal-body">
+              <div className="team-detail-grid">
+                <div><strong>Department</strong><span>{viewingTeam.departmentName || '-'}</span></div>
+                <div><strong>Status</strong><span>{viewingTeam.status || '-'}</span></div>
+                <div><strong>Team Leader</strong><span>{viewingTeam.teamLeaderName || '-'}</span></div>
+                <div><strong>Project Manager</strong><span>{viewingTeam.projectManagerName || '-'}</span></div>
+                <div><strong>Created By</strong><span>{viewingTeam.createdByName || '-'}</span></div>
+                <div><strong>Created Date</strong><span>{formatDate(viewingTeam.createdDate)}</span></div>
+              </div>
+
+              <div className="team-field">
+                <label>Team Goal</label>
+                <p className="team-muted">{viewingTeam.teamGoal || '-'}</p>
+              </div>
+
+              <div className="team-field">
+                <label>Members</label>
+                {viewingTeam.members?.length ? (
+                  <div className="team-member-list">
+                    {viewingTeam.members.map((member) => (
+                      <div className="team-member-item" key={member.userId ?? member.employeeId ?? member.userName}>
+                        <span>{member.userName || member.employeeName || '-'}</span>
+                        <small>Started: {formatDate(member.startedDate)}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="team-muted">No members assigned.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {inactivatingTeam && (
         <div className="team-modal-overlay" onClick={closeInactivateModal}>

@@ -172,7 +172,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
             }
             try {
-                employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
+                employeeKpiWorkflowService.prepareCyclePeriods(id);
             } catch (ResponseStatusException ex) {
                 throw ex;
             } catch (RuntimeException ex) {

@@ -50,6 +50,12 @@ const fileToBase64 = (file: File) =>
     reader.readAsDataURL(file);
   });
 
+const normalizeProfileRole = (value?: string | null) =>
+  String(value ?? '')
+    .replace(/^ROLE_/i, '')
+    .replace(/[\s_-]+/g, '')
+    .toUpperCase();
+
 const passwordRules = (password: string) => ({
   hasMinLength: password.length >= 8,
   hasMaxLength: password.length <= 128,
@@ -92,6 +98,14 @@ const ProfilePage = () => {
   }, [profile, fullName, email, phoneNumber, profileImageData, profileImageType]);
 
   const avatarSrc = imageSrc(previewProfile);
+  const normalizedRole = normalizeProfileRole(profile?.role);
+  const normalizedDashboard = normalizeProfileRole(profile?.dashboard);
+  const showDepartmentFields = [
+    normalizedRole,
+    normalizedDashboard,
+  ].some((value) =>
+    ['EMPLOYEE', 'EMPLOYEEDASHBOARD', 'MANAGER', 'MANAGERDASHBOARD', 'DEPARTMENTHEAD', 'DEPARTMENTHEADDASHBOARD', 'HR', 'HRDASHBOARD'].includes(value),
+  );
 
   const newPasswordRules = useMemo(
     () => passwordRules(newPassword),
@@ -434,6 +448,46 @@ const ProfilePage = () => {
                   placeholder="+95..."
                 />
               </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-bold text-slate-700">
+                  Position Name
+                </span>
+                <input
+                  value={profile?.positionName ?? profile?.position ?? ''}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
+                  disabled
+                  placeholder="Position not assigned"
+                />
+              </label>
+
+              {showDepartmentFields && (
+                <>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-bold text-slate-700">
+                      Current Department
+                    </span>
+                    <input
+                      value={profile?.currentDepartmentName ?? profile?.departmentName ?? ''}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
+                      disabled
+                      placeholder="Department not assigned"
+                    />
+                  </label>
+
+                  <label className="block md:col-span-2">
+                    <span className="mb-1 block text-sm font-bold text-slate-700">
+                      Parent Department
+                    </span>
+                    <input
+                      value={profile?.parentDepartmentName ?? ''}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
+                      disabled
+                      placeholder="Parent department not assigned"
+                    />
+                  </label>
+                </>
+              )}
             </div>
 
             <button

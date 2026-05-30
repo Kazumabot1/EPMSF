@@ -18,10 +18,15 @@ public final class UserProfileDtos {
         private String role;
         private String dashboard;
         private String position;
+        private String positionName;
         private String employeeCode;
         private Integer employeeId;
         private Integer departmentId;
         private String departmentName;
+        private Integer currentDepartmentId;
+        private String currentDepartmentName;
+        private Integer parentDepartmentId;
+        private String parentDepartmentName;
     }
 
     @Data

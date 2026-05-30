@@ -226,6 +226,7 @@ const EmployeeFormModal = ({
       ? defaultDashboardForRole(selectedRoleName)
       : null;
   const latestAdultBirthDate = useMemo(() => getLatestAdultBirthDate(), []);
+  const restrictedHrEdit = mode === 'edit';
 
   const parentDepartmentOptions = useMemo(() => {
     if (!form.currentDepartmentId) return [];
@@ -464,7 +465,7 @@ const EmployeeFormModal = ({
                 <select
                     className="employee-input"
                     value={form.positionId}
-                    disabled={loadingLookups}
+                    disabled={loadingLookups || restrictedHrEdit}
                     onChange={(event) => {
                       setForm((prev) => ({
                         ...prev,
@@ -526,7 +527,7 @@ const EmployeeFormModal = ({
                 <select
                     className="employee-input"
                     value={form.currentDepartmentId}
-                    disabled={loadingLookups}
+                    disabled={loadingLookups || restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({
                           ...prev,
@@ -552,7 +553,7 @@ const EmployeeFormModal = ({
                 <select
                     className="employee-input"
                     value={form.parentDepartmentId}
-                    disabled={!form.currentDepartmentId || loadingLookups}
+                    disabled={!form.currentDepartmentId || loadingLookups || restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({
                           ...prev,
@@ -598,6 +599,7 @@ const EmployeeFormModal = ({
                     className="employee-input"
                     type="email"
                     value={form.email}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({
                           ...prev,
@@ -614,6 +616,7 @@ const EmployeeFormModal = ({
                 <input
                     className="employee-input"
                     value={form.staffNrc}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, staffNrc: event.target.value }))
                     }
@@ -625,6 +628,7 @@ const EmployeeFormModal = ({
                 <select
                     className="employee-input"
                     value={form.gender}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, gender: event.target.value }))
                     }
@@ -658,6 +662,7 @@ const EmployeeFormModal = ({
                 <input
                     className="employee-input"
                     value={form.race}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, race: event.target.value }))
                     }
@@ -669,6 +674,7 @@ const EmployeeFormModal = ({
                 <input
                     className="employee-input"
                     value={form.religion}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, religion: event.target.value }))
                     }
@@ -743,6 +749,7 @@ const EmployeeFormModal = ({
                 <input
                     className="employee-input"
                     value={form.spouseNrc}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, spouseNrc: event.target.value }))
                     }
@@ -765,6 +772,7 @@ const EmployeeFormModal = ({
                 <input
                     className="employee-input"
                     value={form.fatherNrc}
+                    disabled={restrictedHrEdit}
                     onChange={(event) =>
                         setForm((prev) => ({ ...prev, fatherNrc: event.target.value }))
                     }

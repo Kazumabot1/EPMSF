@@ -10,6 +10,7 @@ import com.epms.entity.EmployeeKpiScore;
 import com.epms.entity.KpiForm;
 import com.epms.entity.KpiFormItem;
 import com.epms.entity.KpiPosition;
+import com.epms.entity.KpiTemplateCycleForm;
 import com.epms.entity.Position;
 import com.epms.entity.Team;
 import com.epms.entity.TeamMember;
@@ -50,6 +51,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -148,6 +150,8 @@ class EmployeeKpiWorkflowServiceImplTest {
                 LocalDate.of(2026, 9, 30),
                 LocalDate.of(2026, 12, 31)
         );
+        assertThat(periods).extracting(KpiTemplateCyclePeriod::getStatus)
+                .containsOnly(KpiTemplateCyclePeriodStatus.SCHEDULED);
     }
 
     @Test
@@ -220,6 +224,90 @@ class EmployeeKpiWorkflowServiceImplTest {
     }
 
     @Test
+    void prepareCyclePeriodsGeneratesScheduleWithoutCreatingAssignmentsOrNotifications() {
+        KpiTemplateCycle cycle = new KpiTemplateCycle();
+        cycle.setId(100);
+        cycle.setStartDate(LocalDate.of(2026, 1, 1));
+        cycle.setEndDate(LocalDate.of(2026, 12, 31));
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+
+        Position engineer = position(10, "Engineer");
+        KpiForm form = form(200, engineer);
+        form.getKpiPositions().get(0).setDurationMonths(3);
+
+        when(kpiTemplateCycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+        when(kpiTemplateCycleFormRepository.findWithFormsByCycleId(100))
+                .thenReturn(List.of(KpiTemplateCycleForm.builder().cycle(cycle).kpiForm(form).build()));
+        when(kpiPositionRepository.findWithPositionByKpiForm_Id(200)).thenReturn(form.getKpiPositions());
+        when(kpiTemplateCyclePeriodRepository.findByCycle_IdAndKpiForm_IdOrderByPeriodNumberAsc(100, 200)).thenReturn(List.of());
+        when(kpiTemplateCyclePeriodRepository.save(any(KpiTemplateCyclePeriod.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.prepareCyclePeriods(100);
+
+        verify(employeeKpiFormRepository, never()).save(any(EmployeeKpiForm.class));
+        verify(notificationService, never()).sendEvent(anyInt(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void maintenanceCreatesScoringWindowForEndedScheduledPeriodWithoutOpeningNextPeriodEarly() {
+        Position engineer = position(10, "Engineer");
+        KpiForm form = form(200, engineer);
+        KpiTemplateCycle cycle = new KpiTemplateCycle();
+        cycle.setId(100);
+        cycle.setCycleName("FY KPI");
+        cycle.setStartDate(LocalDate.now().minusMonths(6));
+        cycle.setEndDate(LocalDate.now().plusMonths(6));
+        cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
+
+        KpiTemplateCyclePeriod ended = new KpiTemplateCyclePeriod();
+        ended.setId(500);
+        ended.setCycle(cycle);
+        ended.setKpiForm(form);
+        ended.setPeriodNumber(1);
+        ended.setStartDate(LocalDate.now().minusMonths(3));
+        ended.setEndDate(LocalDate.now().minusDays(1));
+        ended.setStatus(KpiTemplateCyclePeriodStatus.SCHEDULED);
+
+        Department department = department(7);
+        User manager = user(1, 7, null, true);
+        Employee employee = employee(11, engineer, true);
+
+        when(kpiTemplateCyclePeriodRepository.findPeriodsPastEndByStatuses(
+                List.of(KpiTemplateCyclePeriodStatus.SCHEDULED, KpiTemplateCyclePeriodStatus.OPEN),
+                LocalDate.now()
+        )).thenReturn(List.of(ended));
+        when(kpiTemplateCycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+        when(kpiTemplateCyclePeriodRepository.findById(500)).thenReturn(Optional.of(ended));
+        when(departmentRepository.findAll()).thenReturn(List.of(department));
+        when(kpiTemplateCycleFormRepository.findWithFormsByCycleId(100))
+                .thenReturn(List.of(KpiTemplateCycleForm.builder().cycle(cycle).kpiForm(form).build()));
+        when(kpiFormRepository.findDetailWithItemsById(200)).thenReturn(Optional.of(form));
+        when(kpiPositionRepository.findWithPositionByKpiForm_Id(200)).thenReturn(form.getKpiPositions());
+        when(employeeRepository.findCurrentByWorkingDepartmentId(7, false)).thenReturn(List.of(employee));
+        when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(user(1011, 7, 11, true)));
+        when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active")).thenReturn(List.of());
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(manager));
+        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
+        when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(employeeKpiPositionTransitionRepository.existsByEmployee_IdAndStatus(11, com.epms.entity.enums.KpiPositionTransitionStatus.PENDING)).thenReturn(false);
+        when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_IdAndCyclePeriod_Id(11, 200, 500)).thenReturn(Optional.empty());
+        when(employeeKpiFormRepository.save(any(EmployeeKpiForm.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(kpiTemplateCyclePeriodRepository.save(any(KpiTemplateCyclePeriod.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(employeeKpiFormRepository.findOpenByCyclePeriodIdWithDetail(500, List.of(EmployeeKpiStatus.FINALIZED, EmployeeKpiStatus.CLOSED))).thenReturn(List.of());
+        when(kpiTemplateCyclePeriodRepository.findClosingPeriodsDue(eq(KpiTemplateCyclePeriodStatus.CLOSING), any(LocalDateTime.class))).thenReturn(List.of());
+        when(employeeKpiPositionTransitionRepository.findDueTransitions(eq(com.epms.entity.enums.KpiPositionTransitionStatus.PENDING), any(LocalDateTime.class))).thenReturn(List.of());
+
+        int processed = service.runCycleMaintenance();
+
+        assertThat(processed).isEqualTo(1);
+        assertThat(ended.getStatus()).isEqualTo(KpiTemplateCyclePeriodStatus.CLOSING);
+        assertThat(ended.getClosingRequestedAt()).isNotNull();
+        assertThat(ended.getGraceEndsAt()).isAfter(LocalDateTime.now().plusDays(6));
+        verify(employeeKpiFormRepository).save(any(EmployeeKpiForm.class));
+        verify(kpiTemplateCyclePeriodRepository, never()).findByCycle_IdAndKpiForm_IdAndPeriodNumber(100, 200, 2);
+    }
+
+    @Test
     void useTemplateForDepartmentAssignsAllActiveMatchingAccountsAndNotifiesOnlyScopedEvaluators() {
         Position engineer = position(10, "Engineer");
         KpiForm form = form(100, engineer);
@@ -261,9 +349,9 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(saved.getAllValues())
                 .extracting(ekf -> ekf.getEmployee().getId())
                 .containsExactlyInAnyOrder(11, 12, 14);
-        verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
-        verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
-        verify(notificationService, never()).send(eq(3), any(), any(), any(), any());
+        verify(notificationService).sendEvent(eq(1), eq(com.epms.notification.NotificationEventKey.KPI_SCORING_REQUESTED), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService).sendEvent(eq(2), eq(com.epms.notification.NotificationEventKey.KPI_SCORING_REQUESTED), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService, never()).sendEvent(eq(3), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -297,8 +385,8 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(saved.getAllValues())
                 .extracting(ekf -> ekf.getEmployee().getId())
                 .containsExactlyInAnyOrder(11, 12);
-        verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
-        verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService).sendEvent(eq(1), eq(com.epms.notification.NotificationEventKey.KPI_SCORING_REQUESTED), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService).sendEvent(eq(2), eq(com.epms.notification.NotificationEventKey.KPI_SCORING_REQUESTED), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
     }
 
     @Test
@@ -334,8 +422,8 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(saved.getValue().getEvaluators())
                 .extracting(evaluator -> evaluator.getEvaluatorUser().getId())
                 .containsExactlyInAnyOrder(1, 2);
-        verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
-        verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService).sendEvent(eq(1), eq(com.epms.notification.NotificationEventKey.KPI_SCORING_REQUESTED), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+        verify(notificationService).sendEvent(eq(2), eq(com.epms.notification.NotificationEventKey.KPI_SCORING_REQUESTED), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
     }
 
     @Test

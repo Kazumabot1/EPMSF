@@ -4,11 +4,13 @@ import com.epms.dto.UserProfileDtos.ChangePasswordRequest;
 import com.epms.dto.UserProfileDtos.UpdateUserProfileRequest;
 import com.epms.dto.UserProfileDtos.UserProfileResponse;
 import com.epms.entity.Department;
+import com.epms.entity.EmployeeDepartment;
 import com.epms.entity.User;
 import com.epms.entity.UserProfile;
 import com.epms.exception.BadRequestException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.DepartmentRepository;
+import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.UserProfileRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
@@ -32,6 +34,7 @@ public class UserProfileService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final DepartmentRepository departmentRepository;
+    private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -249,8 +252,10 @@ public class UserProfileService {
 
         if (user.getPosition() != null) {
             response.setPosition(user.getPosition().getPositionTitle());
+            response.setPositionName(user.getPosition().getPositionTitle());
         } else if (principal != null) {
             response.setPosition(principal.getPosition());
+            response.setPositionName(principal.getPosition());
         }
 
         response.setEmployeeCode(user.getEmployeeCode());
@@ -265,7 +270,26 @@ public class UserProfileService {
             );
         }
 
+        if (user.getEmployeeId() != null) {
+            employeeDepartmentRepository.findActiveAssignmentsForEmployeeId(user.getEmployeeId())
+                    .stream()
+                    .findFirst()
+                    .ifPresent(assignment -> applyDepartmentProfile(response, assignment));
+        }
+
         return response;
+    }
+
+    private void applyDepartmentProfile(UserProfileResponse response, EmployeeDepartment assignment) {
+        if (assignment.getCurrentDepartment() != null) {
+            response.setCurrentDepartmentId(assignment.getCurrentDepartment().getId());
+            response.setCurrentDepartmentName(assignment.getCurrentDepartment().getDepartmentName());
+        }
+
+        if (assignment.getParentDepartment() != null) {
+            response.setParentDepartmentId(assignment.getParentDepartment().getId());
+            response.setParentDepartmentName(assignment.getParentDepartment().getDepartmentName());
+        }
     }
 
     private void validateEmail(String email) {

@@ -19,4 +19,6 @@ public interface ContinuousFeedbackService {
     List<ContinuousFeedbackResponseDto> getMyGivenFeedback();
 
     List<ContinuousFeedbackResponseDto> getMyReceivedFeedback();
+
+    List<ContinuousFeedbackResponseDto> getVisibleFeedback();
 }

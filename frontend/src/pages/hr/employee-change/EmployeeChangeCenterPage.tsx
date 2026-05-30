@@ -219,7 +219,7 @@ const EmployeeChangeCenterPage = () => {
           reason,
         });
 
-        setMessage('Position change request submitted for CEO approval.');
+        setMessage('Position change request submitted for HR Admin approval.');
       }
 
       if (modalMode === 'DEPARTMENT_CHANGE') {
@@ -236,7 +236,7 @@ const EmployeeChangeCenterPage = () => {
           reason,
         });
 
-        setMessage('Department change request submitted for CEO approval.');
+        setMessage('Department change request submitted for HR Admin approval.');
       }
 
       setIsError(false);
@@ -263,7 +263,7 @@ const EmployeeChangeCenterPage = () => {
                 Workforce Changes
               </h1>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                Review employee details and submit position or department change requests for CEO approval.
+                Review employee details and submit position or department change requests for HR Admin approval.
               </p>
             </div>
 
@@ -533,7 +533,7 @@ const EmployeeChangeCenterPage = () => {
                   : 'Request Department Change'}
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                This request will be sent to CEO for approval.
+                This request will be sent to HR Admin for approval.
               </p>
             </div>
 
@@ -628,7 +628,7 @@ const EmployeeChangeCenterPage = () => {
                 disabled={submitting}
                 className="rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
               >
-                {submitting ? 'Submitting...' : 'Submit for CEO Approval'}
+                {submitting ? 'Submitting...' : 'Submit for HR Admin Approval'}
               </button>
             </div>
           </div>

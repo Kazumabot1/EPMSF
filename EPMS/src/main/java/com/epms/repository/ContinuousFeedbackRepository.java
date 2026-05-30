@@ -23,4 +23,12 @@ public interface ContinuousFeedbackRepository extends JpaRepository<ContinuousFe
             "giverUser"
     })
     List<ContinuousFeedback> findByEmployeeIdOrderByCreatedAtDesc(Integer employeeId);
+
+    @EntityGraph(attributePaths = {
+            "team",
+            "team.department",
+            "employee",
+            "giverUser"
+    })
+    List<ContinuousFeedback> findAllByOrderByCreatedAtDesc();
 }

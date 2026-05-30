@@ -293,11 +293,14 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     @Transactional
     public EmployeeResponseDto updateEmployee(Integer id, EmployeeRequestDto request) {
-        validateLoginAccountRequest(request);
-
         Employee employee = employeeRepository.findWithDepartmentsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
 
+        if (isRestrictedHrEditor()) {
+            preserveRestrictedHrFields(request, employee);
+        }
+
+        validateLoginAccountRequest(request);
         validateEmployeeIdentityUniqueness(request, employee.getId());
 
         Position oldPosition = employee.getPosition();
@@ -606,6 +609,56 @@ public class EmployeeServiceImpl implements EmployeeService {
                 throw new BusinessValidationException("Staff NRC is already used by another employee.");
             }
         }
+    }
+
+    private boolean isRestrictedHrEditor() {
+        try {
+            UserPrincipal principal = SecurityUtils.currentUser();
+            String dashboard = normalize(principal.getDashboard());
+            List<String> roles = principal.getRoles() == null ? List.of() : principal.getRoles();
+
+            boolean hrAdmin = "HRADMIN_DASHBOARD".equals(dashboard)
+                    || roles.stream().map(this::normalize).anyMatch(role -> role.equals("HRADMIN") || role.equals("ADMIN"));
+
+            if (hrAdmin) {
+                return false;
+            }
+
+            return "HR_DASHBOARD".equals(dashboard)
+                    || roles.stream().map(this::normalize).anyMatch(role -> role.equals("HR") || role.equals("HUMAN_RESOURCES"));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void preserveRestrictedHrFields(EmployeeRequestDto request, Employee employee) {
+        EmployeeDepartment assignment = getActiveAssignment(employee).orElseGet(() -> getLatestAssignment(employee));
+
+        request.setEmail(employee.getEmail());
+        request.setStaffNrc(employee.getStaffNrc());
+        request.setGender(employee.getGender());
+        request.setRace(employee.getRace());
+        request.setReligion(employee.getReligion());
+        request.setSpouseNrc(employee.getSpouseNrc());
+        request.setFatherNrc(employee.getFatherNrc());
+        request.setPositionId(employee.getPosition() == null ? null : employee.getPosition().getId());
+        request.setManagerId(employee.getManagerId());
+        request.setCurrentDepartmentId(
+                assignment != null && assignment.getCurrentDepartment() != null
+                        ? assignment.getCurrentDepartment().getId()
+                        : employee.getDepartmentId()
+        );
+        request.setDepartmentId(request.getCurrentDepartmentId());
+        request.setParentDepartmentId(
+                assignment != null && assignment.getParentDepartment() != null
+                        ? assignment.getParentDepartment().getId()
+                        : null
+        );
+        request.setConfirmDepartmentTransfer(false);
+        request.setTransferTeamId(null);
+        request.setCreateLoginAccount(false);
+        request.setSendTemporaryPasswordEmail(false);
+        request.setDashboard(null);
     }
 
     private void mergeAccountProvisioning(EmployeeResponseDto dto, AccountProvisionResult provision) {
@@ -1313,5 +1366,18 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         String t = value.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
     }
 }

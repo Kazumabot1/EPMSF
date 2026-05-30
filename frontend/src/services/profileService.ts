@@ -10,10 +10,15 @@ export interface UserProfile {
   role?: string | null;
   dashboard?: string | null;
   position?: string | null;
+  positionName?: string | null;
   employeeCode?: string | null;
   employeeId?: number | null;
   departmentId?: number | null;
   departmentName?: string | null;
+  currentDepartmentId?: number | null;
+  currentDepartmentName?: string | null;
+  parentDepartmentId?: number | null;
+  parentDepartmentName?: string | null;
 }
 
 export interface UpdateProfilePayload {

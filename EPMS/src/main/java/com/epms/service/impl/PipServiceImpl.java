@@ -493,7 +493,7 @@ public class PipServiceImpl implements PipService {
 
     private boolean canView(User currentUser, Pip pip) {
         if (isHr(currentUser)) {
-            return positionPermissionService.currentUserHasPermission("pipViewAll");
+            return true;
         }
 
         if (Objects.equals(currentUser.getId(), pip.getEmployeeUserId())) {
@@ -778,7 +778,12 @@ public class PipServiceImpl implements PipService {
 
 
     private boolean isHr(User user) {
-        return hasDashboard(user, "HR_DASHBOARD") || hasRole(user, "HR") || hasRole(user, "ROLE_HR");
+        return hasDashboard(user, "HR_DASHBOARD")
+                || hasDashboard(user, "HRADMIN_DASHBOARD")
+                || hasRole(user, "HR")
+                || hasRole(user, "ROLE_HR")
+                || hasRole(user, "HRADMIN")
+                || hasRole(user, "ROLE_HRADMIN");
     }
 
     private boolean isDepartmentHead(User user) {

@@ -881,6 +881,31 @@
   font-weight: 800;
 }
 
+.team-member-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-member-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.team-member-item span {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.team-member-item small {
+  color: #64748b;
+  font-weight: 700;
+}
+
 .team-history-mini-table th,
 .team-history-mini-table td {
   white-space: normal;

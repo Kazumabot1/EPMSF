@@ -20,10 +20,12 @@ public class ContinuousFeedbackResponseDto {
     private Integer employeeId;
     private String employeeName;
     private String employeeEmail;
+    private String employeeDepartmentName;
 
     private Integer giverUserId;
     private String giverName;
     private String giverEmail;
+    private String giverDepartmentName;
 
     private String feedbackText;
     private String category;

@@ -7,9 +7,12 @@ export interface ContinuousFeedback {
   teamName?: string | null;
   employeeId: number;
   employeeName: string;
+  employeeEmail?: string | null;
+  employeeDepartmentName?: string | null;
   giverUserId: number;
   giverName: string;
   giverEmail?: string | null;
+  giverDepartmentName?: string | null;
   feedbackText: string;
   category: string;
   rating?: number | null;
@@ -64,5 +67,10 @@ export async function getGivenContinuousFeedback(): Promise<ContinuousFeedback[]
 
 export async function getReceivedContinuousFeedback(): Promise<ContinuousFeedback[]> {
   const response = await api.get('/continuous-feedback/received');
+  return unwrap<ContinuousFeedback[]>(response);
+}
+
+export async function getVisibleContinuousFeedback(): Promise<ContinuousFeedback[]> {
+  const response = await api.get('/continuous-feedback/visible');
   return unwrap<ContinuousFeedback[]>(response);
 }

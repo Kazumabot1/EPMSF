@@ -741,11 +741,7 @@ public class SecurityConfig {
         }
 
         if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
-            return new AuthorizationDecision(
-                    currentPositionHasPermission("pipViewAll")
-                            || currentPositionHasPermission("pipCreate")
-                            || currentPositionHasPermission("pipEdit")
-            );
+            return new AuthorizationDecision(true);
         }
 
         if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
@@ -835,10 +831,7 @@ public class SecurityConfig {
         }
 
         if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
-            return new AuthorizationDecision(
-                    currentPositionHasPermission("continuousFeedbackView")
-                            || currentPositionHasPermission("continuousFeedbackGive")
-            );
+            return new AuthorizationDecision(true);
         }
 
         if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))

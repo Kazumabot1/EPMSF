@@ -44,6 +44,20 @@ public interface KpiTemplateCyclePeriodRepository extends JpaRepository<KpiTempl
     @Query(
             """
                     SELECT p FROM KpiTemplateCyclePeriod p
+                    JOIN FETCH p.cycle c
+                    LEFT JOIN FETCH p.kpiForm f
+                    WHERE p.status IN :statuses
+                    AND p.endDate < :today
+                    """
+    )
+    List<KpiTemplateCyclePeriod> findPeriodsPastEndByStatuses(
+            @Param("statuses") Collection<KpiTemplateCyclePeriodStatus> statuses,
+            @Param("today") LocalDate today
+    );
+
+    @Query(
+            """
+                    SELECT p FROM KpiTemplateCyclePeriod p
                     JOIN FETCH p.kpiForm f
                     WHERE p.cycle.id = :cycleId
                     ORDER BY f.id ASC, p.periodNumber ASC

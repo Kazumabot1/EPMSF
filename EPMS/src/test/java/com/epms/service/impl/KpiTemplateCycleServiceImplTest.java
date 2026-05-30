@@ -228,6 +228,7 @@ class KpiTemplateCycleServiceImplTest {
                 .kpiForm(form)
                 .build();
         authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
         when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection()))
                 .thenReturn(List.of(link));
 
@@ -240,6 +241,33 @@ class KpiTemplateCycleServiceImplTest {
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("already used by the running cycle");
+    }
+
+    @Test
+    void activatingCyclePreparesPeriodsWithoutImmediateAssignments() {
+        User hr = user(17, "HR User");
+        KpiTemplateCycle cycle = draftCycle();
+        KpiForm form = new KpiForm();
+        form.setId(200);
+        form.setTitle("Engineering KPI");
+        form.setStatus(KpiFormStatus.ACTIVE);
+        KpiTemplateCycleForm link = KpiTemplateCycleForm.builder()
+                .cycle(cycle)
+                .kpiForm(form)
+                .build();
+        authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        stubCycle(cycle);
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
+        when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of(link));
+
+        KpiTemplateCycleStatusRequestDTO request = new KpiTemplateCycleStatusRequestDTO();
+        request.setActive(true);
+
+        service.updateStatus(100, request);
+
+        assertThat(cycle.getStatus()).isEqualTo(KpiTemplateCycleStatus.ACTIVE);
+        verify(employeeKpiWorkflowService).prepareCyclePeriods(100);
+        verify(employeeKpiWorkflowService, never()).useCycleForAllActiveDepartments(100);
     }
 
     private KpiTemplateCycle draftCycle() {
@@ -261,7 +289,6 @@ class KpiTemplateCycleServiceImplTest {
     private void stubCycle(KpiTemplateCycle cycle) {
         when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
         when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of());
-        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(100)).thenReturn(Optional.empty());
     }
 
     private KpiTemplateCycle activeCycle() {

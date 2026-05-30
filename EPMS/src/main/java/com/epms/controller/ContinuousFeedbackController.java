@@ -68,4 +68,11 @@ public class ContinuousFeedbackController {
                 GenericApiResponse.success("Received feedback retrieved", continuousFeedbackService.getMyReceivedFeedback())
         );
     }
+
+    @GetMapping("/visible")
+    public ResponseEntity<GenericApiResponse<List<ContinuousFeedbackResponseDto>>> getVisible() {
+        return ResponseEntity.ok(
+                GenericApiResponse.success("Continuous feedback records retrieved", continuousFeedbackService.getVisibleFeedback())
+        );
+    }
 }

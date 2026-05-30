@@ -13,6 +13,7 @@ import com.epms.entity.User;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.notification.NotificationEventKey;
 import com.epms.repository.ContinuousFeedbackRepository;
+import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.TeamRepository;
@@ -39,6 +40,7 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
+    private final DepartmentRepository departmentRepository;
     private final TeamRepository teamRepository;
     private final PositionPermissionService positionPermissionService;
     private final NotificationService notificationService;
@@ -143,6 +145,37 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ContinuousFeedbackResponseDto> getVisibleFeedback() {
+        User currentUser = userRepository.findById(SecurityUtils.currentUserId())
+                .orElseThrow(() -> new RuntimeException("Current user not found."));
+
+        if (isHrOrHrAdmin(currentUser)) {
+            return continuousFeedbackRepository.findAllByOrderByCreatedAtDesc()
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+
+        if (isDepartmentHead(currentUser)) {
+            Integer departmentId = currentUser.getDepartmentId();
+
+            if (departmentId == null) {
+                return List.of();
+            }
+
+            return continuousFeedbackRepository.findAllByOrderByCreatedAtDesc()
+                    .stream()
+                    .filter(feedback -> isEmployeeInWorkingDepartment(feedback.getEmployee(), departmentId)
+                            || isUserInWorkingDepartment(feedback.getGiverUser(), departmentId))
+                    .map(this::toResponse)
+                    .toList();
+        }
+
+        throw new UnauthorizedActionException("Your position does not have permission to view continuous feedback records.");
     }
 
     private void validateRequest(ContinuousFeedbackRequestDto request) {
@@ -353,9 +386,11 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
                 .employeeId(feedback.getEmployee() == null ? null : feedback.getEmployee().getId())
                 .employeeName(displayEmployee(feedback.getEmployee()))
                 .employeeEmail(feedback.getEmployee() == null ? null : feedback.getEmployee().getEmail())
+                .employeeDepartmentName(workingDepartmentName(feedback.getEmployee()))
                 .giverUserId(feedback.getGiverUser() == null ? null : feedback.getGiverUser().getId())
                 .giverName(displayUser(feedback.getGiverUser()))
                 .giverEmail(feedback.getGiverUser() == null ? null : feedback.getGiverUser().getEmail())
+                .giverDepartmentName(workingDepartmentName(feedback.getGiverUser()))
                 .feedbackText(feedback.getFeedbackText())
                 .category(feedback.getCategory())
                 .rating(feedback.getRating())
@@ -398,5 +433,111 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
         }
 
         return "User #" + user.getId();
+    }
+
+    private boolean isHrOrHrAdmin(User user) {
+        String dashboard = normalize(user == null ? null : user.getDashboard());
+        String positionRole = normalize(user != null && user.getPosition() != null && user.getPosition().getRole() != null
+                ? user.getPosition().getRole().getName()
+                : null);
+
+        return dashboard.equals("HR_DASHBOARD")
+                || dashboard.equals("HRADMIN_DASHBOARD")
+                || positionRole.equals("HR")
+                || positionRole.equals("HRADMIN");
+    }
+
+    private boolean isDepartmentHead(User user) {
+        String dashboard = normalize(user == null ? null : user.getDashboard());
+        String positionRole = normalize(user != null && user.getPosition() != null && user.getPosition().getRole() != null
+                ? user.getPosition().getRole().getName()
+                : null);
+
+        return dashboard.equals("DEPARTMENT_HEAD_DASHBOARD")
+                || dashboard.equals("DEPARTMENTHEAD_DASHBOARD")
+                || dashboard.equals("DEPT_HEAD_DASHBOARD")
+                || positionRole.equals("DEPARTMENT_HEAD")
+                || positionRole.equals("DEPARTMENTHEAD");
+    }
+
+    private boolean isEmployeeInWorkingDepartment(Employee employee, Integer departmentId) {
+        if (employee == null || departmentId == null) {
+            return false;
+        }
+
+        return employeeDepartmentRepository.findActiveAssignmentsForEmployeeId(employee.getId())
+                .stream()
+                .anyMatch(assignment -> {
+                    Integer workingDepartmentId = assignment.getParentDepartment() != null
+                            ? assignment.getParentDepartment().getId()
+                            : assignment.getCurrentDepartment() != null ? assignment.getCurrentDepartment().getId() : null;
+
+                    return Objects.equals(workingDepartmentId, departmentId);
+                });
+    }
+
+    private boolean isUserInWorkingDepartment(User user, Integer departmentId) {
+        if (user == null || departmentId == null) {
+            return false;
+        }
+
+        if (user.getEmployeeId() != null
+                && isEmployeeInWorkingDepartment(employeeRepository.findById(user.getEmployeeId()).orElse(null), departmentId)) {
+            return true;
+        }
+
+        return Objects.equals(user.getDepartmentId(), departmentId);
+    }
+
+    private String workingDepartmentName(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+
+        return employeeDepartmentRepository.findActiveAssignmentsForEmployeeId(employee.getId())
+                .stream()
+                .findFirst()
+                .map(assignment -> assignment.getParentDepartment() != null
+                        ? assignment.getParentDepartment().getDepartmentName()
+                        : assignment.getCurrentDepartment() != null ? assignment.getCurrentDepartment().getDepartmentName() : null)
+                .orElseGet(() -> employee.getDepartmentId() == null
+                        ? null
+                        : departmentRepository.findById(employee.getDepartmentId())
+                                .map(department -> department.getDepartmentName())
+                                .orElse(null));
+    }
+
+    private String workingDepartmentName(User user) {
+        if (user == null) {
+            return null;
+        }
+
+        if (user.getEmployeeId() != null) {
+            Employee employee = employeeRepository.findById(user.getEmployeeId()).orElse(null);
+            String departmentName = workingDepartmentName(employee);
+
+            if (departmentName != null) {
+                return departmentName;
+            }
+        }
+
+        return user.getDepartmentId() == null
+                ? null
+                : departmentRepository.findById(user.getDepartmentId())
+                        .map(department -> department.getDepartmentName())
+                        .orElse(null);
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase();
     }
 }
