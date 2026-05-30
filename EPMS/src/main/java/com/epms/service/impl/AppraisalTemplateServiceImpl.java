@@ -77,6 +77,9 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
         dropLegacyTemplateUniqueIndexesIfPresent();
 
         AppraisalFormTemplate sourceTemplate = getTemplateEntity(templateId);
+        if (!Boolean.TRUE.equals(request.getCycleSpecificCopy())) {
+            ensureUniqueTemplateNameForUpdate(request.getTemplateName(), sourceTemplate.getId());
+        }
         ensureTemplateEditable(sourceTemplate);
         String auditBefore = templateAuditSummary(sourceTemplate);
         List<AuditChangeParts> auditChanges = buildTemplateRequestAuditChanges(sourceTemplate, request);
@@ -715,7 +718,17 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
 
     private void ensureUniqueTemplateNameForCreate(String templateName) {
         String normalizedName = templateName == null ? "" : templateName.trim();
-        if (templateRepository.existsByTemplateNameIgnoreCase(normalizedName)) {
+        if (templateRepository.existsByTemplateNameIgnoreCaseAndCycleSpecificCopyFalse(normalizedName)) {
+            throw new BadRequestException("Template name already exists. Please use a different template name.");
+        }
+    }
+
+    private void ensureUniqueTemplateNameForUpdate(String templateName, Integer currentTemplateId) {
+        String normalizedName = templateName == null ? "" : templateName.trim();
+        if (normalizedName.isBlank() || currentTemplateId == null) {
+            return;
+        }
+        if (templateRepository.existsByTemplateNameIgnoreCaseAndCycleSpecificCopyFalseAndIdNot(normalizedName, currentTemplateId)) {
             throw new BadRequestException("Template name already exists. Please use a different template name.");
         }
     }
