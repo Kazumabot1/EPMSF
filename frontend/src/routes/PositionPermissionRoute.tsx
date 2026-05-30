@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { authStorage } from '../services/authStorage';
 import { emptyPositionPermission, positionPermissionService } from '../services/positionPermissionService';
@@ -7,6 +7,30 @@ import type { PositionPermission } from '../types/positionPermission';
 type PositionPermissionRouteProps = {
   permission: keyof PositionPermission;
   fallbackPath?: string;
+};
+
+const normalizeRoleName = (role?: string | null) =>
+  String(role ?? '')
+    .replace(/^ROLE_/i, '')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase();
+
+const isDefaultAccessRole = (user: ReturnType<typeof authStorage.getUser>) => {
+  const roles = (user?.roles ?? []).map(normalizeRoleName);
+  const dashboard = normalizeRoleName(user?.dashboard);
+
+  return (
+    roles.includes('HRADMIN') ||
+    roles.includes('ADMIN') ||
+    roles.includes('CEO') ||
+    roles.includes('EXECUTIVE') ||
+    dashboard === 'HRADMIN_DASHBOARD' ||
+    dashboard === 'ADMIN_DASHBOARD' ||
+    dashboard === 'CEO_DASHBOARD' ||
+    dashboard === 'EXECUTIVE_DASHBOARD'
+  );
 };
 
 const PositionPermissionRoute = ({
@@ -18,7 +42,14 @@ const PositionPermissionRoute = ({
   const [permissions, setPermissions] = useState<PositionPermission>(emptyPositionPermission());
   const [loading, setLoading] = useState(true);
 
+  const bypassPositionPermission = useMemo(() => isDefaultAccessRole(user), [user]);
+
   useEffect(() => {
+    if (bypassPositionPermission) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     setLoading(true);
@@ -37,7 +68,11 @@ const PositionPermissionRoute = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bypassPositionPermission]);
+
+  if (bypassPositionPermission) {
+    return <Outlet />;
+  }
 
   if (loading) {
     return (
