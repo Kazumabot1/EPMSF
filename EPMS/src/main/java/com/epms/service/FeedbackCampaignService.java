@@ -2,8 +2,10 @@ package com.epms.service;
 
 import com.epms.dto.FeedbackCampaignActivationReadinessResponse;
 import com.epms.dto.FeedbackCampaignCreateRequest;
+import com.epms.dto.FeedbackCampaignCloseRequest;
 import com.epms.dto.FeedbackCampaignMonitoringResponse;
 import com.epms.dto.FeedbackCampaignTargetsResponse;
+import com.epms.dto.FeedbackReminderRequest;
 import com.epms.dto.FeedbackReminderResponse;
 import com.epms.dto.FeedbackCampaignScoringConfigRequest;
 import com.epms.dto.FeedbackCampaignScoringConfigResponse;
@@ -34,9 +36,11 @@ public interface FeedbackCampaignService {
     FeedbackCampaign approveEarlyClose(Long campaignId, Long actorUserId, String reviewNote);
     FeedbackCampaign rejectEarlyClose(Long campaignId, Long actorUserId, String reviewNote);
     FeedbackCampaign closeCampaign(Long campaignId, Long actorUserId);
+    FeedbackCampaign closeCampaignWithReadiness(Long campaignId, FeedbackCampaignCloseRequest request, Long actorUserId);
     FeedbackCampaign publishCampaign(Long campaignId, Long actorUserId);
     int closeExpiredCampaigns();
     void deleteDraftCampaign(Long campaignId, Long actorUserId);
     long countAssignments(Long campaignId);
     FeedbackReminderResponse sendPendingEvaluatorReminders(Long campaignId, Long actorUserId);
+    FeedbackReminderResponse sendScopedEvaluatorReminders(Long campaignId, FeedbackReminderRequest request, Long actorUserId);
 }

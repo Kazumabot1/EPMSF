@@ -1,0 +1,168 @@
+.f360-monitoring-progress-ring {
+    transform: rotate(-90deg);
+    transform-origin: center;
+}
+
+.f360-monitoring-alert-list {
+    max-height: 430px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.f360-monitoring-alert-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.f360-monitoring-alert-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+.f360-monitoring-skeleton {
+    background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 45%, #f8fafc 80%);
+    background-size: 220% 100%;
+    animation: f360-monitoring-skeleton 1.3s ease-in-out infinite;
+}
+
+@keyframes f360-monitoring-skeleton {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.f360-monitoring-target-table {
+    scrollbar-width: thin;
+}
+
+.f360-monitoring-target-table::-webkit-scrollbar {
+    height: 10px;
+}
+
+.f360-monitoring-target-table::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+.f360-monitoring-root {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.f360-monitoring-root *,
+.f360-monitoring-root *::before,
+.f360-monitoring-root *::after {
+    box-sizing: border-box;
+}
+
+.f360-monitoring-summary-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 1rem;
+}
+
+.f360-monitoring-filter-grid {
+    display: grid;
+    min-width: 0;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+    .f360-monitoring-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .f360-monitoring-filter-grid {
+        grid-template-columns: minmax(260px, 1.4fr) repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1536px) {
+    .f360-monitoring-filter-grid {
+        grid-template-columns: minmax(280px, 1.35fr) repeat(4, minmax(150px, 1fr)) minmax(92px, auto);
+    }
+}
+
+.f360-monitoring-dashboard-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.f360-monitoring-dashboard-grid > * {
+    min-width: 0;
+    height: 100%;
+}
+
+@media (min-width: 1280px) {
+    .f360-monitoring-dashboard-grid {
+        grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+    }
+}
+
+@media (min-width: 1536px) {
+    .f360-monitoring-dashboard-grid {
+        grid-template-columns: minmax(0, 1.15fr) minmax(380px, 0.85fr);
+    }
+}
+
+.f360-monitoring-striped-bar-track {
+    position: relative;
+    height: 14px;
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+    border-radius: 10px;
+    background-color: #f8fafc;
+    background-image: repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.18) 0, rgba(148, 163, 184, 0.18) 6px, transparent 6px, transparent 12px);
+    box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.85);
+}
+
+.f360-monitoring-striped-bar-fill {
+    height: 100%;
+    min-width: 0;
+    border-radius: 10px;
+    background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.26) 0, rgba(255, 255, 255, 0.26) 6px, transparent 6px, transparent 12px);
+    transition: width 0.25s ease;
+}
+
+.f360-monitoring-evaluator-filter-grid {
+    display: grid;
+    min-width: 0;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+    .f360-monitoring-evaluator-filter-grid {
+        grid-template-columns: minmax(220px, 1.25fr) repeat(2, minmax(150px, 1fr)) minmax(92px, auto);
+    }
+}
+
+.f360-monitoring-workload-bar {
+    height: 12px;
+    max-width: none;
+}
+
+.f360-monitoring-spin {
+    animation: f360-monitoring-spin 0.8s linear infinite;
+}
+
+@keyframes f360-monitoring-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
