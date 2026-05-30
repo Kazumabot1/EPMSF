@@ -70,7 +70,18 @@ const ProfileHeaderAvatar = ({
   const displayEmail = profile?.email || email || '';
 
   return (
-    <span className={className} aria-hidden>
+    <span
+      className={className}
+      aria-hidden
+      style={{
+        overflow: 'hidden',
+        display: 'inline-grid',
+        placeItems: 'center',
+        flexShrink: 0,
+        aspectRatio: '1 / 1',
+        lineHeight: 1,
+      }}
+    >
       {src ? (
         <img
           src={src}
@@ -78,6 +89,8 @@ const ProfileHeaderAvatar = ({
           style={{
             width: '100%',
             height: '100%',
+            maxWidth: '100%',
+            maxHeight: '100%',
             borderRadius: 'inherit',
             objectFit: 'cover',
             display: 'block',

@@ -516,7 +516,12 @@
 .employee-user-avatar {
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  max-height: 36px;
+  flex: 0 0 36px;
   border-radius: 999px;
+  overflow: hidden;
   background: #f3e8ff;
   color: #6d28d9;
   display: grid;
@@ -770,14 +775,19 @@
 .profile-mini-initials {
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  max-height: 36px;
   border-radius: 999px;
   border: 2px solid #ede9fe;
-  flex: 0 0 auto;
+  overflow: hidden;
+  flex: 0 0 36px;
 }
 
 .profile-mini-avatar {
   object-fit: cover;
   display: block;
+  aspect-ratio: 1 / 1;
 }
 
 .profile-mini-initials {
@@ -828,6 +838,8 @@
 .employee-avatar-image {
   object-fit: cover;
   display: block;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
 }
 
 .employee-avatar-initials {

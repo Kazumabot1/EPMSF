@@ -35,20 +35,118 @@ const imageSrc = (profile: UserProfile) => {
   return `data:${profile.profileImageType};base64,${profile.profileImageData}`;
 };
 
-const fileToBase64 = (file: File) =>
+const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_PROFILE_IMAGE_LABEL = '5MB';
+const CROP_PREVIEW_SIZE = 280;
+const CROP_OUTPUT_SIZE = 512;
+const SUPPORTED_PROFILE_IMAGE_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+];
+
+type CropEditorState = {
+  sourceUrl: string;
+  mimeType: string;
+  fileName: string;
+  rotation: number;
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+const readFileAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const commaIndex = result.indexOf(',');
-
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-
+    reader.onload = () => resolve(String(reader.result || ''));
     reader.onerror = () => reject(new Error('Failed to read image file.'));
     reader.readAsDataURL(file);
   });
+
+const dataUrlToBase64 = (dataUrl: string) => {
+  const commaIndex = dataUrl.indexOf(',');
+
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+};
+
+const loadImageElement = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to load image.'));
+    image.src = src;
+  });
+
+const outputMimeType = (mimeType: string) => {
+  const type = mimeType.toLowerCase();
+
+  if (type === 'image/jpeg' || type === 'image/jpg') {
+    return 'image/jpeg';
+  }
+
+  if (type === 'image/webp') {
+    return 'image/webp';
+  }
+
+  return 'image/png';
+};
+
+const drawCroppedProfileImage = async (
+  canvas: HTMLCanvasElement,
+  crop: CropEditorState,
+  size: number,
+) => {
+  const image = await loadImageElement(crop.sourceUrl);
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('Image editor is not available.');
+  }
+
+  const offsetScale = size / CROP_PREVIEW_SIZE;
+  const radians = (crop.rotation * Math.PI) / 180;
+  const coverScale =
+    Math.max(size / image.naturalWidth, size / image.naturalHeight) * crop.zoom;
+
+  canvas.width = size;
+  canvas.height = size;
+
+  context.clearRect(0, 0, size, size);
+  context.save();
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, size, size);
+  context.translate(
+    size / 2 + crop.offsetX * offsetScale,
+    size / 2 + crop.offsetY * offsetScale,
+  );
+  context.rotate(radians);
+  context.drawImage(
+    image,
+    -(image.naturalWidth * coverScale) / 2,
+    -(image.naturalHeight * coverScale) / 2,
+    image.naturalWidth * coverScale,
+    image.naturalHeight * coverScale,
+  );
+  context.restore();
+};
+
+const createCroppedProfileImage = async (crop: CropEditorState) => {
+  const canvas = document.createElement('canvas');
+  await drawCroppedProfileImage(canvas, crop, CROP_OUTPUT_SIZE);
+
+  const mimeType = outputMimeType(crop.mimeType);
+  const dataUrl =
+    mimeType === 'image/png'
+      ? canvas.toDataURL(mimeType)
+      : canvas.toDataURL(mimeType, 0.9);
+
+  return {
+    base64: dataUrlToBase64(dataUrl),
+    mimeType,
+  };
+};
 
 const passwordRules = (password: string) => ({
   hasMinLength: password.length >= 8,
@@ -62,6 +160,7 @@ const passwordRules = (password: string) => ({
 
 const ProfilePage = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [fullName, setFullName] = useState('');
@@ -77,6 +176,8 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [cropEditor, setCropEditor] = useState<CropEditorState | null>(null);
+  const [applyingCrop, setApplyingCrop] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -141,20 +242,52 @@ const ProfilePage = () => {
     void loadProfile();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!cropEditor || !cropCanvasRef.current) {
+      return undefined;
+    }
+
+    const canvas = cropCanvasRef.current;
+
+    drawCroppedProfileImage(canvas, cropEditor, CROP_PREVIEW_SIZE).catch(() => {
+      if (!cancelled) {
+        setError('Could not preview this image. Please choose another file.');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cropEditor]);
+
   const chooseImage = () => {
     fileInputRef.current?.click();
+  };
+
+  const openCropEditor = (sourceUrl: string, mimeType: string, fileName = 'Profile image') => {
+    setCropEditor({
+      sourceUrl,
+      mimeType,
+      fileName,
+      rotation: 0,
+      zoom: 1,
+      offsetX: 0,
+      offsetY: 0,
+    });
   };
 
   const onImageSelected = async (file?: File) => {
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Profile image must be smaller than 2MB.');
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      setError(`Profile image must be smaller than ${MAX_PROFILE_IMAGE_LABEL}.`);
       setMessage('');
       return;
     }
 
-    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) {
+    if (!SUPPORTED_PROFILE_IMAGE_TYPES.includes(file.type)) {
       setError('Only PNG, JPG, JPEG, or WEBP images are allowed.');
       setMessage('');
       return;
@@ -164,19 +297,49 @@ const ProfilePage = () => {
       setError('');
       setMessage('');
 
-      const base64 = await fileToBase64(file);
-
-      setProfileImageData(base64);
-      setProfileImageType(file.type);
+      const sourceUrl = await readFileAsDataUrl(file);
+      openCropEditor(sourceUrl, file.type, file.name);
     } catch (err) {
       setError(getApiErrorMessage(err));
       setMessage('');
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const editCurrentImage = () => {
+    if (!avatarSrc) return;
+
+    openCropEditor(avatarSrc, profileImageType || 'image/png');
+  };
+
+  const applyCroppedImage = async () => {
+    if (!cropEditor) return;
+
+    try {
+      setApplyingCrop(true);
+      setError('');
+      setMessage('');
+
+      const cropped = await createCroppedProfileImage(cropEditor);
+
+      setProfileImageData(cropped.base64);
+      setProfileImageType(cropped.mimeType);
+      setCropEditor(null);
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+      setMessage('');
+    } finally {
+      setApplyingCrop(false);
     }
   };
 
   const removeImage = () => {
     setProfileImageData('');
     setProfileImageType('');
+    setCropEditor(null);
     setError('');
     setMessage('');
   };
@@ -480,6 +643,16 @@ const ProfilePage = () => {
                 Upload Image
               </button>
 
+              {avatarSrc && (
+                <button
+                  type="button"
+                  onClick={editCurrentImage}
+                  className="rounded-2xl border border-indigo-200 px-4 py-2 text-sm font-black text-indigo-700 transition hover:bg-indigo-50"
+                >
+                  Crop / Rotate
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={removeImage}
@@ -490,7 +663,7 @@ const ProfilePage = () => {
             </div>
 
             <p className="mt-3 text-xs font-semibold text-slate-500">
-              PNG, JPG, JPEG, or WEBP. Max 2MB.
+              PNG, JPG, JPEG, or WEBP. Max {MAX_PROFILE_IMAGE_LABEL}. Crop and rotate before saving.
             </p>
           </div>
         </div>
@@ -595,6 +768,173 @@ const ProfilePage = () => {
           </button>
         </div>
       </div>
+
+      {cropEditor && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Crop & Rotate Profile Image</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Drag the sliders to center the face, zoom, and rotate before saving.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCropEditor(null)}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+              <div className="flex flex-col items-center">
+                <div className="rounded-[2rem] border border-slate-200 bg-slate-100 p-4 shadow-inner">
+                  <canvas
+                    ref={cropCanvasRef}
+                    width={CROP_PREVIEW_SIZE}
+                    height={CROP_PREVIEW_SIZE}
+                    className="h-[280px] w-[280px] rounded-full border-4 border-white bg-white shadow-lg"
+                  />
+                </div>
+                <p className="mt-3 max-w-[280px] text-center text-xs font-semibold text-slate-500">
+                  The header avatar will always use this square cropped version, so tall photos will no longer overflow.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-black text-slate-700">Selected image</p>
+                  <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                    {cropEditor.fileName}
+                  </p>
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between text-sm font-black text-slate-700">
+                    Zoom
+                    <small className="font-bold text-slate-500">{cropEditor.zoom.toFixed(1)}x</small>
+                  </span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.05"
+                    value={cropEditor.zoom}
+                    onChange={(e) =>
+                      setCropEditor((current) =>
+                        current ? { ...current, zoom: Number(e.target.value) } : current,
+                      )
+                    }
+                    className="w-full accent-indigo-600"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between text-sm font-black text-slate-700">
+                    Move left / right
+                    <small className="font-bold text-slate-500">{cropEditor.offsetX}px</small>
+                  </span>
+                  <input
+                    type="range"
+                    min="-120"
+                    max="120"
+                    step="1"
+                    value={cropEditor.offsetX}
+                    onChange={(e) =>
+                      setCropEditor((current) =>
+                        current ? { ...current, offsetX: Number(e.target.value) } : current,
+                      )
+                    }
+                    className="w-full accent-indigo-600"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between text-sm font-black text-slate-700">
+                    Move up / down
+                    <small className="font-bold text-slate-500">{cropEditor.offsetY}px</small>
+                  </span>
+                  <input
+                    type="range"
+                    min="-120"
+                    max="120"
+                    step="1"
+                    value={cropEditor.offsetY}
+                    onChange={(e) =>
+                      setCropEditor((current) =>
+                        current ? { ...current, offsetY: Number(e.target.value) } : current,
+                      )
+                    }
+                    className="w-full accent-indigo-600"
+                  />
+                </label>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCropEditor((current) =>
+                        current
+                          ? { ...current, rotation: current.rotation - 90 }
+                          : current,
+                      )
+                    }
+                    className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Rotate Left
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCropEditor((current) =>
+                        current ? { ...current, rotation: 0, zoom: 1, offsetX: 0, offsetY: 0 } : current,
+                      )
+                    }
+                    className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Reset
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCropEditor((current) =>
+                        current
+                          ? { ...current, rotation: current.rotation + 90 }
+                          : current,
+                      )
+                    }
+                    className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Rotate Right
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setCropEditor(null)}
+                    className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void applyCroppedImage()}
+                    disabled={applyingCrop}
+                    className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {applyingCrop ? 'Applying...' : 'Apply Crop'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

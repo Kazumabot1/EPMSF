@@ -886,9 +886,13 @@
 .hr-user-avatar {
   width: 34px;
   height: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  max-height: 34px;
   display: grid;
   place-items: center;
-  flex-shrink: 0;
+  flex: 0 0 34px;
+  overflow: hidden;
   border-radius: 999px;
   background: #dcfce7;
   color: #16a34a;
