@@ -1288,3 +1288,35 @@
     grid-column: auto;
   }
 }
+
+/* Compact header profile chip: keep details on profile page, not in the mini icon. */
+.hr-user-chip,
+.employee-user-chip,
+.profile-mini-button {
+  max-width: 220px;
+  min-width: 0;
+}
+
+.hr-user-chip-meta,
+.employee-user-meta,
+.profile-mini-text {
+  min-width: 0;
+}
+
+.hr-user-chip-meta strong,
+.employee-user-meta span,
+.profile-mini-text strong {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hr-user-chip-meta small,
+.employee-user-meta small,
+.profile-mini-text small {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

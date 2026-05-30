@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+/*Z*/import { useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
@@ -106,6 +106,17 @@ const RedirectWithMessage = ({ message, to }: RedirectWithMessageProps) => {
   return <Navigate to={destination} replace />;
 };
 
+const MyTeamRoute = () => {
+  const { user } = useAuth();
+  const role = resolveUserRole(user);
+
+  if (role === 'DepartmentHead') {
+    return <Navigate to="/department-head/teams" replace />;
+  }
+
+  return <MyTeamPage />;
+};
+
 function App() {
   return (
       <BrowserRouter>
@@ -121,7 +132,7 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/notification-settings" element={<NotificationSettings />} />
-              <Route path="/my-team" element={<MyTeamPage />} />
+              <Route path="/my-team" element={<MyTeamRoute />} />
               <Route path="/employee/notifications" element={<Notifications />} />
               <Route path="/employee/notification-settings" element={<NotificationSettings />} />
               <Route path="/my-kpis" element={<EmployeeKpiResultsPage />} />
@@ -267,7 +278,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['DepartmentHead']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/department-head/dashboard" element={<RolePerformanceDashboard view="departmentHead" />} />
-                <Route path="/department-head/my-team" element={<Navigate to="/my-team" replace />} />
+                <Route path="/department-head/my-team" element={<Navigate to="/department-head/teams" replace />} />
                 <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
                 <Route path="/department-head/self-assessment" element={<Navigate to="/department-head/self-assessment-forms" replace />} />
                 <Route path="/department-head/self-assessment-forms" element={<DepartmentHeadSelfAssessmentViewPage />} />

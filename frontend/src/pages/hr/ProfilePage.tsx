@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   profileService,
   type UserProfile,
@@ -338,6 +338,39 @@ const ProfilePage = () => {
     }
   };
 
+  const formatRole = (value?: string | null) => {
+    const safeValue = value || 'Not assigned';
+
+    return safeValue
+      .replace(/^ROLE_/i, '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const profileSummaryItems = [
+    {
+      label: 'Position',
+      value: profile?.position || 'Not assigned',
+      icon: 'bi-person-badge',
+    },
+    {
+      label: 'Department',
+      value: profile?.departmentName || 'Not assigned',
+      icon: 'bi-building',
+    },
+    {
+      label: 'Employee Code',
+      value: profile?.employeeCode || 'Not assigned',
+      icon: 'bi-hash',
+    },
+    {
+      label: 'System Role',
+      value: formatRole(profile?.role || profile?.dashboard),
+      icon: 'bi-shield-check',
+    },
+  ];
+
   const RuleItem = ({
     valid,
     children,
@@ -372,11 +405,11 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-sky-50 p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white shadow-xl">
+        <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 p-6 text-white shadow-xl shadow-blue-100">
           <h1 className="text-2xl font-black">My Profile</h1>
-          <p className="mt-2 text-sm text-indigo-100">
+          <p className="mt-2 text-sm text-blue-50">
             Update your profile picture, Gmail/email, phone number, and password.
           </p>
         </div>
@@ -395,7 +428,31 @@ const ProfilePage = () => {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">Profile Information</h2>
+            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">Profile Information</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Your editable contact details are below. Work assignment details are shown here for reference.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {profileSummaryItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-blue-100 bg-blue-50/45 p-4 shadow-sm"
+                >
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-blue-700">
+                    <i className={`bi ${item.icon}`} aria-hidden />
+                    {item.label}
+                  </div>
+                  <p className="mt-2 text-sm font-black leading-snug text-slate-900">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="block">
@@ -405,7 +462,7 @@ const ProfilePage = () => {
                 <input
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   placeholder="Your name"
                 />
               </label>
@@ -418,7 +475,7 @@ const ProfilePage = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   placeholder="your.email@gmail.com"
                 />
               </label>
@@ -430,7 +487,7 @@ const ProfilePage = () => {
                 <input
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   placeholder="+95..."
                 />
               </label>
@@ -440,7 +497,7 @@ const ProfilePage = () => {
               type="button"
               onClick={() => void saveProfile()}
               disabled={savingProfile}
-              className="mt-6 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-6 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {savingProfile ? 'Saving...' : 'Save Profile'}
             </button>
@@ -454,10 +511,10 @@ const ProfilePage = () => {
                 <img
                   src={avatarSrc}
                   alt="Profile"
-                  className="h-36 w-36 rounded-full border-4 border-indigo-100 object-cover shadow-lg"
+                  className="h-36 w-36 rounded-full border-4 border-blue-100 object-cover shadow-lg"
                 />
               ) : (
-                <div className="grid h-36 w-36 place-items-center rounded-full border-4 border-indigo-100 bg-indigo-50 text-4xl font-black text-indigo-700 shadow-lg">
+                <div className="grid h-36 w-36 place-items-center rounded-full border-4 border-blue-100 bg-blue-50 text-4xl font-black text-blue-700 shadow-lg">
                   {initials(fullName, email)}
                 </div>
               )}
@@ -475,7 +532,7 @@ const ProfilePage = () => {
               <button
                 type="button"
                 onClick={chooseImage}
-                className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 transition hover:bg-indigo-100"
+                className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-100"
               >
                 Upload Image
               </button>
@@ -520,7 +577,7 @@ const ProfilePage = () => {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                 autoComplete="current-password"
               />
             </label>
@@ -533,7 +590,7 @@ const ProfilePage = () => {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                 autoComplete="new-password"
               />
             </label>
@@ -546,7 +603,7 @@ const ProfilePage = () => {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                 autoComplete="new-password"
               />
             </label>
@@ -589,7 +646,7 @@ const ProfilePage = () => {
             type="button"
             onClick={() => void changePassword()}
             disabled={changingPassword}
-            className="mt-6 rounded-2xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {changingPassword ? 'Changing...' : 'Change Password'}
           </button>

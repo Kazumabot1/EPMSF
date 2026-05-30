@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+/*Z*/import type { CSSProperties } from 'react';
 import EmptyChartState from './EmptyChartState';
 import {
     DASHBOARD_CHART_COLORS,
@@ -23,6 +23,7 @@ type ComparisonColumnChartProps = {
     maxBars?: number;
     primaryLabel?: string;
     comparisonLabel?: string;
+    showComparison?: boolean;
     valueFormatter?: (value: number, item?: ComparisonColumnDatum) => string;
 };
 
@@ -50,6 +51,7 @@ const ComparisonColumnChart = ({
     maxBars = 8,
     primaryLabel = 'This Period',
     comparisonLabel = 'Previous Period',
+    showComparison = true,
     valueFormatter,
 }: ComparisonColumnChartProps) => {
     const chartData = data
@@ -61,7 +63,7 @@ const ComparisonColumnChart = ({
     }
 
     const maxValue = Math.max(
-        ...chartData.flatMap((item) => [toDashboardNumber(item.value), toDashboardNumber(item.compareValue)]),
+        ...chartData.flatMap((item) => showComparison ? [toDashboardNumber(item.value), toDashboardNumber(item.compareValue)] : [toDashboardNumber(item.value)]),
         1,
     );
     const baseline = 52;
@@ -106,7 +108,7 @@ const ComparisonColumnChart = ({
                 />
             </svg>
 
-            <div className="dashboard-comparison-chart__plot" aria-label={`${primaryLabel} and ${comparisonLabel} comparison`}>
+            <div className={`dashboard-comparison-chart__plot ${showComparison ? '' : 'dashboard-comparison-chart__plot--single'}`} aria-label={showComparison ? `${primaryLabel} and ${comparisonLabel} comparison` : `${primaryLabel} chart`}>
                 {chartData.map((item, index) => {
                     const value = toDashboardNumber(item.value);
                     const compareValue = toDashboardNumber(item.compareValue);
@@ -126,11 +128,13 @@ const ComparisonColumnChart = ({
                                     style={{ height: `${barHeight}px`, '--bar-color': color } as CSSProperties}
                                     title={`${item.label} ${primaryLabel}: ${formattedValue}`}
                                 />
-                                <span
-                                    className="dashboard-comparison-chart__bar dashboard-comparison-chart__bar--secondary"
-                                    style={{ height: `${compareHeight}px`, '--bar-color': compareColor } as CSSProperties}
-                                    title={`${item.label} ${item.compareLabel || comparisonLabel}: ${formattedCompare}`}
-                                />
+                                {showComparison ? (
+                                    <span
+                                        className="dashboard-comparison-chart__bar dashboard-comparison-chart__bar--secondary"
+                                        style={{ height: `${compareHeight}px`, '--bar-color': compareColor } as CSSProperties}
+                                        title={`${item.label} ${item.compareLabel || comparisonLabel}: ${formattedCompare}`}
+                                    />
+                                ) : null}
                             </div>
                             <span className="dashboard-comparison-chart__label" title={item.label}>{item.label}</span>
                         </div>
@@ -140,7 +144,7 @@ const ComparisonColumnChart = ({
 
             <div className="dashboard-comparison-chart__legend" aria-label="Chart legend">
                 <span><i style={{ background: primaryColor }} />{primaryLabel}</span>
-                <span><i style={{ background: secondaryColor }} />{comparisonLabel}</span>
+                {showComparison ? <span><i style={{ background: secondaryColor }} />{comparisonLabel}</span> : null}
             </div>
         </div>
     );
