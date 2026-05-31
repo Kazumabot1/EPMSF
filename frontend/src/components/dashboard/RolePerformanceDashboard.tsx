@@ -326,7 +326,7 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
   if (view === 'employee') {
     return {
       eyebrow: 'My Performance',
-      title: `Good morning, ${firstName}!`,
+      title: `Welcome Back, ${firstName}!`,
       description: 'Here is your personal KPI, appraisal, and feedback snapshot.',
       scope: 'Personal dashboard',
       chartTitle: 'My Overall Results',
@@ -339,7 +339,7 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
   if (view === 'manager') {
     return {
       eyebrow: 'Manager Performance',
-      title: `Good morning, ${firstName}!`,
+      title: `Welcome Back, ${firstName}!`,
       description: 'Track performance, reviews, PIP risk, and feedback completion for employees in your manager scope.',
       scope: 'Manager scope',
       chartTitle: 'Overall Results by Employee / Team',
@@ -352,7 +352,7 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
   if (view === 'departmentHead') {
     return {
       eyebrow: 'Department Performance',
-      title: `Good morning, ${firstName}!`,
+      title: `Welcome Back, ${firstName}!`,
       description: 'Monitor performance, review status, feedback completion, and risk within your department scope.',
       scope: 'Department scope',
       chartTitle: 'Overall Results by Department',
@@ -365,7 +365,7 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
   if (view === 'ceo') {
     return {
       eyebrow: 'Executive Performance',
-      title: `Good morning, ${firstName}!`,
+      title: `Welcome Back, ${firstName}!`,
       description: 'Review organization-wide performance, completion health, feedback trends, and people risk.',
       scope: 'Organization view',
       chartTitle: 'Overall Results by Department',
@@ -378,7 +378,7 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
   if (view === 'admin') {
     return {
       eyebrow: 'HR Admin Performance',
-      title: `Good morning, ${firstName}!`,
+      title: `Welcome Back, ${firstName}!`,
       description: 'Monitor organization performance health using the same secured reporting data used by HR.',
       scope: 'HR Admin view',
       chartTitle: 'Overall Results by Department',
@@ -390,7 +390,7 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
 
   return {
     eyebrow: 'HR Performance',
-    title: `Good morning, ${firstName}!`,
+    title: `Welcome Back, ${firstName}!`,
     description: 'Monitor organization performance, appraisal progress, 360 feedback, and PIP risk from one workspace.',
     scope: 'HR organization view',
     chartTitle: 'Overall Results by Department',
