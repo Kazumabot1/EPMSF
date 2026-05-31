@@ -4,7 +4,11 @@ import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import KpiTemplateCycleViewModal from '../../../components/hr/kpi-template/KpiTemplateCycleViewModal';
 import { kpiTemplateCycleService } from '../../../services/kpiTemplateCycleService';
-import type { KpiGraceExtension, KpiTemplateCycleResponse } from '../../../types/kpiTemplateCycle';
+import type {
+  KpiCycleActivationReadiness,
+  KpiGraceExtension,
+  KpiTemplateCycleResponse,
+} from '../../../types/kpiTemplateCycle';
 
 const graceOptions: Array<{ value: KpiGraceExtension; label: string }> = [
   { value: 'ONE_WEEK', label: '1 week' },
@@ -51,6 +55,7 @@ const KpiTemplateCycleListPage = () => {
   const [closeCycle, setCloseCycle] = useState<KpiTemplateCycleResponse | null>(null);
   const [closeReason, setCloseReason] = useState('');
   const [graceExtension, setGraceExtension] = useState<KpiGraceExtension>('ONE_WEEK');
+  const [activationReadiness, setActivationReadiness] = useState<KpiCycleActivationReadiness | null>(null);
 
   const load = async () => {
     try {
@@ -83,6 +88,21 @@ const KpiTemplateCycleListPage = () => {
       setCloseReason('');
       setGraceExtension('ONE_WEEK');
       return;
+    }
+    if (nextActive) {
+      try {
+        setTogglingId(cycle.id);
+        const readiness = await kpiTemplateCycleService.activationReadiness(cycle.id);
+        if (!readiness.ready) {
+          setActivationReadiness(readiness);
+          return;
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Activation readiness check failed.');
+        return;
+      } finally {
+        setTogglingId(null);
+      }
     }
     try {
       setTogglingId(cycle.id);
@@ -285,6 +305,64 @@ const KpiTemplateCycleListPage = () => {
         cycleId={viewCycleId}
         onClose={() => setViewCycleId(null)}
       />
+
+      {activationReadiness && (
+        <div className="kpi-tpl-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="kpi-tpl-reason-modal max-w-3xl">
+            <div className="kpi-tpl-modal-header">
+              <div>
+                <p className="kpi-tpl-modal-kicker">Activation blocked</p>
+                <h2>Unassigned KPI evaluators</h2>
+              </div>
+              <button type="button" className="kpi-tpl-icon-btn" onClick={() => setActivationReadiness(null)}>
+                <i className="bi bi-x-lg" aria-hidden />
+              </button>
+            </div>
+            <div className="kpi-tpl-modal-body space-y-4">
+              <p className="text-sm leading-6 text-gray-600">
+                {activationReadiness.cycleName} cannot be activated until every target employee has a KPI evaluator.
+                Fix organization setup or assign evaluators manually after applying templates.
+              </p>
+              {activationReadiness.blockingIssues.length > 0 && (
+                <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">
+                  {activationReadiness.blockingIssues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              )}
+              {activationReadiness.unassignedEvaluators.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-amber-200">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-amber-50 text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                      <tr>
+                        <th className="px-3 py-2">Employee</th>
+                        <th className="px-3 py-2">Department</th>
+                        <th className="px-3 py-2">Position</th>
+                        <th className="px-3 py-2">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-amber-100 bg-white">
+                      {activationReadiness.unassignedEvaluators.map((row) => (
+                        <tr key={row.employeeId}>
+                          <td className="px-3 py-2 font-medium text-gray-900">{row.employeeName}</td>
+                          <td className="px-3 py-2 text-gray-700">{row.departmentName}</td>
+                          <td className="px-3 py-2 text-gray-700">{row.positionTitle}</td>
+                          <td className="px-3 py-2 text-gray-600">{row.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="kpi-tpl-modal-footer kpi-tpl-reason-footer">
+              <button type="button" className="kpi-tpl-btn-primary" onClick={() => setActivationReadiness(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {closeCycle && (
         <div className="kpi-tpl-modal-backdrop" role="dialog" aria-modal="true">

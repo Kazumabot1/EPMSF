@@ -301,9 +301,21 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 ekf.addScore(row);
             }
 
+            LinkedHashSet<Integer> evaluatorIds = routing.evaluatorIdsForEmployee(emp.getId());
+            if (evaluatorIds.isEmpty()) {
+                skipped++;
+                log.warn(
+                        "KPI assignment skipped for employeeId={} in departmentId={}: {}",
+                        emp.getId(),
+                        departmentId,
+                        routing.unassignedReasonForEmployee(emp.getId())
+                );
+                continue;
+            }
+
             EmployeeKpiForm saved = employeeKpiFormRepository.save(ekf);
             notifyEmployeeKpiAssigned(emp, form, cycle, cyclePeriod, saved);
-            for (Integer evaluatorId : routing.evaluatorIdsForEmployee(emp.getId())) {
+            for (Integer evaluatorId : evaluatorIds) {
                 userRepository.findById(evaluatorId).ifPresent(evaluator -> {
                     if (!employeeKpiFormEvaluatorRepository.existsByEmployeeKpiForm_IdAndEvaluatorUser_Id(saved.getId(), evaluator.getId())) {
                         saved.addEvaluator(EmployeeKpiFormEvaluator.builder()
@@ -1012,8 +1024,18 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 for (KpiFormItem item : form.getItems()) {
                     assignment.addScore(EmployeeKpiScore.builder().kpiFormItem(item).build());
                 }
+                LinkedHashSet<Integer> evaluatorIds = routing.evaluatorIdsForEmployee(employee.getId());
+                if (evaluatorIds.isEmpty()) {
+                    log.warn(
+                            "KPI assignment skipped for employeeId={} in departmentId={}: {}",
+                            employee.getId(),
+                            workingDepartmentId,
+                            routing.unassignedReasonForEmployee(employee.getId())
+                    );
+                    continue;
+                }
                 EmployeeKpiForm saved = employeeKpiFormRepository.save(assignment);
-                for (Integer evaluatorId : routing.evaluatorIdsForEmployee(employee.getId())) {
+                for (Integer evaluatorId : evaluatorIds) {
                     userRepository.findById(evaluatorId).ifPresent(evaluator ->
                             saved.addEvaluator(EmployeeKpiFormEvaluator.builder()
                                     .employeeKpiForm(saved)
@@ -1754,8 +1776,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             return scoped.stream().toList();
         }
         if (hasManagerScope(principal)) {
-            ManagerEmployeeRouting routing = managerEmployeeRouting(deptId);
-            scoped.addAll(routing.employeeIdsForManager(evaluator.getId()));
+            EvaluatorEmployeeRouting routing = evaluatorEmployeeRouting(deptId, activeDepartmentEmployees(deptId));
+            scoped.addAll(routing.employeeIdsForEvaluator(evaluator.getId()));
             return scoped.stream().toList();
         }
 
@@ -1780,71 +1802,213 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             Integer departmentId,
             Map<Integer, Employee> activeDepartmentEmployees
     ) {
-        Map<Integer, LinkedHashSet<Integer>> evaluatorEmployeeIds = new LinkedHashMap<>();
-        ManagerEmployeeRouting managerRouting = managerEmployeeRouting(departmentId, activeDepartmentEmployees);
-        evaluatorEmployeeIds.putAll(managerRouting.managerEmployeeIds());
+        if (departmentId == null || activeDepartmentEmployees == null || activeDepartmentEmployees.isEmpty()) {
+            return EvaluatorEmployeeRouting.empty();
+        }
 
-        for (User departmentHead : userRepository.findActiveDepartmentHeadsByDepartmentId(departmentId)) {
-            if (!isActiveUser(departmentHead)) {
+        DepartmentTeamContext teamContext = buildDepartmentTeamContext(departmentId, activeDepartmentEmployees);
+        Map<Integer, LinkedHashSet<Integer>> evaluatorEmployeeIds = new LinkedHashMap<>();
+        Map<Integer, String> unassignedReasonsByEmployeeId = new LinkedHashMap<>();
+
+        for (Integer employeeId : activeDepartmentEmployees.keySet()) {
+            if (!hasActiveEmployeeAccount(employeeId)) {
                 continue;
             }
-            evaluatorEmployeeIds
-                    .computeIfAbsent(departmentHead.getId(), ignored -> new LinkedHashSet<>())
-                    .addAll(departmentHeadScopedEmployeeIds(departmentId, departmentHead.getId()));
-        }
-
-        LinkedHashSet<Integer> seniorTargetIds = seniorScopedEmployeeIds(null).stream()
-                .filter(activeDepartmentEmployees::containsKey)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (!seniorTargetIds.isEmpty()) {
-            for (Integer employeeId : seniorTargetIds) {
-                for (User evaluator : seniorKpiEvaluatorUsersForTarget(employeeId, null)) {
-                    evaluatorEmployeeIds
-                            .computeIfAbsent(evaluator.getId(), ignored -> new LinkedHashSet<>())
-                            .add(employeeId);
-                }
+            EvaluatorResolution resolution = resolveEvaluatorUserIdsForTarget(
+                    employeeId,
+                    departmentId,
+                    activeDepartmentEmployees,
+                    teamContext
+            );
+            if (resolution.evaluatorUserIds().isEmpty()) {
+                unassignedReasonsByEmployeeId.put(employeeId, resolution.missingReason());
+                continue;
+            }
+            for (Integer evaluatorUserId : resolution.evaluatorUserIds()) {
+                evaluatorEmployeeIds
+                        .computeIfAbsent(evaluatorUserId, ignored -> new LinkedHashSet<>())
+                        .add(employeeId);
             }
         }
 
-        return new EvaluatorEmployeeRouting(evaluatorEmployeeIds);
+        return new EvaluatorEmployeeRouting(evaluatorEmployeeIds, unassignedReasonsByEmployeeId);
     }
 
-    private ManagerEmployeeRouting managerEmployeeRouting(Integer departmentId) {
-        return managerEmployeeRouting(departmentId, activeDepartmentEmployees(departmentId));
+    private EvaluatorResolution resolveEvaluatorUserIdsForTarget(
+            Integer employeeId,
+            Integer departmentId,
+            Map<Integer, Employee> activeDepartmentEmployees,
+            DepartmentTeamContext teamContext
+    ) {
+        if (employeeId == null || !activeDepartmentEmployees.containsKey(employeeId)) {
+            return EvaluatorResolution.unassigned("Employee is not active in this department.");
+        }
+
+        User targetUser = userRepository.findActiveByEmployeeId(employeeId).orElse(null);
+        if (!isActiveUser(targetUser)) {
+            return EvaluatorResolution.unassigned("Employee has no active user account.");
+        }
+
+        if (isKpiTargetHrAdminUser(targetUser)) {
+            LinkedHashSet<Integer> evaluators = seniorKpiEvaluatorUsersForTarget(employeeId, null).stream()
+                    .map(User::getId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return evaluators.isEmpty()
+                    ? EvaluatorResolution.unassigned("No other HR Admin or CEO is available to score this HR Admin.")
+                    : EvaluatorResolution.assigned(evaluators);
+        }
+
+        if (isKpiTargetDepartmentHeadUser(targetUser)) {
+            LinkedHashSet<Integer> evaluators = activeUsersByRolesOrDashboardOrPosition(HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES).stream()
+                    .filter(user -> !Objects.equals(user.getId(), targetUser.getId()))
+                    .filter(user -> !Objects.equals(user.getEmployeeId(), employeeId))
+                    .map(User::getId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return evaluators.isEmpty()
+                    ? EvaluatorResolution.unassigned("No HR Admin is available to score this Department Head.")
+                    : EvaluatorResolution.assigned(evaluators);
+        }
+
+        if (isKpiTargetManagerLevelUser(targetUser, teamContext.isActiveTeamLeader(employeeId))) {
+            LinkedHashSet<Integer> evaluators = userRepository.findActiveDepartmentHeadsByDepartmentId(departmentId).stream()
+                    .filter(this::isActiveUser)
+                    .filter(user -> !Objects.equals(user.getId(), targetUser.getId()))
+                    .map(User::getId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return evaluators.isEmpty()
+                    ? EvaluatorResolution.unassigned("No Department Head is available to score this manager-level employee.")
+                    : EvaluatorResolution.assigned(evaluators);
+        }
+
+        DepartmentTeamContext.EmployeeTeamAssignment teamAssignment = teamContext.assignmentForEmployee(employeeId);
+        if (teamAssignment != null) {
+            LinkedHashSet<Integer> evaluators = new LinkedHashSet<>();
+            addEvaluatorUserId(evaluators, teamAssignment.teamLeaderUserId(), employeeId);
+            addEvaluatorUserId(evaluators, teamAssignment.projectManagerUserId(), employeeId);
+            if (!evaluators.isEmpty()) {
+                return EvaluatorResolution.assigned(evaluators);
+            }
+            return EvaluatorResolution.unassigned("Active team has no active Team Leader or Project Manager.");
+        }
+
+        User reportsToManager = resolveReportsToManagerUser(employeeId);
+        if (reportsToManager != null) {
+            return EvaluatorResolution.assigned(new LinkedHashSet<>(List.of(reportsToManager.getId())));
+        }
+
+        List<User> departmentManagers = userRepository.findActiveManagersByDepartmentId(departmentId).stream()
+                .filter(this::isActiveUser)
+                .filter(user -> !Objects.equals(user.getEmployeeId(), employeeId))
+                .toList();
+        if (!departmentManagers.isEmpty()) {
+            return EvaluatorResolution.assigned(departmentManagers.stream()
+                    .map(User::getId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+        }
+
+        List<User> departmentHeads = userRepository.findActiveDepartmentHeadsByDepartmentId(departmentId).stream()
+                .filter(this::isActiveUser)
+                .filter(user -> !Objects.equals(user.getEmployeeId(), employeeId))
+                .toList();
+        if (!departmentHeads.isEmpty()) {
+            return EvaluatorResolution.assigned(departmentHeads.stream()
+                    .map(User::getId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+        }
+
+        return EvaluatorResolution.unassigned(
+                "No active team, reports-to manager, department manager, or department head is available."
+        );
     }
 
-    private ManagerEmployeeRouting managerEmployeeRouting(Integer departmentId, Map<Integer, Employee> activeDepartmentEmployees) {
-        Map<Integer, LinkedHashSet<Integer>> managerEmployeeIds = new LinkedHashMap<>();
-        Set<Integer> activeProjectManagerTeamEmployeeIds = new HashSet<>();
+    private void addEvaluatorUserId(LinkedHashSet<Integer> evaluators, Integer evaluatorUserId, Integer targetEmployeeId) {
+        if (evaluatorUserId == null) {
+            return;
+        }
+        userRepository.findById(evaluatorUserId)
+                .filter(this::isActiveUser)
+                .filter(user -> !Objects.equals(user.getEmployeeId(), targetEmployeeId))
+                .ifPresent(user -> evaluators.add(user.getId()));
+    }
+
+    private User resolveReportsToManagerUser(Integer employeeId) {
+        return userRepository.findActiveByEmployeeId(employeeId)
+                .map(User::getManagerId)
+                .flatMap(userRepository::findById)
+                .filter(this::isActiveUser)
+                .filter(manager -> manager.getEmployeeId() == null || !Objects.equals(manager.getEmployeeId(), employeeId))
+                .orElse(null);
+    }
+
+    private boolean isKpiTargetHrAdminUser(User user) {
+        if (!isActiveUser(user)) {
+            return false;
+        }
+        return hasAnyAuthority(
+                user.getDashboard(),
+                user.getId(),
+                HR_ADMIN_ROLE_NAMES,
+                HR_ADMIN_DASHBOARD_NAMES
+        ) || hasAnyAuthority(
+                user.getDashboard(),
+                user.getId(),
+                HR_ROLE_NAMES,
+                HR_DASHBOARD_NAMES
+        );
+    }
+
+    private boolean isKpiTargetDepartmentHeadUser(User user) {
+        return isActiveUser(user) && hasAnyAuthority(
+                user.getDashboard(),
+                user.getId(),
+                DEPARTMENT_HEAD_ROLE_NAMES,
+                DEPARTMENT_HEAD_DASHBOARD_NAMES
+        );
+    }
+
+    private boolean isKpiTargetManagerLevelUser(User user, boolean activeTeamLeader) {
+        if (!isActiveUser(user)) {
+            return false;
+        }
+        if (activeTeamLeader) {
+            return true;
+        }
+        return hasAnyAuthority(user.getDashboard(), user.getId(), MANAGER_ROLE_NAMES, MANAGER_DASHBOARD_NAMES);
+    }
+
+    private boolean hasAnyAuthority(
+            String dashboard,
+            Integer userId,
+            Collection<String> roleNames,
+            Collection<String> dashboardNames
+    ) {
+        Set<String> roles = roleNames.stream().map(this::normalizeAuthorityName).collect(Collectors.toSet());
+        Set<String> dashboards = dashboardNames.stream().map(this::normalizeAuthorityName).collect(Collectors.toSet());
+        if (dashboards.contains(normalizeAuthorityName(dashboard))) {
+            return true;
+        }
+        return userRepository.findNormalizedRoleNamesByUserId(userId).stream()
+                .map(this::normalizeAuthorityName)
+                .anyMatch(roles::contains);
+    }
+
+    private DepartmentTeamContext buildDepartmentTeamContext(
+            Integer departmentId,
+            Map<Integer, Employee> activeDepartmentEmployees
+    ) {
+        Map<Integer, DepartmentTeamContext.EmployeeTeamAssignment> assignmentByEmployeeId = new LinkedHashMap<>();
         Set<Integer> activeTeamLeaderEmployeeIds = new HashSet<>();
-        Set<Integer> managersWithActiveTeams = new HashSet<>();
-        Set<Integer> nonEmployeeTargetIds = privilegedTargetEmployeeIds();
-        Map<Integer, Employee> managerAssignableEmployees = activeDepartmentEmployees.entrySet().stream()
-                .filter(entry -> !nonEmployeeTargetIds.contains(entry.getKey()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new));
 
         for (Team team : teamRepository.findByDepartmentIdAndStatusIgnoreCase(departmentId, "Active")) {
             User teamLeader = team.getTeamLeader();
-            Integer teamLeaderEmployeeId = teamLeader == null ? null : teamLeader.getEmployeeId();
-            if (isActiveUser(teamLeader)
-                    && teamLeaderEmployeeId != null
-                    && activeDepartmentEmployees.containsKey(teamLeaderEmployeeId)) {
-                activeTeamLeaderEmployeeIds.add(teamLeaderEmployeeId);
-                activeProjectManagerTeamEmployeeIds.add(teamLeaderEmployeeId);
+            User projectManager = team.getProjectManager();
+            Integer teamLeaderUserId = isActiveUser(teamLeader) ? teamLeader.getId() : null;
+            Integer projectManagerUserId = isActiveUser(projectManager) ? projectManager.getId() : null;
+            if (teamLeader != null
+                    && teamLeader.getEmployeeId() != null
+                    && activeDepartmentEmployees.containsKey(teamLeader.getEmployeeId())) {
+                activeTeamLeaderEmployeeIds.add(teamLeader.getEmployeeId());
             }
-
-            User manager = team.getProjectManager();
-            boolean hasActiveProjectManager = isActiveUser(manager) && manager.getEmployeeId() != null;
-            if (hasActiveProjectManager) {
-                managersWithActiveTeams.add(manager.getId());
-            }
-
-            LinkedHashSet<Integer> projectManagerScopedIds = hasActiveProjectManager
-                    ? managerEmployeeIds.computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>())
-                    : null;
-            LinkedHashSet<Integer> teamLeaderScopedIds = isActiveUser(teamLeader)
-                    ? managerEmployeeIds.computeIfAbsent(teamLeader.getId(), ignored -> new LinkedHashSet<>())
-                    : null;
 
             if (team.getTeamMembers() == null) {
                 continue;
@@ -1856,52 +2020,17 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                         || member.getEndedDate() != null
                         || !isActiveUser(memberUser)
                         || employeeId == null
-                        || !managerAssignableEmployees.containsKey(employeeId)) {
+                        || !activeDepartmentEmployees.containsKey(employeeId)) {
                     continue;
                 }
-
-                activeProjectManagerTeamEmployeeIds.add(employeeId);
-
-                if (projectManagerScopedIds != null && !Objects.equals(employeeId, manager.getEmployeeId())) {
-                    projectManagerScopedIds.add(employeeId);
-                }
-                if (teamLeaderScopedIds != null && !Objects.equals(employeeId, teamLeader.getEmployeeId())) {
-                    teamLeaderScopedIds.add(employeeId);
-                }
+                assignmentByEmployeeId.putIfAbsent(
+                        employeeId,
+                        new DepartmentTeamContext.EmployeeTeamAssignment(teamLeaderUserId, projectManagerUserId)
+                );
             }
         }
 
-        List<User> departmentManagers = userRepository.findActiveManagersByDepartmentId(departmentId);
-        List<Integer> teamlessEmployeeIds = managerAssignableEmployees.keySet().stream()
-                .filter(employeeId -> !activeProjectManagerTeamEmployeeIds.contains(employeeId))
-                .toList();
-        for (User manager : departmentManagers) {
-            if (!isActiveUser(manager)) {
-                continue;
-            }
-            LinkedHashSet<Integer> scopedIds = managerEmployeeIds.computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>());
-            scopedIds.addAll(activeTeamLeaderEmployeeIds.stream()
-                    .filter(employeeId -> !Objects.equals(employeeId, manager.getEmployeeId()))
-                    .toList());
-
-            if (managersWithActiveTeams.contains(manager.getId())) {
-                continue;
-            }
-            managerEmployeeIds
-                    .computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>())
-                    .addAll(teamlessEmployeeIds.stream()
-                            .filter(employeeId -> !Objects.equals(employeeId, manager.getEmployeeId()))
-                            .toList());
-        }
-
-        Map<Integer, Employee> routableEmployees = managerEmployeeIds.values().stream()
-                .flatMap(Collection::stream)
-                .distinct()
-                .map(managerAssignableEmployees::get)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(Employee::getId, e -> e, (left, right) -> left, LinkedHashMap::new));
-
-        return new ManagerEmployeeRouting(managerEmployeeIds, routableEmployees);
+        return new DepartmentTeamContext(assignmentByEmployeeId, activeTeamLeaderEmployeeIds);
     }
 
     private Map<Integer, Employee> activeDepartmentEmployees(Integer departmentId) {
@@ -1913,12 +2042,20 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     }
 
     private LinkedHashSet<Integer> departmentHeadScopedEmployeeIds(Integer departmentId, Integer evaluatorUserId) {
-        return activeManagerUsersByDepartment(departmentId).stream()
-                .filter(user -> !Objects.equals(user.getId(), evaluatorUserId))
-                .filter(user -> user.getEmployeeId() != null)
-                .filter(user -> hasActiveEmployeeAccount(user.getEmployeeId()))
-                .map(User::getEmployeeId)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Integer, Employee> employees = activeDepartmentEmployees(departmentId);
+        DepartmentTeamContext teamContext = buildDepartmentTeamContext(departmentId, employees);
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+        for (Integer employeeId : employees.keySet()) {
+            User user = userRepository.findActiveByEmployeeId(employeeId).orElse(null);
+            if (!isKpiTargetManagerLevelUser(user, teamContext.isActiveTeamLeader(employeeId))) {
+                continue;
+            }
+            if (user != null && Objects.equals(user.getId(), evaluatorUserId)) {
+                continue;
+            }
+            ids.add(employeeId);
+        }
+        return ids;
     }
 
     private LinkedHashSet<Integer> hrAdminScopedEmployeeIds(Integer evaluatorUserId) {
@@ -1967,16 +2104,6 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .filter(user -> requiredEvaluatorUserId == null || Objects.equals(user.getId(), requiredEvaluatorUserId))
                 .filter(user -> !Objects.equals(user.getEmployeeId(), targetEmployeeId))
                 .toList();
-    }
-
-    private Set<Integer> privilegedTargetEmployeeIds() {
-        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
-        activeManagerUsers().stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRolesOrDashboardOrPosition(DEPARTMENT_HEAD_ROLE_NAMES, DEPARTMENT_HEAD_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRolesOrDashboardOrPosition(HR_ROLE_NAMES, HR_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRolesOrDashboardOrPosition(HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRolesOrDashboardOrPosition(EXECUTIVE_ROLE_NAMES, EXECUTIVE_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        return ids;
     }
 
     private List<User> activeManagerUsers() {
@@ -2094,7 +2221,40 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .toUpperCase(Locale.ROOT);
     }
 
-    private record EvaluatorEmployeeRouting(Map<Integer, LinkedHashSet<Integer>> evaluatorEmployeeIds) {
+    private record EvaluatorResolution(LinkedHashSet<Integer> evaluatorUserIds, String missingReason) {
+        static EvaluatorResolution assigned(LinkedHashSet<Integer> evaluatorUserIds) {
+            return new EvaluatorResolution(evaluatorUserIds, null);
+        }
+
+        static EvaluatorResolution unassigned(String missingReason) {
+            return new EvaluatorResolution(new LinkedHashSet<>(), missingReason);
+        }
+    }
+
+    private record DepartmentTeamContext(
+            Map<Integer, EmployeeTeamAssignment> assignmentByEmployeeId,
+            Set<Integer> activeTeamLeaderEmployeeIds
+    ) {
+        EmployeeTeamAssignment assignmentForEmployee(Integer employeeId) {
+            return assignmentByEmployeeId.get(employeeId);
+        }
+
+        boolean isActiveTeamLeader(Integer employeeId) {
+            return employeeId != null && activeTeamLeaderEmployeeIds.contains(employeeId);
+        }
+
+        record EmployeeTeamAssignment(Integer teamLeaderUserId, Integer projectManagerUserId) {
+        }
+    }
+
+    private record EvaluatorEmployeeRouting(
+            Map<Integer, LinkedHashSet<Integer>> evaluatorEmployeeIds,
+            Map<Integer, String> unassignedReasonsByEmployeeId
+    ) {
+        static EvaluatorEmployeeRouting empty() {
+            return new EvaluatorEmployeeRouting(Map.of(), Map.of());
+        }
+
         LinkedHashSet<Integer> evaluatorIdsWithAnyEmployee(Set<Integer> employeeIds) {
             LinkedHashSet<Integer> ids = new LinkedHashSet<>();
             if (employeeIds == null || employeeIds.isEmpty()) {
@@ -2120,31 +2280,145 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             }
             return ids;
         }
+
+        LinkedHashSet<Integer> employeeIdsForEvaluator(Integer evaluatorUserId) {
+            return new LinkedHashSet<>(evaluatorEmployeeIds.getOrDefault(evaluatorUserId, new LinkedHashSet<>()));
+        }
+
+        String unassignedReasonForEmployee(Integer employeeId) {
+            return unassignedReasonsByEmployeeId.get(employeeId);
+        }
     }
 
-    private record ManagerEmployeeRouting(
-            Map<Integer, LinkedHashSet<Integer>> managerEmployeeIds,
-            Map<Integer, Employee> routableEmployeesById
-    ) {
-        LinkedHashSet<Integer> managerIds() {
-            return new LinkedHashSet<>(managerEmployeeIds.keySet());
+    @Override
+    @Transactional(readOnly = true)
+    public KpiCycleActivationReadinessDto buildCycleActivationReadiness(Integer cycleId) {
+        KpiTemplateCycle cycle = kpiTemplateCycleRepository.findById(cycleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found."));
+
+        List<KpiTemplateCycleForm> links = kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycleId);
+        if (links.isEmpty()) {
+            return KpiCycleActivationReadinessDto.builder()
+                    .cycleId(cycleId)
+                    .cycleName(cycle.getCycleName())
+                    .ready(false)
+                    .blockingIssues(List.of("This KPI cycle has no KPI templates."))
+                    .build();
         }
 
-        LinkedHashSet<Integer> employeeIdsForManager(Integer managerId) {
-            return new LinkedHashSet<>(managerEmployeeIds.getOrDefault(managerId, new LinkedHashSet<>()));
-        }
+        List<KpiUnassignedEvaluatorDto> unassigned = new ArrayList<>();
+        int targetCount = 0;
 
-        LinkedHashSet<Integer> managerIdsWithAnyEmployee(Set<Integer> employeeIds) {
-            LinkedHashSet<Integer> ids = new LinkedHashSet<>();
-            if (employeeIds == null || employeeIds.isEmpty()) {
-                return ids;
-            }
-            for (Map.Entry<Integer, LinkedHashSet<Integer>> entry : managerEmployeeIds.entrySet()) {
-                if (entry.getValue().stream().anyMatch(employeeIds::contains)) {
-                    ids.add(entry.getKey());
+        for (Integer departmentId : activeDepartmentIds()) {
+            Map<Integer, Employee> activeEmployees = activeDepartmentEmployees(departmentId);
+            EvaluatorEmployeeRouting routing = evaluatorEmployeeRouting(departmentId, activeEmployees);
+            String departmentName = departmentRepository.findById(departmentId)
+                    .map(Department::getDepartmentName)
+                    .orElse("Department #" + departmentId);
+
+            for (KpiTemplateCycleForm link : links) {
+                KpiForm form = link.getKpiForm();
+                if (form == null || form.getId() == null) {
+                    continue;
+                }
+                Set<Integer> positionIds = kpiPositionRepository.findWithPositionByKpiForm_Id(form.getId()).stream()
+                        .filter(kp -> kp.getPosition() != null)
+                        .map(kp -> kp.getPosition().getId())
+                        .collect(Collectors.toSet());
+                if (positionIds.isEmpty()) {
+                    continue;
+                }
+
+                for (Employee employee : activeEmployees.values()) {
+                    if (employee.getPosition() == null || !positionIds.contains(employee.getPosition().getId())) {
+                        continue;
+                    }
+                    if (employeeKpiPositionTransitionRepository.existsByEmployee_IdAndStatus(
+                            employee.getId(),
+                            KpiPositionTransitionStatus.PENDING
+                    )) {
+                        continue;
+                    }
+                    targetCount++;
+                    if (!routing.evaluatorIdsForEmployee(employee.getId()).isEmpty()) {
+                        continue;
+                    }
+                    unassigned.add(KpiUnassignedEvaluatorDto.builder()
+                            .employeeId(employee.getId())
+                            .employeeName(fullName(employee))
+                            .departmentId(departmentId)
+                            .departmentName(departmentName)
+                            .positionTitle(employee.getPosition().getPositionTitle())
+                            .reason(routing.unassignedReasonForEmployee(employee.getId()))
+                            .build());
                 }
             }
-            return ids;
+        }
+
+        List<String> blockingIssues = new ArrayList<>();
+        if (targetCount == 0) {
+            blockingIssues.add("No eligible employees match the linked KPI template positions.");
+        }
+        if (!unassigned.isEmpty()) {
+            blockingIssues.add(unassigned.size() + " employee(s) have no KPI evaluator assigned.");
+        }
+
+        return KpiCycleActivationReadinessDto.builder()
+                .cycleId(cycleId)
+                .cycleName(cycle.getCycleName())
+                .ready(blockingIssues.isEmpty())
+                .targetEmployeeCount(targetCount)
+                .unassignedEvaluators(unassigned)
+                .blockingIssues(blockingIssues)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void assignManualEvaluator(Integer employeeKpiFormId, AssignKpiEvaluatorRequest request) {
+        EmployeeKpiForm assignment = employeeKpiFormRepository.findWithScoresForUpdate(employeeKpiFormId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee KPI assignment not found."));
+        if (assignment.getStatus() == EmployeeKpiStatus.FINALIZED || assignment.getStatus() == EmployeeKpiStatus.CLOSED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Finalized KPI assignments cannot change evaluators.");
+        }
+
+        User evaluator = userRepository.findById(request.getEvaluatorUserId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evaluator user not found."));
+        if (!isActiveUser(evaluator)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Evaluator must be an active user.");
+        }
+        if (assignment.getEmployee() != null
+                && Objects.equals(assignment.getEmployee().getId(), evaluator.getEmployeeId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An employee cannot be their own KPI evaluator.");
+        }
+        if (employeeKpiFormEvaluatorRepository.existsByEmployeeKpiForm_IdAndEvaluatorUser_Id(
+                employeeKpiFormId,
+                evaluator.getId()
+        )) {
+            return;
+        }
+
+        assignment.addEvaluator(EmployeeKpiFormEvaluator.builder()
+                .employeeKpiForm(assignment)
+                .evaluatorUser(evaluator)
+                .build());
+        employeeKpiFormRepository.save(assignment);
+
+        Employee employee = assignment.getEmployee();
+        KpiForm form = assignment.getKpiForm();
+        if (employee != null && form != null && form.getId() != null) {
+            notificationService.sendEvent(
+                    evaluator.getId(),
+                    NotificationEventKey.KPI_SCORING_REQUESTED,
+                    "KPI scoring requested",
+                    "HR assigned you as KPI evaluator for "
+                            + fullName(employee)
+                            + " on template \""
+                            + form.getTitle()
+                            + "\".",
+                    TYPE_KPI_MANAGER_ASSIGNMENT,
+                    form.getId()
+            );
         }
     }
 

@@ -257,10 +257,10 @@ class EmployeeKpiWorkflowServiceImplTest {
         service.useTemplateForDepartment(100, departmentRequest(7));
 
         ArgumentCaptor<EmployeeKpiForm> saved = ArgumentCaptor.forClass(EmployeeKpiForm.class);
-        verify(employeeKpiFormRepository, org.mockito.Mockito.times(3)).save(saved.capture());
+        verify(employeeKpiFormRepository, org.mockito.Mockito.times(2)).save(saved.capture());
         assertThat(saved.getAllValues())
                 .extracting(ekf -> ekf.getEmployee().getId())
-                .containsExactlyInAnyOrder(11, 12, 14);
+                .containsExactlyInAnyOrder(11, 12);
         verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
         verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
         verify(notificationService, never()).send(eq(3), any(), any(), any(), any());
@@ -302,12 +302,12 @@ class EmployeeKpiWorkflowServiceImplTest {
     }
 
     @Test
-    void useTemplateForDepartmentRoutesTeamLeaderAssignmentsToAllDepartmentManagers() {
+    void useTemplateForDepartmentRoutesTeamLeaderAssignmentsToDepartmentHead() {
         Position teamLeaderPosition = position(53, "Team Leader");
         KpiForm form = form(100, teamLeaderPosition);
         Department department = department(7);
         User managerA = user(1, 7, 101, true);
-        User managerB = user(2, 7, 102, true);
+        User departmentHead = user(90, 7, 90, true);
         User teamLeaderUser = user(31, 7, 11, true);
         Employee teamLeaderEmployee = employee(11, teamLeaderPosition, true);
 
@@ -318,11 +318,11 @@ class EmployeeKpiWorkflowServiceImplTest {
         when(teamRepository.findByDepartmentIdAndStatusIgnoreCase(7, "Active"))
                 .thenReturn(List.of(team(21, department, managerA, teamLeaderUser)));
         when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(teamLeaderUser));
-        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(managerA, managerB));
-        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
+        when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(managerA));
+        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of(departmentHead));
         when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
-        when(userRepository.findById(1)).thenReturn(Optional.of(managerA));
-        when(userRepository.findById(2)).thenReturn(Optional.of(managerB));
+        when(userRepository.findById(90)).thenReturn(Optional.of(departmentHead));
+        when(userRepository.findNormalizedRoleNamesByUserId(anyInt())).thenReturn(List.of());
         when(employeeKpiFormRepository.findByEmployee_IdAndKpiForm_Id(11, 100)).thenReturn(Optional.empty());
         when(employeeKpiFormRepository.save(any(EmployeeKpiForm.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -333,9 +333,8 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(saved.getValue().getEmployee().getId()).isEqualTo(11);
         assertThat(saved.getValue().getEvaluators())
                 .extracting(evaluator -> evaluator.getEvaluatorUser().getId())
-                .containsExactlyInAnyOrder(1, 2);
-        verify(notificationService).send(eq(1), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
-        verify(notificationService).send(eq(2), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
+                .containsExactly(90);
+        verify(notificationService).send(eq(90), eq("KPI scoring requested"), any(), eq(EmployeeKpiWorkflowServiceImpl.TYPE_KPI_MANAGER_ASSIGNMENT), eq(100));
     }
 
     @Test
@@ -369,7 +368,7 @@ class EmployeeKpiWorkflowServiceImplTest {
 
     @Test
     @SuppressWarnings({"unchecked", "rawtypes"})
-    void managerAssignmentListIncludesTeamLeaderForEveryDepartmentManager() {
+    void managerAssignmentListDoesNotIncludeTeamLeaderForProjectManagers() {
         Position teamLeaderPosition = position(53, "Team Leader");
         Department department = department(7);
         User managerA = user(1, 7, 101, true);
@@ -384,7 +383,9 @@ class EmployeeKpiWorkflowServiceImplTest {
                 .thenReturn(List.of(team(21, department, managerA, teamLeaderUser)));
         when(userRepository.findActiveByEmployeeId(11)).thenReturn(Optional.of(teamLeaderUser));
         when(userRepository.findActiveManagersByDepartmentId(7)).thenReturn(List.of(managerA, managerB));
+        when(userRepository.findActiveDepartmentHeadsByDepartmentId(7)).thenReturn(List.of());
         when(userRepository.findActiveUsersByNormalizedRoleNames(any())).thenReturn(List.of());
+        when(userRepository.findNormalizedRoleNamesByUserId(anyInt())).thenReturn(List.of());
         when(kpiFormRepository.findDetailWithItemsById(100)).thenReturn(Optional.of(form(100, teamLeaderPosition)));
         when(employeeKpiFormRepository.findByKpiFormIdAndEmployeeIdIn(eq(100), any())).thenReturn(List.of());
 
@@ -393,7 +394,7 @@ class EmployeeKpiWorkflowServiceImplTest {
         assertThat(result).isEmpty();
         ArgumentCaptor<Collection<Integer>> employeeIds = ArgumentCaptor.forClass(Collection.class);
         verify(employeeKpiFormRepository).findByKpiFormIdAndEmployeeIdIn(eq(100), employeeIds.capture());
-        assertThat(employeeIds.getValue()).containsExactly(11);
+        assertThat(employeeIds.getValue()).isEmpty();
     }
 
     @Test
