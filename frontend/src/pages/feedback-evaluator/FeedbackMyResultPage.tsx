@@ -38,7 +38,7 @@ const RELATIONSHIP_ORDER: Array<{
     { key: 'SELF', label: 'Self', scoreKey: 'selfAverageScore', countKey: 'selfResponses' },
     { key: 'MANAGER', label: 'Manager', scoreKey: 'managerAverageScore', countKey: 'managerResponses' },
     { key: 'PEER', label: 'Peers', scoreKey: 'peerAverageScore', countKey: 'peerResponses' },
-    { key: 'SUBORDINATE', label: 'Direct reports', scoreKey: 'subordinateAverageScore', countKey: 'subordinateResponses' },
+    { key: 'SUBORDINATE', label: 'Subordinate reviewers', scoreKey: 'subordinateAverageScore', countKey: 'subordinateResponses' },
 ];
 
 const unwrap = <T,>(payload: ApiEnvelope<T> | T): T => {
@@ -358,7 +358,7 @@ const FeedbackMyResultPage = () => {
                         <article>
                             <span>Others score</span>
                             <strong>{formatScore(othersAverage)}</strong>
-                            <small>Visible manager, peer, or direct-report feedback only</small>
+                            <small>Visible manager, peer, or subordinate reviewer feedback only</small>
                         </article>
                     </div>
                 </section>
@@ -429,7 +429,7 @@ const FeedbackMyResultPage = () => {
                     <p className="feedback-result-kicker">Privacy explanation</p>
                     <h2>How anonymity is protected</h2>
                     <p>
-                        Peer and direct-report groups are hidden when the number of responses is below the confidentiality threshold. HR can review full quality checks, but employee results only show privacy-safe information.
+                        Peer and subordinate reviewer groups are hidden when the number of responses is below the confidentiality threshold. HR can review full quality checks, but employee results only show privacy-safe information.
                     </p>
                 </div>
                 <div className="feedback-privacy-grid">

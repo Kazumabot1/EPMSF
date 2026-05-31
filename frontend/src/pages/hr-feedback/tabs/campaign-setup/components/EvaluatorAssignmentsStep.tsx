@@ -25,7 +25,7 @@ const RELATIONSHIP_RULES: RelationshipConfig[] = [
     {
         key: 'MANAGER',
         title: 'Manager Review',
-        helper: 'Only the recipient\'s Reports To manager is valid.',
+        helper: 'Uses eligible manager reviewers.',
         icon: 'bi-person-workspace',
         enabledKey: 'includeManager',
         weightDefault: 30,
@@ -33,15 +33,15 @@ const RELATIONSHIP_RULES: RelationshipConfig[] = [
     {
         key: 'PEER',
         title: 'Peer Review',
-        helper: 'Same department, similar layer, and same or adjacent level.',
+        helper: 'Uses eligible peer reviewers.',
         icon: 'bi-people',
         enabledKey: 'includePeers',
         weightDefault: 40,
     },
     {
         key: 'SUBORDINATE',
-        title: 'Direct Report Review',
-        helper: 'Only employees whose Reports To points to the recipient.',
+        title: 'Subordinate Review',
+        helper: 'Uses eligible subordinate reviewers.',
         icon: 'bi-person-lines-fill',
         enabledKey: 'includeSubordinates',
         weightDefault: 20,
@@ -99,6 +99,8 @@ interface Props {
     evaluatorSearch: any;
     setEvaluatorSearch: StateSetter;
     evaluatorCandidates: any;
+    relationshipCandidatesLoading: any;
+    relationshipCandidatesError: any;
     manualCandidateNotice: any;
     manualEvaluatorEligibilityError: any;
     activeTargetSummary: any;
@@ -174,6 +176,8 @@ export function EvaluatorAssignmentsStep({
                                              evaluatorSearch,
                                              setEvaluatorSearch,
                                              evaluatorCandidates,
+                                             relationshipCandidatesLoading,
+                                             relationshipCandidatesError,
                                              manualCandidateNotice,
                                              manualEvaluatorEligibilityError,
                                              activeTargetSummary,
@@ -245,7 +249,7 @@ export function EvaluatorAssignmentsStep({
                             <div>
                                 <span className="hfdq-kicker">Rules</span>
                                 <h4>Relationship rules</h4>
-                                <p>Manager and direct-report reviewers are strict reporting-line relationships. Peer reviewers are not company-wide suggestions.</p>
+                                <p>Reviewer groups are generated from eligible reviewers for each recipient. Peer reviewers are not company-wide suggestions.</p>
                             </div>
                             <span className={`hfdcw-total ${weightReady ? 'ready' : 'blocked'}`}>{relationshipWeightTotal}% total</span>
                         </div>
@@ -364,7 +368,7 @@ export function EvaluatorAssignmentsStep({
                             />
                             <span>
                                 <strong>Redistribute unavailable relationship weight</strong>
-                                <small>Use this when a relationship does not exist for a recipient, such as an employee with no direct reports. This is not for evaluators who fail to submit.</small>
+                                <small>Use this when a relationship does not exist for a recipient, such as an recipient with no eligible subordinate reviewers. This is not for evaluators who fail to submit.</small>
                             </span>
                         </label>
 
@@ -521,12 +525,16 @@ export function EvaluatorAssignmentsStep({
                                     </label>
                                     <label className="hfdc-field">
                                         <span>Find evaluator</span>
-                                        <input className="hfd-input" value={evaluatorSearch} disabled={!canEditEvaluators || !hasAssignmentPreview} onChange={(event: any) => setEvaluatorSearch(event.target.value)} placeholder="Search valid candidates" />
+                                        <input className="hfd-input" value={evaluatorSearch} disabled={!canEditEvaluators || !hasAssignmentPreview || relationshipCandidatesLoading} onChange={(event: any) => setEvaluatorSearch(event.target.value)} placeholder="Search eligible reviewers" />
                                     </label>
                                 </div>
                                 <div className="hfde-candidate-list modal-list">
-                                    {evaluatorCandidates.length === 0 ? (
-                                        <span className="hfde-empty-line">No valid candidate found for this relationship.</span>
+                                    {relationshipCandidatesLoading ? (
+                                        <span className="hfde-empty-line">Loading eligible reviewers...</span>
+                                    ) : relationshipCandidatesError ? (
+                                        <span className="hfde-empty-line">Could not load eligible reviewers. Please try again.</span>
+                                    ) : evaluatorCandidates.length === 0 ? (
+                                        <span className="hfde-empty-line">No eligible reviewer found for this relationship.</span>
                                     ) : evaluatorCandidates.map((employee: any) => (
                                         <button
                                             key={employee.id}
@@ -537,7 +545,7 @@ export function EvaluatorAssignmentsStep({
                                             <span className="hfde-avatar">{initials(employee.fullName)}</span>
                                             <span>
                                                 <strong>{employee.fullName}</strong>
-                                                <small>{[employee.currentDepartment ?? 'Department not set', employee.positionTitle].filter(Boolean).join(' · ')}</small>
+                                                <small>{[employee.currentDepartment ?? 'Department not set', employee.positionTitle, employee.sourceLabel].filter(Boolean).join(' · ')}</small>
                                             </span>
                                             {manualForm.evaluatorEmployeeId === employee.id && <i className="bi bi-check-circle-fill" />}
                                         </button>
@@ -550,11 +558,11 @@ export function EvaluatorAssignmentsStep({
                                 )}
                                 <label className="hfdc-field full">
                                     <span>Reason</span>
-                                    <textarea className="hfd-input hfdc-textarea" rows={2} disabled={!canEditEvaluators || !hasAssignmentPreview} value={manualForm.reason ?? ''} onChange={(event: any) => setManualForm((current: any) => ({ ...current, reason: event.target.value }))} placeholder="Example: Confirmed after reviewing the reporting line." />
+                                    <textarea className="hfd-input hfdc-textarea" rows={2} disabled={!canEditEvaluators || !hasAssignmentPreview} value={manualForm.reason ?? ''} onChange={(event: any) => setManualForm((current: any) => ({ ...current, reason: event.target.value }))} placeholder="Example: Confirmed after reviewing the eligible reviewer list." />
                                 </label>
                                 <div className="hfde-manual-actions">
                                     <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => setManualOpen(false)}>Cancel</button>
-                                    <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditEvaluators || !hasAssignmentPreview || addingEvaluator || !manualForm.evaluatorEmployeeId || Boolean(manualEvaluatorEligibilityError) || !manualForm.reason?.trim()} onClick={() => void handleAddManual()}>
+                                    <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canEditEvaluators || !hasAssignmentPreview || relationshipCandidatesLoading || addingEvaluator || !manualForm.evaluatorEmployeeId || Boolean(manualEvaluatorEligibilityError) || !manualForm.reason?.trim()} onClick={() => void handleAddManual()}>
                                         <i className="bi bi-plus-lg" /> {addingEvaluator ? 'Adding...' : 'Add Evaluator'}
                                     </button>
                                 </div>

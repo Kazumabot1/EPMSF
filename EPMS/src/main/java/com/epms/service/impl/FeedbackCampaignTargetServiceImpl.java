@@ -303,7 +303,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             warnings.add("Current department is missing.");
         }
         if (user != null && (managerUser == null || !isUserActive(managerUser))) {
-            warnings.add("No work-context manager found.");
+            warnings.add("No eligible manager reviewer found.");
         }
         if (activeTeamIds.isEmpty()) {
             notes.add("No active team found.");
@@ -356,7 +356,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             context.warnings.add("Limited peer options found.");
         }
         if (context.subordinateCandidateCount == 0) {
-            context.notes.add("No work-context subordinates found.");
+            context.notes.add("No eligible subordinate reviewers found.");
         }
     }
 

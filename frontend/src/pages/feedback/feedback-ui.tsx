@@ -6,7 +6,7 @@ export const evaluatorTypeOptions: EvaluatorType[] = ['MANAGER', 'PEER', 'SUBORD
 export const evaluatorTypeLabels: Record<EvaluatorType, string> = {
   MANAGER: 'Manager',
   PEER: 'Peer',
-  SUBORDINATE: 'Direct report',
+  SUBORDINATE: 'Subordinate reviewer',
   SELF: 'Self',
 };
 

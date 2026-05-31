@@ -5,11 +5,10 @@ import com.epms.dto.FeedbackAssignmentDetailItemResponse;
 import com.epms.dto.FeedbackAssignmentGenerationResponse;
 import com.epms.dto.FeedbackAssignmentPreviewItemResponse;
 import com.epms.dto.FeedbackManualAssignmentRequest;
+import com.epms.dto.FeedbackRelationshipCandidateResponse;
 import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackRequest;
-import com.epms.entity.Team;
-import com.epms.entity.TeamMember;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.EvaluatorSelectionMethod;
@@ -17,18 +16,16 @@ import com.epms.entity.enums.FeedbackCampaignStatus;
 import com.epms.entity.enums.FeedbackRelationshipType;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
+import com.epms.repository.DepartmentRepository;
 import com.epms.repository.FeedbackCampaignRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackRequestRepository;
-import com.epms.repository.TeamMemberRepository;
-import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
 import com.epms.repository.projection.PendingEvaluatorProjection;
 import com.epms.service.FeedbackEvaluationService;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackOperationalService;
 import com.epms.service.FeedbackWorkRelationshipResolver;
-import com.epms.service.ProjectPeerDirectory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.List;
@@ -50,18 +48,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService {
 
-    private static final Set<String> HR_ADMIN_ROLE_NAMES = Set.of(
-            "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
-    );
     private static final Set<String> EXECUTIVE_ROLE_NAMES = Set.of("CEO", "EXECUTIVE");
 
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
     private final FeedbackCampaignRepository feedbackCampaignRepository;
+    private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
-    private final TeamMemberRepository teamMemberRepository;
-    private final TeamRepository teamRepository;
-    private final ProjectPeerDirectory projectPeerDirectory;
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackCampaignQuestionReviewService questionReviewService;
     private final FeedbackWorkRelationshipResolver workRelationshipResolver;
@@ -147,7 +140,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             Set<Long> assignedEvaluatorEmployeeIds = new LinkedHashSet<>();
             Set<Long> managerEmployeeIds = workRelationshipResolver.resolveManagerEmployeeIds(targetUser);
             Set<Long> subordinateEmployeeIds = workRelationshipResolver.resolveSubordinateEmployeeIds(targetUser);
-            Integer workingDepartmentId = resolveWorkingDepartmentId(request, targetUser);
             List<FeedbackEvaluatorAssignment> preservedManualAssignments = manualAssignmentsByRequestId
                     .getOrDefault(request.getId(), List.of());
             preservedManualAssignments.stream()
@@ -170,7 +162,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
             if (Boolean.TRUE.equals(config.getIncludeManager())) {
                 if (managerEmployeeIds.isEmpty()) {
-                    targetWarnings.add("No work-context manager found. Manager feedback will be skipped for this target.");
+                    targetWarnings.add("No eligible manager reviewer found. Manager feedback will be skipped for this recipient.");
                 }
                 for (Long managerEmployeeId : managerEmployeeIds) {
                     if (managerEmployeeId != null && !Objects.equals(managerEmployeeId, request.getTargetEmployeeId())) {
@@ -204,7 +196,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                         .toList();
 
                 if (subordinateEmployeeIds.isEmpty()) {
-                    targetWarnings.add("No work-context subordinates found. Subordinate feedback will be skipped for this target.");
+                    targetWarnings.add("No eligible subordinate reviewers found. Subordinate feedback will be skipped for this recipient.");
                 }
                 if (selectedSubordinates.size() < requestedSubordinateMinCount(config)) {
                     targetWarnings.add("Only " + selectedSubordinates.size()
@@ -224,40 +216,17 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
             LinkedHashSet<Long> peerPool = new LinkedHashSet<>();
             if (isPeerSelectionEnabled(config)) {
-                if (isTeamPeerSelectionEnabled(config)) {
-                    if (targetTeamIds.isEmpty()) {
-                        targetWarnings.add("No active team found. Team peer selection cannot be applied for this target.");
-                    }
-                    peerPool.addAll(findTeamPeerEmployeeIds(targetUser));
-                }
-                if (isDepartmentPeerSelectionEnabled(config)) {
-                    if (workingDepartmentId == null) {
-                        targetWarnings.add("No current department found. Department peer fallback cannot be applied.");
-                    } else {
-                        peerPool.addAll(findDepartmentPeerEmployeeIds(targetUser, workingDepartmentId));
-                    }
-                }
+                peerPool.addAll(workRelationshipResolver.resolvePeerEmployeeIds(targetUser));
+                peerPool.remove(null);
+                peerPool.remove(request.getTargetEmployeeId());
+                peerPool.removeAll(managerEmployeeIds);
+                peerPool.removeAll(subordinateEmployeeIds);
+                peerPool.removeAll(assignedEvaluatorEmployeeIds);
 
-                if (Boolean.TRUE.equals(config.getIncludeProjectPeers())) {
-                    peerPool.addAll(projectPeerDirectory.findProjectPeerEmployeeIds(targetUser));
-                    if (!projectPeerDirectory.isConfigured()) {
-                        targetWarnings.add("Project peer source is enabled by a legacy caller, but no project membership directory is configured.");
-                    }
-                }
-                if (Boolean.TRUE.equals(config.getIncludeCrossTeamPeers())) {
-                    peerPool.addAll(findCrossTeamPeerEmployeeIds(targetUser, targetTeamIds));
+                if (peerPool.isEmpty()) {
+                    targetWarnings.add("No eligible peer reviewers found. Peer feedback will be skipped for this recipient.");
                 }
             }
-
-            peerPool = filterEligiblePeerPool(
-                    peerPool,
-                    targetUser,
-                    request.getTargetEmployeeId(),
-                    managerEmployeeIds,
-                    subordinateEmployeeIds,
-                    assignedEvaluatorEmployeeIds,
-                    targetWarnings
-            );
 
             int requestedPeerMinCount = requestedPeerMinCount(config);
             int requestedPeerMaxCount = requestedPeerMaxCount(config);
@@ -302,7 +271,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
         if (!Boolean.TRUE.equals(config.getFlexibleMode())) {
             List<String> blockingWarnings = warnings.stream()
-                    .filter(warning -> warning.contains("minimum rule") || warning.contains("No work-context manager"))
+                    .filter(warning -> warning.contains("minimum rule") || warning.contains("No eligible manager reviewer"))
                     .distinct()
                     .toList();
             if (!blockingWarnings.isEmpty()) {
@@ -438,10 +407,135 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         ));
     }
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FeedbackRelationshipCandidateResponse> getRelationshipCandidates(
+            Long campaignId,
+            Long targetEmployeeId,
+            FeedbackRelationshipType relationshipType
+    ) {
+        getCampaignOrThrow(campaignId);
+        if (targetEmployeeId == null) {
+            throw new BusinessValidationException("Target employee is required.");
+        }
+        if (relationshipType == null) {
+            throw new BusinessValidationException("Relationship type is required.");
+        }
+
+        FeedbackRequest feedbackRequest = feedbackRequestRepository
+                .findByCampaignIdAndTargetEmployeeId(campaignId, targetEmployeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target employee is not part of this campaign."));
+
+        User targetUser = userRepository.findByEmployeeId(feedbackRequest.getTargetEmployeeId().intValue())
+                .orElseThrow(() -> new ResourceNotFoundException("Target employee has no active user account."));
+        if (Boolean.FALSE.equals(targetUser.getActive())) {
+            throw new BusinessValidationException("Target employee must be active.");
+        }
+
+        LinkedHashSet<Long> candidateEmployeeIds = switch (relationshipType) {
+            case SELF -> new LinkedHashSet<>(List.of(feedbackRequest.getTargetEmployeeId()));
+            case MANAGER -> workRelationshipResolver.resolveManagerEmployeeIds(targetUser);
+            case SUBORDINATE -> workRelationshipResolver.resolveSubordinateEmployeeIds(targetUser);
+            case PEER -> workRelationshipResolver.resolvePeerEmployeeIds(targetUser);
+        };
+
+        Map<Integer, String> departmentNamesById = new HashMap<>();
+        return candidateEmployeeIds.stream()
+                .filter(Objects::nonNull)
+                .map(employeeId -> userRepository.findByEmployeeId(employeeId.intValue()))
+                .flatMap(optional -> optional.stream())
+                .filter(candidate -> !Boolean.FALSE.equals(candidate.getActive()))
+                .filter(candidate -> isRelationshipCandidateAllowed(targetUser, candidate, relationshipType))
+                .sorted(Comparator
+                        .comparing((User user) -> safeLower(user.getFullName()))
+                        .thenComparing((User user) -> safeLower(user.getEmail()))
+                        .thenComparing(User::getId, Comparator.nullsLast(Integer::compareTo)))
+                .map(candidate -> toRelationshipCandidateResponse(targetUser, candidate, relationshipType, departmentNamesById))
+                .toList();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<PendingEvaluatorProjection> getPendingEvaluators(Long requestId) {
         return assignmentRepository.findPendingEvaluatorsByRequestId(requestId);
+    }
+
+
+    private boolean isRelationshipCandidateAllowed(
+            User targetUser,
+            User candidateUser,
+            FeedbackRelationshipType relationshipType
+    ) {
+        if (targetUser == null || candidateUser == null || relationshipType == null) {
+            return false;
+        }
+        return switch (relationshipType) {
+            case SELF -> Objects.equals(targetUser.getEmployeeId(), candidateUser.getEmployeeId());
+            case MANAGER, SUBORDINATE, PEER -> workRelationshipResolver.isValidRelationship(
+                    targetUser, candidateUser, relationshipType
+            );
+        };
+    }
+
+    private FeedbackRelationshipCandidateResponse toRelationshipCandidateResponse(
+            User targetUser,
+            User candidateUser,
+            FeedbackRelationshipType relationshipType,
+            Map<Integer, String> departmentNamesById
+    ) {
+        return FeedbackRelationshipCandidateResponse.builder()
+                .employeeId(candidateUser.getEmployeeId() == null ? null : candidateUser.getEmployeeId().longValue())
+                .userId(candidateUser.getId())
+                .employeeCode(candidateUser.getEmployeeCode())
+                .employeeName(candidateUser.getFullName())
+                .email(candidateUser.getEmail())
+                .currentDepartmentId(candidateUser.getDepartmentId())
+                .currentDepartmentName(resolveDepartmentName(candidateUser.getDepartmentId(), departmentNamesById))
+                .positionId(candidateUser.getPosition() == null ? null : candidateUser.getPosition().getId())
+                .positionName(candidateUser.getPosition() == null ? null : candidateUser.getPosition().getPositionTitle())
+                .levelCode(candidateUser.getPosition() == null || candidateUser.getPosition().getLevel() == null
+                        ? null
+                        : candidateUser.getPosition().getLevel().getLevelCode())
+                .relationshipType(relationshipType)
+                .sourceLabel(resolveCandidateSourceLabel(targetUser, candidateUser, relationshipType))
+                .build();
+    }
+
+    private String resolveDepartmentName(Integer departmentId, Map<Integer, String> departmentNamesById) {
+        if (departmentId == null) {
+            return null;
+        }
+        if (departmentNamesById.containsKey(departmentId)) {
+            return departmentNamesById.get(departmentId);
+        }
+        String departmentName = departmentRepository.findById(departmentId)
+                .map(department -> department.getDepartmentName())
+                .orElse(null);
+        departmentNamesById.put(departmentId, departmentName);
+        return departmentName;
+    }
+
+    private String resolveCandidateSourceLabel(
+            User targetUser,
+            User candidateUser,
+            FeedbackRelationshipType relationshipType
+    ) {
+        if (relationshipType == null) {
+            return "Eligible reviewer";
+        }
+        return switch (relationshipType) {
+            case SELF -> "Self reviewer";
+            case MANAGER -> workRelationshipResolver.sharesActiveTeam(targetUser, candidateUser)
+                    ? "Active team leader"
+                    : "Department manager/head";
+            case SUBORDINATE -> workRelationshipResolver.sharesActiveTeam(targetUser, candidateUser)
+                    ? "Active team member"
+                    : "Department subordinate";
+            case PEER -> workRelationshipResolver.sharesActiveTeam(targetUser, candidateUser)
+                    ? "Same active team peer"
+                    : "Same department peer";
+        };
     }
 
     private void validateConfig(EvaluatorConfigDTO config) {
@@ -508,40 +602,21 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
         if (relationshipType == FeedbackRelationshipType.MANAGER) {
             if (!workRelationshipResolver.isWorkContextManager(target, evaluator)) {
-                throw new BusinessValidationException("Manager review must use a work-context manager: active team leader, or department manager/head when no active team exists.");
+                throw new BusinessValidationException("Manager review must use an eligible manager reviewer for the selected recipient.");
             }
             return;
         }
 
         if (relationshipType == FeedbackRelationshipType.SUBORDINATE) {
             if (!workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
-                throw new BusinessValidationException("Subordinate review must use a work-context subordinate from the target's active team or department scope.");
+                throw new BusinessValidationException("Subordinate review must use an eligible subordinate reviewer for the selected recipient.");
             }
             return;
         }
 
-        if (relationshipType == FeedbackRelationshipType.PEER) {
-            if (workRelationshipResolver.isWorkContextManager(target, evaluator)) {
-                throw new BusinessValidationException("The recipient's work-context manager cannot be added as a peer evaluator.");
-            }
-            if (workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
-                throw new BusinessValidationException("A work-context subordinate cannot be added as a peer evaluator.");
-            }
-            if (hasHrAdminRole(evaluator)) {
-                throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
-            }
-            if (isExecutivePeerMismatch(resolvePeerLayer(target), evaluator)) {
-                throw new BusinessValidationException("Executive users are not peer evaluators for this recipient layer.");
-            }
-            if (!sameDepartment(target, evaluator)) {
-                throw new BusinessValidationException("Peer reviewers must be from the same department by default.");
-            }
-            if (!isPeerLayerCompatible(target, evaluator)) {
-                throw new BusinessValidationException("This employee is not a close organizational peer for the selected recipient. Choose someone at the same organization layer.");
-            }
-            if (levelDistance(target, evaluator) > 1) {
-                throw new BusinessValidationException("Choose a peer from the same or adjacent level.");
-            }
+        if (relationshipType == FeedbackRelationshipType.PEER
+                && !workRelationshipResolver.isWorkContextPeer(target, evaluator)) {
+            throw new BusinessValidationException("Peer review must use an eligible peer reviewer for the selected recipient.");
         }
     }
 
@@ -706,7 +781,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         }
         if (assignment.getRelationshipType() == FeedbackRelationshipType.PEER
                 && assignment.getSelectionMethod() == EvaluatorSelectionMethod.AUTO_RANKED) {
-            detailWarnings.add("Suggested peer selected by ranked work-context matching.");
+            detailWarnings.add("Suggested peer selected by reviewer eligibility ranking.");
         }
         Long evaluatorEmployeeId = assignment.getEvaluatorEmployeeId();
         if (evaluatorEmployeeId != null) {
@@ -803,13 +878,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return config.getSubordinateMaxCount() == null ? 5 : Math.max(0, config.getSubordinateMaxCount());
     }
 
-    private Integer resolveWorkingDepartmentId(FeedbackRequest request, User targetUser) {
-        if (request != null && request.getTargetCurrentDepartmentId() != null) {
-            return request.getTargetCurrentDepartmentId();
-        }
-        return targetUser == null ? null : targetUser.getDepartmentId();
-    }
-
     private boolean addAssignment(
             List<FeedbackEvaluatorAssignment> assignmentsToSave,
             Set<Long> assignedEvaluatorEmployeeIds,
@@ -885,48 +953,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
     }
 
-    private LinkedHashSet<Long> filterEligiblePeerPool(
-            Set<Long> rawPeerPool,
-            User targetUser,
-            Long targetEmployeeId,
-            Set<Long> managerEmployeeIds,
-            Set<Long> subordinateEmployeeIds,
-            Set<Long> alreadyAssignedEmployeeIds,
-            List<String> targetWarnings
-    ) {
-        LinkedHashSet<Long> filtered = new LinkedHashSet<>(rawPeerPool == null ? Set.of() : rawPeerPool);
-        int originalSize = filtered.size();
-        filtered.remove(null);
-        filtered.remove(targetEmployeeId);
-        if (managerEmployeeIds != null) {
-            managerEmployeeIds.forEach(filtered::remove);
-        }
-        if (subordinateEmployeeIds != null) {
-            subordinateEmployeeIds.forEach(filtered::remove);
-        }
-        if (alreadyAssignedEmployeeIds != null) {
-            alreadyAssignedEmployeeIds.forEach(filtered::remove);
-        }
-
-        PeerLayer targetLayer = resolvePeerLayer(targetUser);
-        LinkedHashSet<Long> eligible = filtered.stream()
-                .filter(employeeId -> {
-                    User candidate = findActiveUserForEmployeeId(employeeId);
-                    return candidate != null
-                            && !hasHrAdminRole(candidate)
-                            && sameDepartment(targetUser, candidate)
-                            && isPeerLayerCompatible(targetUser, candidate)
-                            && !isExecutivePeerMismatch(targetLayer, candidate)
-                            && levelDistance(targetUser, candidate) <= 1;
-                })
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        if (targetWarnings != null && originalSize > eligible.size()) {
-            targetWarnings.add("Some peer candidates were excluded because they were inactive, HR/Admin users, work-context managers, work-context subordinates, outside the recipient department, or not at the same organization layer.");
-        }
-        return eligible;
-    }
-
     private boolean hasActiveUserForEmployeeId(Long employeeId) {
         return findActiveUserForEmployeeId(employeeId) != null;
     }
@@ -968,45 +994,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             return PeerLayer.LEAD_OR_SUPERVISOR;
         }
         return PeerLayer.INDIVIDUAL_CONTRIBUTOR;
-    }
-
-    private boolean isPeerLayerCompatible(User target, User candidate) {
-        if (target == null || candidate == null) {
-            return false;
-        }
-        PeerLayer targetLayer = resolvePeerLayer(target);
-        PeerLayer candidateLayer = resolvePeerLayer(candidate);
-        if (targetLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR) {
-            return candidateLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR
-                    || candidateLayer == PeerLayer.LEAD_OR_SUPERVISOR;
-        }
-        if (targetLayer == PeerLayer.LEAD_OR_SUPERVISOR) {
-            return candidateLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR
-                    || candidateLayer == PeerLayer.LEAD_OR_SUPERVISOR;
-        }
-        if (targetLayer == PeerLayer.MANAGER) {
-            return candidateLayer == PeerLayer.MANAGER;
-        }
-        if (targetLayer == PeerLayer.DEPARTMENT_HEAD) {
-            return candidateLayer == PeerLayer.DEPARTMENT_HEAD;
-        }
-        return candidateLayer == PeerLayer.EXECUTIVE;
-    }
-
-    private boolean isExecutivePeerMismatch(PeerLayer targetLayer, User candidate) {
-        return targetLayer != PeerLayer.EXECUTIVE && !Collections.disjoint(normalizedRoleNames(candidate), EXECUTIVE_ROLE_NAMES);
-    }
-
-    private boolean sameDepartment(User target, User candidate) {
-        return target != null
-                && candidate != null
-                && target.getDepartmentId() != null
-                && Objects.equals(target.getDepartmentId(), candidate.getDepartmentId());
-    }
-
-
-    private boolean hasHrAdminRole(User user) {
-        return !Collections.disjoint(normalizedRoleNames(user), HR_ADMIN_ROLE_NAMES);
     }
 
     private Set<String> normalizedRoleNames(User user) {
@@ -1058,7 +1045,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         if (target == null || candidate == null || targetTeamIds == null || targetTeamIds.isEmpty()) {
             return false;
         }
-        return !Collections.disjoint(targetTeamIds, findActiveTeamIds(candidate));
+        return !Collections.disjoint(targetTeamIds, workRelationshipResolver.resolveActiveTeamIds(candidate));
     }
 
     private int peerScore(User target, User candidate, Set<Integer> targetTeamIds, Map<Long, Integer> evaluatorLoadByEmployeeId) {
@@ -1132,7 +1119,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
     private String buildPeerSelectionReason(User target, User evaluator) {
         if (target == null || evaluator == null) {
-            return "Suggested peer based on the best available work-context match.";
+            return "Suggested peer based on the best available eligible reviewer match.";
         }
         List<String> reasons = new ArrayList<>();
         if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), evaluator.getDepartmentId())) {
@@ -1155,7 +1142,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             reasons.add("similar position family");
         }
         if (reasons.isEmpty()) {
-            return "Suggested peer based on the closest available eligible work-context match.";
+            return "Suggested peer based on the closest available eligible reviewer match.";
         }
         return "Suggested peer based on " + String.join(", ", reasons) + ".";
     }
@@ -1176,92 +1163,9 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_");
     }
 
-    private Set<Long> findDepartmentPeerEmployeeIds(User targetUser, Integer workingDepartmentId) {
-        if (workingDepartmentId == null) {
-            return Set.of();
-        }
-        return userRepository.findByDepartmentIdAndActiveTrue(workingDepartmentId).stream()
-                .filter(candidate -> candidate.getEmployeeId() != null)
-                .filter(candidate -> !Objects.equals(candidate.getId(), targetUser.getId()))
-                .map(candidate -> candidate.getEmployeeId().longValue())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+    private String safeLower(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private Set<Long> findTeamPeerEmployeeIds(User targetUser) {
-        Set<Long> employeeIds = new LinkedHashSet<>();
-        for (Team team : findActiveTeams(targetUser)) {
-            if (team.getTeamLeader() != null
-                    && team.getTeamLeader().getEmployeeId() != null
-                    && !Boolean.FALSE.equals(team.getTeamLeader().getActive())) {
-                employeeIds.add(team.getTeamLeader().getEmployeeId().longValue());
-            }
-            List<TeamMember> members = team.getTeamMembers() != null
-                    ? team.getTeamMembers()
-                    : teamMemberRepository.findByTeamId(team.getId());
-            for (TeamMember member : members) {
-                if (member.getEndedDate() == null
-                        && member.getMemberUser() != null
-                        && member.getMemberUser().getEmployeeId() != null
-                        && !Boolean.FALSE.equals(member.getMemberUser().getActive())) {
-                    employeeIds.add(member.getMemberUser().getEmployeeId().longValue());
-                }
-            }
-        }
-        return employeeIds;
-    }
 
-    private Set<Long> findCrossTeamPeerEmployeeIds(User targetUser, Set<Integer> targetTeamIds) {
-        Set<Long> candidateEmployeeIds = new LinkedHashSet<>();
-
-        for (User candidate : findActiveUsers()) {
-            if (candidate.getEmployeeId() == null || Objects.equals(candidate.getId(), targetUser.getId())) {
-                continue;
-            }
-            if (targetUser.getDepartmentId() != null
-                    && !Objects.equals(candidate.getDepartmentId(), targetUser.getDepartmentId())) {
-                continue;
-            }
-            Set<Integer> candidateTeamIds = findActiveTeamIds(candidate);
-            if (!targetTeamIds.isEmpty()) {
-                if (candidateTeamIds.isEmpty() || !Collections.disjoint(candidateTeamIds, targetTeamIds)) {
-                    continue;
-                }
-            } else if (candidateTeamIds.isEmpty()) {
-                continue;
-            }
-            candidateEmployeeIds.add(candidate.getEmployeeId().longValue());
-        }
-
-        return candidateEmployeeIds;
-    }
-
-    private List<User> findActiveUsers() {
-        return userRepository.findAll().stream()
-                .filter(candidate -> !Boolean.FALSE.equals(candidate.getActive()))
-                .sorted(Comparator.comparing(User::getId))
-                .toList();
-    }
-
-    private List<Team> findActiveTeams(User user) {
-        Map<Integer, Team> teams = teamMemberRepository.findByMemberUserId(user.getId()).stream()
-                .filter(member -> member.getEndedDate() == null)
-                .map(TeamMember::getTeam)
-                .filter(Objects::nonNull)
-                .filter(team -> "Active".equalsIgnoreCase(team.getStatus()))
-                .collect(Collectors.toMap(Team::getId, team -> team, (left, right) -> left));
-
-        for (Team ledTeam : teamRepository.findByTeamLeaderIdAndStatusIgnoreCase(user.getId(), "Active")) {
-            teams.put(ledTeam.getId(), ledTeam);
-        }
-
-        return teams.values().stream()
-                .sorted(Comparator.comparing(Team::getId))
-                .toList();
-    }
-
-    private Set<Integer> findActiveTeamIds(User user) {
-        return findActiveTeams(user).stream()
-                .map(Team::getId)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
 }

@@ -75,7 +75,7 @@ const EVALUATOR_RELATIONSHIP_FILTERS: Array<{ value: EvaluatorRelationshipFilter
     { value: 'ALL', label: 'All relationships' },
     { value: 'MANAGER', label: 'Manager' },
     { value: 'PEER', label: 'Peer' },
-    { value: 'SUBORDINATE', label: 'Direct Report' },
+    { value: 'SUBORDINATE', label: 'Subordinate reviewer' },
     { value: 'SELF', label: 'Self' },
 ];
 
@@ -83,7 +83,7 @@ const TARGET_RELATIONSHIP_FILTERS: Array<{ value: TargetRelationshipFilter; labe
     { value: 'ALL', label: 'All relationships' },
     { value: 'MANAGER', label: 'Manager needs action' },
     { value: 'PEER', label: 'Peer needs action' },
-    { value: 'SUBORDINATE', label: 'Direct report needs action' },
+    { value: 'SUBORDINATE', label: 'Subordinate reviewer needs action' },
     { value: 'SELF', label: 'Self needs action' },
     { value: 'MISSING', label: 'Missing evaluator' },
     { value: 'PRIVACY_RISK', label: 'Privacy risk' },
@@ -374,7 +374,7 @@ const resolveTone = (value: string | undefined, map: Record<string, Tone>, fallb
 
 const normalizeRelationshipLabel = (relationship: RelationshipProgress) => {
     if (relationship.label) return relationship.label;
-    if (relationship.relationshipType === 'SUBORDINATE') return 'Direct Report';
+    if (relationship.relationshipType === 'SUBORDINATE') return 'Subordinate reviewer';
     return labelFromValue(relationship.relationshipType);
 };
 
@@ -451,7 +451,7 @@ const activityIcon = (activityType?: string | null) => {
 
 
 const relationshipLabelFromKey = (relationship: string) =>
-    relationship === 'SUBORDINATE' ? 'Direct Report' : labelFromValue(relationship);
+    relationship === 'SUBORDINATE' ? 'Subordinate reviewer' : labelFromValue(relationship);
 
 const hasEvaluatorSearchMatch = (evaluator: EvaluatorWorkload, query: string) => {
     if (!query.trim()) return true;
@@ -566,7 +566,7 @@ const alertTargetsPrivacy = (alert: MonitoringAlert) => {
 const relationshipFromAlert = (alert: MonitoringAlert): TargetRelationshipFilter => {
     const key = `${alert.alertType ?? ''} ${alert.actionType ?? ''} ${alert.filterKey ?? ''} ${alert.title ?? ''}`.toUpperCase();
     if (key.includes('PEER')) return 'PEER';
-    if (key.includes('SUBORDINATE') || key.includes('DIRECT REPORT')) return 'SUBORDINATE';
+    if (key.includes('SUBORDINATE') || key.includes('SUBORDINATE REVIEWER')) return 'SUBORDINATE';
     if (key.includes('MANAGER')) return 'MANAGER';
     if (key.includes('SELF')) return 'SELF';
     if (key.includes('PRIVACY') || key.includes('ANONYMITY')) return 'PRIVACY_RISK';
@@ -1639,7 +1639,7 @@ function ReminderPanel({
             </div>
 
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-600">
-                Send one campaign-level reminder to pending evaluators. The backend automatically sends overdue wording after the campaign deadline.
+                Send one campaign-level reminder to pending evaluators. The system automatically sends overdue wording after the campaign deadline.
             </div>
 
             <button
@@ -2150,7 +2150,7 @@ function TargetRelationshipMiniCard({
     relationshipType: string;
     relationship?: TargetRelationshipStatus;
 }) {
-    const label = relationshipType === 'SUBORDINATE' ? 'Direct Report' : labelFromValue(relationshipType);
+    const label = relationshipType === 'SUBORDINATE' ? 'Subordinate reviewer' : labelFromValue(relationshipType);
 
     if (!relationship) {
         return (
@@ -2230,7 +2230,7 @@ function PrivacyPanel({ target }: { target: TargetHealth }) {
                 {target.privacyCoveragePassed ? 'Anonymity ready' : 'Anonymity not ready'}
             </p>
             <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">
-                Peer or direct report feedback needs the minimum submitted responses before breakdowns are safe.
+                Peer or subordinate reviewer feedback needs the minimum submitted responses before breakdowns are safe.
             </p>
         </div>
     );

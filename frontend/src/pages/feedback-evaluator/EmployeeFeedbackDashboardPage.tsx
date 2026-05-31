@@ -99,7 +99,7 @@ const relationshipLabel = (type: FeedbackRelationshipType | string | null | unde
         case 'PEER':
             return plural ? 'Peers' : 'Peer';
         case 'SUBORDINATE':
-            return plural ? 'Direct reports' : 'Direct report';
+            return plural ? 'Subordinate reviewers' : 'Subordinate reviewer';
         case 'SELF':
             return plural ? 'Self reviews' : 'Self review';
         default:
@@ -688,7 +688,7 @@ const EmployeeFeedbackDashboardPage = () => {
                                 <option value="ALL">All relationships</option>
                                 <option value="MANAGER">Manager</option>
                                 <option value="PEER">Peer</option>
-                                <option value="SUBORDINATE">Direct report</option>
+                                <option value="SUBORDINATE">Subordinate reviewer</option>
                                 <option value="SELF">Self</option>
                             </Feedback360Select>
                             <Feedback360Select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)}>
