@@ -113,10 +113,8 @@ public class SecurityConfig {
             "HR_ADMIN",
             "PEOPLE",
             "PEOPLE_OPS",
-            "TALENT",
             "ADMIN",
-            "CEO",
-            "EXECUTIVE"
+            "HRADMIN"
     );
 
     private static final Set<String> ADMIN_DASHBOARDS = Set.of(
@@ -166,8 +164,7 @@ public class SecurityConfig {
     private static final Set<String> WORKFORCE_CHANGE_REVIEW_DASHBOARDS = Set.of(
             "HR_DASHBOARD",
             "ADMIN_DASHBOARD",
-            "EXECUTIVE_DASHBOARD",
-            "CEO_DASHBOARD"
+            "HRADMIN_DASHBOARD"
     );
 
     @Bean
@@ -249,12 +246,12 @@ public class SecurityConfig {
                         )
 
                         .requestMatchers(
-                                "/api/employee-change-requests/ceo/pending",
-                                "/api/employee-change-requests/ceo/*",
-                                "/api/employee-change-requests/ceo/*/approve",
-                                "/api/employee-change-requests/ceo/*/reject"
+                                "/api/employee-change-requests/hradmin/pending",
+                                "/api/employee-change-requests/hradmin/*",
+                                "/api/employee-change-requests/hradmin/*/approve",
+                                "/api/employee-change-requests/hradmin/*/reject"
                         ).access((authentication, context) ->
-                                hasRoleDashboardOrPosition(authentication.get(), EXECUTIVE_ROLES, EXECUTIVE_DASHBOARDS)
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )
 
                         .requestMatchers(
@@ -501,21 +498,16 @@ public class SecurityConfig {
                                 )
                         )
 
+
                         .requestMatchers(
                                 "/api/hr/kpi-template-cycles",
-                                "/api/hr/kpi-template-cycles/**",
-                                "/api/hr/department-kpi-templates",
-                                "/api/hr/department-kpi-templates/**",
-                                "/api/hr/department-kpi-cycles",
-                                "/api/hr/department-kpi-cycles/**",
-                                "/api/hr/department-kpi-workflow",
-                                "/api/hr/department-kpi-workflow/**"
+                                "/api/hr/kpi-template-cycles/**"
                         ).access((authentication, context) ->
                                 hasAnyRoleAndPositionPermission(
                                         authentication.get(),
                                         HR_ROLES,
                                         HR_DASHBOARDS,
-                                        "departmentKpiPermission"
+                                        "kpiPermission"
                                 )
                         )
 
@@ -590,9 +582,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/api/executive/kpi-approvals",
-                                "/api/executive/kpi-approvals/**",
-                                "/api/executive/department-kpi-approvals",
-                                "/api/executive/department-kpi-approvals/**"
+                                "/api/executive/kpi-approvals/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )

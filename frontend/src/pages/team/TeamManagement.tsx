@@ -118,8 +118,10 @@ const TeamManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
-  const [inactivatingTeam, setInactivatingTeam] = useState<TeamResponse | null>(null);
+ const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
+ const [selectedDetailTeam, setSelectedDetailTeam] = useState<TeamResponse | null>(null);
+ const [inactivatingTeam, setInactivatingTeam] = useState<TeamResponse | null>(null);
+
   const [inactivateReason, setInactivateReason] = useState('');
   const [inactivateError, setInactivateError] = useState('');
   const [inactivating, setInactivating] = useState(false);
@@ -249,6 +251,27 @@ const TeamManagement: React.FC = () => {
       setDeleting(false);
     }
   };
+
+const openTeamDetail = (team: TeamResponse) => {
+  if (!isHr) {
+    return;
+  }
+
+  setSelectedDetailTeam(team);
+};
+
+const closeTeamDetail = () => {
+  setSelectedDetailTeam(null);
+};
+
+const memberName = (member: TeamResponse['members'][number]) =>
+  member.userName || member.employeeName || 'Unnamed member';
+
+const memberStartedDate = (member: TeamResponse['members'][number]) =>
+  member.startedDate ? formatDate(member.startedDate) : '—';
+
+const activeMembers = (team: TeamResponse | null) =>
+  Array.isArray(team?.members) ? team!.members : [];
 
   const openInactivateModal = (team: TeamResponse) => {
     setError('');
@@ -404,17 +427,17 @@ const TeamManagement: React.FC = () => {
           <div className="team-table-wrap">
             <table className="team-table">
               <thead>
-                <tr>
-                  <th>No.</th>
-                  <th>Team</th>
-                  <th>Department</th>
-                  <th>Team Leader</th>
-                  <th>Project Manager</th>
-                  <th>Members</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
+              <tr>
+                <th>No.</th>
+                <th>Team</th>
+                <th>Department</th>
+                <th>Team Leader</th>
+                <th>Project Manager</th>
+                <th>Members</th>
+                <th>Status</th>
+                <th>Created</th>
+                {!isHr && <th>Actions</th>}
+              </tr>
               </thead>
 
               <tbody>
@@ -422,7 +445,12 @@ const TeamManagement: React.FC = () => {
                   const isActiveTeam = team.status?.toLowerCase() === 'active';
 
                   return (
-                  <tr key={team.id}>
+                 <tr
+                   key={team.id}
+                   className={isHr ? 'team-row-clickable' : undefined}
+                   onClick={() => openTeamDetail(team)}
+                   title={isHr ? 'Click to view team details' : undefined}
+                 >
                     <td>{index + 1}</td>
 
                     <td>
@@ -484,35 +512,43 @@ const TeamManagement: React.FC = () => {
 
                     <td>{formatDate(team.createdDate)}</td>
 
-                    <td>
-                      {canShowEditTeam ? (
-                        <div className="team-row-actions">
-                          {isActiveTeam ? (
-                            <>
-                              <button
-                                type="button"
-                                className="team-action-btn"
-                                onClick={() => setEditingTeam(team)}
-                              >
-                                Edit
-                              </button>
+{!isHr && (
+  <td>
+    {canShowEditTeam ? (
+      <div className="team-row-actions">
+        {isActiveTeam ? (
+          <>
+            <button
+              type="button"
+              className="team-action-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                setEditingTeam(team);
+              }}
+            >
+              Edit
+            </button>
 
-                              <button
-                                type="button"
-                                className="team-action-btn team-action-btn-danger"
-                                onClick={() => openInactivateModal(team)}
-                              >
-                                Inactivate
-                              </button>
-                            </>
-                          ) : (
-                            <span className="team-muted">Inactive</span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="team-muted">View only</span>
-                      )}
-                    </td>
+            <button
+              type="button"
+              className="team-action-btn team-action-btn-danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                openInactivateModal(team);
+              }}
+            >
+              Inactivate
+            </button>
+          </>
+        ) : (
+          <span className="team-muted">Inactive</span>
+        )}
+      </div>
+    ) : (
+      <span className="team-muted">View only</span>
+    )}
+  </td>
+)}
                   </tr>
                   );
                 })}
@@ -530,6 +566,117 @@ const TeamManagement: React.FC = () => {
         onClose={() => setEditingTeam(null)}
         onSaved={loadTeams}
       />
+
+      {isHr && selectedDetailTeam && (
+        <div className="team-modal-overlay" onClick={closeTeamDetail}>
+          <div
+            className="team-modal team-modal-wide"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="team-modal-header">
+              <div>
+                <p className="team-eyebrow">Team Details</p>
+                <h2>{selectedDetailTeam.teamName}</h2>
+              </div>
+
+              <button
+                type="button"
+                className="team-modal-close"
+                onClick={closeTeamDetail}
+                aria-label="Close team detail"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="team-modal-body">
+              <div className="team-detail-grid">
+                <div>
+                  <span>Team</span>
+                  <strong>{selectedDetailTeam.teamName || '—'}</strong>
+                </div>
+
+                <div>
+                  <span>Department</span>
+                  <strong>{selectedDetailTeam.departmentName || '—'}</strong>
+                </div>
+
+                <div>
+                  <span>Status</span>
+                  <strong>{selectedDetailTeam.status || '—'}</strong>
+                </div>
+
+                <div>
+                  <span>Created</span>
+                  <strong>{formatDate(selectedDetailTeam.createdDate)}</strong>
+                </div>
+
+                <div>
+                  <span>Team Leader</span>
+                  <strong>{selectedDetailTeam.teamLeaderName || '—'}</strong>
+                </div>
+
+                <div>
+                  <span>Project Manager</span>
+                  <strong>{selectedDetailTeam.projectManagerName || '—'}</strong>
+                </div>
+
+                <div>
+                  <span>Members</span>
+                  <strong>{activeMembers(selectedDetailTeam).length}</strong>
+                </div>
+
+                <div>
+                  <span>Created By</span>
+                  <strong>{selectedDetailTeam.createdByName || '—'}</strong>
+                </div>
+              </div>
+
+              <div className="team-detail-section">
+                <h3>Team Goal</h3>
+                <p>{selectedDetailTeam.teamGoal || 'No team goal recorded.'}</p>
+              </div>
+
+              {selectedDetailTeam.projectManagerTeams && (
+                <div className="team-detail-section">
+                  <h3>Other Teams Managed by Project Manager</h3>
+                  <p>{selectedDetailTeam.projectManagerTeams}</p>
+                </div>
+              )}
+
+              <div className="team-detail-section">
+                <h3>Team Members</h3>
+
+                {activeMembers(selectedDetailTeam).length === 0 ? (
+                  <p>No active members in this team.</p>
+                ) : (
+                  <div className="team-detail-member-list">
+                    {activeMembers(selectedDetailTeam).map((member, index) => (
+                      <div
+                        key={`${member.userId ?? member.employeeId ?? index}-${index}`}
+                        className="team-detail-member-card"
+                      >
+                        <strong>{memberName(member)}</strong>
+                        <span>Started: {memberStartedDate(member)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="team-modal-footer">
+                <button
+                  type="button"
+                  className="team-btn team-btn-secondary"
+                  onClick={closeTeamDetail}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {inactivatingTeam && (
         <div className="team-modal-overlay" onClick={closeInactivateModal}>

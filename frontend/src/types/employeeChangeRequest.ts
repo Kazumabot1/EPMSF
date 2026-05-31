@@ -88,6 +88,9 @@ export type WorkforceEmployee = {
   positionId?: number;
   positionTitle?: string;
   positionName?: string;
+  roleName?: string;
+  role?: string;
+  dashboard?: string;
 
   currentDepartmentId?: number;
   departmentId?: number;

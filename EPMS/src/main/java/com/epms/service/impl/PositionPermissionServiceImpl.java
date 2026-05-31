@@ -211,10 +211,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
             case "teamPermission" -> safe(pp.getTeamView())
                     || safe(pp.getTeamCreate())
                     || safe(pp.getTeamEdit())
-                    || safe(pp.getTeamHistory())
-                    || safe(pp.getTeamAssignAsLeader())
-                    || safe(pp.getTeamAssignAsPm())
-                    || safe(pp.getTeamAssignAsMember());
+                    || safe(pp.getTeamHistory());
             case "organizationPermission" -> safe(pp.getDepartmentCrud())
                     || safe(pp.getDepartmentComparisonView())
                     || safe(pp.getEmployeeCrud())
@@ -237,10 +234,8 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     || safe(pp.getKpiScore())
                     || safe(pp.getKpiView())
                     || safe(pp.getKpiInput());
-            case "departmentKpiPermission" -> safe(pp.getKpiCreate())
-                    || safe(pp.getKpiEdit())
-                    || safe(pp.getKpiScore())
-                    || safe(pp.getKpiView());
+
+
             case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate())
                     || safe(pp.getOneOnOneDeptSelection())
                     || safe(pp.getOneOnOneTeamSelection());
@@ -257,7 +252,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
             case "teamHistory" -> safe(pp.getTeamHistory());
             case "teamView" -> safe(pp.getTeamView());
             case "teamAssignAsLeader" -> safe(pp.getTeamAssignAsLeader());
-            case "teamAssignAsPm" -> safe(pp.getTeamAssignAsPm());
+            case "teamAssignAsPm" -> false;
             case "teamAssignAsMember" -> safe(pp.getTeamAssignAsMember());
 
             case "pipCreate" -> safe(pp.getPipCreate());
@@ -312,7 +307,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .oneOnOnePermission(hasPermission(pp, "oneOnOnePermission"))
                 .positionPermission(hasPermission(pp, "positionPermission"))
                 .kpiPermission(hasPermission(pp, "kpiPermission"))
-                .departmentKpiPermission(hasPermission(pp, "departmentKpiPermission"))
+
                 .assessmentScoresView(hasPermission(pp, "assessmentScoresView"))
                 .assessmentFormCreate(hasPermission(pp, "assessmentFormCreate"))
 
@@ -325,7 +320,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .teamHistory(safe(pp.getTeamHistory()))
                 .teamView(safe(pp.getTeamView()))
                 .teamAssignAsLeader(safe(pp.getTeamAssignAsLeader()))
-                .teamAssignAsPm(safe(pp.getTeamAssignAsPm()))
+                .teamAssignAsPm(false)
                 .teamAssignAsMember(safe(pp.getTeamAssignAsMember()))
 
                 .pipCreate(safe(pp.getPipCreate()))
@@ -374,7 +369,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
         pp.setTeamHistory(safe(safeDto.getTeamHistory()));
         pp.setTeamView(safe(safeDto.getTeamView()));
         pp.setTeamAssignAsLeader(safe(safeDto.getTeamAssignAsLeader()));
-        pp.setTeamAssignAsPm(safe(safeDto.getTeamAssignAsPm()));
+        pp.setTeamAssignAsPm(false);
         pp.setTeamAssignAsMember(safe(safeDto.getTeamAssignAsMember()));
 
         pp.setPipCreate(safe(safeDto.getPipCreate()));
@@ -512,24 +507,17 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
         }
 
         boolean leader = safe(dto.getTeamAssignAsLeader());
-        boolean pm = safe(dto.getTeamAssignAsPm());
         boolean member = safe(dto.getTeamAssignAsMember());
 
-        if (leader) {
-            dto.setTeamAssignAsPm(false);
-            dto.setTeamAssignAsMember(false);
-            return;
-        }
+        dto.setTeamAssignAsPm(false);
 
-        if (pm) {
-            dto.setTeamAssignAsLeader(false);
+        if (leader) {
             dto.setTeamAssignAsMember(false);
             return;
         }
 
         if (member) {
             dto.setTeamAssignAsLeader(false);
-            dto.setTeamAssignAsPm(false);
         }
     }
 

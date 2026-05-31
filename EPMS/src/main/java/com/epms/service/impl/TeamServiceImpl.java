@@ -5,6 +5,8 @@ import com.epms.dto.TeamHistoryResponseDto;
 import com.epms.dto.TeamRequestDto;
 import com.epms.dto.TeamResponseDto;
 import com.epms.entity.Department;
+import com.epms.entity.Employee;
+import com.epms.entity.Position;
 import com.epms.entity.PositionPermission;
 import com.epms.entity.Role;
 import com.epms.entity.Team;
@@ -17,6 +19,7 @@ import com.epms.exception.ResourceNotFoundException;
 import com.epms.notification.NotificationEventKey;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
+import com.epms.repository.EmployeeRepository;
 import com.epms.repository.RoleRepository;
 import com.epms.repository.TeamHistoryRepository;
 import com.epms.repository.TeamMemberRepository;
@@ -54,6 +57,7 @@ public class TeamServiceImpl implements TeamService {
     private final TeamRepository teamRepository;
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final TeamHistoryRepository teamHistoryRepository;
@@ -98,7 +102,7 @@ public class TeamServiceImpl implements TeamService {
         User teamLeader = getActiveUserOrThrow(request.getTeamLeaderId(), "Team Leader");
         User projectManager = resolveProjectManager(request.getProjectManagerId(), department, teamLeader);
 
-        validateTeamLeaderPermission(teamLeader);
+        validateTeamLeaderPermission(teamLeader, null);
         validateUserInWorkingDepartment(teamLeader, department.getId(), "Team Leader");
         validateTeamLeaderAvailability(teamLeader, null);
 
@@ -200,7 +204,7 @@ public class TeamServiceImpl implements TeamService {
                 newLeader
         );
 
-        validateTeamLeaderPermission(newLeader);
+        validateTeamLeaderPermission(newLeader, team.getId());
         validateUserInWorkingDepartment(newLeader, department.getId(), "Team Leader");
         validateTeamLeaderAvailability(newLeader, team.getId());
 
@@ -374,12 +378,14 @@ public class TeamServiceImpl implements TeamService {
                 .filter(this::isTeamLeaderCandidate)
                 .map(user -> {
                     Team activeLeaderTeam = getFirstActiveLeaderTeam(user.getId());
-                    boolean available = activeLeaderTeam == null;
+                    Team activeMemberTeam = getFirstActiveMemberTeam(user.getId());
+                    Team activeTeam = activeLeaderTeam != null ? activeLeaderTeam : activeMemberTeam;
+                    boolean available = activeTeam == null;
 
                     CandidateResponseDto dto = toCandidate(user, "Team Leader", available);
-                    dto.setCurrentTeamId(activeLeaderTeam != null ? activeLeaderTeam.getId() : null);
-                    dto.setCurrentTeamName(activeLeaderTeam != null ? activeLeaderTeam.getTeamName() : null);
-                    dto.setCurrentTeamNames(activeLeaderTeam != null ? activeLeaderTeam.getTeamName() : null);
+                    dto.setCurrentTeamId(activeTeam != null ? activeTeam.getId() : null);
+                    dto.setCurrentTeamName(activeTeam != null ? activeTeam.getTeamName() : null);
+                    dto.setCurrentTeamNames(activeTeam != null ? activeTeam.getTeamName() : null);
                     return dto;
                 })
                 .sorted(candidateComparator())
@@ -396,13 +402,15 @@ public class TeamServiceImpl implements TeamService {
                 .filter(user -> !isBlockedTeamCandidate(user))
                 .filter(this::isTeamMemberCandidate)
                 .map(user -> {
+                    Team activeLeaderTeam = getFirstActiveLeaderTeam(user.getId());
                     Team activeMemberTeam = getFirstActiveMemberTeam(user.getId());
-                    boolean available = activeMemberTeam == null;
+                    Team activeTeam = activeLeaderTeam != null ? activeLeaderTeam : activeMemberTeam;
+                    boolean available = activeTeam == null;
 
                     CandidateResponseDto dto = toCandidate(user, "Member", available);
-                    dto.setCurrentTeamId(activeMemberTeam != null ? activeMemberTeam.getId() : null);
-                    dto.setCurrentTeamName(activeMemberTeam != null ? activeMemberTeam.getTeamName() : null);
-                    dto.setCurrentTeamNames(activeMemberTeam != null ? activeMemberTeam.getTeamName() : null);
+                    dto.setCurrentTeamId(activeTeam != null ? activeTeam.getId() : null);
+                    dto.setCurrentTeamName(activeTeam != null ? activeTeam.getTeamName() : null);
+                    dto.setCurrentTeamNames(activeTeam != null ? activeTeam.getTeamName() : null);
 
                     return dto;
                 })
@@ -588,6 +596,10 @@ public class TeamServiceImpl implements TeamService {
             throw new BusinessValidationException("Team Leader is required.");
         }
 
+        if (request.getProjectManagerId() == null) {
+            throw new BusinessValidationException("Project Manager is required.");
+        }
+
         if (safeIds(request.getEffectiveMemberUserIds()).isEmpty()) {
             throw new BusinessValidationException("At least one Team Member is required.");
         }
@@ -606,6 +618,10 @@ public class TeamServiceImpl implements TeamService {
 
         if (request.getTeamLeaderId() == null) {
             throw new BusinessValidationException("Team Leader is required.");
+        }
+
+        if (request.getProjectManagerId() == null) {
+            throw new BusinessValidationException("Project Manager is required.");
         }
 
         String status = cleanStatus(request.getStatus());
@@ -649,7 +665,7 @@ public class TeamServiceImpl implements TeamService {
 
     private User resolveProjectManager(Integer projectManagerId, Department department, User teamLeader) {
         if (projectManagerId == null) {
-            return null;
+            throw new BusinessValidationException("Project Manager is required.");
         }
 
         User projectManager = getActiveUserOrThrow(projectManagerId, "Project Manager");
@@ -661,7 +677,7 @@ public class TeamServiceImpl implements TeamService {
         }
 
         if (!isProjectManagerCandidate(projectManager)) {
-            throw new BusinessValidationException("Selected Project Manager must have a Manager or Project Manager position.");
+            throw new BusinessValidationException("Selected Project Manager must have the MANAGER role.");
         }
 
         validateUserInWorkingDepartment(projectManager, department.getId(), "Project Manager");
@@ -700,6 +716,19 @@ public class TeamServiceImpl implements TeamService {
                 throw new BusinessValidationException("Project Manager cannot be selected as a normal member.");
             }
 
+            boolean existingMemberInThisTeam = currentTeamId != null
+                    && existingMemberIds != null
+                    && existingMemberIds.contains(memberId);
+
+            Team activeLeaderTeam = getFirstActiveLeaderTeam(memberId);
+            if (activeLeaderTeam != null
+                    && (currentTeamId == null || !Objects.equals(activeLeaderTeam.getId(), currentTeamId))) {
+                throw new BusinessValidationException(
+                        "Selected Team member is already assigned as Team Leader in active team: "
+                                + nullToEmpty(activeLeaderTeam.getTeamName())
+                );
+            }
+
             Team activeMemberTeam = getFirstActiveMemberTeam(memberId);
             if (activeMemberTeam != null
                     && (currentTeamId == null || !Objects.equals(activeMemberTeam.getId(), currentTeamId))) {
@@ -713,19 +742,32 @@ public class TeamServiceImpl implements TeamService {
 
             assertAssignableTeamUser(member, "Team member");
 
-            if (!isTeamMemberCandidate(member)) {
-                throw new BusinessValidationException("Selected Team member cannot be a Team Leader, Manager, Project Manager, or Department Head.");
+            if (!existingMemberInThisTeam && !isTeamMemberCandidate(member)) {
+                throw new BusinessValidationException("Selected Team member must be an EMPLOYEE with Can be Team Member eligibility.");
             }
 
             validateUserInWorkingDepartment(member, department.getId(), "Team member");
         }
     }
 
-    private void validateTeamLeaderPermission(User teamLeader) {
+    private void validateTeamLeaderPermission(User teamLeader, Integer currentTeamId) {
         assertAssignableTeamUser(teamLeader, "Team Leader");
 
+        boolean currentLeaderInThisTeam = currentTeamId != null
+                && teamLeader != null
+                && teamLeader.getId() != null
+                && teamRepository.findById(currentTeamId)
+                .map(Team::getTeamLeader)
+                .map(User::getId)
+                .map(id -> Objects.equals(id, teamLeader.getId()))
+                .orElse(false);
+
+        if (currentLeaderInThisTeam) {
+            return;
+        }
+
         if (!isTeamLeaderCandidate(teamLeader)) {
-            throw new BusinessValidationException("Selected Team Leader must have a Team Leader position.");
+            throw new BusinessValidationException("Selected Team Leader must be an EMPLOYEE with Can be Team Leader eligibility.");
         }
     }
 
@@ -734,20 +776,22 @@ public class TeamServiceImpl implements TeamService {
             throw new BusinessValidationException("Team Leader is required.");
         }
 
-        List<Team> activeLeaderTeams = teamRepository
-                .findByTeamLeaderIdAndStatusIgnoreCase(teamLeader.getId(), "Active");
+        Team activeLeaderTeam = getFirstActiveLeaderTeam(teamLeader.getId());
+        if (activeLeaderTeam != null
+                && (currentTeamId == null || !Objects.equals(activeLeaderTeam.getId(), currentTeamId))) {
+            throw new BusinessValidationException(
+                    "Selected Team Leader is already leading active team: "
+                            + nullToEmpty(activeLeaderTeam.getTeamName())
+            );
+        }
 
-        for (Team activeTeam : activeLeaderTeams) {
-            if (activeTeam == null || activeTeam.getId() == null) {
-                continue;
-            }
-
-            if (currentTeamId == null || !Objects.equals(activeTeam.getId(), currentTeamId)) {
-                throw new BusinessValidationException(
-                        "Selected Team Leader is already leading active team: "
-                                + nullToEmpty(activeTeam.getTeamName())
-                );
-            }
+        Team activeMemberTeam = getFirstActiveMemberTeam(teamLeader.getId());
+        if (activeMemberTeam != null
+                && (currentTeamId == null || !Objects.equals(activeMemberTeam.getId(), currentTeamId))) {
+            throw new BusinessValidationException(
+                    "Selected Team Leader is already assigned as member in active team: "
+                            + nullToEmpty(activeMemberTeam.getTeamName())
+            );
         }
     }
 
@@ -947,11 +991,8 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private boolean isTeamLeaderCandidate(User user) {
-        if (isBlockedTeamCandidate(user)) {
-            return false;
-        }
-
-        return isTeamLeaderPosition(user) || hasPositionPermission(user, "teamAssignAsLeader");
+        return isEmployeeTeamCandidate(user)
+                && hasPositionPermission(user, "teamAssignAsLeader");
     }
 
     private boolean isProjectManagerCandidate(User user) {
@@ -959,26 +1000,29 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return isProjectManagerPosition(user) || hasPositionPermission(user, "teamAssignAsPm");
+        return hasRole(user, "MANAGER");
     }
 
     private boolean isTeamMemberCandidate(User user) {
+        return isEmployeeTeamCandidate(user)
+                && hasPositionPermission(user, "teamAssignAsMember");
+    }
+
+    private boolean isEmployeeTeamCandidate(User user) {
         if (isBlockedTeamCandidate(user)) {
             return false;
         }
 
-        if (isTeamLeaderPosition(user)
-                || isProjectManagerPosition(user)
-                || hasPositionPermission(user, "teamAssignAsLeader")
-                || hasPositionPermission(user, "teamAssignAsPm")) {
-            return false;
-        }
-
-        if (hasPositionPermission(user, "teamAssignAsMember")) {
-            return true;
-        }
-
-        return true;
+        return hasRole(user, "EMPLOYEE")
+                && !hasRole(user, "MANAGER")
+                && !hasRole(user, "PROJECT_MANAGER")
+                && !hasRole(user, "PM")
+                && !hasRole(user, "HR")
+                && !hasRole(user, "HRADMIN")
+                && !hasRole(user, "ADMIN")
+                && !hasRole(user, "CEO")
+                && !hasRole(user, "EXECUTIVE")
+                && !isDepartmentHeadUser(user);
     }
 
     private boolean hasPositionPermission(User user, String permissionField) {
@@ -993,8 +1037,8 @@ public class TeamServiceImpl implements TeamService {
         }
 
         return switch (permissionField) {
-            case "teamAssignAsLeader", "teamAssignAsPm", "teamAssignAsMember" ->
-                    permissionField.equals(resolveTeamAssignmentPermission(permissions));
+            case "teamAssignAsLeader" -> Boolean.TRUE.equals(permissions.getTeamAssignAsLeader());
+            case "teamAssignAsMember" -> Boolean.TRUE.equals(permissions.getTeamAssignAsMember());
             default -> false;
         };
     }
@@ -1042,15 +1086,39 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private PositionPermission getPositionPermissions(User user) {
-        if (user == null || user.getPosition() == null) {
+        Position position = resolvePosition(user);
+
+        if (position == null) {
             return null;
         }
 
         try {
-            return user.getPosition().getPermissions();
+            return position.getPermissions();
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private Position resolvePosition(User user) {
+        if (user == null) {
+            return null;
+        }
+
+        if (user.getEmployeeId() != null) {
+            try {
+                Position employeePosition = employeeRepository.findById(user.getEmployeeId())
+                        .map(Employee::getPosition)
+                        .orElse(null);
+
+                if (employeePosition != null) {
+                    return employeePosition;
+                }
+            } catch (Exception ignored) {
+                // Fallback to the user-position link below.
+            }
+        }
+
+        return user.getPosition();
     }
 
     private String resolveTeamAssignmentPermission(PositionPermission permissions) {
@@ -1060,10 +1128,6 @@ public class TeamServiceImpl implements TeamService {
 
         if (Boolean.TRUE.equals(permissions.getTeamAssignAsLeader())) {
             return "teamAssignAsLeader";
-        }
-
-        if (Boolean.TRUE.equals(permissions.getTeamAssignAsPm())) {
-            return "teamAssignAsPm";
         }
 
         if (Boolean.TRUE.equals(permissions.getTeamAssignAsMember())) {
@@ -1093,14 +1157,13 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private boolean hasPositionTitle(User user, String expectedTitle) {
-        if (user == null
-                || user.getPosition() == null
-                || user.getPosition().getPositionTitle() == null
-                || expectedTitle == null) {
+        Position position = resolvePosition(user);
+
+        if (position == null || position.getPositionTitle() == null || expectedTitle == null) {
             return false;
         }
 
-        String actual = normalizeRole(user.getPosition().getPositionTitle());
+        String actual = normalizeRole(position.getPositionTitle());
         String expected = normalizeRole(expectedTitle);
 
         return actual.equals(expected) || actual.endsWith(expected);
@@ -1124,13 +1187,13 @@ public class TeamServiceImpl implements TeamService {
     }
 
     private String normalizedPositionTitle(User user) {
-        if (user == null
-                || user.getPosition() == null
-                || user.getPosition().getPositionTitle() == null) {
+        Position position = resolvePosition(user);
+
+        if (position == null || position.getPositionTitle() == null) {
             return "";
         }
 
-        return normalizeRole(user.getPosition().getPositionTitle());
+        return normalizeRole(position.getPositionTitle());
     }
 
     private boolean hasRole(User user, String roleName) {
@@ -1139,11 +1202,12 @@ public class TeamServiceImpl implements TeamService {
         }
 
         String expected = normalizeRole(roleName);
+        Position position = resolvePosition(user);
 
-        if (user.getPosition() != null
-                && user.getPosition().getRole() != null
-                && user.getPosition().getRole().getName() != null
-                && expected.equals(normalizeRole(user.getPosition().getRole().getName()))) {
+        if (position != null
+                && position.getRole() != null
+                && position.getRole().getName() != null
+                && expected.equals(normalizeRole(position.getRole().getName()))) {
             return true;
         }
 

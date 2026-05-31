@@ -441,7 +441,7 @@ const CeoDashboard = () => {
 
         <button
           type="button"
-          onClick={() => navigate('/executive/approval/department-kpi')}
+
           style={{
             border: '1px solid #bfdbfe',
             background: '#fff',
@@ -477,7 +477,7 @@ const CeoDashboard = () => {
               marginBottom: 6,
             }}
           >
-            Department KPI Approval
+
           </strong>
 
           <small

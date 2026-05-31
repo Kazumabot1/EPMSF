@@ -8,19 +8,19 @@ export interface PositionPermission {
   oneOnOnePermission: boolean;
   positionPermission: boolean;
   kpiPermission: boolean;
-  departmentKpiPermission: boolean;
+
   assessmentScoresView: boolean;
   assessmentFormCreate: boolean;
 
   oneOnOneCreate: boolean;
   oneOnOneDeptSelection: boolean;
   oneOnOneTeamSelection: boolean;
+
   teamCreate: boolean;
   teamEdit: boolean;
   teamHistory: boolean;
   teamView: boolean;
   teamAssignAsLeader: boolean;
-  teamAssignAsPm: boolean;
   teamAssignAsMember: boolean;
   pipCreate: boolean;
   pipEdit: boolean;

@@ -13,8 +13,7 @@ import type {
 import '../position/position-ui.css';
 
 type PermissionField = keyof PositionPermission;
-type TeamAssignmentMode = 'none' | 'teamAssignAsLeader' | 'teamAssignAsPm' | 'teamAssignAsMember';
-
+type TeamAssignmentMode = 'none' | 'teamAssignAsLeader' | 'teamAssignAsMember';
 type PermissionItem = {
   key: PermissionField;
   label: string;
@@ -111,6 +110,7 @@ const allGroups: PermissionGroup[] = [
   },
 ];
 
+
 const allowedByRole: Record<string, PermissionField[]> = {
   HR: [
     'oneOnOneCreate', 'oneOnOneDeptSelection',
@@ -135,15 +135,19 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'kpiInput', 'kpiScore',
     'selfAssessmentSign', 'continuousFeedbackGive', 'feedbackSend',
   ],
+
+  /**
+   * Employee positions use position permission only for team assignment eligibility.
+   * They should not expose normal feature toggles here.
+   */
   EMPLOYEE: [
-    'teamView', 'teamAssignAsLeader', 'teamAssignAsMember',
-    'oneOnOneCreate', 'appraisalView', 'kpiView',
-    'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentSign',
-    'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
+    'teamAssignAsLeader',
+    'teamAssignAsMember',
   ],
+
   ADMIN: [
     'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
-    'teamView', 'teamCreate', 'teamEdit', 'teamHistory', 'teamAssignAsLeader', 'teamAssignAsPm', 'teamAssignAsMember',
+    'teamView', 'teamCreate', 'teamEdit', 'teamHistory',
     'pipViewAll', 'pipCreate', 'pipEdit',
     'appraisalView', 'appraisalReview', 'appraisalApprove', 'appraisalScoreInput', 'appraisalSign',
     'kpiView', 'kpiCreate', 'kpiEdit', 'kpiInput', 'kpiScore',
@@ -151,18 +155,39 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'feedbackFormCreate', 'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
     'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
   ],
-  CEO: ['appraisalView', 'departmentComparisonView', 'kpiView'],
+  HRADMIN: [
+    'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
+    'teamView', 'teamCreate', 'teamEdit', 'teamHistory',
+    'pipViewAll', 'pipCreate', 'pipEdit',
+    'appraisalView', 'appraisalReview', 'appraisalApprove', 'appraisalScoreInput', 'appraisalSign',
+    'kpiView', 'kpiCreate', 'kpiEdit', 'kpiInput', 'kpiScore',
+    'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentLock', 'selfAssessmentSign',
+    'feedbackFormCreate', 'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
+    'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
+  ],
 };
+
 
 const teamAssignmentOptions: Array<{
   value: TeamAssignmentMode;
   label: string;
   helper: string;
 }> = [
-  { value: 'none', label: 'No team assignment eligibility', helper: 'This position will not appear in team assignment selectors.' },
-  { value: 'teamAssignAsLeader', label: 'Can be Team Leader', helper: 'This position can be selected as Team Leader.' },
-  { value: 'teamAssignAsPm', label: 'Legacy PM flag', helper: 'Kept only for old data; new PM selector uses MANAGER role.' },
-  { value: 'teamAssignAsMember', label: 'Can be Team Member', helper: 'This position can be selected as a normal member.' },
+  {
+    value: 'none',
+    label: 'No team assignment eligibility',
+    helper: 'Employees with this position will not appear in Team Leader or Member selection.',
+  },
+  {
+    value: 'teamAssignAsLeader',
+    label: 'Can be Team Leader',
+    helper: 'Employees with this position can be selected only as Team Leader.',
+  },
+  {
+    value: 'teamAssignAsMember',
+    label: 'Can be Team Member',
+    helper: 'Employees with this position can be selected only as normal Team Members.',
+  },
 ];
 
 const normalizeRoleName = (role?: string | null) =>
@@ -180,6 +205,12 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 };
 
+const isPermissionManagedPosition = (position: PositionResponse) => {
+  const role = normalizeRoleName(position.roleName);
+
+  return role !== 'CEO' && role !== 'EXECUTIVE';
+};
+
 const normalizeColumnName = (value?: string | null) =>
   String(value ?? '')
     .split('_')
@@ -195,7 +226,6 @@ const valueBadge = (value?: string | null) => {
 
 const getTeamAssignmentMode = (permission: PositionPermission): TeamAssignmentMode => {
   if (permission.teamAssignAsLeader) return 'teamAssignAsLeader';
-  if (permission.teamAssignAsPm) return 'teamAssignAsPm';
   if (permission.teamAssignAsMember) return 'teamAssignAsMember';
   return 'none';
 };
@@ -206,7 +236,6 @@ const buildTeamAssignmentPermission = (
 ): PositionPermission => ({
   ...previous,
   teamAssignAsLeader: mode === 'teamAssignAsLeader',
-  teamAssignAsPm: mode === 'teamAssignAsPm',
   teamAssignAsMember: mode === 'teamAssignAsMember',
 });
 
@@ -243,6 +272,7 @@ const PositionPermissions = () => {
     [roleKey],
   );
 
+
   const visibleGroups = useMemo(
     () => allGroups
       .map((group) => ({ ...group, items: group.items.filter((item) => allowedFields.has(item.key)) }))
@@ -266,21 +296,28 @@ const PositionPermissions = () => {
     [permissions, originalPermissions],
   );
 
-  const loadPositions = async () => {
-    setLoading(true);
-    setMessage('');
-    setIsError(false);
-    try {
-      const data = await positionService.getPositions();
-      setPositions(data);
-      setSelectedPositionId((prev) => (prev && data.some((item) => item.id === prev) ? prev : data[0]?.id ?? null));
-    } catch (error) {
-      setIsError(true);
-      setMessage(error instanceof Error ? error.message : 'Failed to load positions.');
-    } finally {
-      setLoading(false);
-    }
-  };
+const loadPositions = async () => {
+  setLoading(true);
+  setMessage('');
+  setIsError(false);
+
+  try {
+    const data = await positionService.getPositions();
+    const managedPositions = data.filter(isPermissionManagedPosition);
+
+    setPositions(managedPositions);
+    setSelectedPositionId((prev) =>
+      prev && managedPositions.some((item) => item.id === prev)
+        ? prev
+        : managedPositions[0]?.id ?? null,
+    );
+  } catch (error) {
+    setIsError(true);
+    setMessage(error instanceof Error ? error.message : 'Failed to load positions.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const loadPositionAccess = async (positionId: number) => {
     setMessage('');
@@ -436,7 +473,7 @@ const PositionPermissions = () => {
                   </div>
                 </div>
 
-                {allowedFields.has('teamAssignAsLeader') || allowedFields.has('teamAssignAsPm') || allowedFields.has('teamAssignAsMember') ? (
+{allowedFields.has('teamAssignAsLeader') || allowedFields.has('teamAssignAsMember') ? (
                   <div className="position-surface" style={{ margin: '0 0 18px' }}>
                     <div className="position-surface-inner">
                       <div className="position-detail-section-title" style={{ marginBottom: 16 }}>

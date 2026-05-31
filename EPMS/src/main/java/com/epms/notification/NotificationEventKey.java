@@ -11,9 +11,7 @@ public final class NotificationEventKey {
     public static final String KPI_CYCLE_WRAP_UP = "KPI_CYCLE_WRAP_UP";
     public static final String KPI_RESULT_FINALIZED = "KPI_RESULT_FINALIZED";
     public static final String KPI_HR_SUMMARY = "KPI_HR_SUMMARY";
-    public static final String DEPARTMENT_KPI_APPROVAL_REQUESTED = "DEPARTMENT_KPI_APPROVAL_REQUESTED";
-    public static final String DEPARTMENT_KPI_APPROVAL_DECIDED = "DEPARTMENT_KPI_APPROVAL_DECIDED";
-    public static final String DEPARTMENT_KPI_FINALIZED = "DEPARTMENT_KPI_FINALIZED";
+
 
     public static final String APPRAISAL_CYCLE_ACTIVATED = "APPRAISAL_CYCLE_ACTIVATED";
     public static final String APPRAISAL_CYCLE_DEACTIVATED = "APPRAISAL_CYCLE_DEACTIVATED";

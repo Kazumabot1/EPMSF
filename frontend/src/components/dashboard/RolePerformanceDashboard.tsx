@@ -272,7 +272,7 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
       { icon: 'bi-upload', title: 'Import Employees', description: 'Bulk employee import', to: '/admin/employee/import' },
       { icon: 'bi-shield-check', title: 'Permissions', description: 'Position permissions', to: '/position-permissions' },
       { icon: 'bi-bullseye', title: 'KPI Approval', description: 'Approve KPI cycles', to: '/admin/approval/kpi' },
-      { icon: 'bi-building-check', title: 'Department KPI Approval', description: 'Approve department KPI', to: '/admin/approval/department-kpi' },
+
       { icon: 'bi-journal-text', title: 'Audit Logs', description: 'System activity', to: '/admin/audit-logs' },
     ];
   }
@@ -292,7 +292,7 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
       { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review' },
       { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review' },
       { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary' },
-      { icon: 'bi-bullseye', title: 'Department KPIs', description: 'Department KPI results', to: '/department-head/department-kpis' },
+
       { icon: 'bi-graph-up', title: 'Reports', description: 'Scoped reports', to: '/department-head/reports/performance' },
     ];
   }

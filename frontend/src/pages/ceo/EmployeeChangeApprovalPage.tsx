@@ -83,7 +83,7 @@ const EmployeeChangeApprovalPage = () => {
     setIsError(false);
 
     try {
-      const data = await employeeChangeRequestService.getCeoPendingRequests();
+      const data = await employeeChangeRequestService.getHrAdminPendingRequests();
       setRequests(data);
     } catch (error) {
       setIsError(true);
@@ -103,7 +103,7 @@ const EmployeeChangeApprovalPage = () => {
     setIsError(false);
 
     try {
-      const data = await employeeChangeRequestService.getCeoDetail(request.id);
+      const data = await employeeChangeRequestService.getHrAdminDetail(request.id);
       setDetail(data);
     } catch (error) {
       setIsError(true);
@@ -137,10 +137,10 @@ const EmployeeChangeApprovalPage = () => {
 
     try {
       if (reviewAction === 'APPROVE') {
-        await employeeChangeRequestService.approveByCeo(selectedRequest.id, reason.trim());
+        await employeeChangeRequestService.approveByHrAdmin(selectedRequest.id, reason.trim());
         setMessage('Workforce change approved and applied.');
       } else {
-        await employeeChangeRequestService.rejectByCeo(selectedRequest.id, reason.trim());
+        await employeeChangeRequestService.rejectByHrAdmin(selectedRequest.id, reason.trim());
         setMessage('Workforce change rejected.');
       }
 
@@ -169,11 +169,10 @@ const EmployeeChangeApprovalPage = () => {
                 Approval
               </p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                Changes Approval
+                Workforce Change Approval
               </h1>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                Review HR-submitted position and department change requests. Approved requests are applied immediately.
-              </p>
+Review HR-submitted position and department change requests. Approved requests are applied immediately by HR Admin.              </p>
             </div>
 
             <button

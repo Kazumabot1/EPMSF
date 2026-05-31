@@ -26,12 +26,12 @@ public class EmployeeChangeRequestController {
         );
     }
 
-    @GetMapping("/ceo/pending")
-    public ResponseEntity<GenericApiResponse<List<EmployeeChangeRequestDtos.SummaryResponse>>> getPendingForCeo() {
+    @GetMapping("/hradmin/pending")
+    public ResponseEntity<GenericApiResponse<List<EmployeeChangeRequestDtos.SummaryResponse>>> getPendingForHrAdmin() {
         return ResponseEntity.ok(
                 GenericApiResponse.success(
                         "Pending employee change requests fetched",
-                        employeeChangeRequestService.getPendingForCeo()
+                        employeeChangeRequestService.getPendingForHrAdmin()
                 )
         );
     }
@@ -48,8 +48,8 @@ public class EmployeeChangeRequestController {
         );
     }
 
-    @GetMapping("/ceo/{requestId}")
-    public ResponseEntity<GenericApiResponse<EmployeeChangeRequestDtos.DetailResponse>> getCeoDetail(
+    @GetMapping("/hradmin/{requestId}")
+    public ResponseEntity<GenericApiResponse<EmployeeChangeRequestDtos.DetailResponse>> getHrAdminDetail(
             @PathVariable Long requestId
     ) {
         return ResponseEntity.ok(
@@ -66,7 +66,7 @@ public class EmployeeChangeRequestController {
     ) {
         return ResponseEntity.ok(
                 GenericApiResponse.success(
-                        "Position change request submitted for CEO approval",
+                        "Position change request submitted for HR Admin approval",
                         employeeChangeRequestService.createPositionChangeRequest(request)
                 )
         );
@@ -78,34 +78,34 @@ public class EmployeeChangeRequestController {
     ) {
         return ResponseEntity.ok(
                 GenericApiResponse.success(
-                        "Department change request submitted for CEO approval",
+                        "Department change request submitted for HR Admin approval",
                         employeeChangeRequestService.createDepartmentChangeRequest(request)
                 )
         );
     }
 
-    @PostMapping("/ceo/{requestId}/approve")
-    public ResponseEntity<GenericApiResponse<EmployeeChangeRequestDtos.SummaryResponse>> approveByCeo(
+    @PostMapping("/hradmin/{requestId}/approve")
+    public ResponseEntity<GenericApiResponse<EmployeeChangeRequestDtos.SummaryResponse>> approveByHrAdmin(
             @PathVariable Long requestId,
             @RequestBody EmployeeChangeRequestDtos.ReviewRequest request
     ) {
         return ResponseEntity.ok(
                 GenericApiResponse.success(
                         "Employee change request approved and applied",
-                        employeeChangeRequestService.approveByCeo(requestId, request)
+                        employeeChangeRequestService.approveByHrAdmin(requestId, request)
                 )
         );
     }
 
-    @PostMapping("/ceo/{requestId}/reject")
-    public ResponseEntity<GenericApiResponse<EmployeeChangeRequestDtos.SummaryResponse>> rejectByCeo(
+    @PostMapping("/hradmin/{requestId}/reject")
+    public ResponseEntity<GenericApiResponse<EmployeeChangeRequestDtos.SummaryResponse>> rejectByHrAdmin(
             @PathVariable Long requestId,
             @RequestBody EmployeeChangeRequestDtos.ReviewRequest request
     ) {
         return ResponseEntity.ok(
                 GenericApiResponse.success(
                         "Employee change request rejected",
-                        employeeChangeRequestService.rejectByCeo(requestId, request)
+                        employeeChangeRequestService.rejectByHrAdmin(requestId, request)
                 )
         );
     }
@@ -121,6 +121,4 @@ public class EmployeeChangeRequestController {
                 )
         );
     }
-
-
 }

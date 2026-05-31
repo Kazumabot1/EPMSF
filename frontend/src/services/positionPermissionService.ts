@@ -23,9 +23,8 @@ export const POSITION_PERMISSION_FIELDS: Array<keyof PositionPermission> = [
   'teamEdit',
   'teamHistory',
   'teamView',
-  'teamAssignAsLeader',
-  'teamAssignAsPm',
-  'teamAssignAsMember',
+'teamAssignAsLeader',
+'teamAssignAsMember',
 
   'pipCreate',
   'pipEdit',
@@ -105,7 +104,7 @@ export const emptyPositionPermission = (): PositionPermission => ({
   oneOnOnePermission: false,
   positionPermission: false,
   kpiPermission: false,
-  departmentKpiPermission: false,
+
   assessmentScoresView: false,
   assessmentFormCreate: false,
 
@@ -117,9 +116,9 @@ export const emptyPositionPermission = (): PositionPermission => ({
   teamEdit: false,
   teamHistory: false,
   teamView: false,
-  teamAssignAsLeader: false,
-  teamAssignAsPm: false,
-  teamAssignAsMember: false,
+
+teamAssignAsLeader: false,
+teamAssignAsMember: false,
 
   pipCreate: false,
   pipEdit: false,
@@ -162,16 +161,14 @@ export const sanitizePositionPermission = (payload: unknown): PositionPermission
     clean[field] = Boolean(source[field]);
   });
 
-  clean.teamPermission = Boolean(
-    source.teamPermission ||
-      clean.teamView ||
-      clean.teamCreate ||
-      clean.teamEdit ||
-      clean.teamHistory ||
-      clean.teamAssignAsLeader ||
-      clean.teamAssignAsPm ||
-      clean.teamAssignAsMember,
-  );
+
+clean.teamPermission = Boolean(
+  source.teamPermission ||
+    clean.teamView ||
+    clean.teamCreate ||
+    clean.teamEdit ||
+    clean.teamHistory,
+);
 
   clean.organizationPermission = Boolean(
     source.organizationPermission ||
@@ -207,9 +204,8 @@ export const sanitizePositionPermission = (payload: unknown): PositionPermission
   clean.kpiPermission = Boolean(
     source.kpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView || clean.kpiInput,
   );
-  clean.departmentKpiPermission = Boolean(
-    source.departmentKpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView,
-  );
+
+
   clean.oneOnOnePermission = Boolean(
     source.oneOnOnePermission || clean.oneOnOneCreate || clean.oneOnOneDeptSelection || clean.oneOnOneTeamSelection,
   );

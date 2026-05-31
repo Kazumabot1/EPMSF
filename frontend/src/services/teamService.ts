@@ -45,10 +45,10 @@ export interface TeamRequest {
   departmentId: number;
   teamLeaderId: number;
 
-  /**
-   * Optional Project Manager.
-   */
-  projectManagerId?: number | null;
+/**
+ * Required Project Manager. Managers can manage multiple active teams.
+ */
+projectManagerId: number;
 
   createdById?: number;
   teamGoal: string;
@@ -193,7 +193,7 @@ export const createTeam = async (
     ...request,
     memberUserIds: memberIds,
     memberEmployeeIds: memberIds,
-    projectManagerId: request.projectManagerId ?? null,
+projectManagerId: request.projectManagerId,
   });
 
   return unwrap<TeamResponse>(response);
@@ -208,7 +208,7 @@ export const createMyDepartmentTeam = async (
     ...request,
     memberUserIds: memberIds,
     memberEmployeeIds: memberIds,
-    projectManagerId: request.projectManagerId ?? null,
+projectManagerId: request.projectManagerId,
   });
 
   return unwrap<TeamResponse>(response);
@@ -224,7 +224,7 @@ export const updateTeam = async (
     ...request,
     memberUserIds: memberIds,
     memberEmployeeIds: memberIds,
-    projectManagerId: request.projectManagerId ?? null,
+projectManagerId: request.projectManagerId,
   });
 
   return unwrap<TeamResponse>(response);
@@ -240,7 +240,7 @@ export const updateMyDepartmentTeam = async (
     ...request,
     memberUserIds: memberIds,
     memberEmployeeIds: memberIds,
-    projectManagerId: request.projectManagerId ?? null,
+projectManagerId: request.projectManagerId,
   });
 
   return unwrap<TeamResponse>(response);

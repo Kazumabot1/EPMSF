@@ -92,15 +92,16 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI History', path: '/admin/kpi/history', icon: 'bi-clock-history' },
       ],
     },
-    {
-      label: 'KPI Approvals',
-      path: '/admin/approval/kpi',
-      icon: 'bi-bullseye',
-      children: [
-        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
-        { label: 'Department KPI Approval', path: '/admin/approval/department-kpi', icon: 'bi-building-check' },
-      ],
-    },
+{
+  label: 'Approvals',
+  path: '/admin/approval/kpi',
+  icon: 'bi-shield-check',
+  children: [
+    { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+
+    { label: 'Workforce Change Review', path: '/admin/approval/changes', icon: 'bi-person-check' },
+  ],
+},
     {
       label: 'Access Control',
       path: '/position-permissions',
@@ -131,15 +132,21 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       label: 'Organization',
       path: '/hr/organization',
       icon: 'bi-building',
-      children: [
-        { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
-        {
-          label: 'Department Comparison',
-          path: '/hr/department-comparison',
-          icon: 'bi-columns-gap',
-          permissionField: 'departmentComparisonView',
-        },
-      ],
+
+     children: [
+       { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
+       {
+         label: 'Department Comparison',
+         path: '/hr/department-comparison',
+         icon: 'bi-columns-gap',
+         permissionField: 'departmentComparisonView',
+       },
+       {
+         label: 'Workforce Changes',
+         path: '/hr/workforce-changes',
+         icon: 'bi-arrow-left-right',
+       },
+     ],
     },
     {
       label: 'Reports',
@@ -245,17 +252,8 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
       ],
     },
-    {
-      label: 'Department KPI Management',
-      path: '/hr/department-kpi-template',
-      icon: 'bi-building-gear',
-      children: [
-        { label: 'Department KPI Templates', path: '/hr/department-kpi-template', icon: 'bi-building-gear' },
-        { label: 'Department KPI Cycle', path: '/hr/department-kpi-cycle', icon: 'bi-arrow-repeat' },
-        { label: 'Department KPI Scoring', path: '/hr/department-kpi-scoring', icon: 'bi-clipboard2-check' },
-        { label: 'Department KPI Results', path: '/hr/department-kpi-results', icon: 'bi-building-check' },
-      ],
-    },
+
+
   ],
 
   DepartmentHead: [
@@ -290,7 +288,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Feedback Completion', path: '/department-head/reports/feedback-completion', icon: 'bi-activity' },
       ],
     },
-    { label: 'Department KPIs', path: '/department-head/department-kpis', icon: 'bi-building-check' },
+
     {
       label: 'Manager KPI Scoring',
       path: '/department-head/kpi-scoring',
@@ -421,7 +419,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    { label: 'People Change Review', path: '/executive/approval/changes', icon: 'bi-person-check' },
     {
       label: 'Reports',
       path: '/executive/reports',

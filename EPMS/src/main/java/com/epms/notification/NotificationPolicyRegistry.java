@@ -26,9 +26,7 @@ public class NotificationPolicyRegistry {
         registerRequired(policies, NotificationEventKey.KPI_CYCLE_WRAP_UP, NotificationCategory.KPI_WORKFLOW);
         registerRequired(policies, NotificationEventKey.KPI_RESULT_FINALIZED, NotificationCategory.KPI_WORKFLOW);
         registerOptional(policies, NotificationEventKey.KPI_HR_SUMMARY, NotificationCategory.KPI_SUMMARY);
-        registerRequired(policies, NotificationEventKey.DEPARTMENT_KPI_APPROVAL_REQUESTED, NotificationCategory.KPI_WORKFLOW);
-        registerRequired(policies, NotificationEventKey.DEPARTMENT_KPI_APPROVAL_DECIDED, NotificationCategory.KPI_WORKFLOW);
-        registerRequired(policies, NotificationEventKey.DEPARTMENT_KPI_FINALIZED, NotificationCategory.KPI_WORKFLOW);
+
 
         registerRequired(policies, NotificationEventKey.APPRAISAL_CYCLE_ACTIVATED, NotificationCategory.APPRAISAL_WORKFLOW);
         registerRequired(policies, NotificationEventKey.APPRAISAL_CYCLE_DEACTIVATED, NotificationCategory.APPRAISAL_WORKFLOW);

@@ -38,7 +38,8 @@ import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
-import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
+
+
 import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
 import DepartmentHeadEmployeeListsPage from './pages/department-head/DepartmentEmployeeListsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -63,12 +64,7 @@ import KpiTemplateCycleListPage from './pages/hr/kpi-template/KpiTemplateCycleLi
 import KpiTemplateCycleEditorPage from './pages/hr/kpi-template/KpiTemplateCycleEditorPage';
 import KpiVersionHistoryPage from './pages/hr/kpi-template/KpiVersionHistoryPage';
 import HrEmployeeKpiListPage from './pages/hr/kpi-template/HrEmployeeKpiListPage';
-import DepartmentKpiTemplateListPage from './pages/hr/department-kpi/DepartmentKpiTemplateListPage';
-import DepartmentKpiTemplateEditorPage from './pages/hr/department-kpi/DepartmentKpiTemplateEditorPage';
-import DepartmentKpiCycleListPage from './pages/hr/department-kpi/DepartmentKpiCycleListPage';
-import DepartmentKpiCycleEditorPage from './pages/hr/department-kpi/DepartmentKpiCycleEditorPage';
-import DepartmentKpiScoringPage from './pages/hr/department-kpi/DepartmentKpiScoringPage';
-import DepartmentKpiResultsPage from './pages/hr/department-kpi/DepartmentKpiResultsPage';
+
 
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
 import Notifications from './pages/Notifications';
@@ -191,9 +187,11 @@ function App() {
                 <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
                 <Route path="/admin/kpi-scoring" element={<ManagerKpiScoringPage />} />
                 <Route path="/admin/kpi/history" element={<ManagerKpiHistoryPage />} />
-                <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
-                <Route path="/admin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
-                <Route path="/position-permissions" element={<PositionPermissions />} />
+
+              <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
+
+              <Route path="/admin/approval/changes" element={<EmployeeChangeApprovalPage />} />
+              <Route path="/position-permissions" element={<PositionPermissions />} />
               </Route>
             </Route>
 
@@ -252,14 +250,15 @@ function App() {
                   element={<RedirectWithMessage to="/executive/dashboard" message="KPI approvals are handled by HR Admin." />}
               />
               <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/dashboard" replace />} />
-              <Route
-                  path="/executive/approval/department-kpi"
-                  element={<RedirectWithMessage to="/executive/dashboard" message="Department KPI approvals are handled by HR Admin." />}
-              />
-              <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
-              <Route path="/executive/approval/changes" element={<EmployeeChangeApprovalPage />} />
-              <Route path="/ceo/approval/changes" element={<Navigate to="/executive/approval/changes" replace />} />
 
+     <Route path="/executive/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
+     <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
+
+       <Route
+           path="/executive/approval/changes"
+           element={<RedirectWithMessage to="/executive/dashboard" message="Workforce change approvals are handled by HR Admin." />}
+       />
+       <Route path="/ceo/approval/changes" element={<Navigate to="/executive/dashboard" replace />} />
               <Route
                   path="/executive/kpis"
                   element={<RedirectWithMessage to="/executive/dashboard" message="KPI management is handled by HR Admin and managers." />}
@@ -296,8 +295,7 @@ function App() {
                 <Route path="/department-head/assessment-review" element={<AssessmentScoreTablePage />} />
                 <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
                 <Route path="/department-head/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
-                <Route path="/department-head/reports/department-performance" element={<DepartmentKpiResultsPage departmentHead />} />
-                <Route path="/department-head/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
+<Route path="/department-head/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />                <Route path="/department-head/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
                 <Route path="/department-head/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
                 <Route path="/department-head/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
                 <Route path="/department-head/reports/recommendations" element={<ReportingDashboardPage reportType="recommendations" />} />
@@ -314,8 +312,7 @@ function App() {
                 <Route path="/department-head/kpi/history" element={<ManagerKpiHistoryPage />} />
                 <Route path="/department-head/kpi-scoring" element={<ManagerKpiScoringPage />} />
 
-                <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
-
+<Route path="/department-head/department-kpis" element={<Navigate to="/department-head/reports/department-performance" replace />} />
                 <Route path="/department-head/teams" element={<TeamManagement />} />
 
                 <Route element={<PositionPermissionRoute permission="teamCreate" fallbackPath="/department-head/teams" />}>
@@ -335,13 +332,13 @@ function App() {
                 <Route path="/hr/profile" element={<ProfilePage />} />
                 <Route path="/hr/kpis" element={<EmployeeKpiResultsPage />} />
 
-    <Route element={<PositionPermissionRoute permission="employeeCrud" fallbackPath="/dashboard" />}>
-      <Route path="/hr/employee" element={<EmployeeManagement />} />
-      <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
-      <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
-      <Route path="/hr/workforce-changes" element={<EmployeeChangeCenterPage />} />
+                <Route path="/hr/workforce-changes" element={<EmployeeChangeCenterPage />} />
 
-    </Route>
+                <Route element={<PositionPermissionRoute permission="employeeCrud" fallbackPath="/dashboard" />}>
+                  <Route path="/hr/employee" element={<EmployeeManagement />} />
+                  <Route path="/hr/employee/workforce" element={<EmployeeDashboard />} />
+                  <Route path="/hr/employee/import" element={<HrEmployeeAccountImport />} />
+                </Route>
 
                 <Route path="/hr/team" element={<TeamManagement />} />
                 <Route path="/hr/team/history" element={<TeamHistoryPage />} />
@@ -419,16 +416,8 @@ function App() {
                   <Route path="/hr/employee-kpis" element={<HrEmployeeKpiListPage />} />
                 </Route>
 
-                <Route element={<PositionPermissionRoute permission="departmentKpiPermission" fallbackPath="/dashboard" />}>
-                  <Route path="/hr/department-kpi-template/new" element={<DepartmentKpiTemplateEditorPage />} />
-                  <Route path="/hr/department-kpi-template/:id/edit" element={<DepartmentKpiTemplateEditorPage />} />
-                  <Route path="/hr/department-kpi-template" element={<DepartmentKpiTemplateListPage />} />
-                  <Route path="/hr/department-kpi-cycle/new" element={<DepartmentKpiCycleEditorPage />} />
-                  <Route path="/hr/department-kpi-cycle/:id/edit" element={<DepartmentKpiCycleEditorPage />} />
-                  <Route path="/hr/department-kpi-cycle" element={<DepartmentKpiCycleListPage />} />
-                  <Route path="/hr/department-kpi-scoring" element={<DepartmentKpiScoringPage />} />
-                  <Route path="/hr/department-kpi-results" element={<DepartmentKpiResultsPage />} />
-                </Route>
+
+
               </Route>
             </Route>
           </Route>

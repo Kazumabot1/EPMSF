@@ -659,20 +659,13 @@ const DepartmentHeadDashboard = () => {
                     status="Idle"
                     onClick={() => navigate('/department-head/appraisals/review')}
                 />
-                <FocusRow
-                    icon="building"
-                    title="Department KPIs"
-                    value="View results"
-                    detail="Finalized department KPI scores for your department."
-                    status="Available"
-                    onClick={() => navigate('/department-head/department-kpis')}
-                />
+
+
                 <FocusRow
                     icon="barChart"
                     title="Reports"
                     value="Ready to view"
-                    detail="Department performance, KPI, feedback, and assessment reports."
-                    status="Available"
+detail="Department performance, feedback, and assessment reports."                    status="Available"
                     onClick={() => navigate('/department-head/reports')}
                 />
               </div>

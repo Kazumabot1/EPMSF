@@ -35,9 +35,8 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
                 return;
             }
             alignEarlyCloseColumns(conn);
-            alignDepartmentKpiEarlyCloseColumns(conn);
-            alignDepartmentKpiTemplateLegacyColumns(conn);
-            alignDepartmentKpiCycleStatusEnum(conn);
+
+
             alignCycleDurationColumns(conn);
             alignCyclePeriodTemplateColumn(conn);
             alignCyclePeriodStatusEnum(conn);
@@ -157,64 +156,14 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
         }
     }
 
-    private void alignDepartmentKpiEarlyCloseColumns(Connection conn) throws SQLException {
-        if (!tableExists(conn, "department_kpi_cycle")) {
-            return;
-        }
-        addDepartmentColumnIfMissing(conn, "duration_years", "INT NOT NULL DEFAULT 1");
-        addDepartmentColumnIfMissing(conn, "closing_requested_at", "DATETIME(6) NULL");
-        addDepartmentColumnIfMissing(conn, "grace_ends_at", "DATETIME(6) NULL");
-        addDepartmentColumnIfMissing(conn, "closed_at", "DATETIME(6) NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_reason", "VARCHAR(1000) NULL");
-        addDepartmentColumnIfMissing(conn, "grace_extension", "VARCHAR(30) NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_requested_at", "DATETIME(6) NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_requested_by", "INT NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_reviewed_at", "DATETIME(6) NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_reviewed_by", "INT NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_review_decision", "VARCHAR(30) NULL");
-        addDepartmentColumnIfMissing(conn, "early_close_review_reason", "VARCHAR(1000) NULL");
-    }
 
-    private void addDepartmentColumnIfMissing(Connection conn, String columnName, String definition) throws SQLException {
-        if (columnExists(conn, "department_kpi_cycle", columnName)) {
-            return;
-        }
-        try (Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("ALTER TABLE department_kpi_cycle ADD COLUMN " + columnName + " " + definition);
-            log.info("Added department_kpi_cycle.{} column.", columnName);
-        }
-    }
 
-    private void alignDepartmentKpiTemplateLegacyColumns(Connection conn) throws SQLException {
-        if (!tableExists(conn, "department_kpi_template")
-                || !columnExists(conn, "department_kpi_template", "duration_months")
-                || columnNullable(conn, "department_kpi_template", "duration_months")) {
-            return;
-        }
-        try (Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("ALTER TABLE department_kpi_template MODIFY COLUMN duration_months INT NULL");
-            log.info("Relaxed legacy department_kpi_template.duration_months column.");
-        }
-    }
 
-    private void alignDepartmentKpiCycleStatusEnum(Connection conn) throws SQLException {
-        if (!tableExists(conn, "department_kpi_cycle") || !columnExists(conn, "department_kpi_cycle", "status")) {
-            return;
-        }
-        String columnType = columnType(conn, "department_kpi_cycle", "status");
-        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
-            return;
-        }
-        if (columnType != null && columnType.toLowerCase(Locale.ROOT).startsWith("enum")) {
-            try (Statement stmt = conn.createStatement()) {
-                stmt.executeUpdate(
-                        "ALTER TABLE department_kpi_cycle "
-                                + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
-                );
-                log.info("Aligned department_kpi_cycle.status enum.");
-            }
-        }
-    }
+
+
+
+
+
 
     private void addColumnIfMissing(Connection conn, String columnName, String definition) throws SQLException {
         if (columnExists(conn, "kpi_template_cycle", columnName)) {

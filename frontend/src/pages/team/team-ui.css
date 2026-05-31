@@ -1014,3 +1014,40 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+
+.team-row-clickable {
+  cursor: pointer;
+}
+
+.team-row-clickable:hover td {
+  background: #eff6ff !important;
+}
+
+.team-detail-member-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.team-detail-member-card {
+  padding: 12px 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.team-detail-member-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.team-detail-member-card span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
