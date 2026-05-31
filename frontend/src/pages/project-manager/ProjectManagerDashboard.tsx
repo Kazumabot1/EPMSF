@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
 import type { AssessmentScoreRow } from '../../types/employeeAssessment';
 
@@ -120,7 +120,7 @@ const ProjectManagerDashboard = () => {
 
             <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-700">
               <i className="bi bi-info-circle me-2" />
-              Project-level KPI and stakeholder feedback modules can be connected here next.
+              KPI Evaluation and stakeholder feedback modules can be connected here next.
             </div>
           </div>
         </section>
@@ -290,9 +290,9 @@ const ProjectManagerDashboard = () => {
                   </span>
 
                   <div>
-                    <p className="font-semibold text-slate-800">Project Performance</p>
+                    <p className="font-semibold text-slate-800">KPI Evaluation</p>
                     <p className="text-xs text-slate-500">
-                      Connect project KPI data here.
+                      Review KPI evaluation work here.
                     </p>
                   </div>
                 </div>
