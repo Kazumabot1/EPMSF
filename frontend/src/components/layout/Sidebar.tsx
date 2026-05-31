@@ -224,6 +224,15 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
       { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
       {
+        to: '/admin/kpi-scoring',
+        label: 'KPI Scoring',
+        icon: 'bi bi-ui-checks-grid',
+        children: [
+          { to: '/admin/kpi-scoring', label: 'Score Senior KPIs', icon: 'bi bi-clipboard2-check', end: true },
+          { to: '/admin/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
+        ],
+      },
+      {
         to: '/admin/approval/kpi',
         label: 'KPI Approvals',
         icon: 'bi bi-bullseye',
@@ -557,12 +566,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
       {
         to: '/manager/kpi-scoring',
-        label: 'Team KPIs',
+        label: 'KPI Evaluation',
         icon: 'bi bi-bullseye',
         children: [
           {
             to: '/manager/kpi-scoring',
-            label: 'KPI Scoring',
+            label: 'Evaluate KPIs',
             icon: 'bi bi-clipboard2-check',
             end: true,
           },

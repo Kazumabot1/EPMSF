@@ -11,6 +11,8 @@ public class DashboardResolver {
 
     private static final Set<String> SUPPORTED_DASHBOARDS = Set.of(
             "ADMIN_DASHBOARD",
+            "HRADMIN_DASHBOARD",
+            "HR_ADMIN_DASHBOARD",
             "HR_DASHBOARD",
             "EXECUTIVE_DASHBOARD",
             "DEPARTMENT_HEAD_DASHBOARD",
@@ -23,7 +25,9 @@ public class DashboardResolver {
                 ? List.of()
                 : roles.stream().map(this::normalizeRoleName).toList();
 
-        if (hasRole(normalizedRoles, "ADMIN")) {
+        if (hasRole(normalizedRoles, "ADMIN")
+                || hasRole(normalizedRoles, "HRADMIN")
+                || hasRole(normalizedRoles, "HR_ADMIN")) {
             return "ADMIN_DASHBOARD";
         }
 
@@ -64,7 +68,7 @@ public class DashboardResolver {
                 .toUpperCase(Locale.ROOT);
 
         return switch (normalized) {
-            case "ADMIN", "ADMIN_DASHBOARD" -> "ADMIN_DASHBOARD";
+            case "ADMIN", "HRADMIN", "HR_ADMIN", "ADMIN_DASHBOARD", "HRADMIN_DASHBOARD", "HR_ADMIN_DASHBOARD" -> "ADMIN_DASHBOARD";
             case "HR", "HR_DASHBOARD" -> "HR_DASHBOARD";
             case "CEO", "EXECUTIVE", "CEO_DASHBOARD", "EXECUTIVE_DASHBOARD" -> "EXECUTIVE_DASHBOARD";
             case "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT",
