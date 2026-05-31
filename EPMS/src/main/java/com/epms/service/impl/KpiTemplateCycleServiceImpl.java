@@ -171,6 +171,13 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
             if (links.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
             }
+            var readiness = employeeKpiWorkflowService.buildCycleActivationReadiness(id);
+            if (!readiness.isReady()) {
+                String details = readiness.getBlockingIssues() == null || readiness.getBlockingIssues().isEmpty()
+                        ? "Resolve missing KPI evaluators before activating this cycle."
+                        : String.join(" ", readiness.getBlockingIssues());
+                throw new ResponseStatusException(HttpStatus.CONFLICT, details);
+            }
             try {
                 employeeKpiWorkflowService.prepareCyclePeriods(id);
             } catch (ResponseStatusException ex) {

@@ -27,7 +27,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class UserProfileService {
 
-    private static final int MAX_IMAGE_LENGTH = 2_500_000;
+    private static final int MAX_IMAGE_LENGTH = 7_100_000;
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int MAX_PASSWORD_LENGTH = 128;
 
@@ -300,7 +300,7 @@ public class UserProfileService {
 
     private void validateImage(String imageData, String imageType) {
         if (imageData.length() > MAX_IMAGE_LENGTH) {
-            throw new BadRequestException("Profile image is too large. Please upload an image below 2MB.");
+            throw new BadRequestException("Profile image is too large. Please upload an image below 5MB.");
         }
 
         if (imageType == null || imageType.isBlank()) {

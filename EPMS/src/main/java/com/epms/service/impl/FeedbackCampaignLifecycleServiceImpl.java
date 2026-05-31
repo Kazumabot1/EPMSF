@@ -217,15 +217,31 @@ public class FeedbackCampaignLifecycleServiceImpl implements FeedbackCampaignLif
     @Override
     @Transactional
     public FeedbackCampaign closeCampaign(Long campaignId, Long actorUserId) {
+        return closeCampaignWithReadiness(campaignId, actorUserId, null, false);
+    }
+
+    @Override
+    @Transactional
+    public FeedbackCampaign closeCampaignWithReadiness(Long campaignId, Long actorUserId, String reason, boolean closeWithWarnings) {
         FeedbackCampaign campaign = getCampaignById(campaignId);
         if (campaign.getStatus() == FeedbackCampaignStatus.CLOSED) {
             return campaign;
         }
         ensureActiveCampaign(campaign);
-        String reason = isBeforeDeadline(campaign)
-                ? "Feedback campaign manually closed by HR before the scheduled deadline"
-                : "Feedback campaign closed after scheduled deadline";
-        return closeCampaignInternal(campaign, actorUserId, isBeforeDeadline(campaign), reason, true);
+        boolean earlyClose = isBeforeDeadline(campaign);
+        String baseReason;
+        if (closeWithWarnings) {
+            baseReason = earlyClose
+                    ? "Feedback campaign closed with warnings by HR before the scheduled deadline"
+                    : "Feedback campaign closed with warnings after scheduled deadline";
+        } else {
+            baseReason = earlyClose
+                    ? "Feedback campaign manually closed by HR before the scheduled deadline"
+                    : "Feedback campaign closed after scheduled deadline";
+        }
+        String normalizedReason = normalizeText(reason, 1000);
+        String closeReason = normalizedReason == null ? baseReason : baseReason + ": " + normalizedReason;
+        return closeCampaignInternal(campaign, actorUserId, earlyClose, closeReason, true);
     }
 
     @Override

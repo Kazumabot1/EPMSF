@@ -1,9 +1,9 @@
 /* EPMS — Employee account CRUD design system
-   Complements Tailwind: semantic layout + brand accents */
+   Complements Tailwind: semantic layout + brand accents by Z */
 
 .epms-emp {
-  --epms-accent: #4f46e5;
-  --epms-accent-mid: #6366f1;
+  --epms-accent: #2563eb;
+  --epms-accent-mid: #2563eb;
   --epms-accent-soft: #eef2ff;
   --epms-accent-ghost: rgba(79, 70, 229, 0.08);
   --epms-ink: #0f172a;
@@ -298,7 +298,7 @@
 }
 
 .epms-emp-btn--primary {
-  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  background: linear-gradient(180deg, #2563eb 0%, #2563eb 100%);
   color: #fff;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 8px rgba(79, 70, 229, 0.3);
   padding: 0.65rem 1.1rem;
@@ -397,7 +397,7 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #fff;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #7c3aed 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #2563eb 50%, #2563eb 100%);
   box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
   text-transform: uppercase;
 }
@@ -658,7 +658,7 @@
 .epms-emp-modal__accent {
   height: 3px;
   width: 100%;
-  background: linear-gradient(90deg, #6366f1, #7c3aed, #0ea5e9);
+  background: linear-gradient(90deg, #2563eb, #2563eb, #0ea5e9);
   flex-shrink: 0;
 }
 
@@ -740,7 +740,7 @@
 }
 
 .epms-emp-form-body::-webkit-scrollbar-thumb:hover {
-  background: #818cf8;
+  background: #60a5fa;
 }
 
 .epms-emp-form-section {
@@ -825,7 +825,7 @@
   font-size: 1rem;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #6366f1, #4f46e5, #6d28d9);
+  background: linear-gradient(135deg, #2563eb, #2563eb, #1d4ed8);
   box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1079,7 +1079,7 @@
 }
 
 .employee-form::-webkit-scrollbar-thumb:hover {
-  background: #818cf8;
+  background: #60a5fa;
 }
 
 /* 2-col grid */
@@ -1141,7 +1141,7 @@
 
 .employee-input:focus {
   outline: none;
-  border-color: var(--epms-accent, #4f46e5);
+  border-color: var(--epms-accent, #2563eb);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }
 
@@ -1188,7 +1188,7 @@ select.employee-input {
   padding: 0.85rem 1rem;
   border-radius: 0.65rem;
   border: 1px solid #e0e7ff;
-  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
+  background: linear-gradient(135deg, #eef2ff 0%, #eff6ff 100%);
 }
 
 .employee-checkbox {
@@ -1208,7 +1208,7 @@ select.employee-input {
 .employee-checkbox input[type='checkbox'] {
   width: 1rem;
   height: 1rem;
-  accent-color: var(--epms-accent, #4f46e5);
+  accent-color: var(--epms-accent, #2563eb);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -1274,7 +1274,7 @@ select.employee-input {
 }
 
 .employee-btn.primary {
-  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  background: linear-gradient(180deg, #2563eb 0%, #2563eb 100%);
   color: #fff;
   border: none;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 8px rgba(79, 70, 229, 0.3);
@@ -1317,6 +1317,6 @@ select.employee-input {
 .employee-login-box .epms-emp-input-field:focus,
 .employee-field .epms-emp-input-field:focus {
   outline: none;
-  border-color: var(--epms-accent, #4f46e5);
+  border-color: var(--epms-accent, #2563eb);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }

@@ -53,6 +53,8 @@ interface AdminUserAccount {
   departmentName?: string | null;
   positionId?: number | null;
   positionName?: string | null;
+  managerId?: number | null;
+  managerName?: string | null;
   roleName?: string | null;
   dashboard?: string | null;
   active?: boolean;
@@ -98,6 +100,7 @@ type ExportUserRow = {
   employeeCode: string;
   departmentName: string;
   positionName: string;
+  managerName: string;
   roleName: string;
   dashboard: string;
   status: string;
@@ -1071,6 +1074,7 @@ const AdminDashboard = () => {
       employeeCode: user.employeeCode ?? '',
       departmentName: user.departmentName ?? '',
       positionName: user.positionName ?? '',
+      managerName: user.managerName ?? '',
       roleName: roleDisplayName(user.roleName ?? ''),
       dashboard: dashboardDisplayName(user.dashboard, user.roleName),
       status: user.active === false ? 'Inactive' : 'Active',
@@ -1084,6 +1088,7 @@ const AdminDashboard = () => {
           { header: 'Employee Code', key: 'employeeCode' },
           { header: 'Department', key: 'departmentName' },
           { header: 'Position', key: 'positionName' },
+          { header: 'Manager', key: 'managerName' },
           { header: 'Role', key: 'roleName' },
           { header: 'Dashboard', key: 'dashboard' },
           { header: 'Status', key: 'status' },
@@ -1094,7 +1099,7 @@ const AdminDashboard = () => {
 
   const renderUserTable = (tableUsers: AdminUserAccount[]) => (
       <div className="overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[1120px] divide-y divide-slate-200 text-left text-sm">
+        <table className="w-full min-w-[1240px] divide-y divide-slate-200 text-left text-sm">
           <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
           <tr>
             <th className="w-14 px-4 py-3">#</th>
@@ -1103,6 +1108,7 @@ const AdminDashboard = () => {
             <th className="min-w-[150px] px-4 py-3">Employee Code</th>
             <th className="min-w-[170px] px-4 py-3">Department</th>
             <th className="min-w-[180px] px-4 py-3">Position</th>
+            <th className="min-w-[170px] px-4 py-3">Manager</th>
             <th className="min-w-[130px] px-4 py-3">Role</th>
             <th className="min-w-[190px] px-4 py-3">Dashboard</th>
             <th className="min-w-[120px] px-4 py-3">Status</th>
@@ -1113,7 +1119,7 @@ const AdminDashboard = () => {
           <tbody className="divide-y divide-slate-100 bg-white">
           {listLoading && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
+                <td colSpan={11} className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
                   Loading user accounts...
                 </td>
               </tr>
@@ -1148,6 +1154,7 @@ const AdminDashboard = () => {
                       <td className="px-4 py-3 text-slate-600">{user.employeeCode ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{user.departmentName ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{user.positionName ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{user.managerName ?? '—'}</td>
 
                       <td className="px-4 py-3">
                         <StatusPill tone="violet">{roleDisplayName(user.roleName ?? '—')}</StatusPill>
@@ -1179,7 +1186,7 @@ const AdminDashboard = () => {
 
           {!listLoading && tableUsers.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10">
+                <td colSpan={11} className="px-4 py-10">
                   <EmptyState
                       title="No user accounts found"
                       message={

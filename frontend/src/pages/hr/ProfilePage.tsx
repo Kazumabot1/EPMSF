@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   profileService,
   type UserProfile,
 } from '../../services/profileService';
+import { profileImageService } from '../../services/profileImageService';
 
 const getApiErrorMessage = (err: any) => {
   return (
@@ -35,26 +36,294 @@ const imageSrc = (profile: UserProfile) => {
   return `data:${profile.profileImageType};base64,${profile.profileImageData}`;
 };
 
-const fileToBase64 = (file: File) =>
+const MAX_PROFILE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const PROFILE_IMAGE_OUTPUT_SIZE = 512;
+const PROFILE_IMAGE_PREVIEW_SIZE = 280;
+const ALLOWED_PROFILE_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+type CropSettings = {
+  zoom: number;
+  rotation: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+type ImageSize = {
+  width: number;
+  height: number;
+};
+
+const normalizeImageType = (type: string) => (type === 'image/jpg' ? 'image/jpeg' : type);
+
+const fileToDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const commaIndex = result.indexOf(',');
-
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-
+    reader.onload = () => resolve(String(reader.result || ''));
     reader.onerror = () => reject(new Error('Failed to read image file.'));
     reader.readAsDataURL(file);
   });
 
-const normalizeProfileRole = (value?: string | null) =>
-  String(value ?? '')
-    .replace(/^ROLE_/i, '')
-    .replace(/[\s_-]+/g, '')
-    .toUpperCase();
+const base64FromDataUrl = (dataUrl: string) => {
+  const commaIndex = dataUrl.indexOf(',');
+  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+};
+
+const imageTypeFromDataUrl = (dataUrl: string, fallbackType: string) => {
+  const match = dataUrl.match(/^data:([^;]+);base64,/i);
+  return normalizeImageType(match?.[1] || fallbackType || 'image/png');
+};
+
+const loadImageElement = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Could not load image for cropping.'));
+    image.src = src;
+  });
+
+const createCroppedProfileImage = async (
+  src: string,
+  imageType: string,
+  crop: CropSettings,
+  imageSize: ImageSize,
+) => {
+  const image = await loadImageElement(src);
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('Your browser could not prepare the cropped image.');
+  }
+
+  const outputSize = PROFILE_IMAGE_OUTPUT_SIZE;
+  const previewSize = PROFILE_IMAGE_PREVIEW_SIZE;
+  const baseScale = Math.max(
+    previewSize / Math.max(imageSize.width, 1),
+    previewSize / Math.max(imageSize.height, 1),
+  );
+  const outputScale = outputSize / previewSize;
+  const targetType = normalizeImageType(imageType || 'image/png');
+
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+
+  context.clearRect(0, 0, outputSize, outputSize);
+  context.save();
+  context.translate(
+    outputSize / 2 + crop.offsetX * outputScale,
+    outputSize / 2 + crop.offsetY * outputScale,
+  );
+  context.rotate((crop.rotation * Math.PI) / 180);
+  context.scale(baseScale * crop.zoom * outputScale, baseScale * crop.zoom * outputScale);
+  context.drawImage(image, -imageSize.width / 2, -imageSize.height / 2);
+  context.restore();
+
+  return canvas.toDataURL(targetType, targetType === 'image/png' ? undefined : 0.92);
+};
+
+type ImageCropModalProps = {
+  source: string;
+  fileType: string;
+  onCancel: () => void;
+  onApply: (base64: string, imageType: string) => void;
+  onError: (message: string) => void;
+};
+
+const ImageCropModal = ({
+  source,
+  fileType,
+  onCancel,
+  onApply,
+  onError,
+}: ImageCropModalProps) => {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [imageSize, setImageSize] = useState<ImageSize>({ width: 1, height: 1 });
+  const [applying, setApplying] = useState(false);
+
+  const baseScale = Math.max(
+    PROFILE_IMAGE_PREVIEW_SIZE / Math.max(imageSize.width, 1),
+    PROFILE_IMAGE_PREVIEW_SIZE / Math.max(imageSize.height, 1),
+  );
+
+  const resetCrop = () => {
+    setZoom(1);
+    setRotation(0);
+    setOffsetX(0);
+    setOffsetY(0);
+  };
+
+  const applyCrop = async () => {
+    try {
+      setApplying(true);
+      const dataUrl = await createCroppedProfileImage(source, fileType, {
+        zoom,
+        rotation,
+        offsetX,
+        offsetY,
+      }, imageSize);
+
+      onApply(base64FromDataUrl(dataUrl), imageTypeFromDataUrl(dataUrl, fileType));
+    } catch (err) {
+      onError(getApiErrorMessage(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-900">Crop & Rotate Profile Image</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Adjust the image so it fits cleanly inside every dashboard header avatar.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-xl font-black text-slate-500 transition hover:bg-slate-50"
+            aria-label="Close image editor"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+          <div className="flex flex-col items-center">
+            <div className="rounded-[2rem] bg-slate-100 p-5 shadow-inner">
+              <div
+                className="relative overflow-hidden rounded-full border-4 border-indigo-100 bg-white shadow-lg"
+                style={{ width: PROFILE_IMAGE_PREVIEW_SIZE, height: PROFILE_IMAGE_PREVIEW_SIZE }}
+              >
+                <img
+                  src={source}
+                  alt="Crop preview"
+                  className="absolute left-1/2 top-1/2 max-w-none select-none"
+                  draggable={false}
+                  onLoad={(event) => {
+                    const img = event.currentTarget;
+                    setImageSize({
+                      width: img.naturalWidth || 1,
+                      height: img.naturalHeight || 1,
+                    });
+                  }}
+                  style={{
+                    width: imageSize.width * baseScale,
+                    height: imageSize.height * baseScale,
+                    transform: `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg) scale(${zoom})`,
+                    transformOrigin: 'center',
+                  }}
+                />
+              </div>
+            </div>
+
+            <p className="mt-3 text-center text-xs font-bold text-slate-500">
+              This circle is what will be saved and shown in the header.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm font-black text-slate-700">Zoom</span>
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="0.05"
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
+                className="w-full accent-indigo-600"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">Move Left / Right</span>
+                <input
+                  type="range"
+                  min="-140"
+                  max="140"
+                  step="1"
+                  value={offsetX}
+                  onChange={(event) => setOffsetX(Number(event.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-black text-slate-700">Move Up / Down</span>
+                <input
+                  type="range"
+                  min="-140"
+                  max="140"
+                  step="1"
+                  value={offsetY}
+                  onChange={(event) => setOffsetY(Number(event.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </label>
+            </div>
+
+            <div>
+              <span className="mb-2 block text-sm font-black text-slate-700">Rotate</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRotation((value) => value - 90)}
+                  className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Rotate Left
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRotation((value) => value + 90)}
+                  className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                >
+                  Rotate Right
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={resetCrop}
+                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                Reset
+              </button>
+
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={applying}
+                onClick={() => void applyCrop()}
+                className="rounded-2xl bg-indigo-600 px-5 py-2 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {applying ? 'Applying...' : 'Apply Crop'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const passwordRules = (password: string) => ({
   hasMinLength: password.length >= 8,
@@ -75,6 +344,8 @@ const ProfilePage = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [profileImageData, setProfileImageData] = useState('');
   const [profileImageType, setProfileImageType] = useState('');
+  const [cropSource, setCropSource] = useState('');
+  const [cropFileType, setCropFileType] = useState('');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -98,14 +369,6 @@ const ProfilePage = () => {
   }, [profile, fullName, email, phoneNumber, profileImageData, profileImageType]);
 
   const avatarSrc = imageSrc(previewProfile);
-  const normalizedRole = normalizeProfileRole(profile?.role);
-  const normalizedDashboard = normalizeProfileRole(profile?.dashboard);
-  const showDepartmentFields = [
-    normalizedRole,
-    normalizedDashboard,
-  ].some((value) =>
-    ['EMPLOYEE', 'EMPLOYEEDASHBOARD', 'MANAGER', 'MANAGERDASHBOARD', 'DEPARTMENTHEAD', 'DEPARTMENTHEADDASHBOARD', 'HR', 'HRDASHBOARD'].includes(value),
-  );
 
   const newPasswordRules = useMemo(
     () => passwordRules(newPassword),
@@ -162,13 +425,13 @@ const ProfilePage = () => {
   const onImageSelected = async (file?: File) => {
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Profile image must be smaller than 2MB.');
+    if (file.size > MAX_PROFILE_IMAGE_SIZE_BYTES) {
+      setError('Profile image must be smaller than 5MB.');
       setMessage('');
       return;
     }
 
-    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) {
+    if (!ALLOWED_PROFILE_IMAGE_TYPES.includes(file.type)) {
       setError('Only PNG, JPG, JPEG, or WEBP images are allowed.');
       setMessage('');
       return;
@@ -178,14 +441,28 @@ const ProfilePage = () => {
       setError('');
       setMessage('');
 
-      const base64 = await fileToBase64(file);
+      const dataUrl = await fileToDataUrl(file);
 
-      setProfileImageData(base64);
-      setProfileImageType(file.type);
+      setCropSource(dataUrl);
+      setCropFileType(normalizeImageType(file.type));
     } catch (err) {
       setError(getApiErrorMessage(err));
       setMessage('');
     }
+  };
+
+  const cancelCrop = () => {
+    setCropSource('');
+    setCropFileType('');
+  };
+
+  const applyCrop = (base64: string, imageType: string) => {
+    setProfileImageData(base64);
+    setProfileImageType(imageType);
+    setCropSource('');
+    setCropFileType('');
+    setError('');
+    setMessage('');
   };
 
   const removeImage = () => {
@@ -240,8 +517,10 @@ const ProfilePage = () => {
       setProfileImageData(updated.profileImageData ?? '');
       setProfileImageType(updated.profileImageType ?? '');
 
-    setMessage('Profile updated successfully.');
-    window.dispatchEvent(new Event('profile-updated'));
+      profileImageService.clearCache();
+      setMessage('Profile updated successfully.');
+      window.dispatchEvent(new Event('profile-updated'));
+      window.dispatchEvent(new Event('epms:profile-avatar-updated'));
     } catch (err) {
       setError(getApiErrorMessage(err));
       setMessage('');
@@ -352,6 +631,39 @@ const ProfilePage = () => {
     }
   };
 
+  const formatRole = (value?: string | null) => {
+    const safeValue = value || 'Not assigned';
+
+    return safeValue
+      .replace(/^ROLE_/i, '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const profileSummaryItems = [
+    {
+      label: 'Position',
+      value: profile?.position || 'Not assigned',
+      icon: 'bi-person-badge',
+    },
+    {
+      label: 'Department',
+      value: profile?.departmentName || 'Not assigned',
+      icon: 'bi-building',
+    },
+    {
+      label: 'Employee Code',
+      value: profile?.employeeCode || 'Not assigned',
+      icon: 'bi-hash',
+    },
+    {
+      label: 'System Role',
+      value: formatRole(profile?.role || profile?.dashboard),
+      icon: 'bi-shield-check',
+    },
+  ];
+
   const RuleItem = ({
     valid,
     children,
@@ -386,11 +698,11 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-sky-50 p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white shadow-xl">
+        <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 p-6 text-white shadow-xl shadow-blue-100">
           <h1 className="text-2xl font-black">My Profile</h1>
-          <p className="mt-2 text-sm text-indigo-100">
+          <p className="mt-2 text-sm text-blue-50">
             Update your profile picture, Gmail/email, phone number, and password.
           </p>
         </div>
@@ -409,7 +721,31 @@ const ProfilePage = () => {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">Profile Information</h2>
+            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">Profile Information</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Your editable contact details are below. Work assignment details are shown here for reference.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {profileSummaryItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-blue-100 bg-blue-50/45 p-4 shadow-sm"
+                >
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-blue-700">
+                    <i className={`bi ${item.icon}`} aria-hidden />
+                    {item.label}
+                  </div>
+                  <p className="mt-2 text-sm font-black leading-snug text-slate-900">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <label className="block">
@@ -419,7 +755,7 @@ const ProfilePage = () => {
                 <input
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   placeholder="Your name"
                 />
               </label>
@@ -432,7 +768,7 @@ const ProfilePage = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   placeholder="your.email@gmail.com"
                 />
               </label>
@@ -444,57 +780,17 @@ const ProfilePage = () => {
                 <input
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   placeholder="+95..."
                 />
               </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-bold text-slate-700">
-                  Position Name
-                </span>
-                <input
-                  value={profile?.positionName ?? profile?.position ?? ''}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
-                  disabled
-                  placeholder="Position not assigned"
-                />
-              </label>
-
-              {showDepartmentFields && (
-                <>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-bold text-slate-700">
-                      Current Department
-                    </span>
-                    <input
-                      value={profile?.currentDepartmentName ?? profile?.departmentName ?? ''}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
-                      disabled
-                      placeholder="Department not assigned"
-                    />
-                  </label>
-
-                  <label className="block md:col-span-2">
-                    <span className="mb-1 block text-sm font-bold text-slate-700">
-                      Parent Department
-                    </span>
-                    <input
-                      value={profile?.parentDepartmentName ?? ''}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none"
-                      disabled
-                      placeholder="Parent department not assigned"
-                    />
-                  </label>
-                </>
-              )}
             </div>
 
             <button
               type="button"
               onClick={() => void saveProfile()}
               disabled={savingProfile}
-              className="mt-6 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-6 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {savingProfile ? 'Saving...' : 'Save Profile'}
             </button>
@@ -508,10 +804,10 @@ const ProfilePage = () => {
                 <img
                   src={avatarSrc}
                   alt="Profile"
-                  className="h-36 w-36 rounded-full border-4 border-indigo-100 object-cover shadow-lg"
+                  className="h-36 w-36 rounded-full border-4 border-blue-100 object-cover shadow-lg"
                 />
               ) : (
-                <div className="grid h-36 w-36 place-items-center rounded-full border-4 border-indigo-100 bg-indigo-50 text-4xl font-black text-indigo-700 shadow-lg">
+                <div className="grid h-36 w-36 place-items-center rounded-full border-4 border-blue-100 bg-blue-50 text-4xl font-black text-blue-700 shadow-lg">
                   {initials(fullName, email)}
                 </div>
               )}
@@ -522,14 +818,17 @@ const ProfilePage = () => {
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp"
               className="hidden"
-              onChange={(e) => void onImageSelected(e.target.files?.[0])}
+              onChange={(e) => {
+                void onImageSelected(e.target.files?.[0]);
+                e.currentTarget.value = '';
+              }}
             />
 
             <div className="mt-6 flex justify-center gap-2">
               <button
                 type="button"
                 onClick={chooseImage}
-                className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 transition hover:bg-indigo-100"
+                className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-100"
               >
                 Upload Image
               </button>
@@ -544,7 +843,7 @@ const ProfilePage = () => {
             </div>
 
             <p className="mt-3 text-xs font-semibold text-slate-500">
-              PNG, JPG, JPEG, or WEBP. Max 2MB.
+              PNG, JPG, JPEG, or WEBP. Max 5MB.
             </p>
           </div>
         </div>
@@ -574,7 +873,7 @@ const ProfilePage = () => {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                 autoComplete="current-password"
               />
             </label>
@@ -587,7 +886,7 @@ const ProfilePage = () => {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                 autoComplete="new-password"
               />
             </label>
@@ -600,7 +899,7 @@ const ProfilePage = () => {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                 autoComplete="new-password"
               />
             </label>
@@ -643,12 +942,25 @@ const ProfilePage = () => {
             type="button"
             onClick={() => void changePassword()}
             disabled={changingPassword}
-            className="mt-6 rounded-2xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-200 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {changingPassword ? 'Changing...' : 'Change Password'}
           </button>
         </div>
       </div>
+
+      {cropSource && (
+        <ImageCropModal
+          source={cropSource}
+          fileType={cropFileType}
+          onCancel={cancelCrop}
+          onApply={applyCrop}
+          onError={(messageText) => {
+            setError(messageText);
+            setMessage('');
+          }}
+        />
+      )}
     </div>
   );
 };

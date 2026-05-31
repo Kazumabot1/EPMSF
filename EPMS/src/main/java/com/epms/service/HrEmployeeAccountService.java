@@ -34,7 +34,9 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -103,8 +105,15 @@ public class HrEmployeeAccountService {
 
         Department department = findDepartment(request);
         Position position = findPosition(request);
-        User manager = resolveManagerUser(request.getManagerId(), request.getEmployeeId());
         String normalizedRole = resolveRoleName(request.getRoleName(), position);
+        User manager = resolveManagerForAccount(
+                request.getManagerId(),
+                null,
+                request.getEmployeeId(),
+                department,
+                normalizedRole,
+                position
+        );
 
         Employee employee = findOrCreateEmployeeForAccount(request, email, fullName, employeeCode, position);
         employeeCode = ensureEmployeeCodeForAccount(employee, position, normalizedRole, employeeCode);
@@ -202,8 +211,15 @@ public class HrEmployeeAccountService {
             position = positionRepository.findById(positionId)
                     .orElseThrow(() -> new BadRequestException("Position not found"));
         }
-        User manager = resolveManagerUser(managerId, user.getEmployeeId());
         String normalizedRole = resolveRoleName(roleNameRaw, position);
+        User manager = resolveManagerForAccount(
+                managerId,
+                user.getManagerId(),
+                user.getEmployeeId(),
+                department,
+                normalizedRole,
+                position
+        );
 
         Employee employee = findOrCreateEmployeeForUser(user, email, fullName, employeeCode, position);
         employeeCode = ensureEmployeeCodeForAccount(employee, position, normalizedRole, employeeCode);
@@ -362,10 +378,18 @@ public class HrEmployeeAccountService {
             }
 
             Employee employee = findOrCreateEmployeeForUser(user, email, fullName, employeeCode, position);
-            employeeCode = ensureEmployeeCodeForAccount(employee, position, resolveRoleName(null, position), employeeCode);
-            Integer managerId = user.getManagerId() != null ? user.getManagerId() : employee.getManagerId();
+            String normalizedRole = resolveRoleName(resolvePrimaryRoleName(user), position);
+            employeeCode = ensureEmployeeCodeForAccount(employee, position, normalizedRole, employeeCode);
+            User manager = resolveManagerForAccount(
+                    null,
+                    user.getManagerId() != null ? user.getManagerId() : employee.getManagerId(),
+                    employee.getId(),
+                    department,
+                    normalizedRole,
+                    position
+            );
             employee.setDepartmentId(department == null ? employee.getDepartmentId() : department.getId());
-            employee.setManagerId(managerId);
+            employee.setManagerId(manager == null ? null : manager.getId());
             employee.setActive(user.getActive() == null || user.getActive());
             employee = employeeRepository.save(employee);
 
@@ -416,6 +440,188 @@ public class HrEmployeeAccountService {
         );
 
         return employeeCodeGeneratorService.ensureEmployeeCode(employee, roleName, dashboard);
+    }
+
+    /**
+     * Keeps employee.manager_id and users.manager_id consistent at account creation time.
+     *
+     * Rules:
+     * - HR/Admin-selected manager always wins.
+     * - During edit/resync, keep the existing manager only if that manager still belongs to
+     *   the same department.
+     * - For normal EMPLOYEE accounts with no selected/existing manager, choose an active
+     *   Manager / Project Manager from the same department.
+     * - Manager-level, Department Head, HR/HR Admin, and CEO accounts are not auto-assigned
+     *   to department managers because KPI scoring for those roles uses senior-evaluator rules.
+     */
+    private User resolveManagerForAccount(
+            Integer requestedManagerId,
+            Integer existingManagerId,
+            Integer employeeIdBeingEdited,
+            Department department,
+            String normalizedRole,
+            Position position
+    ) {
+        if (requestedManagerId != null) {
+            User requestedManager = resolveManagerUser(requestedManagerId, employeeIdBeingEdited);
+            validateManagerDepartment(requestedManager, department);
+            validateManagerLikeUser(requestedManager);
+            return requestedManager;
+        }
+
+        if (!shouldAutoAssignDepartmentManager(normalizedRole, position)) {
+            return null;
+        }
+
+        if (existingManagerId != null) {
+            User existingManager = resolveManagerUser(existingManagerId, employeeIdBeingEdited);
+            if (isManagerInDepartment(existingManager, department)) {
+                return existingManager;
+            }
+        }
+
+        if (department == null || department.getId() == null) {
+            return null;
+        }
+
+        return findBestDepartmentManager(department.getId(), employeeIdBeingEdited).orElse(null);
+    }
+
+    private void validateManagerDepartment(User manager, Department department) {
+        if (manager == null || department == null || department.getId() == null || manager.getDepartmentId() == null) {
+            return;
+        }
+
+        if (!Objects.equals(manager.getDepartmentId(), department.getId())) {
+            throw new BadRequestException("Assigned manager must belong to the employee's department");
+        }
+    }
+
+    private boolean isManagerInDepartment(User manager, Department department) {
+        return manager != null
+                && department != null
+                && department.getId() != null
+                && Objects.equals(manager.getDepartmentId(), department.getId());
+    }
+
+    private void validateManagerLikeUser(User manager) {
+        if (manager != null && !isManagerLikeUser(manager)) {
+            throw new BadRequestException("Assigned manager must be an active Manager or Project Manager account");
+        }
+    }
+
+    private boolean shouldAutoAssignDepartmentManager(String normalizedRole, Position position) {
+        String role = normalizeRoleName(normalizedRole);
+
+        if (!"EMPLOYEE".equals(role)) {
+            return false;
+        }
+
+        String positionTitle = normalizeAuthorityName(position == null ? null : position.getPositionTitle());
+
+        return !positionTitle.contains("MANAGER")
+                && !positionTitle.contains("PROJECT_MANAGER")
+                && !positionTitle.contains("TEAM_MANAGER")
+                && !positionTitle.contains("DEPARTMENT_HEAD")
+                && !positionTitle.contains("DEPARTMENTHEAD")
+                && !positionTitle.contains("HEAD_OF_DEPARTMENT")
+                && !positionTitle.contains("HR")
+                && !positionTitle.contains("HUMAN_RESOURCE")
+                && !positionTitle.contains("CEO")
+                && !positionTitle.contains("EXECUTIVE");
+    }
+
+    private Optional<User> findBestDepartmentManager(Integer departmentId, Integer employeeIdBeingEdited) {
+        if (departmentId == null) {
+            return Optional.empty();
+        }
+
+        LinkedHashMap<Integer, User> candidatesById = new LinkedHashMap<>();
+
+        for (User user : userRepository.findActiveManagersByDepartmentId(departmentId)) {
+            candidatesById.put(user.getId(), user);
+        }
+
+        for (User user : userRepository.findByDepartmentIdAndActiveTrue(departmentId)) {
+            if (isManagerLikeUser(user)) {
+                candidatesById.put(user.getId(), user);
+            }
+        }
+
+        return candidatesById.values().stream()
+                .filter(this::isActiveUser)
+                .filter(user -> user.getId() != null)
+                .filter(user -> user.getEmployeeId() == null || !Objects.equals(user.getEmployeeId(), employeeIdBeingEdited))
+                .sorted(Comparator
+                        .comparingLong((User user) -> userRepository.countByManagerId(user.getId()))
+                        .thenComparing(user -> safeText(user.getFullName()), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(User::getId))
+                .findFirst();
+    }
+
+    private boolean isManagerLikeUser(User user) {
+        if (!isActiveUser(user)) {
+            return false;
+        }
+
+        List<String> roles = user.getId() == null
+                ? List.of()
+                : userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
+                .map(this::normalizeAuthorityName)
+                .toList();
+
+        if (roles.stream().anyMatch(this::isManagerRoleName)) {
+            return true;
+        }
+
+        if ("MANAGER_DASHBOARD".equals(normalizeAuthorityName(user.getDashboard()))) {
+            return true;
+        }
+
+        String positionTitle = normalizeAuthorityName(user.getPosition() == null ? null : user.getPosition().getPositionTitle());
+        return isManagerRoleName(positionTitle) || positionTitle.contains("MANAGER");
+    }
+
+    private boolean isManagerRoleName(String value) {
+        String normalized = normalizeAuthorityName(value);
+        return normalized.equals("MANAGER")
+                || normalized.equals("PROJECT_MANAGER")
+                || normalized.equals("PROJECTMANAGER")
+                || normalized.equals("TEAM_MANAGER")
+                || normalized.equals("PM");
+    }
+
+    private boolean isActiveUser(User user) {
+        return user != null && user.getId() != null && (user.getActive() == null || Boolean.TRUE.equals(user.getActive()));
+    }
+
+    private String resolvePrimaryRoleName(User user) {
+        if (user == null || user.getId() == null) {
+            return null;
+        }
+
+        return userRepository.findNormalizedRoleNamesByUserId(user.getId())
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String normalizeAuthorityName(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private String safeText(String value) {
+        String cleaned = clean(value);
+        return cleaned == null ? "" : cleaned;
     }
 
     private User resolveManagerUser(Integer managerId, Integer employeeIdBeingEdited) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/*Z*/import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { profileService, type UserProfile } from '../services/profileService';
 
@@ -31,17 +31,21 @@ const imageSrc = (profile?: UserProfile | null) => {
   return `data:${profile.profileImageType};base64,${profile.profileImageData}`;
 };
 
-const displayRole = (
-  profile?: UserProfile | null,
-  fallbackRole?: string | null,
-) => {
-  const role = profile?.role || profile?.dashboard || fallbackRole || 'Profile';
+const formatRole = (role?: string | null) => {
+  const safeRole = role || 'Profile';
 
-  return role
+  return safeRole
     .replace(/^ROLE_/i, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const displayMeta = (
+  profile?: UserProfile | null,
+  fallbackRole?: string | null,
+) => {
+  return formatRole(profile?.role || profile?.dashboard || fallbackRole);
 };
 
 const ProfileMiniIcon = ({
@@ -100,6 +104,17 @@ const ProfileMiniIcon = ({
           src={avatarSrc}
           alt="Profile"
           className="profile-mini-avatar"
+          style={{
+            width: 36,
+            height: 36,
+            minWidth: 36,
+            maxWidth: 36,
+            maxHeight: 36,
+            borderRadius: 9999,
+            objectFit: 'cover',
+            display: 'block',
+            flex: '0 0 36px',
+          }}
         />
       ) : (
         <span className="profile-mini-initials">
@@ -109,7 +124,7 @@ const ProfileMiniIcon = ({
 
       <span className="profile-mini-text">
         <strong>{name}</strong>
-        <small>{displayRole(profile, fallbackRole)}</small>
+        <small>{displayMeta(profile, fallbackRole)}</small>
       </span>
     </button>
   );

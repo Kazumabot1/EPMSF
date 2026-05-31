@@ -10,7 +10,9 @@ import java.util.Set;
 public class DashboardResolver {
 
     private static final Set<String> SUPPORTED_DASHBOARDS = Set.of(
+            "ADMIN_DASHBOARD",
             "HRADMIN_DASHBOARD",
+            "HR_ADMIN_DASHBOARD",
             "HR_DASHBOARD",
             "EXECUTIVE_DASHBOARD",
             "DEPARTMENT_HEAD_DASHBOARD",
@@ -23,8 +25,10 @@ public class DashboardResolver {
                 ? List.of()
                 : roles.stream().map(this::normalizeRoleName).toList();
 
-        if (hasRole(normalizedRoles, "HRADMIN") || hasRole(normalizedRoles, "ADMIN")) {
-            return "HRADMIN_DASHBOARD";
+        if (hasRole(normalizedRoles, "ADMIN")
+                || hasRole(normalizedRoles, "HRADMIN")
+                || hasRole(normalizedRoles, "HR_ADMIN")) {
+            return "ADMIN_DASHBOARD";
         }
 
         if (hasRole(normalizedRoles, "HR")) {
@@ -64,7 +68,7 @@ public class DashboardResolver {
                 .toUpperCase(Locale.ROOT);
 
         return switch (normalized) {
-            case "HRADMIN", "HRADMIN_DASHBOARD", "ADMIN", "ADMIN_DASHBOARD" -> "HRADMIN_DASHBOARD";
+            case "ADMIN", "HRADMIN", "HR_ADMIN", "ADMIN_DASHBOARD", "HRADMIN_DASHBOARD", "HR_ADMIN_DASHBOARD" -> "ADMIN_DASHBOARD";
             case "HR", "HR_DASHBOARD" -> "HR_DASHBOARD";
             case "CEO", "EXECUTIVE", "CEO_DASHBOARD", "EXECUTIVE_DASHBOARD" -> "EXECUTIVE_DASHBOARD";
             case "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT",
@@ -91,10 +95,6 @@ public class DashboardResolver {
                 .replaceAll("[\\s/-]+", "_")
                 .replaceAll("^_+|_+$", "")
                 .toUpperCase(Locale.ROOT);
-
-        if (normalized.equals("ADMIN") || normalized.equals("ADMIN_DASHBOARD")) {
-            return "HRADMIN";
-        }
 
         if (normalized.equals("DEPARTMENTHEAD")
                 || normalized.equals("DEPT_HEAD")

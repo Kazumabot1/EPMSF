@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/*Z*/import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
 import api from '../../services/api';
@@ -105,10 +105,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
   const normalizedDashboard = normalizeRoleName(dashboard);
 
-  const isHrAdmin =
-      normalizedRoles.includes('HRADMIN') ||
+  const isAdmin =
       normalizedRoles.includes('ADMIN') ||
-      normalizedDashboard === 'HRADMIN_DASHBOARD' ||
       normalizedDashboard === 'ADMIN_DASHBOARD';
 
   const isHr =
@@ -135,7 +133,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       normalizedDashboard === 'EXECUTIVE_DASHBOARD';
 
   const isEmployee =
-      !isHrAdmin &&
+      !isAdmin &&
       !isHr &&
       !isDepartmentHead &&
       !isManager &&
@@ -151,7 +149,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           ? 'HR Admin'
           : variant === 'hr'
               ? 'HR'
-              : isHrAdmin
+              : isAdmin
                   ? 'HR Admin'
                   : isHr
                       ? 'HR'
@@ -221,21 +219,28 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ]
         : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
-    const hrAdminNavItems: NavItem[] = [
-      { to: '/hradmin/dashboard', label: 'HR Admin Dashboard', icon: 'bi bi-shield-lock' },
-      { to: '/hradmin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
-      { to: '/hradmin/employee/import', label: 'Import Accounts', icon: 'bi bi-upload' },
+    const adminNavItems: NavItem[] = [
+      { to: '/admin/dashboard', label: 'HR Admin Dashboard', icon: 'bi bi-shield-lock' },
+      { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
+      { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
       {
-        to: '/hradmin/approval/kpi',
-        label: 'Approval',
-        icon: 'bi bi-shield-check',
+        to: '/admin/kpi-scoring',
+        label: 'KPI Scoring',
+        icon: 'bi bi-ui-checks-grid',
         children: [
-          { to: '/hradmin/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
-          { to: '/hradmin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
-          { to: '/hradmin/approval/changes', label: 'Position & Department Changes', icon: 'bi bi-arrow-left-right' },
+          { to: '/admin/kpi-scoring', label: 'Score Senior KPIs', icon: 'bi bi-clipboard2-check', end: true },
+          { to: '/admin/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
-      { to: '/hradmin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
+      {
+        to: '/admin/approval/kpi',
+        label: 'KPI Approvals',
+        icon: 'bi bi-bullseye',
+        children: [
+          { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
+          { to: '/admin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
+        ],
+      },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -518,7 +523,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
       { to: '/employee/feedback', label: '360 Feedback', icon: 'bi bi-chat-dots' },
-      { to: '/employee/continuous-feedback', label: 'Continuous Feedback', icon: 'bi bi-chat-square-text' },
       { to: '/employee/one-on-ones', label: 'One-on-Ones', icon: 'bi bi-calendar-check' },
       {
         to: '/pip',
@@ -562,12 +566,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
       {
         to: '/manager/kpi-scoring',
-        label: 'Team KPIs',
+        label: 'KPI Evaluation',
         icon: 'bi bi-bullseye',
         children: [
           {
             to: '/manager/kpi-scoring',
-            label: 'KPI Scoring',
+            label: 'Evaluate KPIs',
             icon: 'bi bi-clipboard2-check',
             end: true,
           },
@@ -696,15 +700,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-      {
-        to: '/executive/kpi-scoring',
-        label: 'KPI Management',
-        icon: 'bi bi-bullseye',
-        children: [
-          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
-          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
-        ],
-      },
+      { to: '/executive/approval/changes', label: 'People Change Review', icon: 'bi bi-person-check' },
       {
         to: '/executive/reports',
         label: 'Reports',
@@ -730,11 +726,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         to: '/profile',
         label: 'Profile',
         icon: 'bi bi-person',
-      },
-      hasMyTeams && {
-        to: '/my-team',
-        label: 'My Team',
-        icon: 'bi bi-diagram-3',
       },
       {
         to: '/department-head/self-assessment-forms',
@@ -919,9 +910,9 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-    if (variant === 'admin') return hrAdminNavItems;
+    if (variant === 'admin') return adminNavItems;
     if (variant === 'hr') return hrNavItems;
-    if (isHrAdmin) return hrAdminNavItems;
+    if (isAdmin) return adminNavItems;
     if (isHr) return hrNavItems;
     if (isDepartmentHead) return departmentHeadNavItems;
     if (isExecutive) return executiveNavItems;
@@ -931,7 +922,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     return hrNavItems;
   }, [
     variant,
-    isHrAdmin,
+    isAdmin,
     isHr,
     isDepartmentHead,
     isExecutive,

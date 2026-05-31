@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
 import FormSignaturePicker, { type FormSignatureValue } from '../../components/signature/FormSignaturePicker';
 import type { AssessmentScoreBand, AssessmentScoreRow, EmployeeAssessment } from '../../types/employeeAssessment';
@@ -489,9 +489,21 @@ const SelfAssessmentRecordTable = ({
             <td>{formatDisplayDateTime(record.submittedAt || record.approvedAt)}</td>
             <td>
               <div className="assessment-score-actions">
-                <button type="button" onClick={() => onView(record)} disabled={viewLoading}>{viewLabel}</button>
+                <button
+                  className="assessment-score-action-btn assessment-score-action-btn--view"
+                  type="button"
+                  onClick={() => onView(record)}
+                  disabled={viewLoading}
+                >
+                  {viewLabel}
+                </button>
                 {showExport && (
-                  <button type="button" onClick={() => onExport(record)} disabled={exportingId === record.id}>
+                  <button
+                    className="assessment-score-action-btn assessment-score-action-btn--export"
+                    type="button"
+                    onClick={() => onExport(record)}
+                    disabled={exportingId === record.id}
+                  >
                     {exportingId === record.id ? 'Exporting...' : 'Export PDF'}
                   </button>
                 )}

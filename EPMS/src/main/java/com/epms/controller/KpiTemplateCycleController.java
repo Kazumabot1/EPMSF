@@ -1,8 +1,10 @@
 package com.epms.controller;
 
+import com.epms.dto.KpiCycleActivationReadinessDto;
 import com.epms.dto.KpiTemplateCycleRequestDTO;
 import com.epms.dto.KpiTemplateCycleResponseDTO;
 import com.epms.dto.KpiTemplateCycleStatusRequestDTO;
+import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.KpiTemplateCycleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import java.util.List;
 public class KpiTemplateCycleController {
 
     private final KpiTemplateCycleService cycleService;
+    private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @PostMapping
     public ResponseEntity<KpiTemplateCycleResponseDTO> create(@Valid @RequestBody KpiTemplateCycleRequestDTO dto) {
@@ -48,5 +51,10 @@ public class KpiTemplateCycleController {
             @Valid @RequestBody KpiTemplateCycleStatusRequestDTO request
     ) {
         return ResponseEntity.ok(cycleService.updateStatus(id, request));
+    }
+
+    @GetMapping("/{id}/activation-readiness")
+    public ResponseEntity<KpiCycleActivationReadinessDto> activationReadiness(@PathVariable Integer id) {
+        return ResponseEntity.ok(employeeKpiWorkflowService.buildCycleActivationReadiness(id));
     }
 }

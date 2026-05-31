@@ -1,4 +1,4 @@
-:root {
+/*Z*/:root {
   --employee-sidebar-width: 292px;
   --employee-sidebar-collapsed-width: 96px;
   --employee-header-height: 86px;
@@ -117,7 +117,7 @@
   display: grid;
   place-items: center;
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   box-shadow: 0 12px 22px rgba(37, 99, 235, 0.22);
 }
 
@@ -518,7 +518,7 @@
   height: 36px;
   border-radius: 999px;
   background: #f3e8ff;
-  color: #6d28d9;
+  color: #1d4ed8;
   display: grid;
   place-items: center;
   font-size: 0.82rem;
@@ -771,7 +771,7 @@
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  border: 2px solid #ede9fe;
+  border: 2px solid #dbeafe;
   flex: 0 0 auto;
 }
 
@@ -784,7 +784,7 @@
   display: grid;
   place-items: center;
   background: #f3e8ff;
-  color: #6d28d9;
+  color: #1d4ed8;
   font-size: 12px;
   font-weight: 900;
 }
@@ -901,3 +901,36 @@
   }
 }
 
+
+
+/* Compact header profile chip: keep details on profile page, not in the mini icon. */
+.hr-user-chip,
+.employee-user-chip,
+.profile-mini-button {
+  max-width: 220px;
+  min-width: 0;
+}
+
+.hr-user-chip-meta,
+.employee-user-meta,
+.profile-mini-text {
+  min-width: 0;
+}
+
+.hr-user-chip-meta strong,
+.employee-user-meta span,
+.profile-mini-text strong {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hr-user-chip-meta small,
+.employee-user-meta small,
+.profile-mini-text small {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

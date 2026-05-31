@@ -1,8 +1,10 @@
 package com.epms.service;
 
+import com.epms.dto.AssignKpiEvaluatorRequest;
 import com.epms.dto.EmployeeKpiResultDto;
 import com.epms.dto.FinalizeEmployeeKpiRequest;
 import com.epms.dto.HrEmployeeKpiRowDto;
+import com.epms.dto.KpiCycleActivationReadinessDto;
 import com.epms.dto.ManagerKpiAssignmentDto;
 import com.epms.dto.ManagerKpiTemplateSummaryDto;
 import com.epms.dto.UpdateEmployeeKpiScoresRequest;
@@ -63,4 +65,8 @@ public interface EmployeeKpiWorkflowService {
 
     /** Assigned / in-progress KPI forms (scores as entered by managers; not yet finalized). */
     List<HrEmployeeKpiRowDto> listInProgressForHr();
+
+    KpiCycleActivationReadinessDto buildCycleActivationReadiness(Integer cycleId);
+
+    void assignManualEvaluator(Integer employeeKpiFormId, AssignKpiEvaluatorRequest request);
 }

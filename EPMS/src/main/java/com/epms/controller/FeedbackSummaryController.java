@@ -3,8 +3,8 @@ package com.epms.controller;
 import com.epms.dto.FeedbackCampaignSummaryResponse;
 import com.epms.dto.FeedbackIntegrationScoreResponse;
 import com.epms.dto.FeedbackMyResultResponse;
-import com.epms.dto.FeedbackTeamSummaryResponse;
 import com.epms.dto.FeedbackSummaryPublishRequest;
+import com.epms.dto.FeedbackTeamSummaryResponse;
 import com.epms.dto.GenericApiResponse;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.security.SecurityUtils;
@@ -14,9 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -29,9 +29,7 @@ public class FeedbackSummaryController {
     private final FeedbackSummaryService feedbackSummaryService;
 
     @GetMapping("/campaigns/{campaignId}/summary")
-    public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> getCampaignSummary(
-            @PathVariable Long campaignId
-    ) {
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> getCampaignSummary(@PathVariable Long campaignId) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Feedback campaign summary retrieved successfully",
@@ -40,9 +38,7 @@ public class FeedbackSummaryController {
     }
 
     @PostMapping("/campaigns/{campaignId}/summary/recalculate")
-    public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> recalculateCampaignSummary(
-            @PathVariable Long campaignId
-    ) {
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> recalculateCampaignSummary(@PathVariable Long campaignId) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Feedback campaign summary recalculated successfully",
@@ -63,9 +59,7 @@ public class FeedbackSummaryController {
     }
 
     @PostMapping("/campaigns/{campaignId}/summary/unpublish")
-    public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> unpublishCampaignSummary(
-            @PathVariable Long campaignId
-    ) {
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignSummaryResponse>> unpublishCampaignSummary(@PathVariable Long campaignId) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Feedback campaign summary unpublished successfully",
@@ -74,9 +68,7 @@ public class FeedbackSummaryController {
     }
 
     @GetMapping("/integration/scores")
-    public ResponseEntity<GenericApiResponse<List<FeedbackIntegrationScoreResponse>>> getIntegrationScores(
-            @RequestParam Long campaignId
-    ) {
+    public ResponseEntity<GenericApiResponse<List<FeedbackIntegrationScoreResponse>>> getIntegrationScores(@RequestParam Long campaignId) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "360 feedback integration scores retrieved successfully",
@@ -85,9 +77,7 @@ public class FeedbackSummaryController {
     }
 
     @GetMapping("/integration/scores/employee/{employeeId}")
-    public ResponseEntity<GenericApiResponse<List<FeedbackIntegrationScoreResponse>>> getIntegrationScoresForEmployee(
-            @PathVariable Long employeeId
-    ) {
+    public ResponseEntity<GenericApiResponse<List<FeedbackIntegrationScoreResponse>>> getIntegrationScoresForEmployee(@PathVariable Long employeeId) {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "360 feedback integration scores for employee retrieved successfully",
@@ -107,7 +97,7 @@ public class FeedbackSummaryController {
     public ResponseEntity<GenericApiResponse<FeedbackTeamSummaryResponse>> getTeamSummary() {
         ensureManagerOrDepartmentHead();
         return ResponseEntity.ok(GenericApiResponse.success(
-                "Team feedback summary retrieved successfully",
+                "Privacy-safe managed employee feedback summary retrieved successfully",
                 feedbackSummaryService.getTeamSummary(SecurityUtils.currentUserId().longValue())
         ));
     }
@@ -129,7 +119,7 @@ public class FeedbackSummaryController {
         List<String> roles = SecurityUtils.currentUser().getRoles();
         boolean authorized = roles != null && roles.stream()
                 .map(this::normalizeRoleName)
-                .anyMatch(role -> role.equals("HR") || role.equals("HRADMIN"));
+                .anyMatch(role -> role.equals("HR") || role.equals("ADMIN") || role.equals("HRADMIN") || role.equals("HR_ADMIN"));
         if (!authorized) {
             throw new UnauthorizedActionException("Only HR or HR Admin can access feedback summaries.");
         }
@@ -140,18 +130,20 @@ public class FeedbackSummaryController {
     }
 
     private boolean isDepartmentHeadDashboard(String dashboard) {
+        String compact = dashboard.replace("_", "");
         return dashboard.equals("DEPARTMENT_HEAD_DASHBOARD")
-                || dashboard.equals("DEPARTMENTHEAD_DASHBOARD")
+                || compact.equals("DEPARTMENT" + "HEAD" + "DASHBOARD")
                 || dashboard.equals("DEPT_HEAD_DASHBOARD");
     }
 
     private boolean isManagerRole(String role) {
-        return role.equals("MANAGER") || role.equals("PROJECT_MANAGER") || role.equals("TEAM_MANAGER");
+        return role.equals("MANAGER") || role.equals("PROJECT_MANAGER") || role.equals("TEAM_MANAGER") || role.equals("TEAM_LEADER") || role.equals("PM");
     }
 
     private boolean isDepartmentHeadRole(String role) {
+        String compact = role.replace("_", "");
         return role.equals("DEPARTMENT_HEAD")
-                || role.equals("DEPARTMENTHEAD")
+                || compact.equals("DEPARTMENT" + "HEAD")
                 || role.equals("DEPT_HEAD")
                 || role.equals("HEAD_OF_DEPARTMENT");
     }

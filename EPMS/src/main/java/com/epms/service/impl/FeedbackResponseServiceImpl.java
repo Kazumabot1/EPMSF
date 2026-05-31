@@ -29,6 +29,7 @@ import com.epms.util.FeedbackScoreUtil;
 import com.epms.service.FeedbackAssignmentQuestionSnapshotService;
 import com.epms.service.FeedbackResponseService;
 import com.epms.service.FeedbackSummaryService;
+import com.epms.service.FeedbackWorkRelationshipResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private final FeedbackSummaryService feedbackSummaryService;
     private final FeedbackAssignmentQuestionSnapshotService assignmentQuestionSnapshotService;
     private final FeedbackCampaignCompetencyWeightRepository competencyWeightRepository;
+    private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     @Override
     @Transactional
@@ -408,9 +410,12 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     }
 
     private boolean isManagerOfTarget(Long targetEmployeeId, Long requestingEmployeeId) {
-        return userRepository.findByEmployeeId(targetEmployeeId.intValue())
-                .map(user -> Objects.equals(user.getManagerId(), userRepository.findByEmployeeId(requestingEmployeeId.intValue()).map(User::getId).orElse(null)))
-                .orElse(false);
+        if (targetEmployeeId == null || requestingEmployeeId == null) {
+            return false;
+        }
+        User target = userRepository.findByEmployeeId(targetEmployeeId.intValue()).orElse(null);
+        User requester = userRepository.findByEmployeeId(requestingEmployeeId.intValue()).orElse(null);
+        return workRelationshipResolver.isWorkContextManager(target, requester);
     }
 
     private LocalDateTime resolveEffectiveDeadline(FeedbackEvaluatorAssignment assignment) {

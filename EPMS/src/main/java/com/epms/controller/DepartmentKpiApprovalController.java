@@ -7,6 +7,7 @@ import com.epms.service.DepartmentKpiService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,13 @@ import java.util.List;
 @RestController
 @RequestMapping({"/api/hradmin/department-kpi-approvals", "/api/executive/department-kpi-approvals"})
 @RequiredArgsConstructor
+@PreAuthorize(
+        "hasAnyRole('ADMIN','HRADMIN','HR_ADMIN') "
+                + "or hasAnyAuthority('ROLE_ADMIN','ROLE_HRADMIN','ROLE_HR_ADMIN','ADMIN','HRADMIN','HR_ADMIN') "
+                + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'HR_ADMIN_DASHBOARD'"
+)
 public class DepartmentKpiApprovalController {
 
     private final DepartmentKpiService service;

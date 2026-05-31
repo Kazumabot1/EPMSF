@@ -1,4 +1,4 @@
-export type DashboardChartDatum = {
+/*Z*/export type DashboardChartDatum = {
     label: string;
     value: number;
     percentage?: number;
@@ -20,7 +20,7 @@ export const DASHBOARD_CHART_COLORS = [
     '#ffbd72',
     '#f6d365',
     '#f59aaa',
-    '#a78bfa',
+    '#3b82f6',
     '#94a3b8',
 ];
 
@@ -225,3 +225,4 @@ export const buildCompletionBars = <T,>(
         .sort((left, right) => right.value - left.value)
         .slice(0, limit);
 };
+

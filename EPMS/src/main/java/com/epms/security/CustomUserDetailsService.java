@@ -42,7 +42,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
         if (Boolean.FALSE.equals(user.getActive())) {
-            throw new DisabledException("This account is inactive for now. Please contact HR or HR Admin to verify!");
+            throw new DisabledException("This account is inactive for now. Please contact the HR or Admin to verify!");
         }
 
         List<UserRole> userRoles = userRoleRepository.findByUserId(user.getId());
@@ -143,7 +143,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         }
 
         return switch (dashboard) {
-            case "HRADMIN_DASHBOARD", "ADMIN_DASHBOARD" -> "HRADMIN";
+            case "ADMIN_DASHBOARD", "HRADMIN_DASHBOARD", "HR_ADMIN_DASHBOARD" -> "ADMIN";
             case "HR_DASHBOARD" -> "HR";
             case "MANAGER_DASHBOARD" -> "MANAGER";
             case "DEPARTMENT_HEAD_DASHBOARD" -> "DEPARTMENT_HEAD";
@@ -166,7 +166,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .replaceAll("^_+|_+$", "")
                 .toUpperCase();
 
-        if (normalized.equals("ADMIN") || normalized.equals("ADMIN_DASHBOARD")) {
+        if (normalized.equals("HRADMIN")
+                || normalized.equals("HR_ADMIN")) {
             return "HRADMIN";
         }
 

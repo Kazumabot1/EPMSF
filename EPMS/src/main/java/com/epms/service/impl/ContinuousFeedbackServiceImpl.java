@@ -64,8 +64,11 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
         assertCanGiveFeedback();
         Team team = requireTeamInCurrentDepartment(teamId);
 
+        Integer currentEmployeeId = resolveCurrentEmployeeId();
+
         return getActiveEmployeeOptions(team)
                 .stream()
+                .filter(option -> !Objects.equals(option.getEmployeeId(), currentEmployeeId))
                 .sorted(employeeOptionComparator())
                 .toList();
     }
@@ -80,8 +83,11 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
         }
 
         Integer departmentId = requireCurrentUserDepartmentId();
+        Integer currentEmployeeId = resolveCurrentEmployeeId();
+
         return employeeRepository.findActiveDropdownEmployeesByDepartmentId(departmentId)
                 .stream()
+                .filter(employee -> !Objects.equals(employee.getId(), currentEmployeeId))
                 .map(this::toEmployeeOption)
                 .sorted(employeeOptionComparator())
                 .toList();
@@ -94,6 +100,12 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
         assertCanGiveFeedback();
 
         Integer currentUserId = SecurityUtils.currentUserId();
+        Integer currentEmployeeId = resolveCurrentEmployeeId();
+
+        if (currentEmployeeId != null && Objects.equals(currentEmployeeId, request.getEmployeeId())) {
+            throw new UnauthorizedActionException("You cannot send continuous feedback to yourself.");
+        }
+
         Integer departmentId = requireCurrentUserDepartmentId();
 
         Team team = null;
@@ -263,9 +275,16 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
     }
 
     private Employee requireActiveEmployeeInScope(Integer employeeId, Integer departmentId, Team team) {
+        Integer currentEmployeeId = resolveCurrentEmployeeId();
+
+        if (currentEmployeeId != null && Objects.equals(currentEmployeeId, employeeId)) {
+            throw new UnauthorizedActionException("You cannot send continuous feedback to yourself.");
+        }
+
         if (team != null) {
             return getActiveEmployeesFromTeam(team)
                     .stream()
+                    .filter(employee -> !Objects.equals(employee.getId(), currentEmployeeId))
                     .filter(employee -> Objects.equals(employee.getId(), employeeId))
                     .findFirst()
                     .orElseThrow(() -> new UnauthorizedActionException("You can select only active employees from the selected team."));
@@ -273,6 +292,7 @@ public class ContinuousFeedbackServiceImpl implements ContinuousFeedbackService 
 
         return employeeRepository.findActiveDropdownEmployeesByDepartmentId(departmentId)
                 .stream()
+                .filter(employee -> !Objects.equals(employee.getId(), currentEmployeeId))
                 .filter(employee -> Objects.equals(employee.getId(), employeeId))
                 .findFirst()
                 .orElseThrow(() -> new UnauthorizedActionException("You can select only active employees from your department."));

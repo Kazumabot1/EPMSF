@@ -1,6 +1,4 @@
-/* KHN new file */
-/* (Styling for team management components, following established HR UI patterns) */
-
+/*Z*/
 .team-page {
   animation: fadeIn 0.4s ease-out;
 }
@@ -915,5 +913,129 @@
 @media (max-width: 900px) {
   .team-detail-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+
+/* My Team page production cleanup: restore card layout and blue theme */
+.team-page {
+  background: linear-gradient(135deg, #f8fbff 0%, #f1f7ff 52%, #f8fafc 100%) !important;
+}
+.team-header {
+  border: 1px solid #dbeafe;
+  border-radius: 24px;
+  padding: 22px 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.08);
+}
+.team-eyebrow {
+  color: #2563eb !important;
+}
+.team-header h1 {
+  color: #0f172a;
+  letter-spacing: -0.035em;
+}
+.team-header p {
+  color: #475569;
+  line-height: 1.55;
+}
+.team-btn,
+.team-action-btn {
+  border: 1px solid #dbeafe !important;
+  border-radius: 14px !important;
+  padding: 0.68rem 1rem !important;
+  box-shadow: none !important;
+}
+.team-btn-primary,
+.team-btn.primary {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
+.team-btn-secondary,
+.team-btn.secondary {
+  background: #ffffff !important;
+  color: #1d4ed8 !important;
+}
+.team-btn-danger,
+.team-action-btn.danger {
+  background: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+.team-stat-card,
+.team-card,
+.team-form-card,
+.team-members-box {
+  border: 1px solid #dbeafe !important;
+  border-radius: 22px !important;
+  background: rgba(255,255,255,0.96) !important;
+  box-shadow: 0 16px 42px rgba(37, 99, 235, 0.075) !important;
+}
+.team-stat-card span,
+.team-details-card span,
+.team-detail-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+.team-stat-card strong,
+.team-details-card strong,
+.team-detail-grid strong {
+  display: block;
+  margin-top: 0.45rem;
+  color: #0f172a;
+  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+  font-weight: 950;
+  letter-spacing: -0.035em;
+}
+.team-details-grid,
+.team-detail-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.team-details-card,
+.team-detail-grid > div {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 14px;
+}
+.team-details-section,
+.team-detail-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.team-details-section h3,
+.team-detail-section h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 900;
+}
+.team-details-section p,
+.team-detail-section p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.55;
+}
+.team-table th {
+  background: #f1f7ff !important;
+  color: #334155 !important;
+}
+.team-table tr:hover td,
+.team-table tbody tr:hover {
+  background: #f8fbff !important;
+}
+@media (max-width: 1100px) {
+  .team-details-grid,
+  .team-detail-grid,
+  .team-stat-grid {
+    grid-template-columns: 1fr !important;
   }
 }

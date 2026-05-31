@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+/*Z*/import { useEffect, useMemo, useState } from "react";
 import type { ReactNode, SVGProps } from "react";
 import { Link } from "react-router-dom";
 import { DashboardShell, DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from "../../components/dashboard";
@@ -756,7 +756,7 @@ const ManagerDashboard = () => {
                 ? "KPI assignments need manager scoring."
                 : "No KPI work is currently open.",
             href: "/manager/kpi-scoring",
-            actionLabel: "Open Team KPIs",
+            actionLabel: "Open KPI Evaluation",
             icon: <ChartIcon className="h-5 w-5" />,
             tone: openKpiAssignments ? "emerald" : "slate",
             progress: openKpiAssignments ? Math.min(openKpiAssignments * 10, 100) : 0,
@@ -825,7 +825,7 @@ const ManagerDashboard = () => {
         },
         {
             id: "focus-team-kpis",
-            label: "Team KPIs",
+            label: "KPI Evaluation",
             value: openKpiAssignments
                 ? `${openKpiAssignments} assignment${openKpiAssignments > 1 ? "s" : ""} open`
                 : "No open KPI work",
@@ -926,7 +926,7 @@ const ManagerDashboard = () => {
         const kpiItems = data.kpiTemplates.slice(0, 3).map(
             (template, index): UpcomingItem => ({
                 id: `kpi-${template.kpiFormId}-${template.cyclePeriodId ?? "cycle"}-${index}`,
-                title: template.title || "Team KPI assignment",
+                title: template.title || "KPI evaluation assignment",
                 subtitle: template.periodEndDate
                     ? `KPI period ends ${formatShortDate(template.periodEndDate)}`
                     : `${template.openAssignments ?? 0} open assignments`,

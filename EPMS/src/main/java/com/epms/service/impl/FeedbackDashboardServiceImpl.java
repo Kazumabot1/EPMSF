@@ -20,6 +20,7 @@ import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
 import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackDashboardService;
+import com.epms.service.FeedbackWorkRelationshipResolver;
 import com.epms.util.FeedbackPrivacyUtil;
 import com.epms.util.FeedbackScoreUtil;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
     private final FeedbackCampaignRepository campaignRepository;
     private final FeedbackFormRepository feedbackFormRepository;
     private final UserRepository userRepository;
+    private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -70,17 +72,15 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
     public FeedbackDashboardResponse getManagerDashboard(Long userId, List<String> roles) {
         Long managerEmployeeId = resolveEmployeeIdForUser(userId);
         List<FeedbackSubmissionStatusResponse> pending = buildPendingStatuses(managerEmployeeId);
-        List<User> directReports = userRepository.findByManagerIdAndActiveTrue(userId.intValue());
-        List<Long> directReportIds = directReports.stream()
-                .map(User::getEmployeeId)
-                .filter(Objects::nonNull)
-                .map(Integer::longValue)
+        User managerUser = userRepository.findById(userId.intValue())
+                .orElseThrow(() -> new BusinessValidationException("This user is not linked to an employee record."));
+        List<Long> workContextEmployeeIds = workRelationshipResolver.resolveSubordinateEmployeeIds(managerUser).stream()
                 .distinct()
                 .toList();
 
-        List<TeamFeedbackSummaryResponse> summaries = directReportIds.isEmpty()
+        List<TeamFeedbackSummaryResponse> summaries = workContextEmployeeIds.isEmpty()
                 ? List.of()
-                : buildTeamSummaries(directReportIds);
+                : buildTeamSummaries(workContextEmployeeIds);
 
         return FeedbackDashboardResponse.builder()
                 .dashboardType("MANAGER")

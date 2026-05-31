@@ -1,6 +1,7 @@
 import api from './api';
 import { extractApiErrorMessage } from './apiError';
 import type {
+  KpiCycleActivationReadiness,
   KpiTemplateCycleRequest,
   KpiTemplateCycleResponse,
   KpiTemplateCycleStatusRequest,
@@ -42,6 +43,15 @@ export const kpiTemplateCycleService = {
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to update KPI template cycle.'));
+    }
+  },
+
+  async activationReadiness(id: number): Promise<KpiCycleActivationReadiness> {
+    try {
+      const response = await api.get<KpiCycleActivationReadiness>(`${BASE}/${id}/activation-readiness`);
+      return response.data;
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Failed to check KPI cycle activation readiness.'));
     }
   },
 
