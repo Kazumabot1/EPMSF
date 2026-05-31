@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import ProfileAvatar from '../../components/ProfileAvatar';
 import {
   fetchDepartmentHeadEmployees,
   fetchDepartmentHeadTeams,
@@ -120,6 +121,33 @@ const buildTeamNameMap = (teams: DepartmentHeadTeam[]) => {
 
 const formatDepartment = (employee: DepartmentHeadEmployee) =>
   String(employee.workingDepartment ?? employee.currentDepartment ?? employee.parentDepartment ?? '-');
+
+const firstText = (...values: Array<unknown>) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+const profileImageDataOf = (employee: DepartmentHeadEmployee) =>
+  firstText(
+    employee.profileImageData,
+    employee.profile_image_data,
+    employee.avatarData,
+    employee.profilePictureData,
+    employee.profilePicture,
+  );
+
+const profileImageTypeOf = (employee: DepartmentHeadEmployee) =>
+  firstText(
+    employee.profileImageType,
+    employee.profile_image_type,
+    employee.avatarType,
+    employee.profilePictureType,
+  );
 
 const DepartmentEmployeeListsPage = () => {
   const [employees, setEmployees] = useState<DepartmentHeadEmployee[]>([]);
@@ -374,9 +402,17 @@ const DepartmentEmployeeListsPage = () => {
                   <tr key={`${employee.id ?? 'employee'}-${employee.userId ?? employee.email}`}>
                     <td>
                       <div className="dept-employee-list-person">
-                        <div className="dept-employee-list-avatar">
-                          {employee.displayName.slice(0, 1).toUpperCase()}
-                        </div>
+                        <ProfileAvatar
+                          userId={employee.userId ?? employee.id}
+                          fullName={employee.displayName}
+                          firstName={employee.firstName}
+                          lastName={employee.lastName}
+                          email={employee.email}
+                          profileImageData={profileImageDataOf(employee)}
+                          profileImageType={profileImageTypeOf(employee)}
+                          size="md"
+                          className="dept-employee-list-profile-avatar"
+                        />
                         <div>
                           <strong>{employee.displayName}</strong>
                           <span>{employee.employeeCode || employee.email || '-'}</span>
