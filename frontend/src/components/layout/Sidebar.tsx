@@ -566,12 +566,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
       {
         to: '/manager/kpi-scoring',
-        label: 'Team KPIs',
+        label: 'KPI Evaluation',
         icon: 'bi bi-bullseye',
         children: [
           {
             to: '/manager/kpi-scoring',
-            label: 'KPI Scoring',
+            label: 'Evaluate KPIs',
             icon: 'bi bi-clipboard2-check',
             end: true,
           },

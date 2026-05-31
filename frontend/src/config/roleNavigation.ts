@@ -1,4 +1,4 @@
-import type { PositionPermission } from '../types/positionPermission';
+/*Z*/import type { PositionPermission } from '../types/positionPermission';
 
 export type UserRole =
     | 'Employee'
@@ -365,12 +365,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       ],
     },
     {
-      label: 'Team KPIs',
+      label: 'KPI Evaluation',
       path: '/manager/kpi-scoring',
       icon: 'bi-bullseye',
       permissionField: 'kpiInput',
       children: [
-        { label: 'KPI Scoring', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'Evaluate KPIs', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
         { label: 'KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
       ],
     },
