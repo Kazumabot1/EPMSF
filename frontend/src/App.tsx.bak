@@ -38,6 +38,7 @@ import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
+import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
 import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
 import DepartmentHeadEmployeeListsPage from './pages/department-head/DepartmentEmployeeListsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -62,6 +63,13 @@ import KpiTemplateCycleListPage from './pages/hr/kpi-template/KpiTemplateCycleLi
 import KpiTemplateCycleEditorPage from './pages/hr/kpi-template/KpiTemplateCycleEditorPage';
 import KpiVersionHistoryPage from './pages/hr/kpi-template/KpiVersionHistoryPage';
 import HrEmployeeKpiListPage from './pages/hr/kpi-template/HrEmployeeKpiListPage';
+import DepartmentKpiTemplateListPage from './pages/hr/department-kpi/DepartmentKpiTemplateListPage';
+import DepartmentKpiTemplateEditorPage from './pages/hr/department-kpi/DepartmentKpiTemplateEditorPage';
+import DepartmentKpiCycleListPage from './pages/hr/department-kpi/DepartmentKpiCycleListPage';
+import DepartmentKpiCycleEditorPage from './pages/hr/department-kpi/DepartmentKpiCycleEditorPage';
+import DepartmentKpiScoringPage from './pages/hr/department-kpi/DepartmentKpiScoringPage';
+import DepartmentKpiResultsPage from './pages/hr/department-kpi/DepartmentKpiResultsPage';
+
 import ForceChangePasswordPage from './pages/auth/ForceChangePasswordPage';
 import Notifications from './pages/Notifications';
 import NotificationSettings from './pages/NotificationSettings';
@@ -83,13 +91,6 @@ import { appraisalRoutes } from './routes/appraisalRoutes';
 import { useAuth } from './contexts/AuthContext';
 import { dashboardPathByRole, resolveUserRole } from './config/roleNavigation';
 
-
-const DepartmentKpiTemplateListPage = () => null;
-const DepartmentKpiTemplateEditorPage = () => null;
-const DepartmentKpiCycleListPage = () => null;
-const DepartmentKpiCycleEditorPage = () => null;
-const DepartmentKpiScoringPage = () => null;
-const DepartmentKpiResultsPage = () => null;
 type RedirectWithMessageProps = {
   message: string;
   to?: string;
@@ -191,6 +192,7 @@ function App() {
                 <Route path="/admin/kpi-scoring" element={<ManagerKpiScoringPage />} />
                 <Route path="/admin/kpi/history" element={<ManagerKpiHistoryPage />} />
                 <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
+                <Route path="/admin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
                 <Route path="/position-permissions" element={<PositionPermissions />} />
               </Route>
             </Route>
