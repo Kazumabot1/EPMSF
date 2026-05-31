@@ -455,8 +455,8 @@ const PositionPermissions = () => {
                                 style={{
                                   padding: 18,
                                   borderRadius: 20,
-                                  border: active ? '1px solid rgba(79, 70, 229, 0.55)' : '1px solid rgba(148, 163, 184, 0.32)',
-                                  background: active ? 'linear-gradient(135deg, rgba(79, 70, 229, 0.14), rgba(14, 165, 233, 0.12))' : 'rgba(248, 250, 252, 0.9)',
+                                  border: active ? '1px solid rgba(37, 99, 235, 0.55)' : '1px solid rgba(148, 163, 184, 0.32)',
+                                  background: active ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(14, 165, 233, 0.12))' : 'rgba(248, 250, 252, 0.9)',
                                   textAlign: 'left',
                                 }}
                               >

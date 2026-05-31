@@ -308,7 +308,7 @@ const KpiTemplateEditorPage = () => {
     return (
       <div className="kpi-tpl-page">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-center px-4 py-28">
-          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-300 to-gray-200" />
+          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-300 to-gray-200" />
           <p className="text-sm font-medium text-gray-600">Loading editor…</p>
         </div>
       </div>
@@ -320,11 +320,11 @@ const KpiTemplateEditorPage = () => {
       <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
         <div className="mb-10 flex flex-col gap-6 border-b border-gray-200/90 pb-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-violet-800 text-2xl text-white shadow-lg shadow-violet-900/20 ring-4 ring-violet-500/10">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 text-2xl text-white shadow-lg shadow-blue-900/20 ring-4 ring-blue-500/10">
               <i className="bi bi-sliders" aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">
                 {isEdit ? 'Edit template' : 'Create template'}
               </p>
               <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
@@ -362,7 +362,7 @@ const KpiTemplateEditorPage = () => {
           <section className="kpi-tpl-card overflow-hidden p-0">
             <div className="p-6 sm:p-8">
               <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
                   <i className="bi bi-info-circle text-xl" aria-hidden />
                 </span>
                 <div>
@@ -469,7 +469,7 @@ const KpiTemplateEditorPage = () => {
 
             <div className="flex flex-wrap items-end justify-between gap-4 border-y border-gray-100 bg-gradient-to-r from-gray-50 to-white px-6 py-6 sm:px-8">
               <div className="flex items-start gap-4">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
                   <i className="bi bi-table text-xl" aria-hidden />
                 </span>
                 <div>

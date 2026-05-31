@@ -143,14 +143,14 @@ const KpiTemplateCycleListPage = () => {
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-7xl px-4 py-8 pb-20">
         <header className="kpi-tpl-card--hero relative overflow-hidden p-6 sm:p-8 lg:p-10">
-          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl" aria-hidden />
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl" aria-hidden />
           <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex max-w-2xl gap-5">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-violet-800 text-3xl text-white shadow-lg shadow-violet-900/25 ring-4 ring-violet-500/15">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 text-3xl text-white shadow-lg shadow-blue-900/25 ring-4 ring-blue-500/15">
                 <i className="bi bi-arrow-repeat" aria-hidden />
               </div>
               <div className="min-w-0 pt-0.5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-violet-700/90">Human Resources</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-700/90">Human Resources</p>
                 <h1 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">KPI template cycles</h1>
                 <p className="mt-3 text-sm leading-relaxed text-gray-600">
                   Group KPI forms into evaluation periods with start dates and configurable durations.
@@ -214,7 +214,7 @@ const KpiTemplateCycleListPage = () => {
                       return (
                       <tr
                         key={cycle.id}
-                        className={`transition-colors hover:bg-violet-50/50 ${locked ? 'bg-gray-50 opacity-65' : ''}`}
+                        className={`transition-colors hover:bg-blue-50/50 ${locked ? 'bg-gray-50 opacity-65' : ''}`}
                       >
                         <td className="px-4 py-4 tabular-nums text-gray-600">{index + 1}</td>
                         <td className="px-4 py-4 font-semibold text-gray-900">
@@ -388,7 +388,7 @@ const KpiTemplateCycleListPage = () => {
                   onChange={(event) => setCloseReason(event.target.value)}
                   rows={5}
                   maxLength={1000}
-                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-violet-500"
+                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-blue-500"
                 />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-gray-700">
@@ -396,7 +396,7 @@ const KpiTemplateCycleListPage = () => {
                 <select
                   value={graceExtension}
                   onChange={(event) => setGraceExtension(event.target.value as KpiGraceExtension)}
-                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-violet-500"
+                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-blue-500"
                 >
                   {graceOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>

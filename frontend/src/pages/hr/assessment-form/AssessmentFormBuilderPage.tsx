@@ -423,9 +423,9 @@ const canDeactivate = (item: AssessmentFormResponse) => {
 };
 
   return (
-    <div className="sa-form-builder-page min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/60 to-slate-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/60 to-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="sa-builder-hero relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-sky-700 p-6 shadow-xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-sky-700 p-6 shadow-xl">
           <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10" />
           <div className="absolute -bottom-20 right-20 h-56 w-56 rounded-full bg-white/10" />
 
@@ -469,24 +469,24 @@ const canDeactivate = (item: AssessmentFormResponse) => {
         )}
 
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="sa-builder-metric rounded-3xl border border-white bg-white/90 p-5 shadow-sm">
+          <div className="rounded-3xl border border-white bg-white/90 p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">Active Forms</p>
             <p className="mt-2 text-3xl font-black text-slate-900">{activeForms.length}</p>
           </div>
 
-          <div className="sa-builder-metric rounded-3xl border border-white bg-white/90 p-5 shadow-sm">
+          <div className="rounded-3xl border border-white bg-white/90 p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">Created Forms</p>
             <p className="mt-2 text-3xl font-black text-slate-900">{forms.length}</p>
           </div>
 
-          <div className="sa-builder-metric rounded-3xl border border-white bg-white/90 p-5 shadow-sm">
+          <div className="rounded-3xl border border-white bg-white/90 p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">Assessment Subjects</p>
             <p className="mt-2 text-3xl font-black text-slate-900">{totalSubjects}</p>
           </div>
         </div>
 
         {activeFormExists && (
-          <div className="sa-builder-alert rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
             <div className="flex gap-3">
               <i className="bi bi-exclamation-triangle-fill text-lg" />
               <div>
@@ -499,7 +499,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
           </div>
         )}
 
-        <div className="sa-builder-list-card rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
             <div>
               <h2 className="text-lg font-black text-slate-900">Created Forms</h2>
@@ -522,7 +522,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
           ) : (
             <div className="divide-y divide-slate-100">
               {forms.map((item) => (
-                <div key={item.id} className="sa-builder-form-row flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+                <div key={item.id} className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-base font-black text-slate-900">{item.formName}</h3>
@@ -540,7 +540,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
                         {formatDate(item.startDate)} - {formatDate(item.endDate)}
                       </span>
-                      <span className="rounded-full bg-purple-50 px-2.5 py-1 text-purple-700">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
                         {getQuestionCount(item)} assessment subject(s)
                       </span>
                     </div>
@@ -583,8 +583,8 @@ const canDeactivate = (item: AssessmentFormResponse) => {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="sa-builder-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="sa-modal-header flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <h2 className="text-xl font-black text-slate-900">
                   {viewOnly ? 'View Assessment Form' : 'Create Self-Assessment Form'}
@@ -605,7 +605,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
               </button>
             </div>
 
-            <div className="sa-modal-body max-h-[calc(92vh-150px)] overflow-y-auto px-6 py-5">
+            <div className="max-h-[calc(92vh-150px)] overflow-y-auto px-6 py-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-sm font-black text-slate-700">Form Name</span>
@@ -613,7 +613,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     value={form.formName}
                     onChange={(event) => setForm((prev) => ({ ...prev, formName: event.target.value }))}
                     disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                     placeholder="Employee Self-assessment Form"
                   />
                 </label>
@@ -624,7 +624,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     value={form.companyName ?? ''}
                     onChange={(event) => setForm((prev) => ({ ...prev, companyName: event.target.value }))}
                     disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                     placeholder="ACE Data Systems Ltd."
                   />
                 </label>
@@ -637,12 +637,12 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                   disabled={viewOnly}
                   rows={3}
-                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                   placeholder="Short description for HR reference"
                 />
               </label>
 
-              <div className="sa-subject-panel mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                   <div>
                     <h3 className="text-base font-black text-slate-900">Assessment Subjects</h3>
@@ -655,7 +655,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     <button
                       type="button"
                       onClick={addSubject}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                     >
                       <i className="bi bi-plus-circle" />
                       Add Assessment
@@ -665,7 +665,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
 
                 <div className="mt-4 space-y-3">
                   {subjects.map((subject, index) => (
-                    <div key={`${subject.id ?? 'new'}-${index}`} className="sa-subject-row rounded-2xl border border-slate-200 bg-white p-4">
+                    <div key={`${subject.id ?? 'new'}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start">
                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-50 text-sm font-black text-blue-700">
                           {index + 1}
@@ -676,7 +676,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                           onChange={(event) => updateSubject(index, event.target.value)}
                           disabled={viewOnly}
                           rows={2}
-                          className="min-h-[72px] flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                          className="min-h-[72px] flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                           placeholder="Type assessment subject, for example: I completed my assigned tasks on time"
                         />
 
@@ -720,7 +720,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
               </div>
             </div>
 
-            <div className="sa-modal-footer flex flex-col justify-end gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row">
+            <div className="flex flex-col justify-end gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
@@ -734,7 +734,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   type="button"
                   onClick={saveForm}
                   disabled={saving}
-                  className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? 'Saving...' : 'Create Form'}
                 </button>
@@ -746,15 +746,15 @@ const canDeactivate = (item: AssessmentFormResponse) => {
 
       {activationTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="sa-activation-modal w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="sa-modal-header border-b border-slate-100 px-6 py-5">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-6 py-5">
               <h2 className="text-xl font-black text-slate-900">Activate Assessment Form</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Set the assessment period for <span className="font-bold text-slate-700">{activationTarget.formName}</span>.
               </p>
             </div>
 
-            <div className="sa-modal-body space-y-5 px-6 py-5">
+            <div className="space-y-5 px-6 py-5">
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 <div className="flex gap-3">
                   <i className="bi bi-exclamation-triangle-fill text-lg" />
@@ -777,7 +777,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                    min={nowDateTimeLocal()}
                    max={oneYearFromNowDateTimeLocal()}
                    onChange={(event) => setActivationStartDate(event.target.value)}
-                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                  />
                 </label>
 
@@ -789,7 +789,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                    min={activationStartDate || nowDateTimeLocal()}
                    max={oneYearFromNowDateTimeLocal()}
                    onChange={(event) => setActivationEndDate(event.target.value)}
-                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                  />
                 </label>
               </div>
@@ -807,7 +807,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
               </label>
             </div>
 
-            <div className="sa-modal-footer flex flex-col justify-end gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row">
+            <div className="flex flex-col justify-end gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row">
               <button
                 type="button"
                 onClick={closeActivation}

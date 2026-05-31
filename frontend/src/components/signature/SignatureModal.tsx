@@ -168,7 +168,7 @@ const SignatureModal = ({ open, onClose }: SignatureModalProps) => {
             <div className="flex gap-2">
               <button
                 type="button"
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${sourceType === 'DRAWN' ? 'bg-indigo-600 text-white' : 'border border-slate-300 text-slate-700'}`}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${sourceType === 'DRAWN' ? 'bg-blue-600 text-white' : 'border border-slate-300 text-slate-700'}`}
                 onClick={() => setSourceType('DRAWN')}
               >
                 <i className="bi bi-pencil mr-1" />
@@ -176,7 +176,7 @@ const SignatureModal = ({ open, onClose }: SignatureModalProps) => {
               </button>
               <button
                 type="button"
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${sourceType === 'UPLOADED' ? 'bg-indigo-600 text-white' : 'border border-slate-300 text-slate-700'}`}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${sourceType === 'UPLOADED' ? 'bg-blue-600 text-white' : 'border border-slate-300 text-slate-700'}`}
                 onClick={() => setSourceType('UPLOADED')}
               >
                 <i className="bi bi-upload mr-1" />
@@ -194,7 +194,7 @@ const SignatureModal = ({ open, onClose }: SignatureModalProps) => {
               type="button"
               disabled={saving}
               onClick={() => void handleSubmit()}
-              className="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-65"
+              className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-65"
             >
               <i className={`bi ${saving ? 'bi-hourglass-split' : editing ? 'bi-check2-circle' : 'bi-plus-circle'} mr-2`} />
               {saving ? 'Saving...' : editing ? 'Update Signature' : 'Create Signature'}

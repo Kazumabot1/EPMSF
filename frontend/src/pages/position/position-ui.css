@@ -13,7 +13,7 @@
   background:
     radial-gradient(circle at 80% 20%, rgba(125, 211, 252, 0.24), transparent 42%),
     radial-gradient(circle at 15% 90%, rgba(167, 139, 250, 0.2), transparent 40%),
-    linear-gradient(135deg, #1e293b 0%, #334155 42%, #4338ca 100%);
+    linear-gradient(135deg, #1e293b 0%, #334155 42%, #1d4ed8 100%);
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
 }
 
@@ -131,8 +131,8 @@
 .position-select:focus,
 .position-textarea:focus {
   outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
   transform: translateY(-1px);
 }
 
@@ -180,8 +180,8 @@
 
 .position-btn.primary {
   color: #ffffff;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.3);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
 }
 
 .position-btn.secondary {
@@ -190,7 +190,7 @@
 }
 
 .position-btn.ghost {
-  color: #4f46e5;
+  color: #2563eb;
   background: transparent;
 }
 
@@ -382,7 +382,7 @@
   background:
     radial-gradient(circle at 85% 20%, rgba(96, 165, 250, 0.3), transparent 36%),
     radial-gradient(circle at 5% 100%, rgba(167, 139, 250, 0.24), transparent 34%),
-    linear-gradient(135deg, #0f172a 0%, #1e3a8a 52%, #4c1d95 100%);
+    linear-gradient(135deg, #0f172a 0%, #1e3a8a 52%, #1e3a8a 100%);
 }
 
 .detail-badge {
@@ -474,9 +474,9 @@
 }
 
 .position-department-chip {
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
   border-radius: 999px;
   padding: 9px 13px;
   font-weight: 700;
@@ -485,8 +485,8 @@
 
 .position-department-chip.selected {
   color: #ffffff;
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
 .position-department-grid {
@@ -516,11 +516,11 @@
 .position-department-card.selected {
   transform: translateY(-2px);
   border-color: #818cf8;
-  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.16);
+  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.16);
 }
 
 .position-department-card.selected {
-  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
 }
 
 .position-department-card-top {
@@ -569,7 +569,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4f46e5, #06b6d4);
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
 }
 
 .position-detail-table-wrap {

@@ -86,7 +86,7 @@
 .appraisal-field textarea:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
 .appraisal-inline-grid {
@@ -125,7 +125,7 @@
 }
 
 .appraisal-button.primary { background: #2563eb; color: #fff; }
-.appraisal-button.secondary { background: #eef2ff; color: #3730a3; }
+.appraisal-button.secondary { background: #eff6ff; color: #1e40af; }
 .appraisal-button.success { background: #059669; color: #fff; }
 .appraisal-button.warning { background: #f59e0b; color: #fff; }
 .appraisal-button.danger { background: #dc2626; color: #fff; }
@@ -158,8 +158,8 @@
   align-items: center;
   border-radius: 999px;
   padding: 4px 10px;
-  background: #e0e7ff;
-  color: #3730a3;
+  background: #dbeafe;
+  color: #1e40af;
   font-weight: 800;
   font-size: 12px;
 }
@@ -184,7 +184,7 @@
 
 .appraisal-template-banner p {
   margin: 4px 0 0;
-  color: #e0e7ff;
+  color: #dbeafe;
 }
 
 .appraisal-section-card {
@@ -209,7 +209,7 @@
   border: none;
   background: transparent;
   font-weight: 800;
-  color: #3730a3;
+  color: #1e40af;
   font-size: 15px;
 }
 
@@ -298,7 +298,7 @@ button.appraisal-rating-dot:not(:disabled) {
 
 .appraisal-list-card.active {
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .appraisal-check-list {
@@ -396,7 +396,7 @@ button.appraisal-rating-dot:not(:disabled) {
 }
 
 .appraisal-department-box {
-  border: 1px dashed #c7d2fe;
+  border: 1px dashed #bfdbfe;
   background: #f8fafc;
   border-radius: 14px;
   padding: 12px;
@@ -516,9 +516,9 @@ button.appraisal-rating-dot:not(:disabled) {
 
 .appraisal-template-table input:focus {
   outline: none;
-  border-color: #c7d2fe;
+  border-color: #bfdbfe;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .appraisal-center-cell {
@@ -546,7 +546,7 @@ button.appraisal-rating-dot:not(:disabled) {
 
 .appraisal-summary-card span {
   font-weight: 800;
-  color: #3730a3;
+  color: #1e40af;
 }
 
 .score-band-wrap {
@@ -678,7 +678,7 @@ button.appraisal-rating-dot:not(:disabled) {
 }
 
 .appraisal-section-readonly-title {
-  color: #3730a3;
+  color: #1e40af;
   font-size: 15px;
 }
 
@@ -695,7 +695,7 @@ button.appraisal-rating-dot:not(:disabled) {
 
 .appraisal-table-input:focus {
   border-color: #a5b4fc;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .appraisal-button.small {
@@ -716,7 +716,7 @@ button.appraisal-rating-dot:not(:disabled) {
   border-radius: 28px;
   background: linear-gradient(135deg, #2563eb 0%, #2563eb 48%, #2563eb 100%);
   padding: 28px;
-  box-shadow: 0 24px 54px rgba(79, 70, 229, 0.22);
+  box-shadow: 0 24px 54px rgba(37, 99, 235, 0.22);
 }
 
 .appraisal-dashboard-orb {
@@ -771,7 +771,7 @@ button.appraisal-rating-dot:not(:disabled) {
 .appraisal-dashboard-hero p:not(.appraisal-dashboard-kicker) {
   max-width: 700px;
   margin: 8px 0 0;
-  color: #e0e7ff;
+  color: #dbeafe;
   line-height: 1.65;
 }
 
@@ -784,7 +784,7 @@ button.appraisal-rating-dot:not(:disabled) {
 
 .appraisal-button.hero-white {
   background: #ffffff;
-  color: #4338ca;
+  color: #1d4ed8;
   box-shadow: 0 14px 30px rgba(49, 46, 129, 0.18);
 }
 
@@ -835,7 +835,7 @@ button.appraisal-rating-dot:not(:disabled) {
   font-size: 20px;
 }
 
-.appraisal-dashboard-stat-icon.indigo { background: #eef2ff; color: #2563eb; }
+.appraisal-dashboard-stat-icon.indigo { background: #eff6ff; color: #2563eb; }
 .appraisal-dashboard-stat-icon.violet { background: #eff6ff; color: #2563eb; }
 .appraisal-dashboard-stat-icon.green { background: #dcfce7; color: #15803d; }
 .appraisal-dashboard-stat-icon.amber { background: #fef3c7; color: #b45309; }
@@ -899,7 +899,7 @@ button.appraisal-rating-dot:not(:disabled) {
 
 .appraisal-modal-header p {
   margin: 5px 0 0;
-  color: #e0e7ff;
+  color: #dbeafe;
 }
 
 .appraisal-modal-close {
@@ -1444,7 +1444,7 @@ button.appraisal-rating-dot:not(:disabled) {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #2563eb;
   font-size: 27px;
 }
@@ -1523,7 +1523,7 @@ button.appraisal-rating-dot:not(:disabled) {
 .appraisal-hero-stat-card span {
   display: block;
   margin-top: 7px;
-  color: #e0e7ff;
+  color: #dbeafe;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -1542,7 +1542,7 @@ button.appraisal-rating-dot:not(:disabled) {
 }
 
 .appraisal-selected-row {
-  background: #eef2ff;
+  background: #eff6ff;
   box-shadow: inset 4px 0 0 #2563eb;
 }
 
@@ -1600,8 +1600,8 @@ button.appraisal-rating-dot:not(:disabled) {
   align-items: center;
   gap: 7px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #3730a3;
+  background: #eff6ff;
+  color: #1e40af;
   padding: 8px 11px;
   font-weight: 900;
 }
@@ -1832,7 +1832,7 @@ button.appraisal-rating-dot:not(:disabled) {
 .appraisal-filter-field select:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
 .appraisal-filter-actions {

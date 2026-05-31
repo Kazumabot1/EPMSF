@@ -374,7 +374,7 @@ button.f360-metric-card { cursor: pointer; font: inherit; }
 .f360-question-stack { display: grid; gap: 10px; padding: 12px; }
 .f360-question-card { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; border: 1px solid var(--f360-border); border-radius: 13px; padding: 14px; background: #ffffff; }
 .f360-question-card.has-error { border-color: #fca5a5; background: #fffafa; }
-.f360-question-index { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.82rem; font-weight: 850; }
+.f360-question-index { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: #eff6ff; color: #1e40af; font-size: 0.82rem; font-weight: 850; }
 .f360-question-body { min-width: 0; }
 .f360-question-topline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; margin-bottom: 8px; }
 .f360-question-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -499,7 +499,7 @@ button.f360-metric-card { cursor: pointer; font: inherit; }
     line-height: 1.25;
 }
 .f360-workspace-tab:hover {
-    border-color: #c7d2fe;
+    border-color: #bfdbfe;
     background: #f8fafc;
     color: var(--f360-primary-dark);
 }

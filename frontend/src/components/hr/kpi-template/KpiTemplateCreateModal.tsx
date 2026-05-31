@@ -598,7 +598,7 @@ function MotionlessModalShell(props: ShellProps) {
 }
 
 function MotionlessModalLoadingShimmer() {
-  return <div className="kpi-tpl-shimmer h-10 w-10 rounded-xl bg-gradient-to-br from-violet-300 to-gray-200" />;
+  return <div className="kpi-tpl-shimmer h-10 w-10 rounded-xl bg-gradient-to-br from-blue-300 to-gray-200" />;
 }
 
 function formatRowLabel(row: KpiTemplateRowDraft, items: KpiItem[]) {

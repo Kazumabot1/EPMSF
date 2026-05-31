@@ -198,10 +198,10 @@ const toneStyles: Record<
         bar: "bg-blue-600",
     },
     indigo: {
-        icon: "bg-indigo-50 text-indigo-600 ring-indigo-100",
-        chip: "bg-indigo-50 text-indigo-700 ring-indigo-100",
-        text: "text-indigo-600",
-        bar: "bg-indigo-600",
+        icon: "bg-blue-50 text-blue-600 ring-blue-100",
+        chip: "bg-blue-50 text-blue-700 ring-blue-100",
+        text: "text-blue-600",
+        bar: "bg-blue-600",
     },
     emerald: {
         icon: "bg-emerald-50 text-emerald-600 ring-emerald-100",

@@ -148,7 +148,7 @@ const DepartmentKpiTemplateEditorPage = () => {
       <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">Department KPI</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Department KPI</p>
             <h1 className="mt-1 text-2xl font-bold text-gray-900">{isEdit ? 'Edit Department KPI Template' : 'New Department KPI Template'}</h1>
           </div>
           <Link to="/hr/department-kpi-template" className="kpi-tpl-btn-secondary no-underline">Back</Link>

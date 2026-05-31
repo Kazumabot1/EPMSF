@@ -523,7 +523,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
       { to: '/employee/feedback', label: '360 Feedback', icon: 'bi bi-chat-dots' },
-      { to: '/employee/continuous-feedback', label: 'Continuous Feedback', icon: 'bi bi-chat-dots' },
       { to: '/employee/one-on-ones', label: 'One-on-Ones', icon: 'bi bi-calendar-check' },
       {
         to: '/pip',

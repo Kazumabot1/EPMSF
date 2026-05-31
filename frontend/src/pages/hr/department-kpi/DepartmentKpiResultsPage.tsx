@@ -23,7 +23,7 @@ const DepartmentKpiResultsPage = ({ departmentHead = false }: Props) => {
   return (
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-7xl px-4 py-8">
-        <header className="mb-6"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">Department KPI</p><h1 className="mt-1 text-2xl font-bold text-gray-900">{departmentHead ? 'My Department KPI Results' : 'Department KPI Results'}</h1></header>
+        <header className="mb-6"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Department KPI</p><h1 className="mt-1 text-2xl font-bold text-gray-900">{departmentHead ? 'My Department KPI Results' : 'Department KPI Results'}</h1></header>
         <div className="space-y-5">
           {rows.length === 0 ? <div className="kpi-tpl-card p-8 text-center text-gray-500">No finalized Department KPI results yet.</div> : rows.map((result) => (
             <section key={result.departmentKpiResultId} className="kpi-tpl-card overflow-hidden p-0">

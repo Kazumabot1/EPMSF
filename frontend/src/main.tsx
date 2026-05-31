@@ -6,7 +6,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './index.css';
 import './styles/epms-blue-normalize.css';
-import './styles/epms-classy-compact.css';
 
 const queryClient = new QueryClient();
 

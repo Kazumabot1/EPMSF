@@ -447,6 +447,20 @@ public class SecurityConfig {
                                 )
                         )
 
+                        /*
+                         * Employees must be able to view meetings assigned to them even when
+                         * their position does not have the create/manage One-on-One permission.
+                         * Service-level queries still restrict employee results to their own meetings.
+                         */
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/one-on-one-meetings/upcoming",
+                                "/api/one-on-one-meetings/ongoing",
+                                "/api/one-on-one-meetings/past"
+                        ).access((authentication, context) ->
+                                hasOneOnOneReadAccess(authentication.get())
+                        )
+
                         .requestMatchers(
                                 "/api/one-on-one-meetings",
                                 "/api/one-on-one-meetings/**",
@@ -802,6 +816,36 @@ public class SecurityConfig {
                                 Set.of("EMPLOYEE_DASHBOARD")
                         ).isGranted()
                 )
+        );
+    }
+
+    private AuthorizationDecision hasOneOnOneReadAccess(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            return new AuthorizationDecision(currentPositionHasPermission("oneOnOnePermission"));
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
+                || Boolean.TRUE.equals(isCurrentAuthenticationDepartmentHead(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        /*
+         * Employee one-on-one page is read-only. Employees should be able to see
+         * meetings assigned to them; create/update/delete stays blocked by
+         * hasOneOnOneApiAccess below unless the position explicitly allows it.
+         */
+        return hasRoleDashboardOrPosition(
+                authentication,
+                Set.of("EMPLOYEE"),
+                Set.of("EMPLOYEE_DASHBOARD")
         );
     }
 

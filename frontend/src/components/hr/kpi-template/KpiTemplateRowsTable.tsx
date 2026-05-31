@@ -117,10 +117,10 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
               <th className="min-w-[140px] px-3 py-3.5">Category</th>
               <th className="min-w-[90px] px-3 py-3.5">Target %</th>
               <th className="min-w-[120px] px-3 py-3.5">Unit</th>
-              <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Actual %</th>
+              <th className="min-w-[88px] bg-blue-50 px-3 py-3.5 text-blue-900">Actual %</th>
               <th className="min-w-[88px] px-3 py-3.5">Weight %</th>
-              <th className="min-w-[88px] bg-violet-50 px-3 py-3.5 text-violet-900">Score %</th>
-              <th className="min-w-[96px] bg-violet-50 px-3 py-3.5 text-violet-900">Weight Score</th>
+              <th className="min-w-[88px] bg-blue-50 px-3 py-3.5 text-blue-900">Score %</th>
+              <th className="min-w-[96px] bg-blue-50 px-3 py-3.5 text-blue-900">Weight Score</th>
               <th className="w-12 px-2 py-3.5" aria-label="Actions" />
             </tr>
           </thead>
@@ -128,7 +128,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
             {rows.map((row, rowIndex) => (
                 <tr
                   key={row.rowId}
-                  className={`align-top odd:bg-gray-50/40 transition-colors hover:bg-violet-50/30 ${
+                  className={`align-top odd:bg-gray-50/40 transition-colors hover:bg-blue-50/30 ${
                     row.id == null && row.changeReason ? 'kpi-tpl-row-added' : ''
                   }`}
                 >
@@ -245,10 +245,10 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </td>
-                <td className="bg-violet-50/60 px-3 py-3">
-                  <div className="flex h-[72px] flex-col items-center justify-center rounded-lg border border-dashed border-violet-200 bg-white/70 px-2 text-center shadow-inner">
-                    <i className="bi bi-lock text-violet-400" aria-hidden />
-                    <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-violet-700/85">Manager</span>
+                <td className="bg-blue-50/60 px-3 py-3">
+                  <div className="flex h-[72px] flex-col items-center justify-center rounded-lg border border-dashed border-blue-200 bg-white/70 px-2 text-center shadow-inner">
+                    <i className="bi bi-lock text-blue-400" aria-hidden />
+                    <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-700/85">Manager</span>
                   </div>
                 </td>
                 <td className="px-3 py-3">
@@ -261,13 +261,13 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                     className="text-right font-semibold tabular-nums"
                   />
                 </td>
-                <td className="bg-violet-50/60 px-3 py-3">
-                  <div className="flex h-[72px] flex-col items-center justify-center rounded-lg border border-dashed border-violet-200 bg-white/70 px-2 text-center shadow-inner">
-                    <i className="bi bi-graph-up-arrow text-violet-400" aria-hidden />
-                    <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-violet-700/85">PM</span>
+                <td className="bg-blue-50/60 px-3 py-3">
+                  <div className="flex h-[72px] flex-col items-center justify-center rounded-lg border border-dashed border-blue-200 bg-white/70 px-2 text-center shadow-inner">
+                    <i className="bi bi-graph-up-arrow text-blue-400" aria-hidden />
+                    <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-700/85">PM</span>
                   </div>
                 </td>
-                <td className="bg-violet-50/60 px-3 py-3 text-center">
+                <td className="bg-blue-50/60 px-3 py-3 text-center">
                   <span className="inline-flex min-w-12 items-center justify-center rounded-md bg-gray-100 px-2 py-2 text-xs font-medium text-gray-400">
                     —
                   </span>
@@ -300,7 +300,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
               >
                 {totalWeight}%
               </td>
-              <td colSpan={2} className="bg-violet-50/60 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-violet-700/85">
+              <td colSpan={2} className="bg-blue-50/60 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-blue-700/85">
                 Total score (PM)
               </td>
               <td className="w-12" />
@@ -309,7 +309,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-gray-200 bg-gradient-to-r from-gray-50 via-violet-50/30 to-gray-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex flex-col gap-3 border-t border-gray-200 bg-gradient-to-r from-gray-50 via-blue-50/30 to-gray-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         {!readOnly && (
           <button type="button" onClick={onAddRow} className="kpi-tpl-btn-primary w-full justify-center sm:w-auto">
             <i className="bi bi-plus-lg text-lg" aria-hidden />

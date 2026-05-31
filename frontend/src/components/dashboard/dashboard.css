@@ -46,9 +46,9 @@
     padding: 1.5rem;
     color: var(--dashboard-text);
     background:
-            radial-gradient(circle at 8% 0%, rgba(79, 70, 229, 0.14), transparent 30%),
+            radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.14), transparent 30%),
             radial-gradient(circle at 94% 8%, rgba(14, 165, 233, 0.12), transparent 28%),
-            linear-gradient(135deg, var(--dashboard-bg) 0%, #eef2ff 48%, var(--dashboard-bg) 100%);
+            linear-gradient(135deg, var(--dashboard-bg) 0%, #eff6ff 48%, var(--dashboard-bg) 100%);
 }
 
 .dashboard-page-shell {
@@ -57,14 +57,14 @@
     background:
             radial-gradient(circle at 5% 2%, rgba(37, 99, 235, 0.08), transparent 22%),
             radial-gradient(circle at 92% 8%, rgba(16, 185, 129, 0.08), transparent 20%),
-            linear-gradient(135deg, var(--dashboard-bg) 0%, #eef2ff 46%, var(--dashboard-bg) 100%);
+            linear-gradient(135deg, var(--dashboard-bg) 0%, #eff6ff 46%, var(--dashboard-bg) 100%);
     color: var(--dashboard-text);
 }
 
 .dashboard-shell--slate {
     background:
             radial-gradient(circle at 8% 0%, rgba(15, 23, 42, 0.12), transparent 30%),
-            radial-gradient(circle at 94% 8%, rgba(79, 70, 229, 0.12), transparent 28%),
+            radial-gradient(circle at 94% 8%, rgba(37, 99, 235, 0.12), transparent 28%),
             linear-gradient(135deg, #f8fafc 0%, #f1f5f9 46%, #f8fafc 100%);
 }
 
@@ -77,7 +77,7 @@
 
 .dashboard-shell--violet {
     background:
-            radial-gradient(circle at 8% 0%, rgba(124, 58, 237, 0.14), transparent 30%),
+            radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.14), transparent 30%),
             radial-gradient(circle at 94% 8%, rgba(59, 130, 246, 0.12), transparent 28%),
             linear-gradient(135deg, #f8fafc 0%, #eff6ff 46%, #f8fafc 100%);
 }
@@ -85,7 +85,7 @@
 .dashboard-shell--amber {
     background:
             radial-gradient(circle at 8% 0%, rgba(245, 158, 11, 0.16), transparent 30%),
-            radial-gradient(circle at 94% 8%, rgba(79, 70, 229, 0.1), transparent 28%),
+            radial-gradient(circle at 94% 8%, rgba(37, 99, 235, 0.1), transparent 28%),
             linear-gradient(135deg, #f8fafc 0%, #fffbeb 46%, #f8fafc 100%);
 }
 
@@ -103,7 +103,7 @@
     color: #ffffff;
     background:
             linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)),
-            radial-gradient(circle at top right, rgba(99, 102, 241, 0.38), transparent 36%);
+            radial-gradient(circle at top right, rgba(37, 99, 235, 0.38), transparent 36%);
     box-shadow: 0 26px 80px rgba(15, 23, 42, 0.22);
 }
 
@@ -130,7 +130,7 @@
 .dashboard-hero__orb--one {
     top: -116px;
     right: 220px;
-    background: rgba(99, 102, 241, 0.62);
+    background: rgba(37, 99, 235, 0.62);
 }
 
 .dashboard-hero__orb--two {
@@ -262,13 +262,13 @@
     width: 116px;
     height: 116px;
     border-radius: 999px;
-    background: rgba(99, 102, 241, 0.1);
+    background: rgba(37, 99, 235, 0.1);
 }
 
 .dashboard-metric-card--emerald::after { background: rgba(16, 185, 129, 0.12); }
 .dashboard-metric-card--amber::after { background: rgba(245, 158, 11, 0.14); }
 .dashboard-metric-card--rose::after { background: rgba(244, 63, 94, 0.13); }
-.dashboard-metric-card--violet::after { background: rgba(124, 58, 237, 0.12); }
+.dashboard-metric-card--violet::after { background: rgba(37, 99, 235, 0.12); }
 .dashboard-metric-card--cyan::after { background: rgba(6, 182, 212, 0.12); }
 .dashboard-metric-card--slate::after { background: rgba(15, 23, 42, 0.08); }
 
@@ -288,7 +288,7 @@
     place-items: center;
     flex: 0 0 auto;
     border-radius: 1rem;
-    background: #eef2ff;
+    background: #eff6ff;
     color: #2563eb;
     font-size: 1.05rem;
 }
@@ -555,7 +555,7 @@
     place-items: center;
     flex: 0 0 auto;
     border-radius: 0.9rem;
-    background: #eef2ff;
+    background: #eff6ff;
     color: #2563eb;
 }
 
@@ -602,7 +602,7 @@
     place-items: center;
     margin: 0 auto 0.8rem;
     border-radius: 1.1rem;
-    background: #eef2ff;
+    background: #eff6ff;
     color: #2563eb;
     font-size: 1.2rem;
 }
@@ -826,7 +826,7 @@
 }
 
 .dashboard-trend-chart__area {
-    fill: rgba(79, 70, 229, 0.12);
+    fill: rgba(37, 99, 235, 0.12);
 }
 
 .dashboard-trend-chart__line {
@@ -1857,14 +1857,14 @@ section + .dashboard-grid {
     width: min(35%, 30px);
     min-height: 7px;
     border-radius: 999px 999px 8px 8px;
-    background: linear-gradient(180deg, var(--bar-color-soft, rgba(124, 92, 255, 0.32)) 0%, var(--bar-color, #2563eb) 100%);
+    background: linear-gradient(180deg, var(--bar-color-soft, rgba(37, 99, 235, 0.32)) 0%, var(--bar-color, #2563eb) 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 9px 18px rgba(91, 71, 168, 0.13);
 }
 
 .dashboard-comparison-chart__bar--primary {
     background:
         repeating-linear-gradient(135deg, rgba(255,255,255,0.24) 0 3px, rgba(255,255,255,0) 3px 7px),
-        linear-gradient(180deg, var(--bar-color-soft, rgba(124, 92, 255, 0.34)) 0%, var(--bar-color, #2563eb) 100%);
+        linear-gradient(180deg, var(--bar-color-soft, rgba(37, 99, 235, 0.34)) 0%, var(--bar-color, #2563eb) 100%);
 }
 
 .dashboard-comparison-chart__bar--secondary {
