@@ -56,8 +56,7 @@ const errorMessage = (error: unknown, departmentView: boolean) => {
     if (isUnauthorizedError(error)) {
         return departmentView
             ? 'You do not have permission to view department 360 summaries. Department summaries are available only to Department Heads for their own department.'
-            : 'You do not have permission to view managed-employee 360 summaries. These summaries are available only to managers for their direct reports and employees in teams they lead or manage.';
-    }
+: 'You do not have permission to view managed-employee 360 summaries. These summaries are available only to managers for their direct reports and employees in teams they manage as Project Manager.';    }
     return error instanceof Error ? error.message : 'Unable to load the 360 feedback summary.';
 };
 
@@ -135,8 +134,7 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
     const title = summary?.accessTitle || (departmentView ? 'Department published 360 summary' : 'Managed employee published 360 summary');
     const description = summary?.accessDescription || (departmentView
         ? 'Review published 360 results for employees in your department. Relationship details stay aggregated and privacy-safe.'
-        : 'Review published results for your direct reports and employees in teams you lead or manage. Relationship details stay aggregated and privacy-safe.');
-    const emptyTitle = departmentView ? 'No published department results yet' : 'No published managed-employee results yet';
+: 'Review published results for your direct reports and employees in teams you manage as Project Manager. Relationship details stay aggregated and privacy-safe.');    const emptyTitle = departmentView ? 'No published department results yet' : 'No published managed-employee results yet';
     const emptyDescription = summary?.emptyStateMessage || (departmentView
         ? 'Department 360 results will appear here only after HR closes and publishes a campaign.'
         : 'Managed-employee 360 results will appear here only after HR closes and publishes a campaign.');
@@ -225,8 +223,7 @@ const ManagerSummaryPage = ({ expectedScope }: ManagerSummaryPageProps) => {
                         <p>
                             {summary.privacyNotice || (departmentView
                                 ? 'Department Head access is a department-level view, not a separate evaluator relationship. Peer and direct-report anonymity rules still apply.'
-                                : 'Managers can review only published summaries for direct reports and employees in teams they lead or manage. Peer and direct-report anonymity rules still apply.')}
-                        </p>
+: 'Managers can review only published summaries for direct reports and employees in teams they manage as Project Manager. Peer and direct-report anonymity rules still apply.')}                        </p>
                     </section>
 
                     <section className="feedback-result-team-grid">

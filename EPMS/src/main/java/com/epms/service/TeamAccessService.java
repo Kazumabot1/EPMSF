@@ -322,8 +322,7 @@ public class TeamAccessService {
 
         if (isManager(current)) {
             if (!isManagedByUser(team, SecurityUtils.currentUserId())) {
-                throw new UnauthorizedActionException("You can access only teams you lead or manage.");
-            }
+                throw new UnauthorizedActionException("You can access only teams you manage as Project Manager.");            }
             return team;
         }
 
@@ -342,8 +341,7 @@ public class TeamAccessService {
         }
 
         if (!isManagedByUser(team, SecurityUtils.currentUserId())) {
-            throw new UnauthorizedActionException("You can access only teams you lead or manage.");
-        }
+            throw new UnauthorizedActionException("You can access only teams you manage as Project Manager.");        }
 
         return team;
     }
@@ -526,16 +524,17 @@ public class TeamAccessService {
                 .toList();
     }
 
+
     private List<Team> getManagedTeams(Integer currentUserId) {
-        Map<Integer, Team> teams = new LinkedHashMap<>();
+        if (currentUserId == null) {
+            return List.of();
+        }
 
-        teamRepository.findByTeamLeaderIdAndStatusIgnoreCase(currentUserId, "Active")
-                .forEach(team -> teams.put(team.getId(), team));
-
-        teamRepository.findByProjectManagerIdAndStatusIgnoreCase(currentUserId, "Active")
-                .forEach(team -> teams.put(team.getId(), team));
-
-        return teams.values().stream().toList();
+        return teamRepository.findByProjectManagerIdAndStatusIgnoreCase(currentUserId, "Active")
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(this::isActiveTeam)
+                .toList();
     }
 
     private List<TeamEmployeeOptionResponseDto> getActiveEmployeeOptions(Team team) {
@@ -662,8 +661,9 @@ public class TeamAccessService {
     }
 
     private boolean isManagedByUser(Team team, Integer userId) {
-        return team.getTeamLeader() != null && Objects.equals(team.getTeamLeader().getId(), userId)
-                || team.getProjectManager() != null && Objects.equals(team.getProjectManager().getId(), userId);
+        return team != null
+                && team.getProjectManager() != null
+                && Objects.equals(team.getProjectManager().getId(), userId);
     }
 
     private String displayUser(User user) {

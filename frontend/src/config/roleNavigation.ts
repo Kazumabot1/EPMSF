@@ -83,26 +83,27 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/hradmin/users', icon: 'bi-person-plus' },
     { label: 'Import Accounts', path: '/hradmin/employee/import', icon: 'bi-upload' },
-    {
-      label: 'Approval',
-      path: '/hradmin/approval/kpi',
-      icon: 'bi-shield-check',
-      children: [
-        { label: 'KPI Approval', path: '/hradmin/approval/kpi', icon: 'bi-bullseye', end: true },
-        { label: 'Department KPI Approval', path: '/hradmin/approval/department-kpi', icon: 'bi-building-check' },
-        { label: 'Position & Department Changes', path: '/hradmin/approval/changes', icon: 'bi-arrow-left-right' },
-      ],
-    },
+  {
+    label: 'Approval',
+    path: '/hradmin/approval/kpi',
+    icon: 'bi-shield-check',
+    children: [
+      { label: 'KPI Approval', path: '/hradmin/approval/kpi', icon: 'bi-bullseye', end: true },
+      { label: 'Position & Department Changes', path: '/hradmin/approval/changes', icon: 'bi-arrow-left-right' },
+    ],
+  },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
-    {
-      label: 'KPI Approvals',
-      path: '/admin/approval/kpi',
-      icon: 'bi-bullseye',
-      children: [
-        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
-        { label: 'Department KPI Approval', path: '/admin/approval/department-kpi', icon: 'bi-building-check' },
-      ],
-    },
+  {
+    label: 'Department KPI Management',
+    path: '/hr/department-kpi-template',
+    icon: 'bi-building-gear',
+    children: [
+      { label: 'Department KPI Templates', path: '/hr/department-kpi-template', icon: 'bi-building-gear' },
+      { label: 'Department KPI Cycle', path: '/hr/department-kpi-cycle', icon: 'bi-arrow-repeat' },
+      { label: 'Department KPI Scoring', path: '/hr/department-kpi-scoring', icon: 'bi-clipboard2-check' },
+      { label: 'Department KPI Results', path: '/hr/department-kpi-results', icon: 'bi-building-check' },
+    ],
+  },
     {
       label: 'Access Control',
       path: '/position-permissions',
@@ -291,7 +292,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Feedback Completion', path: '/department-head/reports/feedback-completion', icon: 'bi-activity' },
       ],
     },
-    { label: 'Department KPIs', path: '/department-head/department-kpis', icon: 'bi-building-check' },
+
     {
       label: 'Manager KPI Scoring',
       path: '/department-head/kpi-scoring',

@@ -374,12 +374,14 @@ public class TeamServiceImpl implements TeamService {
                 .filter(this::isTeamLeaderCandidate)
                 .map(user -> {
                     Team activeLeaderTeam = getFirstActiveLeaderTeam(user.getId());
-                    boolean available = activeLeaderTeam == null;
+                    Team activeMemberTeam = getFirstActiveMemberTeam(user.getId());
+                    Team activeTeam = activeLeaderTeam != null ? activeLeaderTeam : activeMemberTeam;
+                    boolean available = activeTeam == null;
 
                     CandidateResponseDto dto = toCandidate(user, "Team Leader", available);
-                    dto.setCurrentTeamId(activeLeaderTeam != null ? activeLeaderTeam.getId() : null);
-                    dto.setCurrentTeamName(activeLeaderTeam != null ? activeLeaderTeam.getTeamName() : null);
-                    dto.setCurrentTeamNames(activeLeaderTeam != null ? activeLeaderTeam.getTeamName() : null);
+                    dto.setCurrentTeamId(activeTeam != null ? activeTeam.getId() : null);
+                    dto.setCurrentTeamName(activeTeam != null ? activeTeam.getTeamName() : null);
+                    dto.setCurrentTeamNames(activeTeam != null ? activeTeam.getTeamName() : null);
                     return dto;
                 })
                 .sorted(candidateComparator())
@@ -396,13 +398,15 @@ public class TeamServiceImpl implements TeamService {
                 .filter(user -> !isBlockedTeamCandidate(user))
                 .filter(this::isTeamMemberCandidate)
                 .map(user -> {
+                    Team activeLeaderTeam = getFirstActiveLeaderTeam(user.getId());
                     Team activeMemberTeam = getFirstActiveMemberTeam(user.getId());
-                    boolean available = activeMemberTeam == null;
+                    Team activeTeam = activeLeaderTeam != null ? activeLeaderTeam : activeMemberTeam;
+                    boolean available = activeTeam == null;
 
                     CandidateResponseDto dto = toCandidate(user, "Member", available);
-                    dto.setCurrentTeamId(activeMemberTeam != null ? activeMemberTeam.getId() : null);
-                    dto.setCurrentTeamName(activeMemberTeam != null ? activeMemberTeam.getTeamName() : null);
-                    dto.setCurrentTeamNames(activeMemberTeam != null ? activeMemberTeam.getTeamName() : null);
+                    dto.setCurrentTeamId(activeTeam != null ? activeTeam.getId() : null);
+                    dto.setCurrentTeamName(activeTeam != null ? activeTeam.getTeamName() : null);
+                    dto.setCurrentTeamNames(activeTeam != null ? activeTeam.getTeamName() : null);
 
                     return dto;
                 })
@@ -588,6 +592,10 @@ public class TeamServiceImpl implements TeamService {
             throw new BusinessValidationException("Team Leader is required.");
         }
 
+        if (request.getProjectManagerId() == null) {
+            throw new BusinessValidationException("Project Manager is required.");
+        }
+
         if (safeIds(request.getEffectiveMemberUserIds()).isEmpty()) {
             throw new BusinessValidationException("At least one Team Member is required.");
         }
@@ -606,6 +614,10 @@ public class TeamServiceImpl implements TeamService {
 
         if (request.getTeamLeaderId() == null) {
             throw new BusinessValidationException("Team Leader is required.");
+        }
+
+        if (request.getProjectManagerId() == null) {
+            throw new BusinessValidationException("Project Manager is required.");
         }
 
         String status = cleanStatus(request.getStatus());
@@ -649,7 +661,7 @@ public class TeamServiceImpl implements TeamService {
 
     private User resolveProjectManager(Integer projectManagerId, Department department, User teamLeader) {
         if (projectManagerId == null) {
-            return null;
+            throw new BusinessValidationException("Project Manager is required.");
         }
 
         User projectManager = getActiveUserOrThrow(projectManagerId, "Project Manager");
@@ -661,7 +673,7 @@ public class TeamServiceImpl implements TeamService {
         }
 
         if (!isProjectManagerCandidate(projectManager)) {
-            throw new BusinessValidationException("Selected Project Manager must have a Manager or Project Manager position.");
+            throw new BusinessValidationException("Selected Project Manager must have the MANAGER role.");
         }
 
         validateUserInWorkingDepartment(projectManager, department.getId(), "Project Manager");
@@ -700,6 +712,15 @@ public class TeamServiceImpl implements TeamService {
                 throw new BusinessValidationException("Project Manager cannot be selected as a normal member.");
             }
 
+            Team activeLeaderTeam = getFirstActiveLeaderTeam(memberId);
+            if (activeLeaderTeam != null
+                    && (currentTeamId == null || !Objects.equals(activeLeaderTeam.getId(), currentTeamId))) {
+                throw new BusinessValidationException(
+                        "Selected Team member is already assigned as Team Leader in active team: "
+                                + nullToEmpty(activeLeaderTeam.getTeamName())
+                );
+            }
+
             Team activeMemberTeam = getFirstActiveMemberTeam(memberId);
             if (activeMemberTeam != null
                     && (currentTeamId == null || !Objects.equals(activeMemberTeam.getId(), currentTeamId))) {
@@ -714,7 +735,7 @@ public class TeamServiceImpl implements TeamService {
             assertAssignableTeamUser(member, "Team member");
 
             if (!isTeamMemberCandidate(member)) {
-                throw new BusinessValidationException("Selected Team member cannot be a Team Leader, Manager, Project Manager, or Department Head.");
+                throw new BusinessValidationException("Selected Team member must have the EMPLOYEE role.");
             }
 
             validateUserInWorkingDepartment(member, department.getId(), "Team member");
@@ -725,7 +746,7 @@ public class TeamServiceImpl implements TeamService {
         assertAssignableTeamUser(teamLeader, "Team Leader");
 
         if (!isTeamLeaderCandidate(teamLeader)) {
-            throw new BusinessValidationException("Selected Team Leader must have a Team Leader position.");
+            throw new BusinessValidationException("Selected Team Leader must have the EMPLOYEE role.");
         }
     }
 
@@ -734,21 +755,24 @@ public class TeamServiceImpl implements TeamService {
             throw new BusinessValidationException("Team Leader is required.");
         }
 
-        List<Team> activeLeaderTeams = teamRepository
-                .findByTeamLeaderIdAndStatusIgnoreCase(teamLeader.getId(), "Active");
-
-        for (Team activeTeam : activeLeaderTeams) {
-            if (activeTeam == null || activeTeam.getId() == null) {
-                continue;
-            }
-
-            if (currentTeamId == null || !Objects.equals(activeTeam.getId(), currentTeamId)) {
-                throw new BusinessValidationException(
-                        "Selected Team Leader is already leading active team: "
-                                + nullToEmpty(activeTeam.getTeamName())
-                );
-            }
+        Team activeLeaderTeam = getFirstActiveLeaderTeam(teamLeader.getId());
+        if (activeLeaderTeam != null
+                && (currentTeamId == null || !Objects.equals(activeLeaderTeam.getId(), currentTeamId))) {
+            throw new BusinessValidationException(
+                    "Selected Team Leader is already leading active team: "
+                            + nullToEmpty(activeLeaderTeam.getTeamName())
+            );
         }
+
+        Team activeMemberTeam = getFirstActiveMemberTeam(teamLeader.getId());
+        if (activeMemberTeam != null
+                && (currentTeamId == null || !Objects.equals(activeMemberTeam.getId(), currentTeamId))) {
+            throw new BusinessValidationException(
+                    "Selected Team Leader is already assigned as member in active team: "
+                            + nullToEmpty(activeMemberTeam.getTeamName())
+            );
+        }
+    }
     }
 
     private void assertCurrentUserCanManageTeams() {
@@ -946,58 +970,42 @@ public class TeamServiceImpl implements TeamService {
         }
     }
 
-    private boolean isTeamLeaderCandidate(User user) {
-        if (isBlockedTeamCandidate(user)) {
-            return false;
-        }
+private boolean isTeamLeaderCandidate(User user) {
+    return isEmployeeTeamCandidate(user);
+}
 
-        return isTeamLeaderPosition(user) || hasPositionPermission(user, "teamAssignAsLeader");
+private boolean isProjectManagerCandidate(User user) {
+    if (isBlockedTeamCandidate(user)) {
+        return false;
     }
 
-    private boolean isProjectManagerCandidate(User user) {
-        if (isBlockedTeamCandidate(user)) {
-            return false;
-        }
+    return hasRole(user, "MANAGER");
+}
 
-        return isProjectManagerPosition(user) || hasPositionPermission(user, "teamAssignAsPm");
+private boolean isTeamMemberCandidate(User user) {
+    return isEmployeeTeamCandidate(user);
+}
+
+/**
+ * Team Leader and Team Member selectors now use only normal EMPLOYEE-role users.
+ * Old position-permission assignment flags are intentionally not used here anymore.
+ */
+private boolean isEmployeeTeamCandidate(User user) {
+    if (isBlockedTeamCandidate(user)) {
+        return false;
     }
 
-    private boolean isTeamMemberCandidate(User user) {
-        if (isBlockedTeamCandidate(user)) {
-            return false;
-        }
-
-        if (isTeamLeaderPosition(user)
-                || isProjectManagerPosition(user)
-                || hasPositionPermission(user, "teamAssignAsLeader")
-                || hasPositionPermission(user, "teamAssignAsPm")) {
-            return false;
-        }
-
-        if (hasPositionPermission(user, "teamAssignAsMember")) {
-            return true;
-        }
-
-        return true;
-    }
-
-    private boolean hasPositionPermission(User user, String permissionField) {
-        if (!isActiveUser(user)) {
-            return false;
-        }
-
-        PositionPermission permissions = getPositionPermissions(user);
-
-        if (permissions == null) {
-            return false;
-        }
-
-        return switch (permissionField) {
-            case "teamAssignAsLeader", "teamAssignAsPm", "teamAssignAsMember" ->
-                    permissionField.equals(resolveTeamAssignmentPermission(permissions));
-            default -> false;
-        };
-    }
+    return hasRole(user, "EMPLOYEE")
+            && !hasRole(user, "MANAGER")
+            && !hasRole(user, "PROJECT_MANAGER")
+            && !hasRole(user, "PM")
+            && !hasRole(user, "HR")
+            && !hasRole(user, "HRADMIN")
+            && !hasRole(user, "ADMIN")
+            && !hasRole(user, "CEO")
+            && !hasRole(user, "EXECUTIVE")
+            && !isDepartmentHeadUser(user);
+}
 
     private void assertAssignableTeamUser(User user, String label) {
         if (user == null || user.getId() == null) {
@@ -1041,37 +1049,7 @@ public class TeamServiceImpl implements TeamService {
                 && normalizeRole(user.getDashboard()).equals(normalizeRole(dashboard));
     }
 
-    private PositionPermission getPositionPermissions(User user) {
-        if (user == null || user.getPosition() == null) {
-            return null;
-        }
 
-        try {
-            return user.getPosition().getPermissions();
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private String resolveTeamAssignmentPermission(PositionPermission permissions) {
-        if (permissions == null) {
-            return "none";
-        }
-
-        if (Boolean.TRUE.equals(permissions.getTeamAssignAsLeader())) {
-            return "teamAssignAsLeader";
-        }
-
-        if (Boolean.TRUE.equals(permissions.getTeamAssignAsPm())) {
-            return "teamAssignAsPm";
-        }
-
-        if (Boolean.TRUE.equals(permissions.getTeamAssignAsMember())) {
-            return "teamAssignAsMember";
-        }
-
-        return "none";
-    }
 
     private boolean isTeamLeaderPosition(User user) {
         return hasPositionTitle(user, "TEAM_LEADER")

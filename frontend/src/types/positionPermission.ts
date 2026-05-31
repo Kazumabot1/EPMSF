@@ -8,7 +8,7 @@ export interface PositionPermission {
   oneOnOnePermission: boolean;
   positionPermission: boolean;
   kpiPermission: boolean;
-  departmentKpiPermission: boolean;
+
   assessmentScoresView: boolean;
   assessmentFormCreate: boolean;
 

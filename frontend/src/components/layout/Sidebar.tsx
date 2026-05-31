@@ -77,8 +77,7 @@ const allow = (permissions: PositionPermission, key: keyof PositionPermission) =
     case 'kpiPermission':
       return Boolean(permissions.kpiPermission);
 
-    case 'departmentKpiPermission':
-      return Boolean(permissions.departmentKpiPermission);
+
 
     default:
       return Boolean(permissions[key]);
@@ -229,11 +228,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         to: '/hradmin/approval/kpi',
         label: 'Approval',
         icon: 'bi bi-shield-check',
-        children: [
-          { to: '/hradmin/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
-          { to: '/hradmin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
-          { to: '/hradmin/approval/changes', label: 'Position & Department Changes', icon: 'bi bi-arrow-left-right' },
-        ],
+     children: [
+       { to: '/hradmin/approval/kpi', label: 'KPI Approval', icon: 'bi bi-bullseye', end: true },
+       { to: '/hradmin/approval/changes', label: 'Position & Department Changes', icon: 'bi bi-arrow-left-right' },
+     ],
       },
       { to: '/hradmin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
@@ -481,33 +479,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'departmentKpiPermission') && {
-        to: '/hr/department-kpi-template',
-        label: 'Department KPI Management',
-        icon: 'bi bi-building-gear',
-        children: [
-          {
-            to: '/hr/department-kpi-template',
-            label: 'Department KPI Templates',
-            icon: 'bi bi-building-gear',
-          },
-          {
-            to: '/hr/department-kpi-cycle',
-            label: 'Department KPI Cycle',
-            icon: 'bi bi-arrow-repeat',
-          },
-          {
-            to: '/hr/department-kpi-scoring',
-            label: 'Department KPI Scoring',
-            icon: 'bi bi-clipboard2-check',
-          },
-          {
-            to: '/hr/department-kpi-results',
-            label: 'Department KPI Results',
-            icon: 'bi bi-building-check',
-          },
-        ],
-      },
+
+
     ]);
 
     const employeeNavItems: NavItem[] = compactItems([
@@ -746,11 +719,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'My KPIs',
         icon: 'bi bi-bullseye',
       },
-      {
-        to: '/department-head/department-kpis',
-        label: 'Department KPIs',
-        icon: 'bi bi-building-check',
-      },
+
+
       {
         to: '/department-head/kpi-scoring',
         label: 'Manager KPI Scoring',

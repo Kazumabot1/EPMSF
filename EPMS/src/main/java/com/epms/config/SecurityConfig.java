@@ -252,15 +252,12 @@ public class SecurityConfig {
                                 hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, HRADMIN_DASHBOARDS)
                         )
 
+
                         .requestMatchers(
                                 "/api/hradmin/kpi-approvals",
                                 "/api/hradmin/kpi-approvals/**",
-                                "/api/hradmin/department-kpi-approvals",
-                                "/api/hradmin/department-kpi-approvals/**",
                                 "/api/executive/kpi-approvals",
-                                "/api/executive/kpi-approvals/**",
-                                "/api/executive/department-kpi-approvals",
-                                "/api/executive/department-kpi-approvals/**"
+                                "/api/executive/kpi-approvals/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, HRADMIN_DASHBOARDS)
                         )
@@ -511,19 +508,13 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/api/hr/kpi-template-cycles",
-                                "/api/hr/kpi-template-cycles/**",
-                                "/api/hr/department-kpi-templates",
-                                "/api/hr/department-kpi-templates/**",
-                                "/api/hr/department-kpi-cycles",
-                                "/api/hr/department-kpi-cycles/**",
-                                "/api/hr/department-kpi-workflow",
-                                "/api/hr/department-kpi-workflow/**"
+                                "/api/hr/kpi-template-cycles/**"
                         ).access((authentication, context) ->
                                 hasAnyRoleAndPositionPermission(
                                         authentication.get(),
                                         HR_ROLES,
                                         HR_DASHBOARDS,
-                                        "departmentKpiPermission"
+                                        "kpiPermission"
                                 )
                         )
 

@@ -298,13 +298,20 @@ const memberRows = useMemo(() => {
       return 'Please select a Team Leader.';
     }
 
-    if (projectManagerId && projectManagerId === teamLeaderId) {
-      return 'Project Manager cannot be the same as Team Leader.';
-    }
 
-    if (projectManagerId && selectedMemberIds.includes(Number(projectManagerId))) {
-      return 'Project Manager cannot be selected as a normal member.';
-    }
+ if (!projectManagerId) {
+   return 'Please select a Project Manager.';
+ }
+
+ if (projectManagerId === teamLeaderId) {
+   return 'Project Manager cannot be the same as Team Leader.';
+ }
+
+ if (selectedMemberIds.includes(Number(projectManagerId))) {
+   return 'Project Manager cannot be selected as a normal member.';
+ }
+
+
 
     if (selectedMemberIds.includes(Number(teamLeaderId))) {
       return 'Team Leader cannot be selected as a normal member.';
@@ -354,7 +361,7 @@ const request: TeamRequest = {
   teamName: teamName.trim(),
   departmentId: isDepartmentHead ? 0 : Number(departmentId),
   teamLeaderId: Number(teamLeaderId),
-  projectManagerId: projectManagerId ? Number(projectManagerId) : null,
+projectManagerId: Number(projectManagerId),
   teamGoal: teamGoal.trim(),
   status: selectedMemberIds.length === 0 ? 'Inactive' : 'Active',
   reason: reason.trim(),
@@ -469,11 +476,19 @@ const request: TeamRequest = {
                 {loadingCandidates ? 'Loading leaders...' : 'Select Team Leader'}
               </option>
 
-              {leaders.map((leader) => (
-                <option key={leader.id} value={leader.id}>
-                  {leader.name}
-                </option>
-              ))}
+           {leaders.map((leader) => {
+             const belongsToThisTeam = Number(leader.currentTeamId) === Number(team.id);
+             const unavailable =
+               (leader.available === false || leader.isAvailable === false) && !belongsToThisTeam;
+
+             return (
+               <option key={leader.id} value={leader.id} disabled={unavailable}>
+                 {formatCandidateLabel(leader)}
+               </option>
+             );
+           })}
+
+
             </select>
           </div>
 
@@ -484,8 +499,7 @@ const request: TeamRequest = {
               onChange={(event) => setProjectManagerId(event.target.value)}
               disabled={loadingCandidates}
             >
-              <option value="">Optional - Select Project Manager</option>
-
+<option value="">Select Project Manager</option>
               {availableProjectManagers.map((pm) => (
                 <option key={pm.id} value={pm.id}>
                   {formatCandidateLabel(pm)}
@@ -493,10 +507,10 @@ const request: TeamRequest = {
               ))}
             </select>
 
-            <small>
-              Optional. Project Manager can manage many teams, but cannot be Team Leader or a
-              normal member in this team.
-            </small>
+           <small>
+             Required. Project Manager can manage many teams, but cannot be Team Leader or a
+             normal member in this team.
+           </small>
           </div>
 
           <div className="team-members-box">

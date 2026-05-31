@@ -481,8 +481,7 @@ public class PipServiceImpl implements PipService {
         }
 
         if (!canManageByTeam(manager, employee)) {
-            throw new BusinessValidationException("Manager or Team Leader can create PIP only for employees in their own team.");
-        }
+            throw new BusinessValidationException("Manager can create PIP only for employees in teams they manage as Project Manager.");        }
     }
 
     private List<Pip> filterVisible(List<Pip> pips, User currentUser) {
@@ -722,15 +721,11 @@ public class PipServiceImpl implements PipService {
             return List.of();
         }
 
-        Map<Integer, Team> teams = new LinkedHashMap<>();
-
-        teamRepository.findByTeamLeaderIdAndStatusIgnoreCase(managerUserId, "Active")
-                .forEach(team -> teams.putIfAbsent(team.getId(), team));
-
-        teamRepository.findByProjectManagerIdAndStatusIgnoreCase(managerUserId, "Active")
-                .forEach(team -> teams.putIfAbsent(team.getId(), team));
-
-        return teams.values().stream().toList();
+        return teamRepository.findByProjectManagerIdAndStatusIgnoreCase(managerUserId, "Active")
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(team -> "Active".equalsIgnoreCase(team.getStatus()))
+                .toList();
     }
 
     private List<User> getActiveTeamMembers(Team team) {

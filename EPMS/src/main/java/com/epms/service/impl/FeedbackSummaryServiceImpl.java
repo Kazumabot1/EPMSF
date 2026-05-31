@@ -263,10 +263,8 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                     .totalManagedTeams(managedTeamCount)
                     .totalClosedResults(0)
                     .accessTitle("Managed employee published 360 summary")
-                    .accessDescription("Managers can view published 360 results for direct reports and employees in active teams they lead or manage.")
-                    .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and direct-report detail remains masked when confidentiality thresholds are not met.")
-                    .emptyStateMessage("No managed-employee 360 results are available yet. This view supports direct reports and any active teams you lead or manage.")
-                    .items(List.of())
+                    .accessDescription("Managers can view published 360 results for direct reports and employees in active teams they manage as Project Manager.")                    .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and direct-report detail remains masked when confidentiality thresholds are not met.")
+                    .emptyStateMessage("No managed-employee 360 results are available yet. This view supports direct reports and active teams you manage as Project Manager.")                    .items(List.of())
                     .build();
         }
 
@@ -285,7 +283,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                 .totalManagedTeams(managedTeamCount)
                 .totalClosedResults(summaries.size())
                 .accessTitle("Managed employee published 360 summary")
-                .accessDescription("Managers can view published 360 results for direct reports and employees in active teams they lead or manage. If one manager handles multiple teams, all active team members are included once.")
+                .accessDescription("Managers can view published 360 results for direct reports and employees in active teams they manage as Project Manager. If one manager handles multiple teams, all active team members are included once.")
                 .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and direct-report detail remains masked when confidentiality thresholds are not met.")
                 .emptyStateMessage("No published managed-employee 360 results are available yet.")
                 .items(mapResults(summaries, loadEmployeeNames(employeeIds), true))
@@ -296,20 +294,13 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         if (managerUserId == null) {
             return List.of();
         }
-        Map<Integer, Team> teamsById = new LinkedHashMap<>();
-        teamRepository.findByTeamLeaderIdAndStatusIgnoreCase(managerUserId, "Active")
-                .forEach(team -> {
-                    if (team.getId() != null) {
-                        teamsById.put(team.getId(), team);
-                    }
-                });
-        teamRepository.findByProjectManagerIdAndStatusIgnoreCase(managerUserId, "Active")
-                .forEach(team -> {
-                    if (team.getId() != null) {
-                        teamsById.put(team.getId(), team);
-                    }
-                });
-        return new ArrayList<>(teamsById.values());
+
+        return teamRepository.findByProjectManagerIdAndStatusIgnoreCase(managerUserId, "Active")
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(team -> team.getId() != null)
+                .filter(team -> "Active".equalsIgnoreCase(team.getStatus()))
+                .toList();
     }
 
     private FeedbackTeamSummaryResponse getDepartmentHeadSummary(User departmentHead, Long userId) {

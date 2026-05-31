@@ -511,7 +511,7 @@ const OneOnOneMeetings: React.FC = () => {
             : canSelectDepartment
               ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
               : teamRequired
-                ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
+? 'Choose one of the active teams you manage as Project Manager, then select an employee from that team.'
                 : hasDefaultDepartment
                   ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
                   : 'Create one-on-one meetings with employees.'}
@@ -552,8 +552,7 @@ const OneOnOneMeetings: React.FC = () => {
                   : canSelectDepartment
                     ? 'Choose an allowed department. Team is optional and only narrows the employee list.'
                     : teamRequired
-                      ? 'Select one of the teams you lead or manage before choosing an employee.'
-                      : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
+? 'Select one of the teams you manage as Project Manager before choosing an employee.'                      : `Using ${context?.departmentName || 'your default department'}. Team is optional.`}
               </p>
             </div>
           </div>

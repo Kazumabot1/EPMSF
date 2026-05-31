@@ -563,11 +563,8 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
             return;
         }
 
-        List<Team> managerTeams = new ArrayList<>();
-        managerTeams.addAll(teamRepository.findByProjectManagerIdAndStatusIgnoreCase(managerUserId, "Active"));
-        managerTeams.addAll(teamRepository.findByTeamLeaderIdAndStatusIgnoreCase(managerUserId, "Active"));
-
-        managerTeams.stream()
+        teamRepository.findByProjectManagerIdAndStatusIgnoreCase(managerUserId, "Active")
+                .stream()
                 .filter(Objects::nonNull)
                 .filter(Team::isActiveTeam)
                 .forEach(team -> collectTeamEmployees(team, managerUserId, candidates, seenEmployeeIds));

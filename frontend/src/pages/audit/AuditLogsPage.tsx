@@ -44,9 +44,6 @@ const ENTITY_OPTIONS = [
   ['KPI_UNIT', 'KPI Unit'],
   ['KPI_CATEGORY', 'KPI Category'],
   ['KPI_ITEM', 'KPI Items'],
-  ['DEPARTMENT_KPI_TEMPLATE', 'Department KPI Template Form'],
-  ['DEPARTMENT_KPI_CYCLE', 'Department KPI Cycle'],
-  ['DEPARTMENT_KPI_SCORE', 'Department KPI Score'],
 ] as const;
 
 const ROLE_OPTIONS = [

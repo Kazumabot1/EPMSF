@@ -265,17 +265,18 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
     ];
   }
 
-  if (view === 'admin') {
-    return [
-      { icon: 'bi-speedometer2', title: 'Dashboard', description: 'HR Admin performance view', to: '/admin/dashboard' },
-      { icon: 'bi-person-gear', title: 'Users', description: 'User accounts', to: '/admin/users' },
-      { icon: 'bi-upload', title: 'Import Employees', description: 'Bulk employee import', to: '/admin/employee/import' },
-      { icon: 'bi-shield-check', title: 'Permissions', description: 'Position permissions', to: '/position-permissions' },
-      { icon: 'bi-bullseye', title: 'KPI Approval', description: 'Approve KPI cycles', to: '/admin/approval/kpi' },
-      { icon: 'bi-building-check', title: 'Department KPI Approval', description: 'Approve department KPI', to: '/admin/approval/department-kpi' },
-      { icon: 'bi-journal-text', title: 'Audit Logs', description: 'System activity', to: '/admin/audit-logs' },
-    ];
-  }
+
+ if (view === 'admin') {
+   return [
+     { icon: 'bi-speedometer2', title: 'Dashboard', description: 'HR Admin performance view', to: '/hradmin/dashboard' },
+     { icon: 'bi-person-gear', title: 'Users', description: 'User accounts', to: '/hradmin/users' },
+     { icon: 'bi-upload', title: 'Import Employees', description: 'Bulk employee import', to: '/hradmin/employee/import' },
+     { icon: 'bi-shield-check', title: 'Permissions', description: 'Position permissions', to: '/position-permissions' },
+     { icon: 'bi-bullseye', title: 'KPI Approval', description: 'Approve employee KPI cycles', to: '/hradmin/approval/kpi' },
+     { icon: 'bi-arrow-left-right', title: 'Change Approval', description: 'Approve position and department changes', to: '/hradmin/approval/changes' },
+     { icon: 'bi-journal-text', title: 'Audit Logs', description: 'System activity', to: '/hradmin/audit-logs' },
+   ];
+ }
 
   if (view === 'ceo') {
     return [
@@ -286,16 +287,15 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
     ];
   }
 
-  if (view === 'departmentHead') {
-    return [
-      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams' },
-      { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review' },
-      { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review' },
-      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary' },
-      { icon: 'bi-bullseye', title: 'Department KPIs', description: 'Department KPI results', to: '/department-head/department-kpis' },
-      { icon: 'bi-graph-up', title: 'Reports', description: 'Scoped reports', to: '/department-head/reports/performance' },
-    ];
-  }
+if (view === 'departmentHead') {
+  return [
+    { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams' },
+    { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review' },
+    { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review' },
+    { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary' },
+    { icon: 'bi-graph-up', title: 'Reports', description: 'Department-scoped reports', to: '/department-head/reports/performance' },
+  ];
+}
 
   if (view === 'manager') {
     return [

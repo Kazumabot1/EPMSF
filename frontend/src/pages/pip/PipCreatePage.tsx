@@ -4,8 +4,7 @@
 /*
   Why this file exists:
   - This is the PIP creation screen.
-  - Team Leader/Manager can create PIP only for employees in their own team.
-  - Department Head can create PIP for employees in their department.
+- Manager can create PIP only for employees in teams they manage as Project Manager.  - Department Head can create PIP for employees in their department.
   - HR should not use this screen.
   - Employee dropdown disables employees who already have an active PIP.
   - Phase boxes are generated based on selected phase count.

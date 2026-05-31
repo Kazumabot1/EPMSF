@@ -259,7 +259,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .oneOnOnePermission(true)
                 .positionPermission(true)
                 .kpiPermission(true)
-                .departmentKpiPermission(true)
+
                 .assessmentScoresView(true)
                 .assessmentFormCreate(true)
                 .oneOnOneCreate(true)
@@ -306,7 +306,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .organizationPermission(true)
                 .appraisalPermission(true)
                 .kpiPermission(true)
-                .departmentKpiPermission(true)
+
                 .appraisalView(true)
                 .kpiView(true)
                 .pipViewAll(true)
@@ -344,7 +344,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
             case "oneOnOnePermission" -> safe(dto.getOneOnOnePermission());
             case "positionPermission" -> safe(dto.getPositionPermission());
             case "kpiPermission" -> safe(dto.getKpiPermission());
-            case "departmentKpiPermission" -> safe(dto.getDepartmentKpiPermission());
+
             case "assessmentScoresView" -> safe(dto.getAssessmentScoresView());
             case "assessmentFormCreate" -> safe(dto.getAssessmentFormCreate());
 
@@ -485,10 +485,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     || safe(pp.getKpiScore())
                     || safe(pp.getKpiView())
                     || safe(pp.getKpiInput());
-            case "departmentKpiPermission" -> safe(pp.getKpiCreate())
-                    || safe(pp.getKpiEdit())
-                    || safe(pp.getKpiScore())
-                    || safe(pp.getKpiView());
+
             case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate())
                     || safe(pp.getOneOnOneDeptSelection())
                     || safe(pp.getOneOnOneTeamSelection());
@@ -560,7 +557,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .oneOnOnePermission(hasPermission(pp, "oneOnOnePermission"))
                 .positionPermission(hasPermission(pp, "positionPermission"))
                 .kpiPermission(hasPermission(pp, "kpiPermission"))
-                .departmentKpiPermission(hasPermission(pp, "departmentKpiPermission"))
+
                 .assessmentScoresView(hasPermission(pp, "assessmentScoresView"))
                 .assessmentFormCreate(hasPermission(pp, "assessmentFormCreate"))
 

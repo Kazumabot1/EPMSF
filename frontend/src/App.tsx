@@ -217,7 +217,7 @@ function App() {
               <Route path="/hradmin/employee/import" element={<HrEmployeeAccountImport />} />
               <Route path="/hradmin/audit-logs" element={<AdminAuditLogsPage />} />
               <Route path="/hradmin/approval/kpi" element={<KpiApprovalPage />} />
-              <Route path="/hradmin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
+
               <Route path="/hradmin/approval/changes" element={<EmployeeChangeApprovalPage />} />
               <Route path="/position-permissions" element={<PositionPermissions />} />
 
@@ -302,16 +302,8 @@ function App() {
               />
               <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/dashboard" replace />} />
 
-              <Route
-                path="/executive/approval/department-kpi"
-                element={
-                  <RedirectWithMessage
-                    to="/executive/dashboard"
-                    message="Department KPI approvals are handled by HR Admin."
-                  />
-                }
-              />
-              <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
+
+
 
               <Route
                 path="/executive/approval/changes"
@@ -356,7 +348,7 @@ function App() {
 
               <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
               <Route path="/department-head/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
-              <Route path="/department-head/reports/department-performance" element={<DepartmentKpiResultsPage departmentHead />} />
+<Route path="/department-head/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
               <Route path="/department-head/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
               <Route path="/department-head/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
               <Route path="/department-head/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
@@ -374,8 +366,7 @@ function App() {
               <Route path="/department-head/kpi/history" element={<ManagerKpiHistoryPage />} />
               <Route path="/department-head/kpi-scoring" element={<ManagerKpiScoringPage />} />
 
-              <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
-              <Route path="/department-head/teams" element={<TeamManagement />} />
+<Route path="/department-head/department-kpis" element={<Navigate to="/department-head/reports/department-performance" replace />} />              <Route path="/department-head/teams" element={<TeamManagement />} />
 
               <Route element={<PositionPermissionRoute permission="teamCreate" fallbackPath="/department-head/teams" />}>
                 <Route path="/department-head/teams/create" element={<TeamCreate />} />
@@ -477,16 +468,8 @@ function App() {
                 <Route path="/hr/employee-kpis" element={<HrEmployeeKpiListPage />} />
               </Route>
 
-              <Route element={<PositionPermissionRoute permission="departmentKpiPermission" fallbackPath="/dashboard" />}>
-                <Route path="/hr/department-kpi-template/new" element={<DepartmentKpiTemplateEditorPage />} />
-                <Route path="/hr/department-kpi-template/:id/edit" element={<DepartmentKpiTemplateEditorPage />} />
-                <Route path="/hr/department-kpi-template" element={<DepartmentKpiTemplateListPage />} />
-                <Route path="/hr/department-kpi-cycle/new" element={<DepartmentKpiCycleEditorPage />} />
-                <Route path="/hr/department-kpi-cycle/:id/edit" element={<DepartmentKpiCycleEditorPage />} />
-                <Route path="/hr/department-kpi-cycle" element={<DepartmentKpiCycleListPage />} />
-                <Route path="/hr/department-kpi-scoring" element={<DepartmentKpiScoringPage />} />
-                <Route path="/hr/department-kpi-results" element={<DepartmentKpiResultsPage />} />
-              </Route>
+
+
             </Route>
           </Route>
         </Route>

@@ -245,32 +245,28 @@ const TeamCreate: React.FC = () => {
     return projectManagers.find((pm) => pm.id === selectedProjectManagerIdNumber) ?? null;
   }, [projectManagers, selectedProjectManagerIdNumber]);
 
-  const roleCandidateIds = useMemo(() => {
-    return new Set([
-      ...leaders.map((leader) => leader.id),
-      ...projectManagers.map((pm) => pm.id),
-    ]);
-  }, [leaders, projectManagers]);
 
-  useEffect(() => {
-    setSelectedMemberIds((prev) => prev.filter((id) => !roleCandidateIds.has(id)));
-  }, [roleCandidateIds]);
 
-  const memberRows = useMemo(() => {
-    return members
-      .filter((member) => !roleCandidateIds.has(member.id))
-      .filter((member) => member.id !== selectedLeaderIdNumber)
-      .filter((member) => member.id !== selectedProjectManagerIdNumber)
-      .map((member) => {
-        const alreadyInTeam = member.available === false || member.isAvailable === false;
 
-        return {
-          ...member,
-          disabled: alreadyInTeam,
-          disabledReason: alreadyInTeam ? getCandidateTeamWarning(member) : '',
-        };
-      });
-  }, [members, roleCandidateIds, selectedLeaderIdNumber, selectedProjectManagerIdNumber]);
+const memberRows = useMemo(() => {
+  return members
+    .filter((member) => member.id !== selectedProjectManagerIdNumber)
+    .map((member) => {
+      const selectedAsLeader = member.id === selectedLeaderIdNumber;
+      const alreadyInTeam = member.available === false || member.isAvailable === false;
+
+      return {
+        ...member,
+        disabled: selectedAsLeader || alreadyInTeam,
+        disabledReason: selectedAsLeader
+          ? 'Selected as Team Leader'
+          : alreadyInTeam
+            ? getCandidateTeamWarning(member)
+            : '',
+      };
+    });
+}, [members, selectedLeaderIdNumber, selectedProjectManagerIdNumber]);
+
 
   const toggleMember = (memberId: number) => {
     setSelectedMemberIds((prev) => {
@@ -282,51 +278,51 @@ const TeamCreate: React.FC = () => {
     });
   };
 
-  const validateForm = () => {
-    if (!isDepartmentHead && !departmentId) {
-      return 'Please select a department.';
-    }
+const validateForm = () => {
+  if (!isDepartmentHead && !departmentId) {
+    return 'Please select a department.';
+  }
 
-    if (!teamName.trim()) {
-      return 'Please enter a team name.';
-    }
+  if (!teamName.trim()) {
+    return 'Please enter a team name.';
+  }
 
-    if (!teamLeaderId) {
-      return 'Please select a Team Leader.';
-    }
+  if (!teamLeaderId) {
+    return 'Please select a Team Leader.';
+  }
 
-    if (selectedMemberIds.length === 0) {
-      return 'Please select at least one Team Member.';
-    }
+  if (!projectManagerId) {
+    return 'Please select a Project Manager.';
+  }
 
-    if (projectManagerId && projectManagerId === teamLeaderId) {
-      return 'Project Manager cannot be the same as Team Leader.';
-    }
+  if (selectedMemberIds.length === 0) {
+    return 'Please select at least one Team Member.';
+  }
 
-    if (projectManagerId && selectedMemberIds.includes(Number(projectManagerId))) {
-      return 'Project Manager cannot be selected as a normal member.';
-    }
+  if (projectManagerId === teamLeaderId) {
+    return 'Project Manager cannot be the same as Team Leader.';
+  }
 
-    if (selectedMemberIds.includes(Number(teamLeaderId))) {
-      return 'Team Leader cannot be selected as a normal member.';
-    }
+  if (selectedMemberIds.includes(Number(projectManagerId))) {
+    return 'Project Manager cannot be selected as a normal member.';
+  }
 
-    if (selectedMemberIds.some((id) => roleCandidateIds.has(id))) {
-      return 'Team Leader and Project Manager candidates cannot be selected as normal members.';
-    }
+  if (selectedMemberIds.includes(Number(teamLeaderId))) {
+    return 'Team Leader cannot be selected as a normal member.';
+  }
 
-    const unavailableMember = members.find(
-      (member) =>
-        selectedMemberIds.includes(member.id) &&
-        (member.available === false || member.isAvailable === false)
-    );
+  const unavailableMember = members.find(
+    (member) =>
+      selectedMemberIds.includes(member.id) &&
+      (member.available === false || member.isAvailable === false)
+  );
 
-    if (unavailableMember) {
-      return `${unavailableMember.name} is ${getCandidateTeamWarning(unavailableMember).toLowerCase()}.`;
-    }
+  if (unavailableMember) {
+    return `${unavailableMember.name} is ${getCandidateTeamWarning(unavailableMember).toLowerCase()}.`;
+  }
 
-    return '';
-  };
+  return '';
+};
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -348,7 +344,7 @@ const TeamCreate: React.FC = () => {
         teamName: teamName.trim(),
         departmentId: isDepartmentHead ? 0 : Number(departmentId),
         teamLeaderId: Number(teamLeaderId),
-        projectManagerId: projectManagerId ? Number(projectManagerId) : null,
+projectManagerId: Number(projectManagerId),
         teamGoal: teamGoal.trim(),
         status: 'Active',
         memberUserIds: selectedMemberIds,
@@ -382,8 +378,8 @@ const TeamCreate: React.FC = () => {
           <p className="team-eyebrow">Team Organization</p>
           <h1>Create Team</h1>
           <p>
-            Create an active team, assign a Team Leader, optionally assign a Project Manager,
-            and choose at least one Team Member.
+         Create an active team, assign a Team Leader and Project Manager,
+         and choose at least one Team Member.
           </p>
         </div>
 
@@ -480,7 +476,7 @@ const TeamCreate: React.FC = () => {
             onChange={(event) => setProjectManagerId(event.target.value)}
             disabled={loadingCandidates || (!isDepartmentHead && !departmentId)}
           >
-            <option value="">Optional - Select Project Manager</option>
+<option value="">Select Project Manager</option>
 
             {availableProjectManagers.map((pm) => (
               <option key={pm.id} value={pm.id}>
@@ -489,10 +485,10 @@ const TeamCreate: React.FC = () => {
             ))}
           </select>
 
-          <small>
-            Optional. Project Manager can manage many teams, but cannot be the Team Leader
-            or a normal member in this team.
-          </small>
+        <small>
+          Required. Project Manager can manage many teams, but cannot be the Team Leader
+          or a normal member in this team.
+        </small>
 
           {selectedProjectManager?.currentTeamNames && (
             <div className="team-info-banner" style={{ marginTop: 10 }}>
@@ -555,12 +551,19 @@ const TeamCreate: React.FC = () => {
           <button
             type="submit"
             className="team-btn team-btn-primary"
-            disabled={submitting || selectedMemberIds.length === 0}
-            title={
-              selectedMemberIds.length === 0
-                ? 'Please select at least one Team Member.'
-                : undefined
-            }
+
+          disabled={submitting || selectedMemberIds.length === 0 || !teamLeaderId || !projectManagerId}
+          title={
+            selectedMemberIds.length === 0
+              ? 'Please select at least one Team Member.'
+              : !teamLeaderId
+                ? 'Please select a Team Leader.'
+                : !projectManagerId
+                  ? 'Please select a Project Manager.'
+                  : undefined
+          }
+
+
           >
             {submitting ? 'Creating...' : 'Create Team'}
           </button>

@@ -105,7 +105,7 @@ export const emptyPositionPermission = (): PositionPermission => ({
   oneOnOnePermission: false,
   positionPermission: false,
   kpiPermission: false,
-  departmentKpiPermission: false,
+
   assessmentScoresView: false,
   assessmentFormCreate: false,
 
@@ -207,9 +207,8 @@ export const sanitizePositionPermission = (payload: unknown): PositionPermission
   clean.kpiPermission = Boolean(
     source.kpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView || clean.kpiInput,
   );
-  clean.departmentKpiPermission = Boolean(
-    source.departmentKpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView,
-  );
+
+
   clean.oneOnOnePermission = Boolean(
     source.oneOnOnePermission || clean.oneOnOneCreate || clean.oneOnOneDeptSelection || clean.oneOnOneTeamSelection,
   );
