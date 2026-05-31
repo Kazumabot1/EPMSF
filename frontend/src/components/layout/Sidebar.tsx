@@ -146,11 +146,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
   const roleLabel =
       variant === 'admin'
-          ? 'Admin'
+          ? 'HR Admin'
           : variant === 'hr'
               ? 'HR'
               : isAdmin
-                  ? 'Admin'
+                  ? 'HR Admin'
                   : isHr
                       ? 'HR'
                       : isDepartmentHead
@@ -220,9 +220,18 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
     const adminNavItems: NavItem[] = [
-      { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
+      { to: '/admin/dashboard', label: 'HR Admin Dashboard', icon: 'bi bi-shield-lock' },
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
       { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
+      {
+        to: '/admin/approval/kpi',
+        label: 'KPI Approvals',
+        icon: 'bi bi-bullseye',
+        children: [
+          { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
+          { to: '/admin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
+        ],
+      },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -682,15 +691,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-      {
-        to: '/executive/kpi-scoring',
-        label: 'KPI Management',
-        icon: 'bi bi-bullseye',
-        children: [
-          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
-          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
-        ],
-      },
+      { to: '/executive/approval/changes', label: 'People Change Review', icon: 'bi bi-person-check' },
       {
         to: '/executive/reports',
         label: 'Reports',

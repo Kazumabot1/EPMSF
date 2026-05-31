@@ -270,6 +270,9 @@ public class GlobalExceptionHandler {
 
         if (path != null && path.matches(".*/api/v1/feedback/campaigns/\\d+/targets$")) {
             message = "Could not save campaign targets because one or more selected employees are already stored for this campaign. Refresh the campaign and try again.";
+        } else if (path != null && path.contains("/api/employees")) {
+            String causeMessage = mostSpecificCauseMessage(ex);
+            message = employeeSaveConflictMessage(causeMessage);
         } else if (path != null && path.contains("/api/hr/kpi-templates")) {
             String causeMessage = mostSpecificCauseMessage(ex);
             if (isKpiPositionConflict(causeMessage)) {
@@ -348,6 +351,28 @@ public class GlobalExceptionHandler {
             }
         }
         return null;
+    }
+
+
+    private static String employeeSaveConflictMessage(String causeMessage) {
+        if (causeMessage == null || causeMessage.isBlank()) {
+            return "Could not create the employee because a unique employee field is already used. Check work email, staff NRC, and employee code.";
+        }
+
+        String msg = causeMessage.toLowerCase();
+        if (msg.contains("employee_code")) {
+            return "Could not create the employee because the generated employee code already exists. Restart the backend and try again; the code generator will skip used codes.";
+        }
+        if (msg.contains("email")) {
+            return "Could not create the employee because this work email is already used by an employee or login account.";
+        }
+        if (msg.contains("staff_nrc") || msg.contains("nrc")) {
+            return "Could not create the employee because this Staff NRC is already used by another employee.";
+        }
+        if (msg.contains("employee_department")) {
+            return "Could not create the employee because the department assignment could not be saved. Check the selected department and try again.";
+        }
+        return "Could not create the employee because a unique employee field is already used. Check work email, staff NRC, and employee code.";
     }
 
     private static boolean isKpiPositionConflict(String causeMessage) {

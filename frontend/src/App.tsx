@@ -174,7 +174,7 @@ function App() {
               </Route>
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead', 'Executive']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['Manager', 'DepartmentHead']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/kpi" element={<Navigate to="/kpi-scoring" replace />} />
                 <Route path="/kpi/history" element={<ManagerKpiHistoryPage />} />
@@ -188,6 +188,8 @@ function App() {
                 <Route path="/admin/users" element={<AdminDashboard />} />
                 <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
                 <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
+                <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
+                <Route path="/admin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
                 <Route path="/position-permissions" element={<PositionPermissions />} />
               </Route>
             </Route>
@@ -242,21 +244,33 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="/executive/dashboard" element={<RolePerformanceDashboard view="ceo" />} />
               <Route path="/ceo/dashboard" element={<Navigate to="/executive/dashboard" replace />} />
-              <Route path="/executive/approval/kpi" element={<KpiApprovalPage />} />
-              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/approval/kpi" replace />} />
-              <Route path="/executive/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
-              <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/approval/department-kpi" replace />} />
-             <Route path="/executive/approval/changes" element={<EmployeeChangeApprovalPage />} />
-<Route path="/ceo/approval/changes" element={<Navigate to="/executive/approval/changes" replace />} />
+              <Route
+                  path="/executive/approval/kpi"
+                  element={<RedirectWithMessage to="/executive/dashboard" message="KPI approvals are handled by HR Admin." />}
+              />
+              <Route path="/ceo/approval/kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route
+                  path="/executive/approval/department-kpi"
+                  element={<RedirectWithMessage to="/executive/dashboard" message="Department KPI approvals are handled by HR Admin." />}
+              />
+              <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/approval/changes" element={<EmployeeChangeApprovalPage />} />
+              <Route path="/ceo/approval/changes" element={<Navigate to="/executive/approval/changes" replace />} />
 
-              <Route path="/executive/kpis" element={<EmployeeKpiResultsPage />} />
-              <Route path="/ceo/kpis" element={<Navigate to="/executive/kpis" replace />} />
-              <Route path="/executive/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />
-              <Route path="/executive/kpi/history" element={<ManagerKpiHistoryPage />} />
-              <Route path="/executive/kpi-scoring" element={<ManagerKpiScoringPage />} />
-              <Route path="/ceo/kpi" element={<Navigate to="/executive/kpi-scoring" replace />} />
-              <Route path="/ceo/kpi/history" element={<Navigate to="/executive/kpi/history" replace />} />
-              <Route path="/ceo/kpi-scoring" element={<Navigate to="/executive/kpi-scoring" replace />} />
+              <Route
+                  path="/executive/kpis"
+                  element={<RedirectWithMessage to="/executive/dashboard" message="KPI management is handled by HR Admin and managers." />}
+              />
+              <Route path="/ceo/kpis" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route
+                  path="/executive/kpi"
+                  element={<RedirectWithMessage to="/executive/dashboard" message="KPI scoring is handled by managers and department heads." />}
+              />
+              <Route path="/executive/kpi/history" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/executive/kpi-scoring" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/ceo/kpi" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/ceo/kpi/history" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route path="/ceo/kpi-scoring" element={<Navigate to="/executive/dashboard" replace />} />
               <Route path="/executive/reports" element={<Navigate to="/executive/reports/performance" replace />} />
               <Route path="/executive/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
               <Route path="/executive/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
