@@ -207,12 +207,13 @@ export const sanitizePositionPermission = (payload: unknown): PositionPermission
   clean.kpiPermission = Boolean(
     source.kpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView || clean.kpiInput,
   );
-  clean.departmentKpiPermission = Boolean(
-    source.departmentKpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView,
-  );
-  clean.oneOnOnePermission = Boolean(
-    source.oneOnOnePermission || clean.oneOnOneCreate || clean.oneOnOneDeptSelection || clean.oneOnOneTeamSelection,
-  );
+  clean.departmentKpiPermission = Boolean(source.departmentKpiPermission);
+
+  if (!clean.oneOnOneCreate) {
+    clean.oneOnOneDeptSelection = false;
+    clean.oneOnOneTeamSelection = false;
+  }
+  clean.oneOnOnePermission = Boolean(clean.oneOnOneCreate);
   clean.feedback360Permission = Boolean(source.feedback360Permission || clean.feedbackFormCreate || clean.feedbackSend);
   clean.positionPermission = Boolean(source.positionPermission || clean.positionCrud);
 

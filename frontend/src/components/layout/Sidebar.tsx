@@ -58,8 +58,9 @@ const allow = (permissions: PositionPermission, key: keyof PositionPermission) =
       return Boolean(permissions.appraisalPermission);
 
     case 'continuousFeedbackView':
-    case 'continuousFeedbackGive':
       return Boolean(permissions.continuousFeedbackView);
+    case 'continuousFeedbackGive':
+      return Boolean(permissions.continuousFeedbackGive);
 
     case 'feedback360Permission':
       return Boolean(permissions.feedback360Permission);
@@ -107,11 +108,16 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
   const isAdmin =
       normalizedRoles.includes('ADMIN') ||
-      normalizedDashboard === 'ADMIN_DASHBOARD';
+      normalizedRoles.includes('HRADMIN') ||
+      normalizedRoles.includes('HR_ADMIN') ||
+      normalizedDashboard === 'ADMIN_DASHBOARD' ||
+      normalizedDashboard === 'HRADMIN_DASHBOARD' ||
+      normalizedDashboard === 'HR_ADMIN_DASHBOARD';
 
   const isHr =
-      normalizedRoles.includes('HR') ||
-      normalizedDashboard === 'HR_DASHBOARD';
+      !isAdmin &&
+      (normalizedRoles.includes('HR') ||
+      normalizedDashboard === 'HR_DASHBOARD');
 
   const isDepartmentHead =
       normalizedRoles.includes('DEPARTMENT_HEAD') ||
@@ -553,7 +559,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'My Self-Assessment',
         icon: 'bi bi-pencil-square',
       },
-      {
+      allow(positionPermissions, 'selfAssessmentSign') && {
         to: '/manager/assessment-review',
         label: 'Assessment Review',
         icon: 'bi bi-clipboard-check',
@@ -563,7 +569,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'My KPIs',
         icon: 'bi bi-bullseye',
       },
-      {
+      (allow(positionPermissions, 'kpiInput') || allow(positionPermissions, 'kpiScore') || allow(positionPermissions, 'kpiView')) && {
         to: '/manager/kpi-scoring',
         label: 'KPI Evaluation',
         icon: 'bi bi-bullseye',
@@ -582,7 +588,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'appraisalPermission') && {
         to: '/manager/appraisals',
         label: 'Appraisal Review',
         icon: 'bi bi-clipboard-data',
@@ -601,7 +607,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'feedback360Permission') && {
         to: '/manager/feedback',
         label: '360 Feedback',
         icon: 'bi bi-chat-square-dots',
@@ -612,13 +618,13 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      (allow(positionPermissions, 'continuousFeedbackView') || allow(positionPermissions, 'continuousFeedbackGive')) && {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
 
-      {
+      allow(positionPermissions, 'oneOnOnePermission') && {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -636,22 +642,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      canViewPip && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
-        children: [
-          {
-            to: '/pip/create',
-            label: 'Create PIP',
-            icon: 'bi bi-plus-square',
-          },
-          {
-            to: '/pip/past-plans',
-            label: 'Past Plans',
-            icon: 'bi bi-clock-history',
-          },
-        ],
+        children: pipChildren,
       },
 
       {
@@ -736,19 +731,19 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'View Self-assessment Form',
         icon: 'bi bi-eye',
       },
-      {
+      allow(positionPermissions, 'selfAssessmentView') && {
         to: '/department-head/assessment-scores',
         label: 'Assessment Review',
         icon: 'bi bi-clipboard-data',
       },
 
-      {
+      (allow(positionPermissions, 'continuousFeedbackView') || allow(positionPermissions, 'continuousFeedbackGive')) && {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
 
-      {
+      allow(positionPermissions, 'feedback360Permission') && {
         to: '/department-head/feedback',
         label: '360 Feedback',
         icon: 'bi bi-chat-square-dots',
@@ -764,7 +759,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'Department KPIs',
         icon: 'bi bi-building-check',
       },
-      {
+      (allow(positionPermissions, 'kpiInput') || allow(positionPermissions, 'kpiScore') || allow(positionPermissions, 'kpiView')) && {
         to: '/department-head/kpi-scoring',
         label: 'Manager KPI Scoring',
         icon: 'bi bi-ui-checks-grid',
@@ -783,7 +778,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'teamView') && {
         to: '/department-head/teams',
         label: 'Teams',
         icon: 'bi bi-people-fill',
@@ -864,7 +859,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'oneOnOnePermission') && {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -882,22 +877,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      canViewPip && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
-        children: [
-          {
-            to: '/pip/create',
-            label: 'Create PIP',
-            icon: 'bi bi-plus-square',
-          },
-          {
-            to: '/pip/past-plans',
-            label: 'Past Plans',
-            icon: 'bi bi-clock-history',
-          },
-        ],
+        children: pipChildren,
       },
 
       {

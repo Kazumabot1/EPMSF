@@ -661,7 +661,7 @@ public class TeamServiceImpl implements TeamService {
         }
 
         if (!isProjectManagerCandidate(projectManager)) {
-            throw new BusinessValidationException("Selected Project Manager must have a Manager or Project Manager position.");
+            throw new BusinessValidationException("Selected Project Manager is not eligible for this team role.");
         }
 
         validateUserInWorkingDepartment(projectManager, department.getId(), "Project Manager");
@@ -714,7 +714,7 @@ public class TeamServiceImpl implements TeamService {
             assertAssignableTeamUser(member, "Team member");
 
             if (!isTeamMemberCandidate(member)) {
-                throw new BusinessValidationException("Selected Team member cannot be a Team Leader, Manager, Project Manager, or Department Head.");
+                throw new BusinessValidationException("Selected Team member is not eligible for this team role.");
             }
 
             validateUserInWorkingDepartment(member, department.getId(), "Team member");
@@ -725,7 +725,7 @@ public class TeamServiceImpl implements TeamService {
         assertAssignableTeamUser(teamLeader, "Team Leader");
 
         if (!isTeamLeaderCandidate(teamLeader)) {
-            throw new BusinessValidationException("Selected Team Leader must have a Team Leader position.");
+            throw new BusinessValidationException("Selected Team Leader is not eligible for this team role.");
         }
     }
 
@@ -951,7 +951,9 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return isTeamLeaderPosition(user) || hasPositionPermission(user, "teamAssignAsLeader");
+        // Keep team assignment simple and stable: Team Leader eligibility comes from the
+        // actual position/role title, not from the removed Team Assignment Eligibility cards.
+        return isTeamLeaderPosition(user);
     }
 
     private boolean isProjectManagerCandidate(User user) {
@@ -959,7 +961,8 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        return isProjectManagerPosition(user) || hasPositionPermission(user, "teamAssignAsPm");
+        // Project Manager eligibility comes from manager/PM position-role mapping.
+        return isProjectManagerPosition(user);
     }
 
     private boolean isTeamMemberCandidate(User user) {
@@ -967,18 +970,8 @@ public class TeamServiceImpl implements TeamService {
             return false;
         }
 
-        if (isTeamLeaderPosition(user)
-                || isProjectManagerPosition(user)
-                || hasPositionPermission(user, "teamAssignAsLeader")
-                || hasPositionPermission(user, "teamAssignAsPm")) {
-            return false;
-        }
-
-        if (hasPositionPermission(user, "teamAssignAsMember")) {
-            return true;
-        }
-
-        return true;
+        // Normal members are employees who are not already manager/team-leader positions.
+        return !isTeamLeaderPosition(user) && !isProjectManagerPosition(user);
     }
 
     private boolean hasPositionPermission(User user, String permissionField) {

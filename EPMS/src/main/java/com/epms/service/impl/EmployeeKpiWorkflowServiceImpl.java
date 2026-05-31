@@ -1089,8 +1089,9 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ManagerKpiTemplateSummaryDto> listKpiTemplatesForManagerDepartment() {
+        ensureActiveCyclePeriodSchedulesAndAssignments(LocalDate.now());
         List<Integer> employeeIds = currentEvaluatorScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();
@@ -1107,6 +1108,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId, Integer cyclePeriodId) {
+        ensureActiveCyclePeriodSchedulesAndAssignments(LocalDate.now());
         List<Integer> employeeIds = currentEvaluatorScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();
@@ -2057,7 +2059,18 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     }
 
     private LinkedHashSet<Integer> hrAdminScopedEmployeeIds(Integer evaluatorUserId) {
-        return seniorScopedEmployeeIds(evaluatorUserId);
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>(employeeKpiFormRepository.findDistinctEmployeeIdsWithAssignments());
+
+        if (evaluatorUserId != null) {
+            userRepository.findById(evaluatorUserId)
+                    .map(User::getEmployeeId)
+                    .ifPresent(ids::remove);
+        }
+
+        return ids.stream()
+                .filter(Objects::nonNull)
+                .filter(this::hasActiveEmployeeAccount)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private LinkedHashSet<Integer> executiveFallbackScopedEmployeeIds(Integer evaluatorUserId) {
