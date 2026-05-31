@@ -36,8 +36,8 @@ const RELATIONSHIP_ORDER: Array<{
     >;
 }> = [
     { key: 'SELF', label: 'Self', scoreKey: 'selfAverageScore', countKey: 'selfResponses' },
-    { key: 'MANAGER', label: 'Manager', scoreKey: 'managerAverageScore', countKey: 'managerResponses' },
-    { key: 'PEER', label: 'Peers', scoreKey: 'peerAverageScore', countKey: 'peerResponses' },
+    { key: 'MANAGER', label: 'Manager reviewer', scoreKey: 'managerAverageScore', countKey: 'managerResponses' },
+    { key: 'PEER', label: 'Peer reviewers', scoreKey: 'peerAverageScore', countKey: 'peerResponses' },
     { key: 'SUBORDINATE', label: 'Subordinate reviewers', scoreKey: 'subordinateAverageScore', countKey: 'subordinateResponses' },
 ];
 
@@ -247,6 +247,9 @@ const FeedbackMyResultPage = () => {
                         <span>Overall score</span>
                         <strong>{formatScore(selectedResult.averageScore)}</strong>
                         <small>{selectedResult.scoreCategory || 'No score band'}</small>
+                        {sectionAllowed(selectedResult.includeScoreExplanation) && selectedResult.rawAverageScore != null ? (
+                            <small>Unweighted normalized average: {selectedResult.rawAverageScore.toFixed(1)}%</small>
+                        ) : null}
                     </article>
                 ) : (
                     <article className="feedback-result-score-card muted">
@@ -278,7 +281,7 @@ const FeedbackMyResultPage = () => {
                     <div className="feedback-result-explanation-grid">
                         <div>
                             <span>Method</span>
-                            <strong>{selectedResult.scoreCalculationMethod || 'Relationship weighted submitted-response average'}</strong>
+                            <strong>{selectedResult.scoreCalculationMethod || 'Weighted submitted-response average'}</strong>
                         </div>
                         <div>
                             <span>Confidence</span>
@@ -369,10 +372,10 @@ const FeedbackMyResultPage = () => {
             <section className="feedback-result-card">
                 <div className="feedback-result-section-head">
                     <div>
-                        <p className="feedback-result-kicker">Relationship summary</p>
+                        <p className="feedback-result-kicker">Reviewer groups</p>
                         <h2>Feedback coverage and privacy</h2>
                     </div>
-                    <span>Anonymous by relationship group</span>
+                    <span>Anonymous reviewer groups</span>
                 </div>
 
                 <div className="feedback-relationship-table">

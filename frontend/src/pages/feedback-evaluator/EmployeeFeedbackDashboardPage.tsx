@@ -2,11 +2,9 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useMyFeedbackTasks } from '../../hooks/useFeedbackEvaluator';
-import { feedbackService } from '../../services/feedbackService';
 import { feedbackAnalyticsApi } from '../../api/feedbackAnalyticsApi';
 import type { FeedbackEvaluatorTask, FeedbackRelationshipType } from '../../types/feedbackEvaluator';
-import type { FeedbackReceivedItem } from '../../types/feedback';
-import type { FeedbackResultItem } from '../../types/feedbackAnalytics';
+import type { FeedbackCompetencyResult, FeedbackPublishedComment, FeedbackResultItem } from '../../types/feedbackAnalytics';
 import {
     Feedback360Avatar,
     Feedback360Banner,
@@ -41,56 +39,23 @@ type TaskBucket = {
     tasks: FeedbackEvaluatorTask[];
 };
 
-type FeedbackReceivedQuestionItem = {
-    questionId: number;
-    questionText?: string | null;
-    questionOrder?: number | null;
-    sectionTitle?: string | null;
-    sectionOrder?: number | null;
-    ratingValue?: number | null;
-    comment?: string | null;
-};
-
-type FeedbackReceivedItemWithQuestions = FeedbackReceivedItem & {
-    questionItems?: FeedbackReceivedQuestionItem[];
-};
-
-type ResultItem = {
-    item: FeedbackReceivedItemWithQuestions;
-    relationship: string;
-    relationshipLabel: string;
-};
-
-type CampaignGroup = {
-    key: string;
-    campaignId: number;
-    campaignName: string;
-    status?: string;
-    items: ResultItem[];
-};
-
-type CompetencyResult = {
-    key: string;
-    name: string;
-    averageScore: number;
-    responseCount: number;
-};
-
-type CommentRelationshipGroup = {
-    relationship: string;
+type PublishedRelationshipRow = {
+    relationship: FeedbackRelationshipType;
     label: string;
-    comments: string[];
+    score?: number | null;
+    count: number;
+    visible: boolean;
+    hiddenReason?: string | null;
 };
 
-type QuestionCommentGroup = {
+type PublishedCommentGroup = {
     key: string;
-    sectionTitle?: string | null;
-    questionText?: string | null;
-    relationships: CommentRelationshipGroup[];
+    title: string;
+    items: FeedbackPublishedComment[];
 };
 
 const MS_PER_DAY = 86_400_000;
-const RELATIONSHIP_ORDER = ['SELF', 'MANAGER', 'PEER', 'SUBORDINATE'] as const;
+const RELATIONSHIP_ORDER: FeedbackRelationshipType[] = ['SELF', 'MANAGER', 'PEER', 'SUBORDINATE'];
 
 const relationshipLabel = (type: FeedbackRelationshipType | string | null | undefined, plural = false) => {
     switch (type) {
@@ -108,7 +73,7 @@ const relationshipLabel = (type: FeedbackRelationshipType | string | null | unde
 };
 
 const formatDate = (value?: string | null) => {
-    if (!value) return 'No deadline';
+    if (!value) return 'Not published yet';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
@@ -191,121 +156,73 @@ const bandText = (score?: number | null, scoreCategory?: string | null) => {
     return 'Unsatisfactory';
 };
 
-const ratingToPercent = (rating?: number | null) => {
-    if (typeof rating !== 'number') return null;
-    return Math.max(0, Math.min(5, rating)) * 20;
-};
+const sectionAllowed = (value?: boolean | null) => value === true;
 
-const averageScore = (scores: Array<number | null | undefined>) => {
-    const valid = scores.filter((score): score is number => typeof score === 'number');
-    return valid.length ? valid.reduce((sum, score) => sum + score, 0) / valid.length : null;
-};
+const privacyForRelationship = (result: FeedbackResultItem, relationship: FeedbackRelationshipType) => (
+    result.relationshipPrivacy?.find((item) => item.relationshipType === relationship)
+);
 
-const resultRelationship = (item: FeedbackReceivedItem) => item.relationshipType ?? item.sourceType ?? 'EVALUATOR';
-
-const canDisplayRelationshipScore = (relationship: string, count?: number | null) => {
-    const safeCount = count ?? 0;
-    if (relationship === 'PEER' || relationship === 'SUBORDINATE') return safeCount >= 2;
-    return safeCount > 0;
-};
-
-const publishContentFlags = (summary?: FeedbackResultItem, campaign?: CampaignGroup) => {
-    const first = campaign?.items[0]?.item;
-    return {
-        includeOverallScore: summary?.includeOverallScore ?? first?.includeOverallScore ?? true,
-        includeCompetencyBreakdown: summary?.includeCompetencyBreakdown ?? first?.includeCompetencyBreakdown ?? true,
-        includeSelfVsOthers: summary?.includeSelfVsOthers ?? first?.includeSelfVsOthers ?? true,
-        includeComments: summary?.includeComments ?? first?.includeComments ?? false,
-        includeScoreExplanation: summary?.includeScoreExplanation ?? first?.includeScoreExplanation ?? true,
-    };
-};
-
-const relationshipScoreFromSummary = (summary: FeedbackResultItem | undefined, relationship: string) => {
+const relationshipScore = (result: FeedbackResultItem, relationship: FeedbackRelationshipType) => {
     switch (relationship) {
         case 'SELF':
-            return summary?.selfAverageScore ?? null;
+            return result.selfAverageScore ?? null;
         case 'MANAGER':
-            return summary?.managerAverageScore ?? null;
+            return result.managerAverageScore ?? null;
         case 'PEER':
-            return summary?.peerAverageScore ?? null;
+            return result.peerAverageScore ?? null;
         case 'SUBORDINATE':
-            return summary?.subordinateAverageScore ?? null;
+            return result.subordinateAverageScore ?? null;
         default:
             return null;
     }
 };
 
-const relationshipCountFromSummary = (summary: FeedbackResultItem | undefined, relationship: string, fallbackItems: ResultItem[]) => {
+const relationshipCount = (result: FeedbackResultItem, relationship: FeedbackRelationshipType) => {
     switch (relationship) {
         case 'SELF':
-            return summary?.selfResponses ?? fallbackItems.length;
+            return result.selfResponses ?? 0;
         case 'MANAGER':
-            return summary?.managerResponses ?? fallbackItems.length;
+            return result.managerResponses ?? 0;
         case 'PEER':
-            return summary?.peerResponses ?? fallbackItems.length;
+            return result.peerResponses ?? 0;
         case 'SUBORDINATE':
-            return summary?.subordinateResponses ?? fallbackItems.length;
+            return result.subordinateResponses ?? 0;
         default:
-            return fallbackItems.length;
+            return 0;
     }
 };
 
-const buildCompetencyResults = (items: ResultItem[]): CompetencyResult[] => {
-    const groups = new Map<string, { name: string; scores: number[] }>();
-    items.forEach(({ item }) => {
-        (item.questionItems ?? []).forEach((question) => {
-            const percent = ratingToPercent(question.ratingValue);
-            if (percent == null) return;
-            const name = question.sectionTitle?.trim() || 'Unmapped competency';
-            const key = name.toLowerCase();
-            if (!groups.has(key)) {
-                groups.set(key, { name, scores: [] });
-            }
-            groups.get(key)?.scores.push(percent);
-        });
-    });
-    return Array.from(groups.entries())
-        .map(([key, group]) => ({
-            key,
-            name: group.name,
-            averageScore: group.scores.reduce((sum, score) => sum + score, 0) / Math.max(1, group.scores.length),
-            responseCount: group.scores.length,
-        }))
-        .sort((a, b) => b.averageScore - a.averageScore || a.name.localeCompare(b.name));
-};
+const buildRelationshipRows = (result: FeedbackResultItem): PublishedRelationshipRow[] => RELATIONSHIP_ORDER.map((relationship) => {
+    const privacy = privacyForRelationship(result, relationship);
+    const count = relationshipCount(result, relationship);
+    const score = relationshipScore(result, relationship);
+    const visible = privacy?.visibleOutsideHr ?? score != null;
+    return {
+        relationship,
+        label: privacy?.label ?? relationshipLabel(relationship),
+        score,
+        count,
+        visible,
+        hiddenReason: privacy?.hiddenReason ?? null,
+    };
+});
 
-const buildQuestionCommentGroups = (items: ResultItem[]): QuestionCommentGroup[] => {
-    const groups = new Map<string, QuestionCommentGroup>();
-    items.forEach(({ item, relationship }) => {
-        (item.questionItems ?? []).forEach((question) => {
-            const comment = question.comment?.trim();
-            if (!comment) return;
-            const key = `${question.questionId}-${question.questionText ?? ''}`;
+const groupedPublishedComments = (comments?: FeedbackPublishedComment[]): PublishedCommentGroup[] => {
+    const groups = new Map<string, PublishedCommentGroup>();
+    (comments ?? [])
+        .filter((comment) => comment.comment?.trim())
+        .forEach((comment) => {
+            const title = comment.competencyName?.trim()
+                || comment.competencyCode?.trim()
+                || comment.questionText?.trim()
+                || 'Other feedback';
+            const key = title.toLowerCase();
             if (!groups.has(key)) {
-                groups.set(key, {
-                    key,
-                    sectionTitle: question.sectionTitle,
-                    questionText: question.questionText,
-                    relationships: [],
-                });
+                groups.set(key, { key, title, items: [] });
             }
-            const group = groups.get(key);
-            if (!group) return;
-            let relationshipGroup = group.relationships.find((entry) => entry.relationship === relationship);
-            if (!relationshipGroup) {
-                relationshipGroup = { relationship, label: relationshipLabel(relationship), comments: [] };
-                group.relationships.push(relationshipGroup);
-            }
-            relationshipGroup.comments.push(comment);
+            groups.get(key)?.items.push(comment);
         });
-    });
-
-    return Array.from(groups.values())
-        .map((group) => ({
-            ...group,
-            relationships: group.relationships.sort((a, b) => RELATIONSHIP_ORDER.indexOf(a.relationship as never) - RELATIONSHIP_ORDER.indexOf(b.relationship as never)),
-        }))
-        .filter((group) => group.relationships.some((entry) => entry.comments.length > 0));
+    return Array.from(groups.values()).sort((a, b) => a.title.localeCompare(b.title));
 };
 
 const resolveWorkspace = (pathname: string): { kind: WorkspaceKind; homePath: string; canSeeAboutMe: boolean; title: string; description: string } => {
@@ -354,11 +271,6 @@ const EmployeeFeedbackDashboardPage = () => {
     const [expandedCampaigns, setExpandedCampaigns] = useState<Record<string, boolean>>({});
 
     const tasksQuery = useMyFeedbackTasks();
-    const dashboardQuery = useQuery({
-        queryKey: ['feedback-dashboard', workspace.kind],
-        queryFn: feedbackService.getEmployeeDashboard,
-        enabled: workspace.canSeeAboutMe,
-    });
     const resultSummaryQuery = useQuery({
         queryKey: ['feedback-my-result', workspace.kind],
         queryFn: feedbackAnalyticsApi.getMyResult,
@@ -366,8 +278,15 @@ const EmployeeFeedbackDashboardPage = () => {
     });
 
     const tasks = tasksQuery.data ?? [];
-    const ownResults = dashboardQuery.data?.ownFeedbackResults ?? [];
     const resultSummaries = resultSummaryQuery.data?.results ?? [];
+
+    const publishedResults = useMemo(() => [...resultSummaries].sort((a, b) => {
+        const left = new Date(a.publishedAt ?? a.summarizedAt ?? '').getTime();
+        const right = new Date(b.publishedAt ?? b.summarizedAt ?? '').getTime();
+        const normalizedLeft = Number.isNaN(left) ? 0 : left;
+        const normalizedRight = Number.isNaN(right) ? 0 : right;
+        return normalizedRight - normalizedLeft || b.campaignId - a.campaignId;
+    }), [resultSummaries]);
 
     const taskCampaignOptions = useMemo(() => {
         const campaigns = new Map<number, string>();
@@ -379,9 +298,9 @@ const EmployeeFeedbackDashboardPage = () => {
         const toComplete = tasks.filter((task) => task.status === 'PENDING').length;
         const inProgress = tasks.filter((task) => task.status === 'IN_PROGRESS').length;
         const submitted = tasks.filter((task) => task.status === 'SUBMITTED').length;
-        const publishedResults = new Set(ownResults.map((item) => item.campaignId)).size;
-        return { toComplete, inProgress, submitted, publishedResults };
-    }, [ownResults, tasks]);
+        const publishedResultsCount = resultSummaries.length;
+        return { toComplete, inProgress, submitted, publishedResults: publishedResultsCount };
+    }, [resultSummaries.length, tasks]);
 
     const filteredTasks = useMemo(() => {
         const search = taskSearch.trim().toLowerCase();
@@ -424,35 +343,6 @@ const EmployeeFeedbackDashboardPage = () => {
         },
     ], [sortedTasks]);
 
-    const displayResults = useMemo<ResultItem[]>(() => ownResults.map((item) => {
-        const relationship = resultRelationship(item);
-        return { item, relationship, relationshipLabel: relationshipLabel(relationship) };
-    }), [ownResults]);
-
-    const campaignGroups = useMemo<CampaignGroup[]>(() => {
-        const groups = new Map<string, CampaignGroup>();
-        displayResults.forEach((result) => {
-            const key = `campaign-${result.item.campaignId}`;
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    key,
-                    campaignId: result.item.campaignId,
-                    campaignName: result.item.campaignName,
-                    status: result.item.campaignStatus,
-                    items: [],
-                });
-            }
-            groups.get(key)?.items.push(result);
-        });
-        return Array.from(groups.values()).sort((a, b) => b.campaignId - a.campaignId);
-    }, [displayResults]);
-
-    const summaryByCampaignId = useMemo(() => {
-        const map = new Map<number, FeedbackResultItem>();
-        resultSummaries.forEach((summary) => map.set(summary.campaignId, summary));
-        return map;
-    }, [resultSummaries]);
-
     const toggleCampaign = (key: string) => setExpandedCampaigns((current) => ({ ...current, [key]: !current[key] }));
 
     const renderTaskCard = (task: FeedbackEvaluatorTask) => {
@@ -491,24 +381,29 @@ const EmployeeFeedbackDashboardPage = () => {
         </Feedback360Panel>
     );
 
-    const renderSelfVsOthers = (summary: FeedbackResultItem | undefined, campaign: CampaignGroup) => {
-        const rows = RELATIONSHIP_ORDER.map((relationship) => {
-            const fallbackItems = campaign.items.filter((item) => item.relationship === relationship);
-            const count = relationshipCountFromSummary(summary, relationship, fallbackItems);
-            const allowed = canDisplayRelationshipScore(relationship, count);
-            const fallbackScore = averageScore(fallbackItems.map((item) => item.item.overallScore));
-            const score = relationshipScoreFromSummary(summary, relationship) ?? fallbackScore;
-            return { relationship, label: relationshipLabel(relationship), count, allowed, score };
-        });
+    const renderLockedSection = (title: string, description = 'HR did not include this section in the published result.') => (
+        <Feedback360EmptyState title={title} description={description} />
+    );
 
+    const renderOverallScore = (result: FeedbackResultItem) => (
+        <section className="f360-overall-score">
+            <span>Overall result</span>
+            <strong>{scoreText(result.averageScore)}</strong>
+            <em>{bandText(result.averageScore, result.scoreCategory)}</em>
+        </section>
+    );
+
+    const renderSelfVsOthers = (result: FeedbackResultItem) => {
+        const rows = buildRelationshipRows(result);
         return (
             <Feedback360Panel>
-                <Feedback360PanelHeader compact title="Self vs others" description="See how your self-view compares with feedback from other groups." />
+                <Feedback360PanelHeader compact title="Self vs others" description="Only privacy-safe relationship summaries are shown. Protected groups stay hidden when the response threshold is not met." />
                 <div className="f360-score-grid">
                     {rows.map((row) => (
                         <div className="f360-score-cell" key={row.relationship}>
                             <span>{row.label}</span>
-                            <strong>{row.allowed && row.score != null ? scoreText(row.score) : 'Not enough feedback'}</strong>
+                            <strong>{row.visible && row.score != null ? scoreText(row.score) : 'Hidden for privacy'}</strong>
+                            <small>{row.visible ? `${row.count} response${row.count === 1 ? '' : 's'}` : row.hiddenReason ?? 'Not enough feedback to show safely'}</small>
                         </div>
                     ))}
                 </div>
@@ -516,28 +411,43 @@ const EmployeeFeedbackDashboardPage = () => {
         );
     };
 
-    const renderCompetencyBreakdown = (competencies: CompetencyResult[]) => {
-        if (competencies.length === 0) {
+    const renderCompetencyBreakdown = (competencies?: FeedbackCompetencyResult[]) => {
+        const safeCompetencies = competencies ?? [];
+        if (safeCompetencies.length === 0) {
             return <Feedback360EmptyState title="Competency breakdown is not available." description="This published result does not include enough mapped competency data." />;
         }
-        const strongest = competencies.slice(0, 3);
-        const development = competencies.length > 3 ? [...competencies].sort((a, b) => a.averageScore - b.averageScore || a.name.localeCompare(b.name)).slice(0, 3) : [];
+        const sortedCompetencies = [...safeCompetencies].sort((a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1) || a.competencyName.localeCompare(b.competencyName));
+        const strongest = sortedCompetencies.slice(0, 3);
+        const development = sortedCompetencies.length > 3
+            ? [...sortedCompetencies].sort((a, b) => (a.averageScore ?? 101) - (b.averageScore ?? 101) || a.competencyName.localeCompare(b.competencyName)).slice(0, 3)
+            : [];
 
         return (
             <>
                 <Feedback360Panel>
-                    <Feedback360PanelHeader compact title="Competency breakdown" description="Average score by competency from the published feedback set." />
+                    <Feedback360PanelHeader compact title="Competency breakdown" description="Average score by competency from the published privacy-safe summary." />
                     <div className="f360-section-grid">
-                        {competencies.map((competency) => (
-                            <div className="f360-competency-row" key={competency.key}>
+                        {sortedCompetencies.map((competency) => (
+                            <div className="f360-competency-row" key={competency.competencyCode || competency.competencyName}>
                                 <div>
-                                    <strong>{competency.name}</strong>
-                                    <span>{competency.responseCount} rating{competency.responseCount === 1 ? '' : 's'}</span>
+                                    <strong>{competency.competencyName}</strong>
+                                    <span>{competency.responseCount} rating{competency.responseCount === 1 ? '' : 's'} · {competency.questionCount} question{competency.questionCount === 1 ? '' : 's'}</span>
                                 </div>
                                 <div>
                                     <b>{scoreText(competency.averageScore)}</b>
-                                    <Feedback360ProgressBar value={competency.averageScore} />
+                                    <Feedback360ProgressBar value={competency.averageScore ?? 0} />
                                 </div>
+                                {competency.relationshipBreakdown?.length ? (
+                                    <div className="f360-score-grid">
+                                        {competency.relationshipBreakdown.map((row) => (
+                                            <div className="f360-score-cell" key={`${competency.competencyCode}-${row.relationshipType}`}>
+                                                <span>{row.label ?? relationshipLabel(row.relationshipType)}</span>
+                                                <strong>{row.visibleOutsideHr === false ? 'Hidden for privacy' : scoreText(row.averageScore)}</strong>
+                                                <small>{row.visibleOutsideHr === false ? row.hiddenReason ?? 'Not enough feedback to show safely' : `${row.responseCount} response${row.responseCount === 1 ? '' : 's'}`}</small>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
                             </div>
                         ))}
                     </div>
@@ -545,35 +455,35 @@ const EmployeeFeedbackDashboardPage = () => {
                 <div className="f360-strength-grid">
                     <Feedback360Panel>
                         <Feedback360PanelHeader compact title="Strengths" />
-                        <ul>{strongest.map((competency) => <li key={`strength-${competency.key}`}>{competency.name}</li>)}</ul>
+                        <ul>{strongest.map((competency) => <li key={`strength-${competency.competencyCode || competency.competencyName}`}>{competency.competencyName}</li>)}</ul>
                     </Feedback360Panel>
                     <Feedback360Panel>
                         <Feedback360PanelHeader compact title="Development areas" />
-                        {development.length > 0 ? <ul>{development.map((competency) => <li key={`development-${competency.key}`}>{competency.name}</li>)}</ul> : <p>Not enough competency data to identify development areas.</p>}
+                        {development.length > 0 ? <ul>{development.map((competency) => <li key={`development-${competency.competencyCode || competency.competencyName}`}>{competency.competencyName}</li>)}</ul> : <p>Not enough competency data to identify development areas.</p>}
                     </Feedback360Panel>
                 </div>
             </>
         );
     };
 
-    const renderWrittenComments = (campaign: CampaignGroup) => {
-        const groups = buildQuestionCommentGroups(campaign.items);
+    const renderWrittenComments = (result: FeedbackResultItem) => {
+        const groups = groupedPublishedComments(result.comments);
         return (
             <Feedback360Panel>
-                <Feedback360PanelHeader compact title="Written comments" description="Comments are grouped by question and evaluator group. Evaluator names are never shown." />
+                <Feedback360PanelHeader compact title="Written comments" description="Only comments approved for publication and safe to show are displayed. Evaluator names are never shown." />
                 {groups.length === 0 ? (
-                    <Feedback360EmptyState title="No written comments are available." description="HR may have hidden comments or the campaign may not include comment publishing." />
+                    <Feedback360EmptyState title="No written comments are available." description="HR may have hidden comments or the confidentiality threshold may not be met." />
                 ) : (
                     <div className="f360-section-grid">
                         {groups.map((group) => (
                             <article className="f360-question-comment-card" key={group.key}>
-                                <span>{group.sectionTitle || 'Competency'}</span>
-                                <strong>{group.questionText}</strong>
+                                <span>{group.title}</span>
                                 <div>
-                                    {group.relationships.map((relationship) => (
-                                        <section key={`${group.key}-${relationship.relationship}`}>
-                                            <b>{relationship.label} feedback</b>
-                                            <ul>{relationship.comments.map((comment, index) => <li key={`${group.key}-${relationship.relationship}-${index}`}>{comment}</li>)}</ul>
+                                    {group.items.map((comment, index) => (
+                                        <section key={`${group.key}-${comment.relationshipType}-${index}`}>
+                                            <b>{comment.label ?? relationshipLabel(comment.relationshipType)} feedback</b>
+                                            {comment.questionText ? <small>{comment.questionText}</small> : null}
+                                            <ul><li>{comment.comment}</li></ul>
                                         </section>
                                     ))}
                                 </div>
@@ -585,9 +495,17 @@ const EmployeeFeedbackDashboardPage = () => {
         );
     };
 
-    const renderScoreExplanation = () => (
+    const renderScoreExplanation = (result: FeedbackResultItem) => (
         <Feedback360Panel>
-            <Feedback360PanelHeader compact title="Score explanation" />
+            <Feedback360PanelHeader compact title="Score explanation" description="This note explains how HR published the visible result." />
+            <div className="f360-score-grid">
+                <div className="f360-score-cell"><span>Method</span><strong>{result.scoreCalculationMethod?.replace(/_/g, ' ') || 'Published summary'}</strong></div>
+                <div className="f360-score-cell"><span>Confidence</span><strong>{result.confidenceLevel?.replace(/_/g, ' ') || 'Not available'}</strong></div>
+                <div className="f360-score-cell"><span>Total responses</span><strong>{result.totalResponses}</strong></div>
+                <div className="f360-score-cell"><span>Completion</span><strong>{typeof result.completionRate === 'number' ? `${result.completionRate.toFixed(0)}%` : 'Not available'}</strong></div>
+            </div>
+            {result.scoreCalculationNote ? <p>{result.scoreCalculationNote}</p> : null}
+            {result.publishNote ? <p>{result.publishNote}</p> : null}
             <div className="f360-score-grid">
                 <div className="f360-score-cell"><span>86–100</span><strong>Outstanding</strong></div>
                 <div className="f360-score-cell"><span>71–85</span><strong>Good</strong></div>
@@ -598,22 +516,24 @@ const EmployeeFeedbackDashboardPage = () => {
         </Feedback360Panel>
     );
 
-    const renderCampaign = (campaign: CampaignGroup) => {
-        const expanded = Boolean(expandedCampaigns[campaign.key]);
-        const summary = summaryByCampaignId.get(campaign.campaignId);
-        const flags = publishContentFlags(summary, campaign);
-        const competencies = buildCompetencyResults(campaign.items);
-        const score = summary?.averageScore ?? averageScore(campaign.items.map((item) => item.item.overallScore));
-        const scoreCategory = bandText(score, summary?.scoreCategory);
+    const renderPrivacyExplanation = () => (
+        <Feedback360Banner tone="info">
+            Peer and subordinate feedback is shown only as aggregated, privacy-safe data. When a group does not meet the confidentiality threshold, its score and comments stay hidden.
+        </Feedback360Banner>
+    );
+
+    const renderPublishedResult = (result: FeedbackResultItem) => {
+        const key = `${result.campaignId}-${result.targetEmployeeId}-${result.publishedAt ?? result.summarizedAt}`;
+        const expanded = Boolean(expandedCampaigns[key]);
         return (
-            <Feedback360VisuallyGrouped key={campaign.key}>
-                <button type="button" className="f360-result-head" onClick={() => toggleCampaign(campaign.key)} aria-expanded={expanded}>
+            <Feedback360VisuallyGrouped key={key}>
+                <button type="button" className="f360-result-head" onClick={() => toggleCampaign(key)} aria-expanded={expanded}>
                     <span className="f360-result-icon"><Feedback360Icon type="spark" /></span>
                     <div>
-                        <h3>{campaign.campaignName}</h3>
+                        <h3>{result.campaignName}</h3>
                         <p>Published 360 feedback result</p>
                     </div>
-                    <strong className="f360-result-score">{flags.includeOverallScore ? scoreText(score) : 'Published'}</strong>
+                    <strong className="f360-result-score">{sectionAllowed(result.includeOverallScore) ? scoreText(result.averageScore) : 'Published'}</strong>
                     <Feedback360StatusPill tone={expanded ? 'brand' : 'neutral'}>{expanded ? 'Hide' : 'View'}</Feedback360StatusPill>
                 </button>
                 {expanded ? (
@@ -622,23 +542,17 @@ const EmployeeFeedbackDashboardPage = () => {
                             <p>ACE Data Systems Ltd.,</p>
                             <h2>360° Feedback Result</h2>
                             <div>
-                                <span>Campaign: {campaign.campaignName}</span>
-                                {summary?.publishedAt ? <span>Published: {formatDate(summary.publishedAt)}</span> : null}
+                                <span>Campaign: {result.campaignName}</span>
+                                <span>Published: {formatDate(result.publishedAt)}</span>
                             </div>
                         </section>
 
-                        {flags.includeOverallScore ? (
-                            <section className="f360-overall-score">
-                                <span>Overall result</span>
-                                <strong>{scoreText(score)}</strong>
-                                <em>{scoreCategory}</em>
-                            </section>
-                        ) : null}
-
-                        {flags.includeSelfVsOthers ? renderSelfVsOthers(summary, campaign) : null}
-                        {flags.includeCompetencyBreakdown ? renderCompetencyBreakdown(competencies) : null}
-                        {flags.includeComments ? renderWrittenComments(campaign) : <Feedback360EmptyState title="Written comments were not included by HR." />}
-                        {flags.includeScoreExplanation ? renderScoreExplanation() : null}
+                        {sectionAllowed(result.includeOverallScore) ? renderOverallScore(result) : renderLockedSection('Overall score was not included by HR.')}
+                        {sectionAllowed(result.includeSelfVsOthers) ? renderSelfVsOthers(result) : renderLockedSection('Self vs others was not included by HR.')}
+                        {sectionAllowed(result.includeCompetencyBreakdown) ? renderCompetencyBreakdown(result.competencyBreakdown) : renderLockedSection('Competency breakdown was not included by HR.')}
+                        {sectionAllowed(result.includeComments) ? renderWrittenComments(result) : renderLockedSection('Written comments were not included by HR.')}
+                        {sectionAllowed(result.includeScoreExplanation) ? renderScoreExplanation(result) : null}
+                        {renderPrivacyExplanation()}
                     </div>
                 ) : null}
             </Feedback360VisuallyGrouped>
@@ -720,14 +634,13 @@ const EmployeeFeedbackDashboardPage = () => {
                         title="My published 360 results"
                         description="Published results are separate from assignments you need to complete. Some feedback may be hidden when the confidentiality threshold is not met."
                     />
-                    {dashboardQuery.isLoading || resultSummaryQuery.isLoading ? <Feedback360EmptyState title="Loading published feedback..." /> : null}
-                    {dashboardQuery.error instanceof Error ? <Feedback360Banner tone="danger">{dashboardQuery.error.message}</Feedback360Banner> : null}
+                    {resultSummaryQuery.isLoading ? <Feedback360EmptyState title="Loading published feedback..." /> : null}
                     {resultSummaryQuery.error instanceof Error ? <Feedback360Banner tone="danger">{resultSummaryQuery.error.message}</Feedback360Banner> : null}
-                    {!dashboardQuery.isLoading && !resultSummaryQuery.isLoading && !dashboardQuery.error && !resultSummaryQuery.error && campaignGroups.length === 0 ? (
+                    {!resultSummaryQuery.isLoading && !resultSummaryQuery.error && publishedResults.length === 0 ? (
                         <Feedback360EmptyState title="No published results yet." description="Your feedback results will appear here when HR publishes them." />
                     ) : null}
-                    {!dashboardQuery.isLoading && !resultSummaryQuery.isLoading && !dashboardQuery.error && !resultSummaryQuery.error && campaignGroups.length > 0 ? (
-                        <div className="f360-section-grid">{campaignGroups.map(renderCampaign)}</div>
+                    {!resultSummaryQuery.isLoading && !resultSummaryQuery.error && publishedResults.length > 0 ? (
+                        <div className="f360-section-grid">{publishedResults.map(renderPublishedResult)}</div>
                     ) : null}
                 </Feedback360Panel>
             ) : null}

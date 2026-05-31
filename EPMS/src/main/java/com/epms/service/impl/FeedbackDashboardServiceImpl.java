@@ -5,6 +5,7 @@ import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackRequest;
 import com.epms.entity.FeedbackResponse;
+import com.epms.entity.FeedbackSummary;
 import com.epms.entity.FeedbackResponseItem;
 import com.epms.entity.User;
 import com.epms.entity.enums.FeedbackSummaryVisibilityStatus;
@@ -52,16 +53,18 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
     public FeedbackDashboardResponse getEmployeeDashboard(Long userId, List<String> roles) {
         Long employeeId = resolveEmployeeIdForUser(userId);
         List<FeedbackSubmissionStatusResponse> pending = buildPendingStatuses(employeeId);
-        List<FeedbackReceivedItemResponse> ownResults = buildVisibleResults(employeeId, roles);
+        long publishedResultCount = countPublishedSummaries(employeeId);
 
         return FeedbackDashboardResponse.builder()
                 .dashboardType("EMPLOYEE")
                 .userId(userId)
                 .totalRequests((long) pending.size())
-                .totalResponses((long) ownResults.size())
+                .totalResponses(publishedResultCount)
                 .totalPendingAssignments((long) pending.size())
                 .pendingFeedbackToSubmit(pending)
-                .ownFeedbackResults(ownResults)
+                // Published 360 results are intentionally not returned through the legacy dashboard payload.
+                // Use FeedbackSummaryService#getMyResult so employee/manager pages receive only privacy-safe summaries.
+                .ownFeedbackResults(List.of())
                 .teamFeedbackSummary(List.of())
                 .campaigns(List.of())
                 .build();
@@ -130,6 +133,20 @@ public class FeedbackDashboardServiceImpl implements FeedbackDashboardService {
                 .filter(Objects::nonNull)
                 .map(Integer::longValue)
                 .orElseThrow(() -> new BusinessValidationException("This user is not linked to an employee record."));
+    }
+
+    private long countPublishedSummaries(Long targetEmployeeId) {
+        return feedbackSummaryRepository.findByTargetEmployeeIdOrderByCampaignEndDateDesc(targetEmployeeId).stream()
+                .filter(this::isPublishedSummaryVisible)
+                .count();
+    }
+
+    private boolean isPublishedSummaryVisible(FeedbackSummary summary) {
+        return summary != null
+                && summary.getCampaign() != null
+                && (summary.getCampaign().getStatus() == FeedbackCampaignStatus.CLOSED
+                || summary.getCampaign().getStatus() == FeedbackCampaignStatus.PUBLISHED)
+                && summary.getVisibilityStatus() == FeedbackSummaryVisibilityStatus.PUBLISHED;
     }
 
     private List<FeedbackSubmissionStatusResponse> buildPendingStatuses(Long evaluatorEmployeeId) {

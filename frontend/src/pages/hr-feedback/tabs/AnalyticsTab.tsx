@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackAnalyticsApi } from '../../../api/feedbackAnalyticsApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
@@ -9,21 +8,19 @@ import type {
 } from '../../../types/feedbackCampaign';
 import type {
   FeedbackCampaignSummary,
-  FeedbackCompetencyAverage,
   FeedbackConfidenceBreakdown,
   FeedbackRelationshipPrivacy,
   FeedbackResultItem,
   FeedbackScoreDistribution,
   FeedbackSummaryPublishRequest,
 } from '../../../types/feedbackAnalytics';
-import './feedback-analytics.css';
 
 type PublishFilter = 'ALL' | 'HIDDEN' | 'READY_TO_PUBLISH' | 'PUBLISHED';
 type ConfidenceFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
 type AnalyticsSort = 'SCORE_DESC' | 'SCORE_ASC' | 'COMPLETION_DESC' | 'COMPLETION_ASC' | 'RESPONSES_DESC';
 type PublishStep = 1 | 2;
 type PublishScope = 'ALL_READY' | 'SELECTED_EMPLOYEES';
-type Tone = 'good' | 'warning' | 'danger' | 'neutral';
+type Tone = 'blue' | 'green' | 'amber' | 'red' | 'slate';
 
 type PublishOptions = {
   scope: PublishScope;
@@ -40,7 +37,6 @@ type MetricCard = {
   label: string;
   value: string | number;
   helper?: string;
-  icon: string;
   tone?: Tone;
 };
 
@@ -57,60 +53,35 @@ const defaultPublishOptions = (): PublishOptions => ({
   includeCompetencyBreakdown: true,
   includeSelfVsOthers: true,
   includeComments: false,
-  includeScoreExplanation: true,
+  includeScoreExplanation: false,
   confirmVisibility: false,
 });
 
+const cx = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 const numberValue = (value?: number | null) => Number(value ?? 0);
 const countValue = (value?: number | null) => Number(value ?? 0);
+const formatCount = (value?: number | null) => Number(value ?? 0).toLocaleString();
+const hasNumericScore = (value?: number | null) => value != null && !Number.isNaN(Number(value));
 
 const formatScore = (value?: number | null, digits = 1) => {
   if (value == null || Number.isNaN(Number(value))) return '—';
   return `${Number(value).toFixed(digits)}%`;
 };
 
-const formatCount = (value?: number | null) => Number(value ?? 0).toLocaleString();
-
-const formatDateTime = (value?: string | null) => {
+const formatShortDate = (value?: string | null) => {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit', year: 'numeric' }).format(date);
 };
 
-const visibilityLabel = (status?: string | null) => {
+const statusText = (status?: string | null) => {
   switch (String(status ?? 'HIDDEN').toUpperCase()) {
     case 'PUBLISHED': return 'Published';
     case 'READY_TO_PUBLISH': return 'Ready';
     default: return 'Hidden';
   }
 };
-
-const visibilityClass = (status?: string | null) => {
-  switch (String(status ?? 'HIDDEN').toUpperCase()) {
-    case 'PUBLISHED': return 'hfa-pill-published';
-    case 'READY_TO_PUBLISH': return 'hfa-pill-ready';
-    default: return 'hfa-pill-hidden';
-  }
-};
-
-const confidenceClass = (item: FeedbackResultItem) => {
-  if (item.insufficientFeedback) return 'hfa-pill-danger';
-  switch (String(item.confidenceLevel ?? '').toUpperCase()) {
-    case 'HIGH': return 'hfa-pill-published';
-    case 'MEDIUM': return 'hfa-pill-warning';
-    case 'LOW': return 'hfa-pill-danger';
-    default: return 'hfa-pill-hidden';
-  }
-};
-
-const confidenceLabel = (item: FeedbackResultItem) => item.insufficientFeedback ? 'Insufficient' : item.confidenceLevel || 'Not calculated';
 
 const scoreBand = (score?: number | null) => {
   if (score == null) return 'No score';
@@ -125,9 +96,9 @@ const relationshipDisplayName = (relationshipType?: string | null) => {
   switch (String(relationshipType ?? '').toUpperCase()) {
     case 'MANAGER': return 'Manager';
     case 'PEER': return 'Peers';
-    case 'SUBORDINATE': return 'Subordinate reviewers';
+    case 'SUBORDINATE': return 'Subordinates';
     case 'SELF': return 'Self';
-    default: return relationshipType || 'Relationship';
+    default: return relationshipType || 'Reviewer group';
   }
 };
 
@@ -140,7 +111,7 @@ const fallbackRelationshipPrivacy = (item: FeedbackResultItem): FeedbackRelation
     thresholdRequired: false,
     thresholdMet: countValue(item.managerResponses) >= 1,
     visibleOutsideHr: countValue(item.managerResponses) >= 1,
-    hiddenReason: countValue(item.managerResponses) >= 1 ? null : 'No manager response submitted.',
+    hiddenReason: countValue(item.managerResponses) >= 1 ? null : 'Not submitted yet.',
   },
   {
     relationshipType: 'PEER',
@@ -150,17 +121,17 @@ const fallbackRelationshipPrivacy = (item: FeedbackResultItem): FeedbackRelation
     thresholdRequired: true,
     thresholdMet: countValue(item.peerResponses) >= 2,
     visibleOutsideHr: countValue(item.peerResponses) >= 2,
-    hiddenReason: countValue(item.peerResponses) >= 2 ? null : 'Peer details are masked until at least 2 peer responses are submitted.',
+    hiddenReason: countValue(item.peerResponses) >= 2 ? null : 'Hidden until the minimum peer response count is met.',
   },
   {
     relationshipType: 'SUBORDINATE',
-    label: 'Subordinate reviewers',
+    label: 'Subordinates',
     responseCount: countValue(item.subordinateResponses),
     minimumVisibleResponses: 2,
     thresholdRequired: true,
     thresholdMet: countValue(item.subordinateResponses) >= 2,
     visibleOutsideHr: countValue(item.subordinateResponses) >= 2,
-    hiddenReason: countValue(item.subordinateResponses) >= 2 ? null : 'Subordinate reviewer details are masked until at least 2 subordinate reviewer responses are submitted.',
+    hiddenReason: countValue(item.subordinateResponses) >= 2 ? null : 'Hidden until the minimum subordinate response count is met.',
   },
   {
     relationshipType: 'SELF',
@@ -170,7 +141,7 @@ const fallbackRelationshipPrivacy = (item: FeedbackResultItem): FeedbackRelation
     thresholdRequired: false,
     thresholdMet: countValue(item.selfResponses) >= 1,
     visibleOutsideHr: countValue(item.selfResponses) >= 1,
-    hiddenReason: countValue(item.selfResponses) >= 1 ? null : 'Self review was not submitted.',
+    hiddenReason: countValue(item.selfResponses) >= 1 ? null : 'Not submitted yet.',
   },
 ];
 
@@ -191,13 +162,29 @@ const isPublished = (item: FeedbackResultItem) => String(item.visibilityStatus ?
 const isReadyToPublish = (item: FeedbackResultItem) => String(item.visibilityStatus ?? '').toUpperCase() === 'READY_TO_PUBLISH'
     || (countValue(item.totalResponses) > 0 && !item.insufficientFeedback && !isPublished(item));
 
+const publishBlockReason = (item: FeedbackResultItem) => {
+  if (isPublished(item)) return 'Already visible to employees.';
+  if (isReadyToPublish(item)) return 'Ready to publish.';
+  if (countValue(item.totalResponses) === 0) return 'No feedback was submitted before this campaign closed.';
+  if (item.insufficientFeedback) return 'Reviewer coverage is below the minimum needed for a safe release.';
+  if (!hasNumericScore(item.averageScore)) return 'No calculated score is available.';
+  return 'This summary did not pass release checks.';
+};
+
+const releaseStatusLabel = (item: FeedbackResultItem) => {
+  if (isPublished(item)) return 'Published';
+  if (isReadyToPublish(item)) return 'Ready';
+  return 'Blocked';
+};
+
+const confidenceLabel = (item: FeedbackResultItem) => item.insufficientFeedback ? 'Insufficient' : item.confidenceLevel || 'Not ready';
+
 const employeeSearchText = (item: FeedbackResultItem) => [
   item.targetEmployeeName,
   item.targetEmployeeId,
   item.scoreCategory,
   item.confidenceLevel,
   item.visibilityStatus,
-  item.scoreCalculationNote,
 ].filter(Boolean).join(' ').toLowerCase();
 
 const confidenceMatches = (item: FeedbackResultItem, filter: ConfidenceFilter) => {
@@ -213,7 +200,45 @@ const initials = (name?: string | null) => {
   return parts.map(part => part[0]?.toUpperCase()).join('') || 'E';
 };
 
-const chartRowsFromDistribution = (distribution: FeedbackScoreDistribution[] | undefined, items: FeedbackResultItem[]): BarRow[] => {
+const metricToneClass: Record<Tone, string> = {
+  blue: 'border-blue-100 bg-blue-50/70 text-blue-700',
+  green: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
+  amber: 'border-amber-100 bg-amber-50/70 text-amber-700',
+  red: 'border-rose-100 bg-rose-50/70 text-rose-700',
+  slate: 'border-slate-200 bg-white text-slate-700',
+};
+
+const badgeClass = (tone: Tone = 'slate') => cx(
+    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold',
+    metricToneClass[tone],
+);
+
+const statusTone = (status?: string | null): Tone => {
+  switch (String(status ?? '').toUpperCase()) {
+    case 'PUBLISHED': return 'green';
+    case 'READY_TO_PUBLISH': return 'blue';
+    default: return 'slate';
+  }
+};
+
+const confidenceTone = (item: FeedbackResultItem): Tone => {
+  if (item.insufficientFeedback) return 'red';
+  switch (String(item.confidenceLevel ?? '').toUpperCase()) {
+    case 'HIGH': return 'green';
+    case 'MEDIUM': return 'amber';
+    case 'LOW': return 'red';
+    default: return 'slate';
+  }
+};
+
+const contentSummary = (options: PublishOptions) => [
+  options.includeOverallScore ? 'overall score' : null,
+  options.includeCompetencyBreakdown ? 'competency breakdown' : null,
+  options.includeSelfVsOthers ? 'self vs others' : null,
+  options.includeComments ? 'anonymous comments' : null,
+].filter(Boolean).join(', ');
+
+const distributionRows = (distribution: FeedbackScoreDistribution[] | undefined, items: FeedbackResultItem[]): BarRow[] => {
   if (distribution?.length) {
     return distribution.map(row => ({
       label: row.label || row.band,
@@ -233,276 +258,321 @@ const chartRowsFromDistribution = (distribution: FeedbackScoreDistribution[] | u
   return bands.map(band => ({
     label: band.label,
     value: items.filter(item => item.averageScore != null && item.averageScore >= band.min && item.averageScore <= band.max).length,
+    meta: formatCount(items.filter(item => item.averageScore != null && item.averageScore >= band.min && item.averageScore <= band.max).length),
   }));
 };
 
-const contentSummary = (options: PublishOptions) => [
-  options.includeOverallScore ? 'overall score' : null,
-  options.includeCompetencyBreakdown ? 'competency breakdown' : null,
-  options.includeSelfVsOthers ? 'self vs others' : null,
-  options.includeComments ? 'anonymous comments' : null,
-  options.includeScoreExplanation ? 'score explanation' : null,
-].filter(Boolean).join(', ');
-
-const MetricCards = ({ cards }: { cards: MetricCard[] }) => (
-    <div className="hfa-metric-grid">
-      {cards.map(card => (
-          <article key={card.label} className={`hfa-metric-card ${card.tone ?? 'neutral'}`}>
-            <div>
-              <i className={`bi ${card.icon}`} />
-              <strong>{card.value}</strong>
-              <span>{card.label}</span>
-            </div>
-            {card.helper && <small>{card.helper}</small>}
-          </article>
-      ))}
-    </div>
-);
-
-const HorizontalBarChart = ({ title, subtitle, rows, maxValue = 100 }: { title: string; subtitle?: string; rows: BarRow[]; maxValue?: number }) => {
-  const max = maxValue === 100 ? 100 : Math.max(1, ...rows.map(row => row.value));
+function SectionHeader({ eyebrow, title, helper }: { eyebrow?: string; title: string; helper?: string }) {
   return (
-      <section className="hfa-chart-card">
-        <div className="hfa-chart-head">
-          <div>
-            <h3>{title}</h3>
-            {subtitle && <p>{subtitle}</p>}
+      <div className="mb-3">
+        {eyebrow ? <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-blue-600">{eyebrow}</p> : null}
+        <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+        {helper ? <p className="mt-0.5 text-xs text-slate-500">{helper}</p> : null}
+      </div>
+  );
+}
+
+function BarList({ rows, maxValue, emptyText = 'No data yet.' }: { rows: BarRow[]; maxValue?: number; emptyText?: string }) {
+  const max = Math.max(1, maxValue ?? Math.max(1, ...rows.map(row => row.value)));
+  if (!rows.length) return <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-400">{emptyText}</p>;
+
+  return (
+      <div className="space-y-2.5">
+        {rows.map((row, index) => (
+            <div key={`${row.label}-${index}`} className="grid grid-cols-[minmax(92px,140px)_1fr_auto] items-center gap-2 text-xs">
+              <span className="truncate font-semibold text-slate-700" title={row.label}>{row.label}</span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <span className="block h-full rounded-full bg-blue-500" style={{ width: `${row.value <= 0 ? 0 : Math.max(4, Math.min(100, (row.value / max) * 100))}%` }} />
+          </span>
+              <span className="min-w-[46px] text-right font-semibold text-slate-600">{row.meta ?? formatScore(row.value)}</span>
+            </div>
+        ))}
+      </div>
+  );
+}
+
+function CompactCard({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <section className={cx('w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm', className)}>{children}</section>;
+}
+
+function MetricCards({ cards }: { cards: MetricCard[] }) {
+  return (
+      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-5">
+        {cards.map(card => (
+            <article key={card.label} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{card.label}</span>
+                <span className={cx('h-1.5 w-1.5 rounded-full', card.tone === 'red' ? 'bg-rose-500' : card.tone === 'amber' ? 'bg-amber-500' : card.tone === 'green' ? 'bg-emerald-500' : 'bg-blue-500')} />
+              </div>
+              <strong className="mt-1 block text-lg font-bold tracking-tight text-slate-950">{card.value}</strong>
+              {card.helper ? <span className="block truncate text-xs text-slate-500">{card.helper}</span> : null}
+            </article>
+        ))}
+      </div>
+  );
+}
+
+function CampaignSummaryStrip({
+                                summary,
+                                campaign,
+                                cards,
+                                selectedId,
+                                closedCampaigns,
+                                setSelectedId,
+                                onRefresh,
+                                loading,
+                              }: {
+  summary: FeedbackCampaignSummary;
+  campaign?: FeedbackCampaign;
+  cards: MetricCard[];
+  selectedId: number | '';
+  closedCampaigns: FeedbackCampaign[];
+  setSelectedId: (value: number | '') => void;
+  onRefresh: () => void;
+  loading: boolean;
+}) {
+  return (
+      <CompactCard className="p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={badgeClass('blue')}>Closed</span>
+              <span className={badgeClass(statusTone(summary.visibilityStatus))}>{statusText(summary.visibilityStatus)}</span>
+              <span className={badgeClass('slate')}>{formatCount(summary.totalEmployees)} employees</span>
+              <span className={badgeClass('slate')}>{formatCount(summary.totalResponses)} responses</span>
+            </div>
+            <h3 className="mt-3 truncate text-xl font-semibold text-slate-950">{campaign?.name ?? summary.campaignName}</h3>
+            <p className="mt-1 text-sm text-slate-500">Review closed campaign results and publish employee summaries.</p>
+          </div>
+
+          <div className="flex w-full flex-col gap-2 lg:w-[360px]">
+            <label>
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Campaign</span>
+              <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={selectedId} onChange={event => setSelectedId(event.target.value ? Number(event.target.value) : '')}>
+                <option value="">Select campaign</option>
+                {closedCampaigns.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
+              </select>
+            </label>
+            <button className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-300" type="button" onClick={onRefresh} disabled={!selectedId || loading}>Refresh</button>
           </div>
         </div>
-        <div className="hfa-bar-list">
-          {rows.length === 0 ? <p className="hfa-muted">No data available yet.</p> : rows.map((row, index) => (
-              <div className="hfa-bar-row" key={`${row.label}-${index}`}>
-                <span className="hfa-bar-label" title={row.label}>{row.label}</span>
-                <div className="hfa-bar-track">
-                  <div className="hfa-bar-fill" style={{ width: `${Math.max(3, Math.min(100, (row.value / max) * 100))}%` }} />
-                </div>
-                <span className="hfa-bar-meta">{row.meta ?? formatScore(row.value)}</span>
-              </div>
-          ))}
-        </div>
-      </section>
-  );
-};
 
-const DonutChart = ({ title, subtitle, rows }: { title: string; subtitle?: string; rows: FeedbackConfidenceBreakdown[] }) => {
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <MetricCards cards={cards} />
+        </div>
+      </CompactCard>
+  );
+}
+
+function CampaignPickerCard({
+                              selectedId,
+                              closedCampaigns,
+                              setSelectedId,
+                              onRefresh,
+                              loading,
+                            }: {
+  selectedId: number | '';
+  closedCampaigns: FeedbackCampaign[];
+  setSelectedId: (value: number | '') => void;
+  onRefresh: () => void;
+  loading: boolean;
+}) {
+  return (
+      <CompactCard>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <label className="w-full lg:max-w-md">
+            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Campaign</span>
+            <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={selectedId} onChange={event => setSelectedId(event.target.value ? Number(event.target.value) : '')}>
+              <option value="">Select closed campaign</option>
+              {closedCampaigns.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+            </select>
+          </label>
+          <button className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-300" type="button" onClick={onRefresh} disabled={!selectedId || loading}>Refresh</button>
+        </div>
+      </CompactCard>
+  );
+}
+
+function ScoringCard({ scoringConfig, scoringLoading }: { summary: FeedbackCampaignSummary; scoringConfig: FeedbackCampaignScoringConfig | null; scoringLoading: boolean }) {
+  const configuredRows = (scoringConfig?.relationshipWeights ?? []).map(row => ({
+    label: relationshipDisplayName(row.relationshipType),
+    value: Number(row.weightPercent ?? 0),
+    meta: `${Number(row.weightPercent ?? 0)}%`,
+  }));
+
+  return (
+      <CompactCard>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-950">Reviewer weights</h4>
+            <p className="mt-0.5 text-xs text-slate-500">{scoringLoading ? 'Loading…' : scoringConfig?.relationshipWeightsReady ? 'Ready' : 'Needs review'}</p>
+          </div>
+          <span className={badgeClass(scoringConfig?.relationshipWeightsReady ? 'green' : 'amber')}>{scoringConfig?.relationshipWeightsReady ? 'Ready' : 'Review'}</span>
+        </div>
+        <BarList rows={configuredRows} maxValue={100} emptyText="No weights configured." />
+      </CompactCard>
+  );
+}
+
+function AnalyticsGrid({ summary }: { summary: FeedbackCampaignSummary }) {
+  const hasResponses = countValue(summary.totalResponses) > 0;
+  const rows = distributionRows(summary.scoreDistribution, summary.items ?? []);
+  const relationshipRows = (summary.relationshipAverages ?? []).map(row => ({
+    label: row.label || relationshipDisplayName(row.relationshipType),
+    value: numberValue(row.averageScore),
+    meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)}`,
+  }));
+  const competencies = [...(summary.competencyAverages ?? [])].filter(row => row.averageScore != null);
+  const topCompetencies = [...competencies]
+      .sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))
+      .slice(0, 4)
+      .map(row => ({ label: row.competencyName || row.competencyCode, value: numberValue(row.averageScore), meta: formatScore(row.averageScore) }));
+  const focusCompetencies = [...competencies]
+      .sort((a, b) => numberValue(a.averageScore) - numberValue(b.averageScore))
+      .slice(0, 4)
+      .map(row => ({ label: row.competencyName || row.competencyCode, value: numberValue(row.averageScore), meta: formatScore(row.averageScore) }));
+
+  if (!hasResponses && competencies.length === 0) {
+    return (
+        <CompactCard>
+          <SectionHeader eyebrow="Analytics" title="Patterns" helper="Patterns appear when submitted feedback is available." />
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500">No feedback was submitted before this campaign closed.</div>
+        </CompactCard>
+    );
+  }
+
+  return (
+      <div className="space-y-3">
+        <SectionHeader eyebrow="Analytics" title="Patterns" helper="Focus on score bands, reviewer groups, and competency trends." />
+        <div className="grid gap-3 lg:grid-cols-2">
+          <CompactCard>
+            <h4 className="mb-1 text-sm font-semibold text-slate-950">Score distribution</h4>
+            <p className="mb-3 text-xs text-slate-500">Employees by score band</p>
+            <BarList rows={rows} maxValue={Math.max(1, ...rows.map(row => row.value))} />
+          </CompactCard>
+          <CompactCard>
+            <h4 className="mb-1 text-sm font-semibold text-slate-950">Reviewer groups</h4>
+            <p className="mb-3 text-xs text-slate-500">Submitted reviewer averages</p>
+            <BarList rows={relationshipRows} maxValue={100} emptyText="No reviewer averages yet." />
+          </CompactCard>
+          <CompactCard>
+            <h4 className="mb-1 text-sm font-semibold text-slate-950">Strongest competencies</h4>
+            <p className="mb-3 text-xs text-slate-500">Highest scoring areas</p>
+            <BarList rows={topCompetencies} maxValue={100} emptyText="No competency scores yet." />
+          </CompactCard>
+          <CompactCard>
+            <h4 className="mb-1 text-sm font-semibold text-slate-950">Development focus</h4>
+            <p className="mb-3 text-xs text-slate-500">Lowest scoring areas</p>
+            <BarList rows={focusCompetencies} maxValue={100} emptyText="No competency scores yet." />
+          </CompactCard>
+        </div>
+      </div>
+  );
+}
+
+function ConfidenceCompact({ rows }: { rows: FeedbackConfidenceBreakdown[] }) {
   const total = rows.reduce((sum, row) => sum + countValue(row.count), 0);
-  const first = total ? (countValue(rows[0]?.count) / total) * 100 : 0;
-  const second = first + (total ? (countValue(rows[1]?.count) / total) * 100 : 0);
-  const third = second + (total ? (countValue(rows[2]?.count) / total) * 100 : 0);
-
   return (
-      <section className="hfa-chart-card">
-        <div className="hfa-chart-head">
+      <CompactCard>
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h3>{title}</h3>
-            {subtitle && <p>{subtitle}</p>}
+            <h4 className="text-sm font-semibold text-slate-950">Confidence</h4>
+            <p className="mt-0.5 text-xs text-slate-500">Result quality</p>
           </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{formatCount(total)}</span>
         </div>
-        {rows.length === 0 ? <p className="hfa-muted">No confidence data available yet.</p> : (
-            <div className="hfa-donut-layout">
-              <div
-                  className="hfa-donut"
-                  style={{
-                    '--hfa-donut-a': `${first}%`,
-                    '--hfa-donut-b': `${second}%`,
-                    '--hfa-donut-c': `${third}%`,
-                  } as CSSProperties}
-              >
-                <div className="hfa-donut-center"><div><strong>{total}</strong><span>results</span></div></div>
-              </div>
-              <div className="hfa-legend">
-                {rows.map((row, index) => (
-                    <div className="hfa-legend-row" key={row.level || row.label}>
-                      <span className="hfa-legend-left"><i className={`hfa-dot hfa-dot-${index + 1}`} />{row.label || row.level}</span>
-                      <strong>{formatCount(row.count)}</strong>
-                    </div>
-                ))}
-              </div>
-            </div>
-        )}
-      </section>
+        <div className="space-y-2">
+          {rows.length === 0 ? <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-400">No confidence data yet.</p> : rows.map((row, index) => {
+            const tone: Tone = String(row.level).toUpperCase().includes('HIGH') ? 'green' : String(row.level).toUpperCase().includes('MEDIUM') ? 'amber' : String(row.level).toUpperCase().includes('LOW') ? 'amber' : 'red';
+            return (
+                <div key={`${row.level}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
+                  <span className="flex items-center gap-2 text-xs font-semibold text-slate-700"><i className={cx('h-1.5 w-1.5 rounded-full not-italic', tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-rose-500')} />{row.label || row.level}</span>
+                  <strong className="text-xs text-slate-950">{formatCount(row.count)}</strong>
+                </div>
+            );
+          })}
+        </div>
+      </CompactCard>
   );
-};
+}
 
-const CampaignResultHeader = ({ summary, campaign }: { summary: FeedbackCampaignSummary; campaign?: FeedbackCampaign }) => (
-    <section className="hfa-result-header">
-      <div>
-        <div className="hfa-result-meta">
-          <span className="hfa-pill"><i className="bi bi-flag" /> {summary.status}</span>
-          <span className={`hfa-pill ${visibilityClass(summary.visibilityStatus)}`}><i className="bi bi-eye" /> {visibilityLabel(summary.visibilityStatus)}</span>
-          <span className="hfa-pill"><i className="bi bi-calendar-check" /> Closed {formatDateTime(campaign?.closedAt)}</span>
-          <span className="hfa-pill"><i className="bi bi-clock-history" /> Updated {formatDateTime(summary.summarizedAt)}</span>
-        </div>
-        <h3>{campaign?.name ?? summary.campaignName}</h3>
-        <p>Closed-campaign analytics for HR review. Campaign status stays closed; employee visibility is controlled by each result summary.</p>
-      </div>
-      <div className="hfa-result-score">
-        <div>
-          <strong>{formatScore(summary.overallAverageScore)}</strong>
-          <span>{summary.overallScoreCategory || scoreBand(summary.overallAverageScore)}</span>
-        </div>
-      </div>
-    </section>
-);
-
-const QualityPrivacyPanel = ({ summary, readyItems, blockedItems, publishedCount }: {
+function PublishReadinessPanel({ summary, readyItems, blockedItems, publishedCount, actionLoading, onPublish, onUnpublish }: {
   summary: FeedbackCampaignSummary;
   readyItems: FeedbackResultItem[];
   blockedItems: FeedbackResultItem[];
   publishedCount: number;
-}) => {
+  actionLoading: boolean;
+  onPublish: () => void;
+  onUnpublish: () => void;
+}) {
   const items = summary.items ?? [];
   const allPrivacyRows = items.flatMap(privacyRowsFor);
   const maskedRows = allPrivacyRows.filter(row => row.thresholdRequired && !row.thresholdMet && row.responseCount > 0);
   const noResponseCount = blockedItems.filter(item => countValue(item.totalResponses) === 0).length;
-  const insufficientCount = blockedItems.filter(item => item.insufficientFeedback).length;
-  const lowConfidenceCount = items.filter(item => String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
-
-  const readinessRows = [
-    { icon: 'bi-check2-circle', title: 'Ready to publish', helper: 'Passed confidence and scoring checks.', value: readyItems.length, tone: 'good' },
-    { icon: 'bi-eye', title: 'Already published', helper: 'Employee-facing visibility is already enabled.', value: publishedCount, tone: 'neutral' },
-    { icon: 'bi-person-dash', title: 'No submitted responses', helper: 'No calculated result is available for these employees.', value: noResponseCount, tone: noResponseCount ? 'danger' : 'good' },
-    { icon: 'bi-exclamation-triangle', title: 'Insufficient feedback', helper: 'Blocked by confidence or minimum-feedback rules.', value: insufficientCount, tone: insufficientCount ? 'warning' : 'good' },
-    { icon: 'bi-activity', title: 'Low confidence', helper: 'Review carefully before publishing.', value: lowConfidenceCount, tone: lowConfidenceCount ? 'warning' : 'good' },
-  ];
-
-  const privacyRows = [
-    { icon: 'bi-shield-lock', title: 'Relationship details masked', helper: 'Peer/subordinate reviewer detail remains hidden outside HR when thresholds are not met.', value: maskedRows.length },
-    { icon: 'bi-people', title: 'Peer threshold', helper: 'Uses campaign privacy settings.', value: `${allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? 2}+` },
-    { icon: 'bi-diagram-3', title: 'Subordinate reviewer threshold', helper: 'Subordinate reviewer details use the same privacy visibility rules.', value: `${allPrivacyRows.find(row => row.relationshipType === 'SUBORDINATE')?.minimumVisibleResponses ?? 2}+` },
-    { icon: 'bi-incognito', title: 'Evaluator identity', helper: 'Analytics shows result groups only. Evaluator names are not exposed.', value: 'Hidden' },
-  ];
+  const insufficientCount = blockedItems.filter(item => item.insufficientFeedback && countValue(item.totalResponses) > 0).length;
+  const nextAction = readyItems.length > 0
+      ? `${readyItems.length} ${readyItems.length === 1 ? 'summary is' : 'summaries are'} ready to publish.`
+      : blockedItems.length > 0
+          ? `${blockedItems.length} ${blockedItems.length === 1 ? 'summary is' : 'summaries are'} blocked from publishing.`
+          : publishedCount > 0
+              ? 'Published summaries are already visible to employees.'
+              : 'No employee summaries are available yet.';
+  const publishDisabledText = readyItems.length === 0 ? 'No ready summaries to publish.' : '';
+  const unpublishDisabledText = publishedCount === 0 ? 'No published summaries to unpublish.' : '';
 
   return (
-      <section>
-        <div className="hfa-section-title">
-          <div>
-            <span className="hfa-eyebrow">Quality and privacy</span>
-            <h3>Release readiness review</h3>
-            <p>HR can review full analytics, while employee-facing details follow campaign confidentiality rules.</p>
-          </div>
+      <CompactCard>
+        <SectionHeader eyebrow="Publish" title="Release decision" helper={nextAction} />
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl bg-slate-50 px-2 py-2"><strong className="block text-lg text-slate-950">{readyItems.length}</strong><span className="text-[11px] font-medium text-slate-500">Ready</span></div>
+          <div className="rounded-xl bg-slate-50 px-2 py-2"><strong className="block text-lg text-slate-950">{blockedItems.length}</strong><span className="text-[11px] font-medium text-slate-500">Blocked</span></div>
+          <div className="rounded-xl bg-slate-50 px-2 py-2"><strong className="block text-lg text-slate-950">{publishedCount}</strong><span className="text-[11px] font-medium text-slate-500">Published</span></div>
         </div>
-        <div className="hfa-quality-grid">
-          <div className="hfa-panel">
-            <div className="hfa-panel-head">
-              <div>
-                <h3>Result quality</h3>
-                <p>What can be published safely.</p>
+
+        <div className="mt-3 grid gap-2">
+          <button className="rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400" type="button" onClick={onPublish} disabled={actionLoading || readyItems.length === 0}>
+            Publish ready summaries
+          </button>
+          {publishDisabledText ? <p className="text-xs font-medium text-slate-500">{publishDisabledText}</p> : null}
+          <button className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300" type="button" onClick={onUnpublish} disabled={actionLoading || publishedCount === 0}>
+            Unpublish published summaries
+          </button>
+          {unpublishDisabledText ? <p className="text-xs font-medium text-slate-500">{unpublishDisabledText}</p> : null}
+        </div>
+
+        <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+          {[
+            ['No feedback submitted', noResponseCount],
+            ['Privacy/coverage blocked', insufficientCount],
+            ['Masked reviewer groups', maskedRows.length],
+          ].map(([label, value]) => (
+              <div key={String(label)} className="flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-500">{label}</span>
+                <strong className="text-slate-900">{value}</strong>
               </div>
-            </div>
-            <div className="hfa-panel-list">
-              {readinessRows.map(row => (
-                  <article key={row.title} className="hfa-quality-item">
-                    <i className={`bi ${row.icon}`} />
-                    <div><strong>{row.title}</strong><small>{row.helper}</small></div>
-                    <span className="hfa-quality-value">{row.value}</span>
-                  </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="hfa-panel">
-            <div className="hfa-panel-head">
-              <div>
-                <h3>Privacy controls</h3>
-                <p>Visibility is controlled by campaign privacy thresholds.</p>
-              </div>
-            </div>
-            <div className="hfa-panel-list">
-              {privacyRows.map(row => (
-                  <article key={row.title} className="hfa-privacy-item">
-                    <i className={`bi ${row.icon}`} />
-                    <div><strong>{row.title}</strong><small>{row.helper}</small></div>
-                    <span className="hfa-quality-value">{row.value}</span>
-                  </article>
-              ))}
-            </div>
+          ))}
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">Peer threshold</span>
+            <strong className="text-slate-900">{allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? 2}+</strong>
           </div>
         </div>
-      </section>
+      </CompactCard>
   );
-};
+}
 
-const AnalyticsCharts = ({ summary }: { summary: FeedbackCampaignSummary }) => {
-  const distributionRows = chartRowsFromDistribution(summary.scoreDistribution, summary.items ?? []);
-  const relationshipRows = (summary.relationshipAverages ?? []).map(row => ({
-    label: row.label || relationshipDisplayName(row.relationshipType),
-    value: numberValue(row.averageScore),
-    meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)} responses`,
-  }));
-  const topCompetencies = [...(summary.competencyAverages ?? [])]
-      .sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))
-      .slice(0, 6)
-      .map(row => ({
-        label: row.competencyName || row.competencyCode,
-        value: numberValue(row.averageScore),
-        meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)} ratings`,
-      }));
-  const developmentCompetencies = [...(summary.competencyAverages ?? [])]
-      .filter(row => row.averageScore != null)
-      .sort((a, b) => numberValue(a.averageScore) - numberValue(b.averageScore))
-      .slice(0, 6)
-      .map(row => ({
-        label: row.competencyName || row.competencyCode,
-        value: numberValue(row.averageScore),
-        meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)} ratings`,
-      }));
-
+function RelationshipChips({ item }: { item: FeedbackResultItem }) {
   return (
-      <section>
-        <div className="hfa-section-title">
-          <div>
-            <span className="hfa-eyebrow">Analytics charts</span>
-            <h3>Campaign performance patterns</h3>
-            <p>Charts use saved summary fields from submitted feedback.</p>
-          </div>
-        </div>
-        <div className="hfa-chart-grid">
-          <HorizontalBarChart title="Score distribution" subtitle="Employees by performance band" rows={distributionRows} maxValue={Math.max(1, ...distributionRows.map(row => row.value))} />
-          <HorizontalBarChart title="Relationship averages" subtitle="Average score by evaluator relationship" rows={relationshipRows} />
-          <HorizontalBarChart title="Strongest competencies" subtitle="Highest scoring competency areas" rows={topCompetencies} />
-          <HorizontalBarChart title="Development focus" subtitle="Lowest scoring competency areas" rows={developmentCompetencies} />
-          <DonutChart title="Confidence breakdown" subtitle="Result confidence by employee summary" rows={summary.confidenceBreakdown ?? []} />
-          <HorizontalBarChart
-              title="Top employee results"
-              subtitle="Highest overall scores in this campaign"
-              rows={[...(summary.items ?? [])]
-                  .filter(item => item.averageScore != null)
-                  .sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))
-                  .slice(0, 8)
-                  .map(item => ({ label: item.targetEmployeeName, value: numberValue(item.averageScore), meta: formatScore(item.averageScore) }))}
-          />
-        </div>
-      </section>
-  );
-};
-
-const RelationshipMini = ({ item }: { item: FeedbackResultItem }) => {
-  const rows = privacyRowsFor(item).filter(row => row.responseCount > 0 || ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'].includes(String(row.relationshipType ?? '').toUpperCase()));
-  return (
-      <div className="hfa-relationship-mini">
-        {rows.map(row => (
-            <span key={row.relationshipType} className={`hfa-mini-chip ${row.thresholdMet ? 'good' : row.responseCount > 0 ? 'masked' : ''}`} title={row.hiddenReason ?? undefined}>
+      <div className="flex flex-wrap gap-1.5">
+        {privacyRowsFor(item).map(row => (
+            <span key={row.relationshipType} className={cx('rounded-full px-2 py-1 text-xs font-semibold', row.responseCount > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500')}>
           {relationshipDisplayName(row.relationshipType)} {row.responseCount}
         </span>
         ))}
       </div>
   );
-};
+}
 
-const EmployeeResultsTable = ({
-                                items,
-                                searchTerm,
-                                setSearchTerm,
-                                publishFilter,
-                                setPublishFilter,
-                                confidenceFilter,
-                                setConfidenceFilter,
-                                sortBy,
-                                setSortBy,
-                                onOpen,
-                                onExport,
-                              }: {
+function EmployeeResultsList({ items, searchTerm, setSearchTerm, publishFilter, setPublishFilter, confidenceFilter, setConfidenceFilter, sortBy, setSortBy, onOpen, onExport }: {
   items: FeedbackResultItem[];
   searchTerm: string;
   setSearchTerm: (value: string) => void;
@@ -514,209 +584,170 @@ const EmployeeResultsTable = ({
   setSortBy: (value: AnalyticsSort) => void;
   onOpen: (item: FeedbackResultItem) => void;
   onExport: () => void;
-}) => (
-    <section className="hfa-table-card">
-      <div className="hfa-table-head">
-        <div>
-          <span className="hfa-eyebrow">Employee result review</span>
-          <h3>Review every employee summary before publishing</h3>
-          <p>Use the drawer to inspect scoring, privacy, relationship coverage, and employee-facing publish content.</p>
+}) {
+  return (
+      <CompactCard>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <SectionHeader eyebrow="Employee results" title="Review summaries" helper="Review each summary before publishing." />
+          <button className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:text-slate-300" type="button" onClick={onExport} disabled={items.length === 0}>
+            Export CSV
+          </button>
         </div>
-        <button className="hfa-btn hfa-btn-secondary" type="button" onClick={onExport} disabled={items.length === 0}>
-          <i className="bi bi-download" /> Export CSV
-        </button>
-      </div>
 
-      <div className="hfa-table-toolbar">
-        <input className="hfa-input" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search employee, score band, confidence…" />
-        <select className="hfa-select" value={publishFilter} onChange={event => setPublishFilter(event.target.value as PublishFilter)}>
-          <option value="ALL">All visibility</option>
-          <option value="HIDDEN">Hidden</option>
-          <option value="READY_TO_PUBLISH">Ready</option>
-          <option value="PUBLISHED">Published</option>
-        </select>
-        <select className="hfa-select" value={confidenceFilter} onChange={event => setConfidenceFilter(event.target.value as ConfidenceFilter)}>
-          <option value="ALL">All confidence</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-          <option value="INSUFFICIENT">Insufficient</option>
-        </select>
-        <select className="hfa-select" value={sortBy} onChange={event => setSortBy(event.target.value as AnalyticsSort)}>
-          <option value="SCORE_DESC">Highest score</option>
-          <option value="SCORE_ASC">Lowest score</option>
-          <option value="COMPLETION_DESC">Highest completion</option>
-          <option value="COMPLETION_ASC">Lowest completion</option>
-          <option value="RESPONSES_DESC">Most responses</option>
-        </select>
-        <span className="hfa-pill">{items.length} results</span>
-      </div>
+        <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_150px_150px_150px_auto]">
+          <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search employee or score band" />
+          <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={publishFilter} onChange={event => setPublishFilter(event.target.value as PublishFilter)}>
+            <option value="ALL">All visibility</option>
+            <option value="HIDDEN">Hidden</option>
+            <option value="READY_TO_PUBLISH">Ready</option>
+            <option value="PUBLISHED">Published</option>
+          </select>
+          <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={confidenceFilter} onChange={event => setConfidenceFilter(event.target.value as ConfidenceFilter)}>
+            <option value="ALL">All confidence</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+            <option value="INSUFFICIENT">Insufficient</option>
+          </select>
+          <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={sortBy} onChange={event => setSortBy(event.target.value as AnalyticsSort)}>
+            <option value="SCORE_DESC">Highest score</option>
+            <option value="SCORE_ASC">Lowest score</option>
+            <option value="COMPLETION_DESC">Highest completion</option>
+            <option value="COMPLETION_ASC">Lowest completion</option>
+            <option value="RESPONSES_DESC">Most responses</option>
+          </select>
+          <span className="inline-flex items-center justify-center rounded-xl bg-slate-100 px-3 text-xs font-semibold text-slate-600">{items.length}</span>
+        </div>
 
-      <div className="hfa-table-wrap">
-        <table className="hfa-table">
-          <thead>
-          <tr>
-            <th>Employee</th>
-            <th>Score</th>
-            <th>Completion</th>
-            <th>Responses</th>
-            <th>Relationship coverage</th>
-            <th>Confidence</th>
-            <th>Visibility</th>
-            <th />
-          </tr>
-          </thead>
-          <tbody>
+        <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200">
           {items.length === 0 ? (
-              <tr><td colSpan={8} className="hfa-muted">No employee result matches the current filters.</td></tr>
+              <div className="bg-slate-50 px-4 py-6 text-center text-sm font-medium text-slate-400">No summaries match the filters.</div>
           ) : items.map(item => (
-              <tr key={item.targetEmployeeId}>
-                <td>
-                  <div className="hfa-employee-cell">
-                    <span className="hfa-avatar">{initials(item.targetEmployeeName)}</span>
-                    <div><strong>{item.targetEmployeeName}</strong><small>ID {item.targetEmployeeId}</small></div>
+              <article key={item.targetEmployeeId} className="bg-white px-4 py-3 transition hover:bg-blue-50/30">
+                <div className="grid gap-3 lg:grid-cols-[minmax(170px,1.3fr)_100px_150px_1.4fr_160px_70px] lg:items-center">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-xs font-bold text-blue-700">{initials(item.targetEmployeeName)}</span>
+                    <div className="min-w-0"><strong className="block truncate text-sm text-slate-950">{item.targetEmployeeName}</strong><span className="text-xs text-slate-500">ID {item.targetEmployeeId}</span></div>
                   </div>
-                </td>
-                <td><div className="hfa-score-cell"><strong>{formatScore(item.averageScore)}</strong><small>{item.scoreCategory || scoreBand(item.averageScore)}</small></div></td>
-                <td>
-                  <div className="hfa-progress">
-                    <div className="hfa-progress-track"><div className="hfa-progress-fill" style={{ width: `${Math.min(100, Math.max(0, numberValue(item.completionRate)))}%` }} /></div>
-                    <span>{formatScore(item.completionRate, 0)}</span>
+                  <div><strong className="block text-base text-slate-950">{formatScore(item.averageScore)}</strong><span className="text-xs text-slate-500">{item.scoreCategory || scoreBand(item.averageScore)}</span></div>
+                  <div>
+                    <div className="flex items-center gap-2"><span className="h-1.5 flex-1 rounded-full bg-slate-100"><span className="block h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, Math.max(0, numberValue(item.completionRate)))}%` }} /></span><strong className="text-xs text-slate-700">{formatScore(item.completionRate, 0)}</strong></div>
+                    <span className="mt-1 block text-xs text-slate-500">{formatCount(item.submittedEvaluatorCount ?? item.totalResponses)} / {formatCount(item.assignedEvaluatorCount)} responses</span>
                   </div>
-                </td>
-                <td>{formatCount(item.submittedEvaluatorCount ?? item.totalResponses)} / {formatCount(item.assignedEvaluatorCount)}</td>
-                <td><RelationshipMini item={item} /></td>
-                <td><span className={`hfa-pill ${confidenceClass(item)}`}>{confidenceLabel(item)}</span></td>
-                <td><span className={`hfa-pill ${visibilityClass(item.visibilityStatus)}`}>{visibilityLabel(item.visibilityStatus)}</span></td>
-                <td><button type="button" className="hfa-action-link" onClick={() => onOpen(item)}>Review</button></td>
-              </tr>
+                  <RelationshipChips item={item} />
+                  <div>
+                    <div className="flex flex-wrap gap-1.5"><span className={badgeClass(confidenceTone(item))}>{confidenceLabel(item)}</span><span className={badgeClass(isPublished(item) ? 'green' : isReadyToPublish(item) ? 'blue' : 'slate')}>{releaseStatusLabel(item)}</span></div>
+                    {!isPublished(item) && !isReadyToPublish(item) ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{publishBlockReason(item)}</p> : null}
+                  </div>
+                  <button type="button" className="text-left text-sm font-bold text-blue-700 hover:text-blue-800" onClick={() => onOpen(item)}>Review</button>
+                </div>
+              </article>
           ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-);
+        </div>
+      </CompactCard>
+  );
+}
 
-const ResultDetailDrawer = ({
-                              item,
-                              competencies,
-                              onClose,
-                            }: {
-  item: FeedbackResultItem | null;
-  competencies: FeedbackCompetencyAverage[];
-  onClose: () => void;
-}) => {
+function ResultDrawer({ item, onClose }: { item: FeedbackResultItem | null; onClose: () => void }) {
   if (!item) return null;
   const privacyRows = privacyRowsFor(item);
-  const included = [
+  const competencyRows = item.competencyBreakdown ?? [];
+  const commentRows = item.comments ?? [];
+  const relationshipRows = [
+    { relationshipType: 'MANAGER', label: 'Manager', score: item.managerAverageScore, count: item.managerResponses },
+    { relationshipType: 'PEER', label: 'Peers', score: item.peerAverageScore, count: item.peerResponses },
+    { relationshipType: 'SUBORDINATE', label: 'Subordinates', score: item.subordinateAverageScore, count: item.subordinateResponses },
+    { relationshipType: 'SELF', label: 'Self', score: item.selfAverageScore, count: item.selfResponses },
+  ];
+  const publishedSections = [
     item.includeOverallScore !== false ? 'Overall score' : null,
-    item.includeCompetencyBreakdown !== false ? 'Competency breakdown' : null,
+    item.includeCompetencyBreakdown !== false ? 'Competencies' : null,
     item.includeSelfVsOthers !== false ? 'Self vs others' : null,
-    item.includeComments ? 'Anonymous comments' : null,
-    item.includeScoreExplanation !== false ? 'Score explanation' : null,
+    item.includeComments ? 'Comments' : null,
   ].filter(Boolean);
 
   return (
-      <div className="hfa-drawer-backdrop" role="dialog" aria-modal="true">
-        <aside className="hfa-drawer">
-          <div className="hfa-drawer-header">
-            <div className="hfa-drawer-title">
-              <span className="hfa-eyebrow">Employee result detail</span>
-              <h3>{item.targetEmployeeName}</h3>
-              <p>Review final score, relationship coverage, confidence, and employee-facing visibility.</p>
+      <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45" role="dialog" aria-modal="true">
+        <aside className="flex h-full w-full max-w-[520px] flex-col bg-white shadow-2xl">
+          <div className="border-b border-slate-200 px-6 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-600">Result review</p>
+                <h3 className="mt-1 text-xl font-semibold text-slate-950">{item.targetEmployeeName}</h3>
+                <p className="mt-1 text-sm text-slate-500">Review release status and employee-facing content.</p>
+              </div>
+              <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-xl font-semibold text-slate-500 hover:bg-slate-50" onClick={onClose} aria-label="Close result detail">×</button>
             </div>
-            <button type="button" className="hfa-icon-btn" onClick={onClose} aria-label="Close result detail">×</button>
           </div>
 
-          <div className="hfa-drawer-body">
-            <div className="hfa-drawer-score-grid">
-              <article className="hfa-drawer-score-card"><strong>{formatScore(item.averageScore)}</strong><span>Overall score</span></article>
-              <article className="hfa-drawer-score-card"><strong>{formatScore(item.rawAverageScore)}</strong><span>Raw score</span></article>
-              <article className="hfa-drawer-score-card"><strong>{formatScore(item.completionRate, 0)}</strong><span>Completion</span></article>
+          <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4"><strong className="block text-2xl text-slate-950">{formatScore(item.averageScore)}</strong><span className="text-xs font-semibold text-slate-500">Score</span></div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4"><strong className="block text-2xl text-slate-950">{formatScore(item.completionRate, 0)}</strong><span className="text-xs font-semibold text-slate-500">Completion</span></div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4"><strong className="block text-2xl text-slate-950">{formatCount(item.totalResponses)}</strong><span className="text-xs font-semibold text-slate-500">Responses</span></div>
             </div>
 
-            <section className="hfa-drawer-section">
-              <h4>Relationship breakdown</h4>
-              <div className="hfa-bar-list">
-                {[
-                  { label: 'Manager', score: item.managerAverageScore, count: item.managerResponses },
-                  { label: 'Peers', score: item.peerAverageScore, count: item.peerResponses },
-                  { label: 'Subordinate reviewers', score: item.subordinateAverageScore, count: item.subordinateResponses },
-                  { label: 'Self', score: item.selfAverageScore, count: item.selfResponses },
-                ].map(row => (
-                    <div className="hfa-bar-row" key={row.label}>
-                      <span className="hfa-bar-label">{row.label}</span>
-                      <div className="hfa-bar-track"><div className="hfa-bar-fill" style={{ width: `${Math.max(3, Math.min(100, numberValue(row.score)))}%` }} /></div>
-                      <span className="hfa-bar-meta">{formatScore(row.score)} · {formatCount(row.count)}</span>
-                    </div>
-                ))}
+            <div className={cx('rounded-2xl border px-4 py-3', isPublished(item) ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : isReadyToPublish(item) ? 'border-blue-100 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-700')}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <strong className="block text-sm">{releaseStatusLabel(item)}</strong>
+                  <p className="mt-0.5 text-xs">{publishBlockReason(item)}</p>
+                </div>
+                <span className={badgeClass(isPublished(item) ? 'green' : isReadyToPublish(item) ? 'blue' : 'slate')}>{statusText(item.visibilityStatus)}</span>
               </div>
-            </section>
+            </div>
 
-            <section className="hfa-drawer-section">
-              <h4>Privacy metadata</h4>
-              <div className="hfa-privacy-grid">
+            <CompactCard>
+              <h4 className="mb-3 text-base font-semibold text-slate-950">Reviewer groups</h4>
+              <BarList rows={relationshipRows.map(row => ({ label: row.label, value: numberValue(row.score), meta: `${formatScore(row.score)} · ${formatCount(row.count)}` }))} maxValue={100} emptyText="No reviewer scores yet." />
+            </CompactCard>
+
+            <CompactCard>
+              <h4 className="mb-3 text-base font-semibold text-slate-950">Employee-facing content</h4>
+              {publishedSections.length ? (
+                  <div className="flex flex-wrap gap-2">{publishedSections.map(section => <span key={String(section)} className={badgeClass('blue')}>{section}</span>)}</div>
+              ) : (
+                  <p className="rounded-xl bg-slate-50 p-4 text-sm font-medium text-slate-500">No sections are currently selected for employees.</p>
+              )}
+            </CompactCard>
+
+            <CompactCard>
+              <h4 className="mb-3 text-base font-semibold text-slate-950">Privacy checks</h4>
+              <div className="space-y-2">
                 {privacyRows.map(row => (
-                    <div className="hfa-privacy-row" key={row.relationshipType}>
-                      <strong>{row.label}</strong>
-                      <small>{row.hiddenReason || (row.visibleOutsideHr ? 'Visible outside HR when this section is published.' : 'Hidden outside HR.')}</small>
-                      <span className={`hfa-pill ${row.thresholdMet ? 'hfa-pill-published' : 'hfa-pill-warning'}`}>
-                    {row.responseCount}/{row.minimumVisibleResponses}
-                  </span>
+                    <div key={row.relationshipType} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3">
+                      <span><strong className="block text-sm text-slate-800">{row.label}</strong><small className="text-slate-500">{row.visibleOutsideHr ? 'Can be shown if this section is published.' : row.hiddenReason || 'Hidden outside HR.'}</small></span>
+                      <span className={badgeClass(row.thresholdMet ? 'green' : 'amber')}>{row.responseCount}/{row.minimumVisibleResponses}</span>
                     </div>
                 ))}
               </div>
-            </section>
+            </CompactCard>
 
-            <section className="hfa-drawer-section">
-              <h4>Competency snapshot</h4>
-              <div className="hfa-bar-list">
-                {competencies.length === 0 ? <p className="hfa-muted">No competency averages returned yet.</p> : competencies.slice(0, 6).map(row => (
-                    <div className="hfa-bar-row" key={row.competencyCode}>
-                      <span className="hfa-bar-label" title={row.competencyName}>{row.competencyName}</span>
-                      <div className="hfa-bar-track"><div className="hfa-bar-fill" style={{ width: `${Math.max(3, Math.min(100, numberValue(row.averageScore)))}%` }} /></div>
-                      <span className="hfa-bar-meta">{formatScore(row.averageScore)}</span>
-                    </div>
-                ))}
-              </div>
-            </section>
+            <CompactCard>
+              <h4 className="mb-3 text-base font-semibold text-slate-950">Competencies</h4>
+              <BarList rows={competencyRows.slice(0, 8).map(row => ({ label: row.competencyName || row.competencyCode, value: numberValue(row.averageScore), meta: formatScore(row.averageScore) }))} maxValue={100} emptyText="No competency scores yet." />
+            </CompactCard>
 
-            <section className="hfa-drawer-section">
-              <h4>Employee-facing preview</h4>
-              <div className="hfa-publish-preview">
-                <strong>{visibilityLabel(item.visibilityStatus)} result content</strong>
-                <ul>
-                  {included.length ? included.map(entry => <li key={entry}>{entry}</li>) : <li>No employee-facing content is currently selected.</li>}
-                </ul>
-              </div>
-            </section>
-
-            <section className="hfa-drawer-section">
-              <h4>Calculation note</h4>
-              <p>{item.scoreCalculationNote || 'Final score uses the configured 360 relationship weights and submitted response data.'}</p>
-              <span className={`hfa-pill ${confidenceClass(item)}`}>{confidenceLabel(item)}</span>
-            </section>
+            {item.includeComments && commentRows.length ? (
+                <CompactCard>
+                  <h4 className="mb-3 text-base font-semibold text-slate-950">Published comments</h4>
+                  <div className="space-y-3">
+                    {commentRows.slice(0, 6).map((comment, index) => (
+                        <blockquote key={`${comment.relationshipType}-${comment.questionCode}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                          <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-blue-600">{comment.competencyName || comment.label || relationshipDisplayName(comment.relationshipType)}</span>
+                          {comment.comment}
+                        </blockquote>
+                    ))}
+                  </div>
+                </CompactCard>
+            ) : null}
           </div>
         </aside>
       </div>
   );
-};
+}
 
-const PublishResultsModal = ({
-                               open,
-                               step,
-                               setStep,
-                               options,
-                               setOptions,
-                               readyItems,
-                               blockedItems,
-                               publishedCount,
-                               selectedReadyCount,
-                               publishReady,
-                               actionLoading,
-                               onClose,
-                               onPublish,
-                             }: {
+function PublishModal({ open, step, setStep, options, setOptions, readyItems, blockedItems, publishedCount, selectedReadyCount, publishReady, actionLoading, onClose, onPublish }: {
   open: boolean;
   step: PublishStep;
   setStep: (value: PublishStep) => void;
@@ -730,7 +761,7 @@ const PublishResultsModal = ({
   actionLoading: boolean;
   onClose: () => void;
   onPublish: () => void;
-}) => {
+}) {
   if (!open) return null;
 
   const toggleEmployee = (employeeId: number) => {
@@ -741,111 +772,119 @@ const PublishResultsModal = ({
           : [...current.selectedEmployeeIds, employeeId],
     }));
   };
-
   const selectAllReady = () => setOptions(current => ({ ...current, selectedEmployeeIds: readyItems.map(item => item.targetEmployeeId) }));
-
   const setBooleanOption = (key: keyof Pick<PublishOptions, 'includeOverallScore' | 'includeCompetencyBreakdown' | 'includeSelfVsOthers' | 'includeComments' | 'includeScoreExplanation' | 'confirmVisibility'>, value: boolean) => {
     setOptions(current => ({ ...current, [key]: value }));
   };
 
   return (
-      <div className="hfa-modal-backdrop" role="dialog" aria-modal="true">
-        <div className="hfa-modal">
-          <div className="hfa-modal-header">
-            <div className="hfa-modal-title">
-              <span className="hfa-eyebrow">Publish center</span>
-              <h3>Publish employee 360 results</h3>
-              <p>Choose who receives results and exactly which sections employees can see.</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
+        <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-600">Publish summaries</p>
+              <h3 className="mt-1 text-xl font-semibold text-slate-950">Employee 360 results</h3>
+              <p className="mt-1 text-sm text-slate-500">Configure what employees will see before publishing.</p>
             </div>
-            <button type="button" className="hfa-icon-btn" onClick={onClose} aria-label="Close publish modal">×</button>
+            <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-xl font-semibold text-slate-500 hover:bg-slate-50" onClick={onClose} aria-label="Close publish modal">×</button>
           </div>
 
-          <div className="hfa-steps">
-            <span className={`hfa-step ${step === 1 ? 'active' : ''}`}>1. Setup</span>
-            <span className={`hfa-step ${step === 2 ? 'active' : ''}`}>2. Review & publish</span>
+          <div className="flex gap-2 border-b border-slate-100 px-6 py-3">
+            <span className={cx('rounded-full px-3 py-1 text-xs font-bold', step === 1 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500')}>Configure</span>
+            <span className={cx('rounded-full px-3 py-1 text-xs font-bold', step === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500')}>Confirm</span>
           </div>
 
-          {step === 1 ? (
-              <div className="hfa-modal-body">
-                <div className="hfa-modal-grid">
-                  <section className="hfa-option-panel">
-                    <h4>Publish scope</h4>
-                    <label className="hfa-option-card">
-                      <input type="radio" checked={options.scope === 'ALL_READY'} onChange={() => setOptions(current => ({ ...current, scope: 'ALL_READY' }))} />
-                      <span><strong>All ready employees</strong><small>Publish every result marked ready by scoring, confidence, and privacy checks.</small></span>
-                    </label>
-                    <label className="hfa-option-card">
-                      <input type="radio" checked={options.scope === 'SELECTED_EMPLOYEES'} onChange={() => setOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} />
-                      <span><strong>Selected employees only</strong><small>Choose specific ready employee results to publish now.</small></span>
-                    </label>
-
-                    {options.scope === 'SELECTED_EMPLOYEES' && (
-                        <div className="hfa-employee-picker">
-                          <button className="hfa-btn hfa-btn-secondary" type="button" onClick={selectAllReady}>Select all ready</button>
-                          {readyItems.map(item => (
-                              <label key={item.targetEmployeeId}>
-                                <input type="checkbox" checked={options.selectedEmployeeIds.includes(item.targetEmployeeId)} onChange={() => toggleEmployee(item.targetEmployeeId)} />
-                                <span>{item.targetEmployeeName}</span>
-                                <small>{formatScore(item.averageScore)}</small>
-                              </label>
-                          ))}
-                        </div>
-                    )}
-                  </section>
-
-                  <section className="hfa-option-panel">
-                    <h4>Employee result content</h4>
-                    <div className="hfa-check-list">
-                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeOverallScore} onChange={event => setBooleanOption('includeOverallScore', event.target.checked)} /><span><strong>Overall score</strong><small>Final score and score band.</small></span></label>
-                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeCompetencyBreakdown} onChange={event => setBooleanOption('includeCompetencyBreakdown', event.target.checked)} /><span><strong>Competency breakdown</strong><small>Strengths and development areas.</small></span></label>
-                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeSelfVsOthers} onChange={event => setBooleanOption('includeSelfVsOthers', event.target.checked)} /><span><strong>Self vs others</strong><small>Comparison view when submitted and allowed.</small></span></label>
-                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeComments} onChange={event => setBooleanOption('includeComments', event.target.checked)} /><span><strong>Anonymous comments</strong><small>Only visible when confidentiality allows it.</small></span></label>
-                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeScoreExplanation} onChange={event => setBooleanOption('includeScoreExplanation', event.target.checked)} /><span><strong>Score explanation</strong><small>Show how the final score was calculated.</small></span></label>
-                    </div>
-                  </section>
-                </div>
-
-                <div className="hfa-alert hfa-alert-info">
-                  <i className="bi bi-shield-lock" /> {blockedItems.length} blocked result{blockedItems.length === 1 ? '' : 's'} stay hidden. {publishedCount} result{publishedCount === 1 ? '' : 's'} are already published.
-                </div>
-              </div>
-          ) : (
-              <div className="hfa-modal-body">
-                <section className="hfa-option-panel">
-                  <h4>Review before publishing</h4>
-                  <dl className="hfa-review-list">
-                    <div className="hfa-review-row"><dt>Results to publish</dt><dd>{selectedReadyCount} employee{selectedReadyCount === 1 ? '' : 's'}</dd></div>
-                    <div className="hfa-review-row"><dt>Visible to</dt><dd>Employee and HR</dd></div>
-                    <div className="hfa-review-row"><dt>Included sections</dt><dd>{contentSummary(options) || 'No content selected'}</dd></div>
-                    <div className="hfa-review-row"><dt>Comments</dt><dd>{options.includeComments ? 'Included only where confidentiality allows' : 'Not included'}</dd></div>
-                    <div className="hfa-review-row"><dt>Blocked results</dt><dd>{blockedItems.length} remain hidden</dd></div>
-                    <div className="hfa-review-row"><dt>Notification</dt><dd>Employees will be notified by the publish flow</dd></div>
-                  </dl>
-                </section>
-
-                <label className="hfa-confirm-box">
-                  <input type="checkbox" checked={options.confirmVisibility} onChange={event => setBooleanOption('confirmVisibility', event.target.checked)} />
-                  <span>I confirm these published results will be visible to employees, and relationship/comment detail must follow campaign privacy rules.</span>
-                </label>
-              </div>
-          )}
-
-          <div className="hfa-modal-footer">
-            <button className="hfa-btn hfa-btn-secondary" type="button" onClick={() => step === 1 ? onClose() : setStep(1)}>
-              {step === 1 ? 'Cancel' : 'Back'}
-            </button>
+          <div className="max-h-[62vh] overflow-y-auto p-6">
             {step === 1 ? (
-                <button className="hfa-btn hfa-btn-primary" type="button" onClick={() => setStep(2)} disabled={selectedReadyCount === 0}>Review publish</button>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <CompactCard>
+                    <h4 className="text-base font-semibold text-slate-950">Publish scope</h4>
+                    <div className="mt-4 space-y-3">
+                      <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 hover:border-blue-200 hover:bg-blue-50/40"><input type="radio" checked={options.scope === 'ALL_READY'} onChange={() => setOptions(current => ({ ...current, scope: 'ALL_READY' }))} /><span><strong className="block text-sm text-slate-950">All ready employees</strong><small className="text-slate-500">Publish every result that passed checks.</small></span></label>
+                      <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 hover:border-blue-200 hover:bg-blue-50/40"><input type="radio" checked={options.scope === 'SELECTED_EMPLOYEES'} onChange={() => setOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} /><span><strong className="block text-sm text-slate-950">Selected employees</strong><small className="text-slate-500">Choose specific ready results.</small></span></label>
+                    </div>
+                    {options.scope === 'SELECTED_EMPLOYEES' ? (
+                        <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+                          <button className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" type="button" onClick={selectAllReady}>Select all ready</button>
+                          <div className="max-h-52 space-y-2 overflow-auto">
+                            {readyItems.map(item => <label key={item.targetEmployeeId} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"><span><input className="mr-2" type="checkbox" checked={options.selectedEmployeeIds.includes(item.targetEmployeeId)} onChange={() => toggleEmployee(item.targetEmployeeId)} />{item.targetEmployeeName}</span><strong>{formatScore(item.averageScore)}</strong></label>)}
+                          </div>
+                        </div>
+                    ) : null}
+                  </CompactCard>
+
+                  <CompactCard>
+                    <h4 className="text-base font-semibold text-slate-950">Visible sections</h4>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        ['includeOverallScore', 'Overall score', 'Final score and band.'],
+                        ['includeCompetencyBreakdown', 'Competency breakdown', 'Strength and development areas.'],
+                        ['includeSelfVsOthers', 'Self vs others', 'Reviewer group comparison.'],
+                        ['includeComments', 'Anonymous comments', 'Only where confidentiality allows.'],
+                      ].map(([key, title, helper]) => (
+                          <label key={key} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 hover:border-blue-200 hover:bg-blue-50/40">
+                            <input type="checkbox" checked={Boolean(options[key as keyof PublishOptions])} onChange={event => setBooleanOption(key as keyof Pick<PublishOptions, 'includeOverallScore' | 'includeCompetencyBreakdown' | 'includeSelfVsOthers' | 'includeComments'>, event.target.checked)} />
+                            <span><strong className="block text-sm text-slate-950">{title}</strong><small className="text-slate-500">{helper}</small></span>
+                          </label>
+                      ))}
+                    </div>
+                  </CompactCard>
+                </div>
             ) : (
-                <button className="hfa-btn hfa-btn-primary" type="button" onClick={onPublish} disabled={!publishReady || actionLoading}>
-                  {actionLoading ? 'Publishing…' : 'Publish results'}
-                </button>
+                <div className="space-y-4">
+                  <CompactCard>
+                    <h4 className="text-base font-semibold text-slate-950">Confirm publishing</h4>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs font-semibold text-slate-500">Results</span><strong>{selectedReadyCount} employees</strong></div>
+                      <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs font-semibold text-slate-500">Included</span><strong>{contentSummary(options) || 'No sections selected'}</strong></div>
+                      <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs font-semibold text-slate-500">Already published</span><strong>{publishedCount}</strong></div>
+                      <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs font-semibold text-slate-500">Blocked</span><strong>{blockedItems.length}</strong></div>
+                    </div>
+                  </CompactCard>
+                  <label className="flex gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-medium text-blue-900"><input type="checkbox" checked={options.confirmVisibility} onChange={event => setBooleanOption('confirmVisibility', event.target.checked)} /><span>I reviewed the selected summaries and confirm these sections can be shown to employees.</span></label>
+                </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+            <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={() => step === 1 ? onClose() : setStep(1)}>{step === 1 ? 'Cancel' : 'Back'}</button>
+            {step === 1 ? (
+                <button className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300" type="button" onClick={() => setStep(2)} disabled={selectedReadyCount === 0}>Preview release</button>
+            ) : (
+                <button className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300" type="button" onClick={onPublish} disabled={!publishReady || actionLoading}>{actionLoading ? 'Publishing…' : 'Publish summaries'}</button>
             )}
           </div>
         </div>
       </div>
   );
-};
+}
+
+
+function UnpublishConfirmModal({ open, publishedCount, actionLoading, onClose, onConfirm }: {
+  open: boolean;
+  publishedCount: number;
+  actionLoading: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
+        <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-600">Unpublish results</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">Hide published summaries?</h3>
+          <p className="mt-2 text-sm text-slate-500">
+            {publishedCount} published {publishedCount === 1 ? 'summary is' : 'summaries are'} currently visible to employees. Unpublishing will hide them from employees, but HR can publish them again later.
+          </p>
+          <div className="mt-5 flex justify-end gap-3">
+            <button className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} disabled={actionLoading}>Cancel</button>
+            <button className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300" type="button" onClick={onConfirm} disabled={actionLoading}>{actionLoading ? 'Unpublishing…' : 'Unpublish summaries'}</button>
+          </div>
+        </div>
+      </div>
+  );
+}
 
 export default function AnalyticsTab() {
   const [campaigns, setCampaigns] = useState<FeedbackCampaign[]>([]);
@@ -863,14 +902,11 @@ export default function AnalyticsTab() {
   const [sortBy, setSortBy] = useState<AnalyticsSort>('SCORE_DESC');
   const [selectedResult, setSelectedResult] = useState<FeedbackResultItem | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [unpublishOpen, setUnpublishOpen] = useState(false);
   const [publishStep, setPublishStep] = useState<PublishStep>(1);
   const [publishOptions, setPublishOptions] = useState<PublishOptions>(defaultPublishOptions);
 
-  const closedCampaigns = useMemo(
-      () => campaigns.filter(campaign => ['CLOSED', 'PUBLISHED'].includes(String(campaign.status ?? '').toUpperCase())),
-      [campaigns],
-  );
-
+  const closedCampaigns = useMemo(() => campaigns.filter(campaign => ['CLOSED', 'PUBLISHED'].includes(String(campaign.status ?? '').toUpperCase())), [campaigns]);
   const selectedCampaign = closedCampaigns.find(campaign => campaign.id === selectedId);
 
   useEffect(() => {
@@ -892,7 +928,6 @@ export default function AnalyticsTab() {
       setScoringConfig(null);
       return;
     }
-
     setLoading(true);
     setScoringLoading(true);
     setError('');
@@ -916,15 +951,13 @@ export default function AnalyticsTab() {
     setSelectedResult(null);
     setNotice('');
     setPublishOpen(false);
+    setUnpublishOpen(false);
   }, [selectedId]);
 
   const readyItems = useMemo(() => (summary?.items ?? []).filter(item => isReadyToPublish(item) && !isPublished(item)), [summary?.items]);
   const blockedItems = useMemo(() => (summary?.items ?? []).filter(item => !isReadyToPublish(item) && !isPublished(item)), [summary?.items]);
   const publishedCount = useMemo(() => (summary?.items ?? []).filter(isPublished).length, [summary?.items]);
-
-  const selectedReadyCount = publishOptions.scope === 'ALL_READY'
-      ? readyItems.length
-      : readyItems.filter(item => publishOptions.selectedEmployeeIds.includes(item.targetEmployeeId)).length;
+  const selectedReadyCount = publishOptions.scope === 'ALL_READY' ? readyItems.length : readyItems.filter(item => publishOptions.selectedEmployeeIds.includes(item.targetEmployeeId)).length;
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -946,16 +979,14 @@ export default function AnalyticsTab() {
 
   const metricCards: MetricCard[] = useMemo(() => {
     if (!summary) return [];
-    const blockedCount = blockedItems.length;
     return [
-      { label: 'Overall average', value: formatScore(summary.overallAverageScore), helper: summary.overallScoreCategory || scoreBand(summary.overallAverageScore), icon: 'bi-stars', tone: 'good' },
-      { label: 'Employees reviewed', value: formatCount(summary.totalEmployees), helper: `${formatCount(summary.totalResponses)} submitted responses`, icon: 'bi-people' },
-      { label: 'Completion', value: formatScore(summary.completionRate, 0), helper: `${formatCount(summary.submittedEvaluatorCount)} / ${formatCount(summary.assignedEvaluatorCount)} evaluators`, icon: 'bi-clipboard-check', tone: numberValue(summary.completionRate) >= 80 ? 'good' : 'warning' },
-      { label: 'Ready to publish', value: readyItems.length, helper: `${blockedCount} blocked`, icon: 'bi-send-check', tone: readyItems.length ? 'good' : 'warning' },
-      { label: 'Insufficient', value: formatCount(summary.insufficientFeedbackCount), helper: 'Blocked by confidence checks', icon: 'bi-exclamation-diamond', tone: countValue(summary.insufficientFeedbackCount) ? 'danger' : 'good' },
-      { label: 'Published', value: `${publishedCount}/${formatCount(summary.totalEmployees)}`, helper: 'Employee-facing visibility', icon: 'bi-eye', tone: publishedCount ? 'good' : 'neutral' },
+      { label: 'Average', value: formatScore(summary.overallAverageScore), helper: summary.overallScoreCategory || scoreBand(summary.overallAverageScore), tone: 'blue' },
+      { label: 'Completion', value: formatScore(summary.completionRate, 0), helper: `${formatCount(summary.submittedEvaluatorCount)} of ${formatCount(summary.assignedEvaluatorCount)}`, tone: numberValue(summary.completionRate) >= 80 ? 'green' : 'amber' },
+      { label: 'Ready', value: readyItems.length, helper: 'Can publish', tone: readyItems.length ? 'green' : 'slate' },
+      { label: 'Blocked', value: formatCount(summary.insufficientFeedbackCount), helper: 'Cannot publish', tone: countValue(summary.insufficientFeedbackCount) ? 'amber' : 'slate' },
+      { label: 'Published', value: `${publishedCount}/${formatCount(summary.totalEmployees)}`, helper: 'Visible to employees', tone: publishedCount ? 'green' : 'slate' },
     ];
-  }, [blockedItems.length, publishedCount, readyItems.length, summary]);
+  }, [publishedCount, readyItems.length, summary]);
 
   const publishPayload = (): FeedbackSummaryPublishRequest => ({
     scope: publishOptions.scope,
@@ -968,11 +999,7 @@ export default function AnalyticsTab() {
     notifyEmployees: true,
   });
 
-  const hasPublishContent = publishOptions.includeOverallScore
-      || publishOptions.includeCompetencyBreakdown
-      || publishOptions.includeSelfVsOthers
-      || publishOptions.includeComments
-      || publishOptions.includeScoreExplanation;
+  const hasPublishContent = publishOptions.includeOverallScore || publishOptions.includeCompetencyBreakdown || publishOptions.includeSelfVsOthers || publishOptions.includeComments;
   const publishReady = selectedReadyCount > 0 && hasPublishContent && publishOptions.confirmVisibility;
 
   const openPublishModal = () => {
@@ -990,7 +1017,7 @@ export default function AnalyticsTab() {
       const nextSummary = await feedbackAnalyticsApi.publishCampaignSummary(selectedId, publishPayload());
       setSummary(nextSummary);
       setPublishOpen(false);
-      setNotice('Results published successfully. Employee visibility now follows each saved result summary and publish option.');
+      setNotice('Results published successfully.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to publish results.');
     } finally {
@@ -1006,7 +1033,8 @@ export default function AnalyticsTab() {
     try {
       const nextSummary = await feedbackAnalyticsApi.unpublishCampaignSummary(selectedId);
       setSummary(nextSummary);
-      setNotice('Results unpublished. Employee-facing visibility has been turned off for this campaign.');
+      setUnpublishOpen(false);
+      setNotice('Published summaries are now hidden from employees.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to unpublish results.');
     } finally {
@@ -1016,7 +1044,7 @@ export default function AnalyticsTab() {
 
   const exportCsv = () => {
     if (!filteredItems.length || !selectedId) return;
-    const header = ['Employee', 'Employee ID', 'Average Score', 'Score Band', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager Responses', 'Peer Responses', 'Subordinate Responses', 'Self Responses', 'Visibility', 'Calculation Note'];
+    const header = ['Employee', 'Employee ID', 'Average Score', 'Score Band', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager Responses', 'Peer Responses', 'Subordinate Responses', 'Self Responses', 'Visibility'];
     const body = filteredItems.map(item => [
       item.targetEmployeeName,
       item.targetEmployeeId,
@@ -1031,8 +1059,7 @@ export default function AnalyticsTab() {
       item.peerResponses,
       item.subordinateResponses,
       item.selfResponses ?? 0,
-      visibilityLabel(item.visibilityStatus),
-      item.scoreCalculationNote ?? '',
+      statusText(item.visibilityStatus),
     ]);
     const csv = [header, ...body].map(line => line.map(escapeCsv).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1045,130 +1072,43 @@ export default function AnalyticsTab() {
   };
 
   return (
-      <div className="hfa-page">
-        <div className="hfa-topbar">
-          <div className="hfa-title-block">
-            <span className="hfa-title-icon"><i className="bi bi-graph-up-arrow" /></span>
-            <div>
-              <h2>360 Feedback Analytics</h2>
-              <p>Review closed-campaign results, validate confidence and privacy, then publish employee summaries from one production workspace.</p>
-            </div>
-          </div>
+      <div className="mx-auto w-full max-w-[1180px] space-y-4 overflow-x-hidden px-4 pb-8 text-slate-900">
+        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{notice}</div> : null}
+        {error ? <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div> : null}
+        {closedCampaigns.length === 0 && !loading ? <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm font-medium text-slate-500">Analytics appears after a 360 campaign is closed.</div> : null}
+        {closedCampaigns.length > 0 && !summary && !loading ? <CampaignPickerCard selectedId={selectedId} closedCampaigns={closedCampaigns} setSelectedId={setSelectedId} onRefresh={refreshSummary} loading={loading} /> : null}
+        {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">Loading analytics…</div> : null}
 
-          <div className="hfa-topbar-actions">
-            <label className="hfa-select-wrap">
-              <span className="hfa-label">Closed campaign</span>
-              <select className="hfa-select" value={selectedId} onChange={event => setSelectedId(event.target.value ? Number(event.target.value) : '')}>
-                <option value="">Select campaign</option>
-                {closedCampaigns.map(campaign => (
-                    <option key={campaign.id} value={campaign.id}>{campaign.name} · {campaign.status}</option>
-                ))}
-              </select>
-            </label>
-            <button className="hfa-btn hfa-btn-secondary" type="button" onClick={refreshSummary} disabled={!selectedId || loading}>
-              <i className="bi bi-arrow-repeat" /> Refresh
-            </button>
-          </div>
-        </div>
-
-        <div className="hfa-alert hfa-alert-info">
-          <i className="bi bi-shield-lock" /> Campaign lifecycle and result visibility are now separate. Closed campaigns stay closed; published visibility is controlled by saved result summaries.
-        </div>
-        {notice && <div className="hfa-alert hfa-alert-success"><i className="bi bi-check-circle" /> {notice}</div>}
-        {error && <div className="hfa-alert hfa-alert-error"><i className="bi bi-exclamation-triangle" /> {error}</div>}
-
-        {closedCampaigns.length === 0 && !loading && (
-            <div className="hfa-empty"><i className="bi bi-lock" />Analytics becomes available after a 360 feedback campaign is closed.</div>
-        )}
-
-        {loading && <div className="hfa-loading"><i className="bi bi-arrow-repeat" /> Loading production analytics…</div>}
-
-        {summary && !loading && (
+        {summary && !loading ? (
             <>
-              <CampaignResultHeader summary={summary} campaign={selectedCampaign} />
-              <MetricCards cards={metricCards} />
+              <CampaignSummaryStrip summary={summary} campaign={selectedCampaign} cards={metricCards} selectedId={selectedId} closedCampaigns={closedCampaigns} setSelectedId={setSelectedId} onRefresh={refreshSummary} loading={loading} />
 
-              <section className="hfa-panel">
-                <div className="hfa-panel-head">
-                  <div>
-                    <span className="hfa-eyebrow">Scoring configuration</span>
-                    <h3>Relationship-weighted calculation</h3>
-                    <p>
-                      {scoringLoading
-                          ? 'Loading campaign scoring rules…'
-                          : scoringConfig?.relationshipWeightsReady
-                              ? 'Scoring weights are ready and summaries use submitted relationship data.'
-                              : 'Scoring weights should be reviewed in Campaign Setup before publishing.'}
-                    </p>
-                  </div>
-                  <span className={`hfa-pill ${scoringConfig?.relationshipWeightsReady ? 'hfa-pill-published' : 'hfa-pill-warning'}`}>
-                {scoringConfig?.relationshipWeightsReady ? 'Weights ready' : 'Review weights'}
-              </span>
-                </div>
-                <div className="hfa-chart-grid">
-                  <HorizontalBarChart
-                      title="Configured relationship weights"
-                      subtitle={scoringConfig?.redistributeMissingRelationshipWeight ? 'Missing relationship weight is redistributed.' : 'Configured relationships are used when available.'}
-                      rows={(scoringConfig?.relationshipWeights ?? []).map(row => ({
-                        label: relationshipDisplayName(row.relationshipType),
-                        value: Number(row.weightPercent ?? 0),
-                        meta: `${Number(row.weightPercent ?? 0)}%`,
-                      }))}
+              <div className="grid w-full min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+                <main className="min-w-0 space-y-4">
+                  <EmployeeResultsList
+                      items={filteredItems}
+                      searchTerm={searchTerm}
+                      setSearchTerm={setSearchTerm}
+                      publishFilter={publishFilter}
+                      setPublishFilter={setPublishFilter}
+                      confidenceFilter={confidenceFilter}
+                      setConfidenceFilter={setConfidenceFilter}
+                      sortBy={sortBy}
+                      setSortBy={setSortBy}
+                      onOpen={setSelectedResult}
+                      onExport={exportCsv}
                   />
-                  <HorizontalBarChart
-                      title="Submitted relationship averages"
-                      subtitle="Calculated average score by relationship."
-                      rows={(summary.relationshipAverages ?? []).map(row => ({
-                        label: row.label || relationshipDisplayName(row.relationshipType),
-                        value: numberValue(row.averageScore),
-                        meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)}`,
-                      }))}
-                  />
-                </div>
-              </section>
+                  <AnalyticsGrid summary={summary} />
+                </main>
+                <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
+                  <PublishReadinessPanel summary={summary} readyItems={readyItems} blockedItems={blockedItems} publishedCount={publishedCount} actionLoading={actionLoading} onPublish={openPublishModal} onUnpublish={() => setUnpublishOpen(true)} />
+                  <ConfidenceCompact rows={summary.confidenceBreakdown ?? []} />
+                  <ScoringCard summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
+                </aside>
+              </div>
 
-              <AnalyticsCharts summary={summary} />
-              <QualityPrivacyPanel summary={summary} readyItems={readyItems} blockedItems={blockedItems} publishedCount={publishedCount} />
-
-              <section className="hfa-panel">
-                <div className="hfa-panel-head">
-                  <div>
-                    <span className="hfa-eyebrow">Publish center</span>
-                    <h3>Release employee summaries</h3>
-                    <p>{readyItems.length} ready, {blockedItems.length} blocked, and {publishedCount} already published.</p>
-                  </div>
-                  <div className="hfa-topbar-actions">
-                    <button className="hfa-btn hfa-btn-danger" type="button" onClick={runUnpublish} disabled={actionLoading || publishedCount === 0}>
-                      <i className="bi bi-eye-slash" /> Unpublish
-                    </button>
-                    <button className="hfa-btn hfa-btn-primary" type="button" onClick={openPublishModal} disabled={actionLoading || readyItems.length === 0}>
-                      <i className="bi bi-send-check" /> Publish ready results
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <EmployeeResultsTable
-                  items={filteredItems}
-                  searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
-                  publishFilter={publishFilter}
-                  setPublishFilter={setPublishFilter}
-                  confidenceFilter={confidenceFilter}
-                  setConfidenceFilter={setConfidenceFilter}
-                  sortBy={sortBy}
-                  setSortBy={setSortBy}
-                  onOpen={setSelectedResult}
-                  onExport={exportCsv}
-              />
-
-              <ResultDetailDrawer
-                  item={selectedResult}
-                  competencies={summary.competencyAverages ?? []}
-                  onClose={() => setSelectedResult(null)}
-              />
-
-              <PublishResultsModal
+              <ResultDrawer item={selectedResult} onClose={() => setSelectedResult(null)} />
+              <PublishModal
                   open={publishOpen}
                   step={publishStep}
                   setStep={setPublishStep}
@@ -1183,8 +1123,15 @@ export default function AnalyticsTab() {
                   onClose={() => setPublishOpen(false)}
                   onPublish={runPublish}
               />
+              <UnpublishConfirmModal
+                  open={unpublishOpen}
+                  publishedCount={publishedCount}
+                  actionLoading={actionLoading}
+                  onClose={() => setUnpublishOpen(false)}
+                  onConfirm={runUnpublish}
+              />
             </>
-        )}
+        ) : null}
       </div>
   );
 }

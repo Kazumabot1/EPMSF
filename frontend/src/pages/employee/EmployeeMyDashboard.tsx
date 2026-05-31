@@ -325,7 +325,7 @@ const EmployeeMyDashboard = () => {
   }, [data.appraisalForms]);
 
   const feedbackPending = data.feedbackDashboard?.totalPendingAssignments ?? data.feedbackDashboard?.pendingFeedbackToSubmit?.length ?? 0;
-  const feedbackReceived = data.feedbackDashboard?.ownFeedbackResults?.length ?? data.feedbackDashboard?.totalResponses ?? 0;
+  const feedbackReceived = data.feedbackDashboard?.totalResponses ?? 0;
   const unreadNotifications = data.notifications.filter((notification) => !notification.isRead).length;
   const kpiPercent = clampPercent(latestKpi?.totalScore ?? latestKpi?.totalWeightedScore ?? 0);
   const kpiCompleted = latestKpi?.lines?.filter((line) => line.score != null || line.weightedScore != null).length ?? 0;
@@ -457,13 +457,17 @@ const EmployeeMyDashboard = () => {
           },
         ]
         : []),
-    ...(data.feedbackDashboard?.ownFeedbackResults?.slice(0, 1).map((item) => ({
-      id: `feedback-${item.responseId}-${item.submittedAt}`,
-      title: 'Feedback received',
-      subtitle: item.campaignName,
-      time: formatRelativeTime(item.submittedAt),
-      icon: <TargetIcon className="h-5 w-5" />,
-    })) ?? []),
+    ...(feedbackReceived > 0
+        ? [
+          {
+            id: 'feedback-published-summary',
+            title: '360 feedback result available',
+            subtitle: `${feedbackReceived} published feedback result${feedbackReceived === 1 ? '' : 's'} available`,
+            time: 'Open feedback',
+            icon: <TargetIcon className="h-5 w-5" />,
+          },
+        ]
+        : []),
   ].slice(0, 5);
 
   return (

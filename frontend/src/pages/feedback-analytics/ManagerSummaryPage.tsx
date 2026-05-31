@@ -1,62 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import api from '../../services/api';
+import { feedbackAnalyticsApi } from '../../api/feedbackAnalyticsApi';
+import type {
+    FeedbackCompetencyResult,
+    FeedbackPublishedComment,
+    FeedbackRelationshipAverage,
+    FeedbackResultItem as BaseFeedbackResultItem,
+    FeedbackTeamSummary as BaseFeedbackTeamSummary,
+} from '../../types/feedbackAnalytics';
 import './manager-summary.css';
 
 type ScopeType = 'MANAGER_SCOPE' | 'DEPARTMENT_SCOPE' | 'MANAGER_DIRECT_REPORTS' | 'DEPARTMENT_EMPLOYEES' | string;
 type ConfidenceFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
 type PrivacyFilter = 'ALL' | 'PROTECTED' | 'CLEAR';
 type CoachingFilter = 'ALL' | 'PRIORITY' | 'STABLE';
+type ReviewerGroupKey = 'SELF' | 'MANAGER' | 'PEER' | 'SUBORDINATE';
 
-type GenericResponse<T> = {
-    success?: boolean;
-    message?: string;
-    data?: T;
-};
-
-type RelationshipPrivacy = {
-    relationshipType?: string | null;
-    label?: string | null;
-    responseCount?: number | null;
-    minimumVisibleResponses?: number | null;
-    thresholdRequired?: boolean | null;
-    thresholdMet?: boolean | null;
-    visibleOutsideHr?: boolean | null;
-    hiddenReason?: string | null;
-};
-
-type RelationshipScore = {
-    relationshipType?: string | null;
-    label?: string | null;
-    averageScore?: number | null;
-    responseCount?: number | null;
-    weight?: number | null;
-    visibleOutsideHr?: boolean | null;
-    hiddenReason?: string | null;
-};
-
-type CompetencyResult = {
-    competencyCode?: string | null;
-    competencyName?: string | null;
-    averageScore?: number | null;
-    responseCount?: number | null;
-    questionCount?: number | null;
-};
-
-type PublishedComment = {
-    competencyCode?: string | null;
-    competencyName?: string | null;
-    relationshipType?: string | null;
-    relationshipLabel?: string | null;
-    comment?: string | null;
-    visibleOutsideHr?: boolean | null;
-    hiddenReason?: string | null;
-};
-
-type FeedbackResultItem = {
-    campaignId?: number | null;
-    campaignName?: string | null;
-    targetEmployeeId?: number | null;
-    targetEmployeeName?: string | null;
+type ManagedFeedbackResultItem = BaseFeedbackResultItem & {
     targetEmployeeCode?: string | null;
     targetPositionName?: string | null;
     positionName?: string | null;
@@ -65,26 +24,11 @@ type FeedbackResultItem = {
     targetLevelCode?: string | null;
     overallScore?: number | null;
     score?: number | null;
-    scoreCategory?: string | null;
-    confidenceLevel?: string | null;
-    insufficientFeedback?: boolean | null;
-    assignedEvaluatorCount?: number | null;
-    submittedEvaluatorCount?: number | null;
-    visibilityStatus?: string | null;
-    summarizedAt?: string | null;
-    publishedAt?: string | null;
-    includeOverallScore?: boolean | null;
-    includeCompetencyBreakdown?: boolean | null;
-    includeSelfVsOthers?: boolean | null;
-    includeComments?: boolean | null;
-    includeScoreExplanation?: boolean | null;
-    relationshipPrivacy?: RelationshipPrivacy[] | null;
-    relationshipScores?: RelationshipScore[] | null;
-    competencyResults?: CompetencyResult[] | null;
-    publishedComments?: PublishedComment[] | null;
-    scoreCalculationNote?: string | null;
+    relationshipScores?: FeedbackRelationshipAverage[] | null;
+    competencyResults?: FeedbackCompetencyResult[] | null;
+    comments?: FeedbackPublishedComment[] | null;
+    publishedComments?: FeedbackPublishedComment[] | null;
 };
-
 
 type FeedbackSummaryScope = {
     viewerRole?: string | null;
@@ -103,7 +47,7 @@ type FeedbackSummaryScope = {
     emptyStateMessage?: string | null;
 };
 
-type FeedbackTeamSummary = {
+type FeedbackTeamSummary = BaseFeedbackTeamSummary & {
     scope?: FeedbackSummaryScope | null;
     viewerRole?: string | null;
     scopeType?: ScopeType | null;
@@ -111,42 +55,39 @@ type FeedbackTeamSummary = {
     scopeTitle?: string | null;
     scopeDescription?: string | null;
     scopeOwnerName?: string | null;
-    departmentName?: string | null;
     scopeDepartmentName?: string | null;
     scopeEmployeeCount?: number | null;
     scopeTeamNames?: string[] | null;
-    managerUserId?: number | null;
-    ownerUserId?: number | null;
-    totalDirectReports?: number | null;
     totalManagedEmployees?: number | null;
-    totalManagedTeams?: number | null;
-    totalDepartmentTeams?: number | null;
-    totalDepartmentEmployees?: number | null;
-    totalClosedResults?: number | null;
     publishedResultCount?: number | null;
     visibleOverallScoreCount?: number | null;
     visibleAverageScore?: number | null;
     privacyProtectedCount?: number | null;
     coachingPriorityCount?: number | null;
-    accessTitle?: string | null;
-    accessDescription?: string | null;
-    privacyNotice?: string | null;
-    emptyStateMessage?: string | null;
-    items?: FeedbackResultItem[] | null;
-    results?: FeedbackResultItem[] | null;
+    results?: ManagedFeedbackResultItem[] | null;
+    items: ManagedFeedbackResultItem[];
 };
 
-type ManagerSummaryPageProps = {
-    expectedScope?: ScopeType;
+type ReviewerGroupRow = {
+    key: ReviewerGroupKey;
+    label: string;
+    score: number | null;
+    count: number;
+    visible: boolean;
+    hiddenReason?: string | null;
 };
 
-const unwrap = <T,>(response: { data: GenericResponse<T> | T }): T => {
-    const body = response.data as GenericResponse<T>;
-    if (body && typeof body === 'object' && 'data' in body) {
-        return body.data as T;
-    }
-    return response.data as T;
-};
+const REVIEWER_GROUPS: Array<{
+    key: ReviewerGroupKey;
+    label: string;
+    scoreKey: keyof Pick<ManagedFeedbackResultItem, 'selfAverageScore' | 'managerAverageScore' | 'peerAverageScore' | 'subordinateAverageScore'>;
+    countKey: keyof Pick<ManagedFeedbackResultItem, 'selfResponses' | 'managerResponses' | 'peerResponses' | 'subordinateResponses'>;
+}> = [
+    { key: 'SELF', label: 'Self review', scoreKey: 'selfAverageScore', countKey: 'selfResponses' },
+    { key: 'MANAGER', label: 'Manager reviewer', scoreKey: 'managerAverageScore', countKey: 'managerResponses' },
+    { key: 'PEER', label: 'Peer reviewers', scoreKey: 'peerAverageScore', countKey: 'peerResponses' },
+    { key: 'SUBORDINATE', label: 'Subordinate reviewers', scoreKey: 'subordinateAverageScore', countKey: 'subordinateResponses' },
+];
 
 const normalize = (value?: string | null) => String(value ?? '').trim().toUpperCase();
 
@@ -154,10 +95,18 @@ const asArray = <T,>(value?: T[] | null): T[] => (Array.isArray(value) ? value :
 
 const bool = (value: boolean | null | undefined, fallback = true) => (value == null ? fallback : Boolean(value));
 
+const toNumber = (value?: number | null) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
+const countOf = (value?: number | null) => Math.max(0, Number(value ?? 0));
+
 const formatScore = (value?: number | null) => {
-    if (value == null || Number.isNaN(Number(value))) return '—';
-    const numeric = Number(value);
-    return `${numeric.toFixed(1)} / 5`;
+    const numeric = toNumber(value);
+    return numeric == null ? '—' : `${numeric.toFixed(1)}%`;
+};
+
+const formatNormalizedAverage = (value?: number | null) => {
+    const numeric = toNumber(value);
+    return numeric == null ? '—' : `${numeric.toFixed(1)}%`;
 };
 
 const formatShortDate = (value?: string | null) => {
@@ -171,27 +120,46 @@ const formatShortDate = (value?: string | null) => {
     }).format(parsed);
 };
 
-const getEmployeeName = (item: FeedbackResultItem) => item.targetEmployeeName?.trim() || `Employee #${item.targetEmployeeId ?? '—'}`;
+const getEmployeeName = (item: ManagedFeedbackResultItem) => item.targetEmployeeName?.trim() || `Employee #${item.targetEmployeeId ?? '—'}`;
 
-const getPositionName = (item: FeedbackResultItem) => item.targetPositionName || item.positionName || '—';
+const getPositionName = (item: ManagedFeedbackResultItem) => item.targetPositionName || item.positionName || '—';
 
-const getDepartmentName = (item: FeedbackResultItem) => item.targetDepartmentName || item.departmentName || '—';
+const getDepartmentName = (item: ManagedFeedbackResultItem) => item.targetDepartmentName || item.departmentName || '—';
 
-const visibleScoreValue = (item: FeedbackResultItem) => item.overallScore ?? item.score ?? null;
+const visibleScoreValue = (item: ManagedFeedbackResultItem) => item.averageScore ?? item.overallScore ?? item.score ?? null;
 
-const canShowOverallScore = (item: FeedbackResultItem) => bool(item.includeOverallScore, true) && visibleScoreValue(item) != null;
+const canShowOverallScore = (item: ManagedFeedbackResultItem) => bool(item.includeOverallScore, true) && visibleScoreValue(item) != null;
 
-const hasPrivacyProtectedGroup = (item: FeedbackResultItem) =>
-    asArray(item.relationshipPrivacy).some((entry) => entry.visibleOutsideHr === false || entry.thresholdMet === false);
+const relationshipPrivacyFor = (item: ManagedFeedbackResultItem, relationshipType?: string | null) =>
+    asArray(item.relationshipPrivacy).find((entry) => normalize(entry.relationshipType) === normalize(relationshipType));
 
-const confidenceLabel = (item: FeedbackResultItem) => {
+const reviewerGroupRows = (item: ManagedFeedbackResultItem): ReviewerGroupRow[] => REVIEWER_GROUPS.map((group) => {
+    const privacy = relationshipPrivacyFor(item, group.key);
+    const score = toNumber(item[group.scoreKey] as number | null | undefined);
+    const count = countOf(item[group.countKey] as number | null | undefined);
+    const visible = privacy?.visibleOutsideHr ?? score != null;
+    return {
+        key: group.key,
+        label: privacy?.label || group.label,
+        score,
+        count,
+        visible,
+        hiddenReason: privacy?.hiddenReason ?? null,
+    };
+});
+
+const hasPrivacyProtectedGroup = (item: ManagedFeedbackResultItem) =>
+    asArray(item.relationshipPrivacy).some((entry) => entry.visibleOutsideHr === false || entry.thresholdMet === false)
+    || reviewerGroupRows(item).some((entry) => entry.count > 0 && !entry.visible);
+
+const confidenceLabel = (item: ManagedFeedbackResultItem) => {
     if (item.insufficientFeedback) return 'Insufficient';
     const value = normalize(item.confidenceLevel);
     if (!value) return 'Not calculated';
     return value.charAt(0) + value.slice(1).toLowerCase();
 };
 
-const confidenceClass = (item: FeedbackResultItem) => {
+const confidenceClass = (item: ManagedFeedbackResultItem) => {
     if (item.insufficientFeedback) return 'insufficient';
     const value = normalize(item.confidenceLevel);
     if (value === 'HIGH') return 'high';
@@ -200,24 +168,28 @@ const confidenceClass = (item: FeedbackResultItem) => {
     return 'neutral';
 };
 
-const scoreBand = (item: FeedbackResultItem) => {
+const scoreBand = (item: ManagedFeedbackResultItem) => {
     const category = item.scoreCategory?.trim();
     if (category) return category;
     const score = visibleScoreValue(item);
     if (score == null) return 'Score hidden';
-    if (score >= 4.2) return 'Strong result';
-    if (score >= 3.5) return 'Stable result';
-    return 'Development focus';
+    if (score >= 86) return 'Outstanding';
+    if (score >= 71) return 'Good';
+    if (score >= 60) return 'Meets requirement';
+    if (score >= 40) return 'Needs improvement';
+    return 'Unsatisfactory';
 };
 
-const isCoachingPriority = (item: FeedbackResultItem) => {
+const isCoachingPriority = (item: ManagedFeedbackResultItem) => {
     const score = visibleScoreValue(item);
     const confidence = normalize(item.confidenceLevel);
-    return Boolean(item.insufficientFeedback || confidence === 'LOW' || score != null && score < 3.5);
+    return Boolean(item.insufficientFeedback || confidence === 'LOW' || score != null && score < 60);
 };
 
-const sortedCompetencies = (item: FeedbackResultItem, direction: 'desc' | 'asc') =>
-    asArray(item.competencyResults)
+const competencyItems = (item: ManagedFeedbackResultItem) => asArray(item.competencyBreakdown ?? item.competencyResults);
+
+const sortedCompetencies = (item: ManagedFeedbackResultItem, direction: 'desc' | 'asc') =>
+    competencyItems(item)
         .filter((entry) => entry.averageScore != null)
         .slice()
         .sort((a, b) => {
@@ -226,13 +198,29 @@ const sortedCompetencies = (item: FeedbackResultItem, direction: 'desc' | 'asc')
             return direction === 'desc' ? right - left : left - right;
         });
 
-const firstVisibleRelationshipScore = (item: FeedbackResultItem, relationshipType: string) =>
-    asArray(item.relationshipScores).find((entry) => normalize(entry.relationshipType) === relationshipType && entry.visibleOutsideHr !== false);
+const visibleComments = (item: ManagedFeedbackResultItem): FeedbackPublishedComment[] => {
+    const source = item.comments?.length ? item.comments : item.publishedComments;
+    const comments = asArray(source);
+    return comments.filter((comment) => {
+        const text = comment.comment?.trim();
+        if (!text) return false;
+        const privacy = relationshipPrivacyFor(item, comment.relationshipType);
+        return privacy?.visibleOutsideHr !== false;
+    });
+};
 
-const relationshipPrivacyFor = (item: FeedbackResultItem, relationshipType?: string | null) =>
-    asArray(item.relationshipPrivacy).find((entry) => normalize(entry.relationshipType) === normalize(relationshipType));
+const selfVsOthers = (item: ManagedFeedbackResultItem) => {
+    const rows = reviewerGroupRows(item);
+    const self = rows.find((row) => row.key === 'SELF');
+    const others = rows.filter((row) => row.key !== 'SELF' && row.visible && row.score != null && row.count > 0);
+    const totalCount = others.reduce((total, row) => total + row.count, 0);
+    const othersAverage = totalCount > 0
+        ? others.reduce((total, row) => total + Number(row.score ?? 0) * row.count, 0) / totalCount
+        : null;
+    return { self, othersAverage };
+};
 
-const coachingFocusText = (item: FeedbackResultItem) => {
+const coachingFocusText = (item: ManagedFeedbackResultItem) => {
     const low = sortedCompetencies(item, 'asc')[0];
     const high = sortedCompetencies(item, 'desc')[0];
 
@@ -245,18 +233,18 @@ const coachingFocusText = (item: FeedbackResultItem) => {
     return 'No specific focus published yet';
 };
 
-const uniqueCampaigns = (items: FeedbackResultItem[]) =>
+const uniqueCampaigns = (items: ManagedFeedbackResultItem[]) =>
     [...new Set(items.map((item) => item.campaignName).filter((value): value is string => Boolean(value?.trim())))].sort();
 
-const uniqueEmployees = (items: FeedbackResultItem[]) =>
+const uniqueEmployees = (items: ManagedFeedbackResultItem[]) =>
     [...new Set(items.map(getEmployeeName).filter(Boolean))].sort();
 
-const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: ManagerSummaryPageProps) => {
+const ManagerSummaryPage = ({ expectedScope = 'MANAGER_SCOPE' }: { expectedScope?: ScopeType }) => {
     const [summary, setSummary] = useState<FeedbackTeamSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState('');
-    const [selected, setSelected] = useState<FeedbackResultItem | null>(null);
+    const [selected, setSelected] = useState<ManagedFeedbackResultItem | null>(null);
     const [query, setQuery] = useState('');
     const [campaignFilter, setCampaignFilter] = useState('ALL');
     const [employeeFilter, setEmployeeFilter] = useState('ALL');
@@ -269,16 +257,16 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
             if (showRefreshing) setRefreshing(true);
             if (!summary) setLoading(true);
             setError('');
-            const response = await api.get<GenericResponse<FeedbackTeamSummary>>('/v1/feedback/team-summary');
-            const data = unwrap<FeedbackTeamSummary>(response);
+            const data = await feedbackAnalyticsApi.getTeamSummary() as FeedbackTeamSummary;
             setSummary(data || null);
-            const rows = asArray(data?.items ?? data?.results);
+            const rows = asArray(data?.items ?? data?.results) as ManagedFeedbackResultItem[];
             setSelected((previous) => {
                 if (!previous) return rows[0] ?? null;
                 return rows.find((row) => row.campaignId === previous.campaignId && row.targetEmployeeId === previous.targetEmployeeId) ?? rows[0] ?? null;
             });
-        } catch (err: any) {
-            setError(err?.response?.data?.message || err?.message || 'Managed employee 360 summary could not be loaded.');
+        } catch (err: unknown) {
+            const maybeError = err as { response?: { data?: { message?: string } }; message?: string };
+            setError(maybeError.response?.data?.message || maybeError.message || 'Managed employee 360 summary could not be loaded.');
             setSummary(null);
             setSelected(null);
         } finally {
@@ -292,7 +280,7 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const rawItems = useMemo(() => asArray(summary?.items ?? summary?.results), [summary]);
+    const rawItems = useMemo(() => asArray(summary?.items ?? summary?.results) as ManagedFeedbackResultItem[], [summary]);
 
     const isManagerScope = useMemo(() => {
         const scope = normalize(summary?.scope?.scopeType || summary?.scopeType || summary?.viewScope || expectedScope);
@@ -353,7 +341,7 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
     const headerTitle = isManagerScope ? 'Managed Employee 360 Summary' : summary?.scope?.title || summary?.scopeTitle || 'Department 360 Summary';
     const headerDescription = isManagerScope
         ? summary?.scope?.description || 'Review HR-published 360 results for employees in your management scope. Use this page for coaching, follow-up, and development conversations.'
-        : summary?.scope?.description || summary?.scopeDescription || 'Review HR-published 360 results with privacy-safe relationship masking.';
+        : summary?.scope?.description || summary?.scopeDescription || 'Review HR-published 360 results with privacy-safe reviewer group masking.';
 
     return (
         <div className="manager360-page">
@@ -365,6 +353,7 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
                     <div className="manager360-chip-row">
                         <span className="manager360-chip">Managed employees: {metrics.managedEmployees}</span>
                         <span className="manager360-chip">Published results only</span>
+                        <span className="manager360-chip">0–100% report score</span>
                         <span className="manager360-chip">No evaluator names</span>
                         {scopeTeamNames.slice(0, 2).map((team) => <span className="manager360-chip" key={team}>Team: {team}</span>)}
                         {scopeTeamNames.length > 2 && <span className="manager360-chip">+{scopeTeamNames.length - 2} more teams</span>}
@@ -382,7 +371,7 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
                 <div>
                     <h2>Privacy-safe manager view</h2>
                     <p>
-                        {summary?.scope?.privacyNotice || summary?.privacyNotice || 'Only HR-published summaries are shown. Evaluator names are never shown. Peer and subordinate reviewer groups may be hidden when confidentiality thresholds are not met.'}
+                        {summary?.scope?.privacyNotice || summary?.privacyNotice || 'Only HR-published summaries are shown. Evaluator names are never shown. Peer and subordinate reviewer groups may be hidden when privacy thresholds are not met.'}
                     </p>
                 </div>
             </section>
@@ -396,32 +385,31 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
                         <MetricCard icon="bi-people" label="Managed employees" value={metrics.managedEmployees} helper="Employees currently in your management scope." />
                         <MetricCard icon="bi-check2-circle" label="Published results" value={metrics.publishedResults} helper="Only HR-published 360 summaries are shown." />
                         <MetricCard icon="bi-chat-heart" label="Coaching priority" value={metrics.coachingPriority} helper="Lower confidence, lower score, or development-focused feedback." tone={metrics.coachingPriority > 0 ? 'warning' : 'neutral'} />
-                        <MetricCard icon="bi-shield-lock" label="Privacy protected" value={metrics.privacyProtected} helper="Results with at least one masked relationship group." />
-                        <MetricCard icon="bi-graph-up" label="Visible average" value={metrics.visibleAverage == null ? '—' : formatScore(metrics.visibleAverage)} helper="Calculated only from results where HR published overall score." />
+                        <MetricCard icon="bi-shield-lock" label="Privacy protected" value={metrics.privacyProtected} helper="Results with at least one masked reviewer group." />
+                        <MetricCard icon="bi-bar-chart" label="Visible average" value={formatScore(metrics.visibleAverage)} helper={`${metrics.visibleScoreCount} result(s) include published scores.`} />
                     </section>
 
                     <section className="manager360-panel manager360-followup-panel">
                         <div className="manager360-panel-header">
                             <div>
-                                <h2>Coaching follow-up</h2>
-                                <p>Use this area to prioritize supportive one-on-one conversations.</p>
+                                <h2>Coaching priorities</h2>
+                                <p>Use these results to plan supportive follow-up conversations without exposing evaluator identities.</p>
                             </div>
-                            <span>{priorityItems.length} priority item(s)</span>
                         </div>
                         {priorityItems.length === 0 ? (
                             <div className="manager360-empty compact">
-                                <i className="bi bi-chat-square-heart" />
-                                <strong>No coaching follow-up yet</strong>
+                                <i className="bi bi-check-circle" />
+                                <strong>No coaching priorities flagged</strong>
                                 <p>Published 360 results that need manager attention will appear here.</p>
                             </div>
                         ) : (
                             <div className="manager360-priority-list">
                                 {priorityItems.map((item) => (
                                     <button key={`${item.campaignId}-${item.targetEmployeeId}`} type="button" onClick={() => setSelected(item)} className="manager360-priority-item">
-                    <span>
-                      <strong>{getEmployeeName(item)}</strong>
-                      <small>{coachingFocusText(item)}</small>
-                    </span>
+                                        <span>
+                                            <strong>{getEmployeeName(item)}</strong>
+                                            <small>{coachingFocusText(item)}</small>
+                                        </span>
                                         <em>{confidenceLabel(item)}</em>
                                     </button>
                                 ))}
@@ -481,7 +469,7 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
                             <div className="manager360-panel-header">
                                 <div>
                                     <h2>Published employee summaries</h2>
-                                    <p>No evaluator names are shown. Relationship groups are masked when campaign privacy thresholds are not met.</p>
+                                    <p>No evaluator names are shown. Reviewer groups are masked when campaign privacy thresholds are not met.</p>
                                 </div>
                                 <span>{filteredItems.length} result(s)</span>
                             </div>
@@ -499,7 +487,7 @@ const ManagerSummaryPage = ({ expectedScope = 'MANAGER_DIRECT_REPORTS' }: Manage
                                         <tr>
                                             <th>Employee</th>
                                             <th>Campaign</th>
-                                            <th>Visible score</th>
+                                            <th>Published score</th>
                                             <th>Confidence</th>
                                             <th>Coaching focus</th>
                                             <th>Privacy</th>
@@ -549,7 +537,7 @@ const MetricCard = ({ icon, label, value, helper, tone = 'neutral' }: { icon: st
     </div>
 );
 
-const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem | null; recentlyPublished: FeedbackResultItem[] }) => {
+const EmployeeDetail = ({ item, recentlyPublished }: { item: ManagedFeedbackResultItem | null; recentlyPublished: ManagedFeedbackResultItem[] }) => {
     if (!item) {
         return (
             <aside className="manager360-panel manager360-detail-panel">
@@ -570,13 +558,13 @@ const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem 
 
     const strengths = sortedCompetencies(item, 'desc').slice(0, 3);
     const development = sortedCompetencies(item, 'asc').slice(0, 3);
-    const comments = asArray(item.publishedComments).filter((comment) => comment.visibleOutsideHr !== false && comment.comment?.trim());
+    const comments = visibleComments(item);
     const showCompetencies = bool(item.includeCompetencyBreakdown, true);
     const showSelfVsOthers = bool(item.includeSelfVsOthers, true);
     const showComments = bool(item.includeComments, false);
-    const selfScore = firstVisibleRelationshipScore(item, 'SELF');
-    const others = asArray(item.relationshipScores).filter((entry) => normalize(entry.relationshipType) !== 'SELF' && entry.visibleOutsideHr !== false && entry.averageScore != null);
-    const othersAverage = others.length ? others.reduce((sum, entry) => sum + Number(entry.averageScore || 0), 0) / others.length : null;
+    const showExplanation = bool(item.includeScoreExplanation, true);
+    const { self, othersAverage } = selfVsOthers(item);
+    const reviewerRows = reviewerGroupRows(item);
 
     return (
         <aside className="manager360-panel manager360-detail-panel">
@@ -591,10 +579,18 @@ const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem 
             </div>
 
             <div className="manager360-score-box">
-                <span>Overall score</span>
+                <span>Published score</span>
                 <strong>{canShowOverallScore(item) ? formatScore(visibleScoreValue(item)) : 'Hidden by HR'}</strong>
-                <small>{scoreBand(item)} · {confidenceLabel(item)}</small>
+                <small>{canShowOverallScore(item) ? `${scoreBand(item)} · ${confidenceLabel(item)}` : confidenceLabel(item)}</small>
+                {showExplanation && item.rawAverageScore != null ? <small>Unweighted normalized average: {formatNormalizedAverage(item.rawAverageScore)}</small> : null}
             </div>
+
+            {showExplanation && (
+                <section className="manager360-detail-section">
+                    <h3>Score explanation</h3>
+                    <p className="manager360-muted">{item.scoreCalculationNote || 'Scores use a 0–100% report scale. Each rating is converted as rating divided by the question max rating, multiplied by 100, before final weighting.'}</p>
+                </section>
+            )}
 
             <section className="manager360-detail-section">
                 <h3>Strengths and development focus</h3>
@@ -616,37 +612,23 @@ const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem 
                 <h3>Self vs others</h3>
                 {showSelfVsOthers ? (
                     <div className="manager360-self-grid">
-                        <div><span>Self score</span><strong>{selfScore?.averageScore == null ? '—' : formatScore(selfScore.averageScore)}</strong></div>
-                        <div><span>Others average</span><strong>{othersAverage == null ? '—' : formatScore(othersAverage)}</strong></div>
-                        <p>Use this as a conversation guide. Avoid interpreting hidden relationship groups directly.</p>
+                        <div><span>Self score</span><strong>{self?.visible === false ? 'Hidden' : formatScore(self?.score)}</strong></div>
+                        <div><span>Others average</span><strong>{formatScore(othersAverage)}</strong></div>
+                        <p>Use this as a conversation guide. Avoid interpreting hidden reviewer groups directly.</p>
                     </div>
                 ) : <p className="manager360-muted">Self vs others comparison was not included in the published result.</p>}
             </section>
 
             <section className="manager360-detail-section">
-                <h3>Relationship summary</h3>
+                <h3>Reviewer group summary</h3>
                 <div className="manager360-relationship-list">
-                    {asArray(item.relationshipScores).length === 0 && asArray(item.relationshipPrivacy).length === 0 && <p className="manager360-muted">No relationship summary was published.</p>}
-                    {asArray(item.relationshipScores).map((entry) => {
-                        const privacy = relationshipPrivacyFor(item, entry.relationshipType);
-                        const visible = entry.visibleOutsideHr !== false && privacy?.visibleOutsideHr !== false;
-                        return (
-                            <div className="manager360-relationship-row" key={`${entry.relationshipType}-${entry.label}`}>
-                                <span>{entry.label || entry.relationshipType || 'Relationship'}</span>
-                                <strong>{visible ? formatScore(entry.averageScore) : 'Hidden'}</strong>
-                                <small>{visible ? `${entry.responseCount ?? 0} response(s)` : privacy?.hiddenReason || entry.hiddenReason || 'Privacy threshold not met'}</small>
-                            </div>
-                        );
-                    })}
-                    {asArray(item.relationshipPrivacy)
-                        .filter((privacy) => !asArray(item.relationshipScores).some((score) => normalize(score.relationshipType) === normalize(privacy.relationshipType)))
-                        .map((privacy) => (
-                            <div className="manager360-relationship-row" key={`privacy-${privacy.relationshipType}`}>
-                                <span>{privacy.label || privacy.relationshipType || 'Relationship'}</span>
-                                <strong>{privacy.visibleOutsideHr === false ? 'Hidden' : '—'}</strong>
-                                <small>{privacy.hiddenReason || `${privacy.responseCount ?? 0} response(s)`}</small>
-                            </div>
-                        ))}
+                    {reviewerRows.map((entry) => (
+                        <div className="manager360-relationship-row" key={entry.key}>
+                            <span>{entry.label}</span>
+                            <strong>{entry.visible ? formatScore(entry.score) : 'Hidden'}</strong>
+                            <small>{entry.visible ? `${entry.count} response${entry.count === 1 ? '' : 's'}` : entry.hiddenReason || 'Privacy threshold not met'}</small>
+                        </div>
+                    ))}
                 </div>
             </section>
 
@@ -656,9 +638,9 @@ const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem 
                 {showComments && comments.length === 0 && <p className="manager360-muted">No privacy-safe comments are visible for this result.</p>}
                 {showComments && comments.length > 0 && (
                     <div className="manager360-comment-list">
-                        {comments.slice(0, 5).map((comment, index) => (
+                        {comments.slice(0, 6).map((comment, index) => (
                             <blockquote key={`${comment.relationshipType}-${index}`}>
-                                <span>{comment.competencyName || comment.relationshipLabel || 'Anonymous feedback'}</span>
+                                <span>{comment.competencyName || comment.label || comment.relationshipType || 'Anonymous feedback'}</span>
                                 <p>{comment.comment}</p>
                             </blockquote>
                         ))}
@@ -672,7 +654,7 @@ const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem 
                     <li>Start with one strength to reinforce positive behavior.</li>
                     <li>Choose one development focus for the next one-on-one discussion.</li>
                     <li>Ask what support, resources, or clarity would help the employee improve.</li>
-                    <li>Do not reference hidden relationship groups directly.</li>
+                    <li>Do not reference hidden reviewer groups directly.</li>
                 </ul>
             </section>
         </aside>
@@ -680,7 +662,8 @@ const EmployeeDetail = ({ item, recentlyPublished }: { item: FeedbackResultItem 
 };
 
 const ScoreLine = ({ label, value }: { label: string; value?: number | null }) => {
-    const width = value == null ? 0 : Math.max(0, Math.min(100, Number(value) / 5 * 100));
+    const numeric = toNumber(value);
+    const width = numeric == null ? 0 : Math.max(0, Math.min(100, numeric));
     return (
         <div className="manager360-score-line">
             <div><span>{label}</span><strong>{formatScore(value)}</strong></div>

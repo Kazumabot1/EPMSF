@@ -234,7 +234,7 @@ const FeedbackLayoutPage = () => {
 
   return (
       <div className="feedback-page feedback-page-subnav-mode">
-        {!selfContainedQuestionPage && activeModule !== 'monitoring' && (
+        {!selfContainedQuestionPage && !['monitoring', 'analytics'].includes(activeModule) && (
             <section className="feedback-hero compact">
               <div>
                 <p className="feedback-eyebrow">{activeCopy.eyebrow}</p>

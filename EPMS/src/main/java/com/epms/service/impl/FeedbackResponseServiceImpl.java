@@ -21,7 +21,6 @@ import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
-import com.epms.repository.RatingScaleRepository;
 import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackOperationalService;
 import com.epms.util.FeedbackPrivacyUtil;
@@ -37,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -63,9 +61,9 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
-    private final RatingScaleRepository ratingScaleRepository;
     private final UserRepository userRepository;
     private final FeedbackOperationalService feedbackOperationalService;
+    private final Feedback360ScoringServiceImpl feedback360ScoringService;
     private final FeedbackSummaryService feedbackSummaryService;
     private final FeedbackAssignmentQuestionSnapshotService assignmentQuestionSnapshotService;
     private final FeedbackCampaignCompetencyWeightRepository competencyWeightRepository;
@@ -105,7 +103,11 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             throw new BusinessValidationException("Submitted feedback cannot be edited.");
         }
 
-        Double overallScore = calculateOverallScore(items, assignmentQuestions);
+        Double overallScore = feedback360ScoringService.calculateResponseOverallScore(
+                items,
+                assignmentQuestions,
+                loadCampaignCompetencyWeights(assignmentQuestions)
+        );
         response.setEvaluatorAssignment(assignment);
         response.setOverallScore(overallScore);
         response.setComments(comments);
@@ -165,7 +167,11 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         Map<Long, FeedbackAssignmentQuestion> assignmentQuestions = loadAssignmentQuestions(assignment);
         validateSubmittedItems(items, assignmentQuestions);
 
-        Double overallScore = calculateOverallScore(items, assignmentQuestions);
+        Double overallScore = feedback360ScoringService.calculateResponseOverallScore(
+                items,
+                assignmentQuestions,
+                loadCampaignCompetencyWeights(assignmentQuestions)
+        );
         Optional<FeedbackResponse> existing = responseRepository.findByEvaluatorAssignmentId(evaluatorAssignmentId);
         if (existing.isPresent() && ResponseStatus.SUBMITTED.equals(existing.get().getFinalStatus())) {
             throw new BusinessValidationException("A response has already been submitted for this assignment.");
@@ -493,7 +499,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
                     throw new BusinessValidationException(label + ": Rating is required.");
                 }
             } else {
-                double maxRating = resolveMaxRating(assignmentQuestion);
+                double maxRating = feedback360ScoringService.resolveMaxRating(assignmentQuestion);
                 if (ratingValue < 1.0 || ratingValue > maxRating) {
                     throw new BusinessValidationException(
                             label + ": Rating must be between 1 and " + formatScore(maxRating) + "."
@@ -624,68 +630,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         });
     }
 
-    private Double calculateOverallScore(List<FeedbackResponseItem> items, Map<Long, FeedbackAssignmentQuestion> assignmentQuestions) {
-        Map<String, List<Double>> scoresByCompetency = new java.util.LinkedHashMap<>();
-
-        for (FeedbackResponseItem item : items) {
-            if (item.getRatingValue() == null || item.getAssignmentQuestion() == null) {
-                continue;
-            }
-
-            Long assignmentQuestionId = item.getAssignmentQuestion().getId();
-            FeedbackAssignmentQuestion question = assignmentQuestions.get(assignmentQuestionId);
-            if (question == null) {
-                throw new ResourceNotFoundException("Feedback assignment question not found: " + assignmentQuestionId);
-            }
-
-            item.setAssignmentQuestion(question);
-            item.setQuestion(question.getSourceQuestion());
-            if (!isScoredQuestion(question)) {
-                continue;
-            }
-
-            double maxRating = resolveMaxRating(question);
-            double questionScore = (item.getRatingValue() / maxRating) * 100.0;
-            String competencyCode = normalizeCompetencyCode(question.getCompetencyCode());
-            scoresByCompetency.computeIfAbsent(competencyCode, ignored -> new ArrayList<>()).add(questionScore);
-        }
-
-        if (scoresByCompetency.isEmpty()) {
-            return 0.0;
-        }
-
-        Map<String, Double> campaignWeights = loadCampaignCompetencyWeights(assignmentQuestions);
-        if (!campaignWeights.isEmpty()) {
-            double weightedScoreSum = 0.0;
-            double availableWeightSum = 0.0;
-            for (Map.Entry<String, List<Double>> entry : scoresByCompetency.entrySet()) {
-                double weight = campaignWeights.getOrDefault(normalizeCompetencyCode(entry.getKey()), 0.0);
-                if (weight <= 0) {
-                    continue;
-                }
-                double competencyScore = entry.getValue().stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-                weightedScoreSum += competencyScore * weight;
-                availableWeightSum += weight;
-            }
-            if (availableWeightSum > 0) {
-                return roundToTwoDecimals(weightedScoreSum / availableWeightSum);
-            }
-        }
-
-        double competencyScoreSum = 0.0;
-        int applicableCompetencyCount = 0;
-        for (Map.Entry<String, List<Double>> entry : scoresByCompetency.entrySet()) {
-            double competencyScore = entry.getValue().stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-            competencyScoreSum += competencyScore;
-            applicableCompetencyCount++;
-        }
-
-        if (applicableCompetencyCount == 0) {
-            return 0.0;
-        }
-        return roundToTwoDecimals(competencyScoreSum / applicableCompetencyCount);
-    }
-
     private Map<String, Double> loadCampaignCompetencyWeights(Map<Long, FeedbackAssignmentQuestion> assignmentQuestions) {
         Long campaignId = assignmentQuestions.values().stream()
                 .filter(Objects::nonNull)
@@ -703,7 +647,7 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
         return competencyWeightRepository.findByCampaignIdOrderByCompetencyNameSnapshotAsc(campaignId).stream()
                 .filter(weight -> weight.getCompetencyCodeSnapshot() != null)
                 .collect(Collectors.toMap(
-                        weight -> normalizeCompetencyCode(weight.getCompetencyCodeSnapshot()),
+                        weight -> feedback360ScoringService.normalizeCompetencyCode(weight.getCompetencyCodeSnapshot()),
                         weight -> toDouble(weight.getWeightPercent()),
                         (first, duplicate) -> duplicate
                 ));
@@ -711,10 +655,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
     private double toDouble(BigDecimal value) {
         return value == null ? 0.0 : value.doubleValue();
-    }
-
-    private boolean isScoredQuestion(FeedbackAssignmentQuestion question) {
-        return question != null;
     }
 
     private boolean isRatingResponseType(String responseType) {
@@ -738,13 +678,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             return SCORING_SCORED;
         }
         return scoringBehavior.trim().toUpperCase().replace('-', '_').replace(' ', '_');
-    }
-
-    private String normalizeCompetencyCode(String competencyCode) {
-        if (competencyCode == null || competencyCode.isBlank()) {
-            return "UNMAPPED";
-        }
-        return competencyCode.trim().toUpperCase().replace('-', '_').replace(' ', '_');
     }
 
     private String normalizeResponseHeaderText(String value) {
@@ -777,20 +710,6 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private double resolveMaxRating(FeedbackAssignmentQuestion question) {
-        Integer ratingScaleId = question.getRatingScaleId();
-        if (ratingScaleId == null) {
-            return 5.0;
-        }
-        return ratingScaleRepository.findById(ratingScaleId)
-                .map(scale -> scale.getScales() != null && scale.getScales() > 0 ? scale.getScales().doubleValue() : 5.0)
-                .orElseThrow(() -> new BusinessValidationException("Rating scale not found for question " + question.getQuestionCode() + "."));
-    }
-
-    private double roundToTwoDecimals(double value) {
-        return Math.round(value * 100.0) / 100.0;
     }
 
     private String formatScore(double value) {

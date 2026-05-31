@@ -1,21 +1,19 @@
 package com.epms.service;
 
+import com.epms.dto.FeedbackCompetencyAverageResponse;
 import com.epms.entity.FeedbackCampaign;
-import com.epms.entity.FeedbackEvaluatorAssignment;
-import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackSummary;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface FeedbackSummaryCalculationService {
 
-    void applySummaryValues(
-            FeedbackSummary summary,
+    List<FeedbackSummary> refreshCampaignSummary(FeedbackCampaign campaign);
+
+    List<FeedbackSummary> refreshCampaignSummaryForTargetEmployees(
             FeedbackCampaign campaign,
-            Long targetEmployeeId,
-            List<FeedbackEvaluatorAssignment> assignments,
-            List<FeedbackResponse> responses,
-            LocalDateTime summarizedAt
+            List<Long> targetEmployeeIds
     );
+
+    List<FeedbackCompetencyAverageResponse> buildCampaignCompetencyAverages(Long campaignId);
 }

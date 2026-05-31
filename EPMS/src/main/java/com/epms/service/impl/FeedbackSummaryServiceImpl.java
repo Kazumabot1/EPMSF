@@ -1,22 +1,29 @@
 package com.epms.service.impl;
 
 import com.epms.dto.FeedbackCampaignSummaryResponse;
+import com.epms.dto.FeedbackCompetencyResultResponse;
 import com.epms.dto.FeedbackIntegrationScoreResponse;
 import com.epms.dto.FeedbackMyResultResponse;
+import com.epms.dto.FeedbackPublishedCommentResponse;
 import com.epms.dto.FeedbackResultItemResponse;
+import com.epms.entity.FeedbackResponseItem;
+import com.epms.entity.FeedbackAssignmentQuestion;
+import com.epms.dto.FeedbackConfidenceBreakdownResponse;
+import com.epms.dto.FeedbackRelationshipAverageResponse;
+import com.epms.dto.FeedbackRelationshipPrivacyResponse;
+import com.epms.dto.FeedbackRelationshipScoreResponse;
+import com.epms.dto.FeedbackScoreDistributionResponse;
 import com.epms.dto.FeedbackTeamSummaryResponse;
 import com.epms.dto.FeedbackSummaryPublishRequest;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
 import com.epms.entity.FeedbackCampaign;
-import com.epms.entity.FeedbackCampaignRelationshipWeight;
 import com.epms.entity.FeedbackEvaluatorAssignment;
 import com.epms.entity.FeedbackRequest;
 import com.epms.entity.FeedbackResponse;
 import com.epms.entity.FeedbackSummary;
 import com.epms.entity.Team;
 import com.epms.entity.User;
-import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
 import com.epms.entity.enums.FeedbackRelationshipType;
 import com.epms.entity.enums.FeedbackSummaryVisibilityStatus;
@@ -26,15 +33,13 @@ import com.epms.exception.ResourceNotFoundException;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeRepository;
-import com.epms.repository.FeedbackCampaignRelationshipWeightRepository;
 import com.epms.repository.FeedbackCampaignRepository;
-import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
-import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackOperationalService;
+import com.epms.service.FeedbackSummaryCalculationService;
 import com.epms.service.FeedbackSummaryService;
 import com.epms.service.FeedbackWorkRelationshipResolver;
 import com.epms.util.FeedbackScoreUtil;
@@ -59,11 +64,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
-    private static final String SCORE_METHOD = "RELATIONSHIP_WEIGHTED_SUBMITTED_RESPONSE_AVERAGE";
     private final FeedbackCampaignRepository feedbackCampaignRepository;
-    private final FeedbackCampaignRelationshipWeightRepository relationshipWeightRepository;
-    private final FeedbackRequestRepository feedbackRequestRepository;
-    private final FeedbackEvaluatorAssignmentRepository feedbackEvaluatorAssignmentRepository;
     private final FeedbackResponseRepository feedbackResponseRepository;
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final TeamRepository teamRepository;
@@ -71,6 +72,8 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final FeedbackOperationalService feedbackOperationalService;
+    private final FeedbackSummaryCalculationService feedbackSummaryCalculationService;
+    private final Feedback360ScoringServiceImpl feedback360ScoringService;
     private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     @Override
@@ -118,6 +121,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
             summary.setPublishedAt(now);
             summary.setPublishedByUserId(userId);
             summary.setPublishNote(publishNote);
+            applyPublishOptions(summary, request);
             feedbackSummaryRepository.save(summary);
         }
 
@@ -504,8 +508,134 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                 .publishedByUserId(campaignPublishedByUserId(summaries))
                 .publishNote(campaignPublishNote(summaries))
                 .summarizedAt(summarizedAt)
+                .scoreDistribution(buildScoreDistribution(summaries))
+                .relationshipAverages(buildRelationshipAverages(summaries))
+                .competencyAverages(feedbackSummaryCalculationService.buildCampaignCompetencyAverages(campaign.getId()))
+                .confidenceBreakdown(buildConfidenceBreakdown(summaries))
                 .items(items)
                 .build();
+    }
+
+
+    private List<FeedbackScoreDistributionResponse> buildScoreDistribution(List<FeedbackSummary> summaries) {
+        return List.of(
+                scoreBand("OUTSTANDING", FeedbackScoreUtil.OUTSTANDING, 86, 100, summaries),
+                scoreBand("GOOD", FeedbackScoreUtil.GOOD, 71, 85, summaries),
+                scoreBand("MEETS_REQUIREMENT", FeedbackScoreUtil.MEETS_REQUIREMENT, 60, 70, summaries),
+                scoreBand("NEEDS_IMPROVEMENT", FeedbackScoreUtil.NEEDS_IMPROVEMENT, 40, 59, summaries),
+                scoreBand("UNSATISFACTORY", FeedbackScoreUtil.UNSATISFACTORY, 0, 39, summaries)
+        );
+    }
+
+    private FeedbackScoreDistributionResponse scoreBand(
+            String band,
+            String label,
+            int minScore,
+            int maxScore,
+            List<FeedbackSummary> summaries
+    ) {
+        long count = summaries.stream()
+                .map(FeedbackSummary::getAverageScore)
+                .filter(Objects::nonNull)
+                .filter(score -> label.equals(FeedbackScoreUtil.category(score)))
+                .count();
+        return FeedbackScoreDistributionResponse.builder()
+                .band(band)
+                .label(label)
+                .minScore(minScore)
+                .maxScore(maxScore)
+                .count(count)
+                .build();
+    }
+
+    private List<FeedbackRelationshipAverageResponse> buildRelationshipAverages(List<FeedbackSummary> summaries) {
+        return List.of(
+                relationshipAverageResponse(FeedbackRelationshipType.MANAGER, "Manager reviewers", summaries),
+                relationshipAverageResponse(FeedbackRelationshipType.PEER, "Peer reviewers", summaries),
+                relationshipAverageResponse(FeedbackRelationshipType.SUBORDINATE, "Subordinate reviewers", summaries),
+                relationshipAverageResponse(FeedbackRelationshipType.SELF, "Self reviewers", summaries)
+        );
+    }
+
+    private FeedbackRelationshipAverageResponse relationshipAverageResponse(
+            FeedbackRelationshipType relationshipType,
+            String label,
+            List<FeedbackSummary> summaries
+    ) {
+        double weightedScoreTotal = 0.0;
+        long responseCount = 0L;
+        for (FeedbackSummary summary : summaries) {
+            long count = relationshipResponseCount(summary, relationshipType);
+            Double average = relationshipAverage(summary, relationshipType);
+            if (count <= 0 || average == null) {
+                continue;
+            }
+            weightedScoreTotal += average * count;
+            responseCount += count;
+        }
+        Double averageScore = responseCount == 0 ? null : roundToTwoDecimals(weightedScoreTotal / responseCount);
+        return FeedbackRelationshipAverageResponse.builder()
+                .relationshipType(relationshipType.name())
+                .label(label)
+                .averageScore(averageScore)
+                .responseCount(responseCount)
+                .build();
+    }
+
+    private List<FeedbackConfidenceBreakdownResponse> buildConfidenceBreakdown(List<FeedbackSummary> summaries) {
+        return List.of(
+                confidenceBreakdownResponse("HIGH", "High confidence", summaries),
+                confidenceBreakdownResponse("MEDIUM", "Medium confidence", summaries),
+                confidenceBreakdownResponse("LOW", "Low confidence", summaries),
+                confidenceBreakdownResponse("INSUFFICIENT", "Insufficient feedback", summaries)
+        );
+    }
+
+    private FeedbackConfidenceBreakdownResponse confidenceBreakdownResponse(
+            String level,
+            String label,
+            List<FeedbackSummary> summaries
+    ) {
+        long count = summaries.stream()
+                .filter(summary -> normalizedConfidenceLevel(summary).equals(level))
+                .count();
+        return FeedbackConfidenceBreakdownResponse.builder()
+                .level(level)
+                .label(label)
+                .count(count)
+                .build();
+    }
+
+    private String normalizedConfidenceLevel(FeedbackSummary summary) {
+        if (summary == null || Boolean.TRUE.equals(summary.getInsufficientFeedback())) {
+            return "INSUFFICIENT";
+        }
+        String level = summary.getConfidenceLevel();
+        if (level == null || level.isBlank()) {
+            return "INSUFFICIENT";
+        }
+        String normalized = level.trim().toUpperCase();
+        return switch (normalized) {
+            case "HIGH", "MEDIUM", "LOW" -> normalized;
+            default -> "INSUFFICIENT";
+        };
+    }
+
+
+    private boolean isScoredAssignmentQuestion(FeedbackAssignmentQuestion question) {
+        return feedback360ScoringService.isScoredQuestion(question);
+    }
+
+    private String normalizeCompetencyCode(String competencyCode) {
+        return feedback360ScoringService.normalizeCompetencyCode(competencyCode);
+    }
+
+    private String resolveCompetencyName(FeedbackAssignmentQuestion question, String competencyCode) {
+        return feedback360ScoringService.resolveCompetencyName(question, competencyCode);
+    }
+
+    private String questionKey(FeedbackAssignmentQuestion question) {
+        return feedback360ScoringService.questionKey(question);
     }
 
     private void refreshClosedCampaignSummariesForEmployee(Long employeeId) {
@@ -513,18 +643,15 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     }
 
     private void refreshClosedCampaignSummariesForEmployees(List<Long> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty()) {
+            return;
+        }
         List<FeedbackCampaign> closedCampaigns = feedbackCampaignRepository.findAllByOrderByStartDateDesc().stream()
                 .filter(campaign -> campaign.getStatus() == FeedbackCampaignStatus.CLOSED
                         || campaign.getStatus() == FeedbackCampaignStatus.PUBLISHED)
                 .toList();
         for (FeedbackCampaign campaign : closedCampaigns) {
-            List<FeedbackRequest> requests = feedbackRequestRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaign.getId())
-                    .stream()
-                    .filter(request -> employeeIds.contains(request.getTargetEmployeeId()))
-                    .toList();
-            if (!requests.isEmpty()) {
-                refreshCampaignSummary(campaign, requests);
-            }
+            feedbackSummaryCalculationService.refreshCampaignSummaryForTargetEmployees(campaign, employeeIds);
         }
     }
 
@@ -543,99 +670,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     }
 
     private List<FeedbackSummary> refreshCampaignSummary(FeedbackCampaign campaign) {
-        List<FeedbackRequest> requests = feedbackRequestRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaign.getId());
-        return refreshCampaignSummary(campaign, requests);
-    }
-
-    private List<FeedbackSummary> refreshCampaignSummary(FeedbackCampaign campaign, List<FeedbackRequest> requests) {
-        List<FeedbackEvaluatorAssignment> campaignAssignments = feedbackEvaluatorAssignmentRepository.findByCampaignIdWithRequest(campaign.getId());
-        List<FeedbackResponse> submittedResponses = feedbackResponseRepository.findByCampaignIdAndStatus(campaign.getId(), ResponseStatus.SUBMITTED);
-
-        Map<Long, List<FeedbackEvaluatorAssignment>> assignmentsByRequestId = campaignAssignments.stream()
-                .collect(Collectors.groupingBy(assignment -> assignment.getFeedbackRequest().getId()));
-
-        Map<Long, FeedbackResponse> submittedResponseByAssignmentId = submittedResponses.stream()
-                .filter(response -> response.getEvaluatorAssignment() != null)
-                .collect(Collectors.toMap(
-                        response -> response.getEvaluatorAssignment().getId(),
-                        response -> response,
-                        (first, duplicate) -> first
-                ));
-
-        List<FeedbackSummary> persisted = new ArrayList<>();
-        Set<Long> activeTargetEmployeeIds = new HashSet<>();
-        LocalDateTime now = LocalDateTime.now();
-
-        for (FeedbackRequest request : requests) {
-            Long targetEmployeeId = request.getTargetEmployeeId();
-            activeTargetEmployeeIds.add(targetEmployeeId);
-            List<FeedbackEvaluatorAssignment> assignments = assignmentsByRequestId.getOrDefault(request.getId(), List.of());
-            List<FeedbackEvaluatorAssignment> countedAssignments = assignments.stream()
-                    .filter(assignment -> assignment.getStatus() != AssignmentStatus.CANCELLED)
-                    .toList();
-            List<FeedbackResponse> responses = countedAssignments.stream()
-                    .map(assignment -> submittedResponseByAssignmentId.get(assignment.getId()))
-                    .filter(Objects::nonNull)
-                    .toList();
-
-            FeedbackSummary summary = feedbackSummaryRepository.findByCampaignIdAndTargetEmployeeId(campaign.getId(), targetEmployeeId)
-                    .orElseGet(FeedbackSummary::new);
-            applySummaryValues(summary, campaign, targetEmployeeId, countedAssignments, responses, now);
-            persisted.add(feedbackSummaryRepository.save(summary));
-        }
-
-        List<FeedbackSummary> existing = feedbackSummaryRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaign.getId());
-        for (FeedbackSummary summary : existing) {
-            if (!activeTargetEmployeeIds.contains(summary.getTargetEmployeeId())) {
-                feedbackSummaryRepository.delete(summary);
-            }
-        }
-
-        return persisted.stream()
-                .sorted(Comparator.comparing(FeedbackSummary::getTargetEmployeeId))
-                .toList();
-    }
-
-    private void applySummaryValues(
-            FeedbackSummary summary,
-            FeedbackCampaign campaign,
-            Long targetEmployeeId,
-            List<FeedbackEvaluatorAssignment> assignments,
-            List<FeedbackResponse> responses,
-            LocalDateTime summarizedAt
-    ) {
-        long assignedCount = assignments.size();
-        long submittedCount = responses.size();
-        long pendingCount = Math.max(0, assignedCount - submittedCount);
-        double completionRate = assignedCount == 0 ? 0.0 : roundToTwoDecimals((submittedCount * 100.0) / assignedCount);
-        Double rawAverage = averageScore(responses);
-        Double relationshipWeightedAverage = weightedScoreByRelationship(campaign, responses);
-        String confidenceLevel = determineConfidenceLevel(assignedCount, submittedCount, completionRate);
-        boolean insufficientFeedback = isInsufficientFeedback(assignedCount, submittedCount, responses);
-
-        summary.setCampaign(campaign);
-        summary.setTargetEmployeeId(targetEmployeeId);
-        summary.setRawAverageScore(rawAverage);
-        summary.setAverageScore(relationshipWeightedAverage);
-        summary.setTotalResponses(submittedCount);
-        summary.setManagerResponses(countByRelationship(responses, FeedbackRelationshipType.MANAGER));
-        summary.setPeerResponses(countByRelationship(responses, FeedbackRelationshipType.PEER));
-        summary.setSubordinateResponses(countByRelationship(responses, FeedbackRelationshipType.SUBORDINATE));
-        summary.setSelfResponses(countByRelationship(responses, FeedbackRelationshipType.SELF));
-        summary.setAssignedEvaluatorCount(assignedCount);
-        summary.setSubmittedEvaluatorCount(submittedCount);
-        summary.setPendingEvaluatorCount(pendingCount);
-        summary.setCompletionRate(completionRate);
-        summary.setConfidenceLevel(confidenceLevel);
-        summary.setInsufficientFeedback(insufficientFeedback);
-        summary.setScoreCalculationMethod(SCORE_METHOD);
-        summary.setScoreCalculationNote(buildScoreCalculationNote(campaign, assignedCount, submittedCount, insufficientFeedback));
-        summary.setManagerAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.MANAGER));
-        summary.setPeerAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.PEER));
-        summary.setSubordinateAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.SUBORDINATE));
-        summary.setSelfAverageScore(averageScoreByRelationship(responses, FeedbackRelationshipType.SELF));
-        summary.setSummarizedAt(summarizedAt);
-        applyVisibilityStatusAfterRecalculation(summary, campaign, submittedCount, insufficientFeedback);
+        return feedbackSummaryCalculationService.refreshCampaignSummary(campaign);
     }
 
 
@@ -673,23 +708,51 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
     private String buildPublishNote(FeedbackSummaryPublishRequest request) {
         List<String> included = new ArrayList<>();
-        if (request == null || !Boolean.FALSE.equals(request.getIncludeOverallScore())) {
+        if (includeOverallScoreOption(request)) {
             included.add("overall score");
         }
-        if (request == null || Boolean.TRUE.equals(request.getIncludeCompetencyBreakdown())) {
+        if (includeCompetencyBreakdownOption(request)) {
             included.add("competency breakdown");
         }
-        if (request == null || Boolean.TRUE.equals(request.getIncludeSelfVsOthers())) {
+        if (includeSelfVsOthersOption(request)) {
             included.add("self vs others comparison");
         }
-        if (request != null && Boolean.TRUE.equals(request.getIncludeComments())) {
+        if (includeCommentsOption(request)) {
             included.add("anonymous comments where confidentiality allows");
         }
-        if (request == null || !Boolean.FALSE.equals(request.getIncludeScoreExplanation())) {
+        if (includeScoreExplanationOption(request)) {
             included.add("score explanation");
         }
         String includedText = included.isEmpty() ? "no optional result sections selected" : String.join(", ", included);
         return "Published by HR/Admin after campaign close. Included: " + includedText + ".";
+    }
+
+    private void applyPublishOptions(FeedbackSummary summary, FeedbackSummaryPublishRequest request) {
+        summary.setIncludeOverallScore(includeOverallScoreOption(request));
+        summary.setIncludeCompetencyBreakdown(includeCompetencyBreakdownOption(request));
+        summary.setIncludeSelfVsOthers(includeSelfVsOthersOption(request));
+        summary.setIncludeComments(includeCommentsOption(request));
+        summary.setIncludeScoreExplanation(includeScoreExplanationOption(request));
+    }
+
+    private boolean includeOverallScoreOption(FeedbackSummaryPublishRequest request) {
+        return request == null || !Boolean.FALSE.equals(request.getIncludeOverallScore());
+    }
+
+    private boolean includeCompetencyBreakdownOption(FeedbackSummaryPublishRequest request) {
+        return request == null || !Boolean.FALSE.equals(request.getIncludeCompetencyBreakdown());
+    }
+
+    private boolean includeSelfVsOthersOption(FeedbackSummaryPublishRequest request) {
+        return request == null || !Boolean.FALSE.equals(request.getIncludeSelfVsOthers());
+    }
+
+    private boolean includeCommentsOption(FeedbackSummaryPublishRequest request) {
+        return request != null && Boolean.TRUE.equals(request.getIncludeComments());
+    }
+
+    private boolean includeScoreExplanationOption(FeedbackSummaryPublishRequest request) {
+        return request == null || !Boolean.FALSE.equals(request.getIncludeScoreExplanation());
     }
 
 
@@ -703,29 +766,6 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         if (campaign.getStatus() != FeedbackCampaignStatus.CLOSED) {
             throw new BusinessValidationException("Cannot publish feedback summary until the campaign is CLOSED.");
         }
-    }
-
-    private void applyVisibilityStatusAfterRecalculation(
-            FeedbackSummary summary,
-            FeedbackCampaign campaign,
-            long submittedCount,
-            boolean insufficientFeedback
-    ) {
-        if (campaign.getStatus() == FeedbackCampaignStatus.CLOSED && submittedCount > 0 && !insufficientFeedback) {
-            if (summary.getVisibilityStatus() == FeedbackSummaryVisibilityStatus.PUBLISHED) {
-                return;
-            }
-            summary.setVisibilityStatus(FeedbackSummaryVisibilityStatus.READY_TO_PUBLISH);
-            summary.setPublishedAt(null);
-            summary.setPublishedByUserId(null);
-            summary.setPublishNote(null);
-            return;
-        }
-
-        summary.setVisibilityStatus(FeedbackSummaryVisibilityStatus.HIDDEN);
-        summary.setPublishedAt(null);
-        summary.setPublishedByUserId(null);
-        summary.setPublishNote(null);
     }
 
     private boolean isPublishedClosedSummary(FeedbackSummary summary) {
@@ -772,135 +812,6 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         return summary.getVisibilityStatus() == null
                 ? FeedbackSummaryVisibilityStatus.HIDDEN.name()
                 : summary.getVisibilityStatus().name();
-    }
-
-    private String buildScoreCalculationNote(FeedbackCampaign campaign, long assignedCount, long submittedCount, boolean insufficientFeedback) {
-        if (assignedCount == 0) {
-            return "No evaluator assignments exist for this target employee.";
-        }
-        if (submittedCount == 0) {
-            return "No submitted feedback responses are available yet.";
-        }
-        if (insufficientFeedback) {
-            return "Feedback score uses submitted responses and configured evaluator relationship weights, but confidence is low because too few evaluators submitted.";
-        }
-        if (Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
-            return "Feedback score applies configured evaluator relationship weights. Unavailable relationship weight is not redistributed.";
-        }
-        return "Feedback score applies configured evaluator relationship weights and redistributes unavailable relationship weight across available evaluator groups.";
-    }
-
-    private boolean isInsufficientFeedback(long assignedCount, long submittedCount, List<FeedbackResponse> responses) {
-        if (submittedCount == 0) {
-            return true;
-        }
-        if (assignedCount > 1 && submittedCount < 2) {
-            return true;
-        }
-        return hasSingleProtectedRelationshipResponse(responses, FeedbackRelationshipType.PEER)
-                || hasSingleProtectedRelationshipResponse(responses, FeedbackRelationshipType.SUBORDINATE);
-    }
-
-    private boolean hasSingleProtectedRelationshipResponse(List<FeedbackResponse> responses, FeedbackRelationshipType relationshipType) {
-        long count = countByRelationship(responses, relationshipType);
-        return count > 0 && !FeedbackPrivacyUtil.hasEnoughProtectedResponses(relationshipType, count);
-    }
-
-    private String determineConfidenceLevel(long assignedCount, long submittedCount, double completionRate) {
-        if (assignedCount == 0 || submittedCount == 0) {
-            return "INSUFFICIENT";
-        }
-        if (submittedCount < 2 || completionRate < 50.0) {
-            return "LOW";
-        }
-        if (completionRate < 100.0 || submittedCount < 3) {
-            return "MEDIUM";
-        }
-        return "HIGH";
-    }
-
-    private long countByRelationship(List<FeedbackResponse> responses, FeedbackRelationshipType relationshipType) {
-        return responses.stream()
-                .filter(response -> response.getEvaluatorAssignment().getRelationshipType() == relationshipType)
-                .count();
-    }
-
-    private Double weightedScoreByRelationship(FeedbackCampaign campaign, List<FeedbackResponse> responses) {
-        if (responses == null || responses.isEmpty()) {
-            return null;
-        }
-        Map<FeedbackRelationshipType, Double> averages = new EnumMap<>(FeedbackRelationshipType.class);
-        for (FeedbackRelationshipType type : FeedbackRelationshipType.values()) {
-            Double average = averageScoreByRelationship(responses, type);
-            if (average != null) {
-                averages.put(type, average);
-            }
-        }
-        if (averages.isEmpty()) {
-            return null;
-        }
-
-        Map<FeedbackRelationshipType, Double> weights = relationshipWeights(campaign.getId());
-        if (weights.isEmpty()) {
-            return averageScore(responses);
-        }
-
-        double weightedTotal = 0.0;
-        double availableWeight = 0.0;
-        double configuredPositiveTotal = weights.values().stream().filter(value -> value > 0).mapToDouble(Double::doubleValue).sum();
-        for (Map.Entry<FeedbackRelationshipType, Double> entry : averages.entrySet()) {
-            double weight = weights.getOrDefault(entry.getKey(), 0.0);
-            if (weight <= 0.0) {
-                continue;
-            }
-            weightedTotal += entry.getValue() * weight;
-            availableWeight += weight;
-        }
-        if (availableWeight <= 0.0) {
-            return averageScore(responses);
-        }
-        double denominator = Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight())
-                ? (configuredPositiveTotal <= 0.0 ? availableWeight : configuredPositiveTotal)
-                : availableWeight;
-        return roundToTwoDecimals(weightedTotal / denominator);
-    }
-
-    private Map<FeedbackRelationshipType, Double> relationshipWeights(Long campaignId) {
-        Map<FeedbackRelationshipType, Double> weights = relationshipWeightRepository.findByCampaignIdOrderByRelationshipTypeAsc(campaignId).stream()
-                .filter(weight -> weight.getRelationshipType() != null)
-                .collect(Collectors.toMap(
-                        FeedbackCampaignRelationshipWeight::getRelationshipType,
-                        weight -> weight.getWeightPercent() == null ? 0.0 : weight.getWeightPercent().doubleValue(),
-                        (first, duplicate) -> duplicate,
-                        () -> new EnumMap<>(FeedbackRelationshipType.class)
-                ));
-        if (!weights.isEmpty()) {
-            return weights;
-        }
-        weights.put(FeedbackRelationshipType.MANAGER, 40.0);
-        weights.put(FeedbackRelationshipType.PEER, 30.0);
-        weights.put(FeedbackRelationshipType.SUBORDINATE, 20.0);
-        weights.put(FeedbackRelationshipType.SELF, 10.0);
-        return weights;
-    }
-
-    private Double averageScore(List<FeedbackResponse> responses) {
-        return responses.stream()
-                .map(FeedbackResponse::getOverallScore)
-                .filter(Objects::nonNull)
-                .mapToDouble(Double::doubleValue)
-                .average()
-                .stream()
-                .map(this::roundToTwoDecimals)
-                .boxed()
-                .findFirst()
-                .orElse(null);
-    }
-
-    private Double averageScoreByRelationship(List<FeedbackResponse> responses, FeedbackRelationshipType relationshipType) {
-        return averageScore(responses.stream()
-                .filter(response -> response.getEvaluatorAssignment().getRelationshipType() == relationshipType)
-                .toList());
     }
 
     private Double visibleRelationshipAverage(
@@ -958,42 +869,331 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     }
 
 
+    private boolean includeOverallScore(FeedbackSummary summary) {
+        return summary == null || !Boolean.FALSE.equals(summary.getIncludeOverallScore());
+    }
+
+    private boolean includeCompetencyBreakdown(FeedbackSummary summary) {
+        return summary == null || !Boolean.FALSE.equals(summary.getIncludeCompetencyBreakdown());
+    }
+
+    private boolean includeSelfVsOthers(FeedbackSummary summary) {
+        return summary == null || !Boolean.FALSE.equals(summary.getIncludeSelfVsOthers());
+    }
+
+    private boolean includeComments(FeedbackSummary summary) {
+        return summary != null && Boolean.TRUE.equals(summary.getIncludeComments());
+    }
+
+    private boolean includeScoreExplanation(FeedbackSummary summary) {
+        return summary == null || !Boolean.FALSE.equals(summary.getIncludeScoreExplanation());
+    }
+
+
+    private Map<String, List<FeedbackResponse>> loadSubmittedResponsesBySummaryKey(List<FeedbackSummary> summaries) {
+        if (summaries == null || summaries.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, List<FeedbackResponse>> responsesBySummaryKey = new LinkedHashMap<>();
+        List<Long> campaignIds = summaries.stream()
+                .map(FeedbackSummary::getCampaign)
+                .filter(Objects::nonNull)
+                .map(FeedbackCampaign::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        for (Long campaignId : campaignIds) {
+            List<FeedbackResponse> responses = feedbackResponseRepository.findByCampaignIdAndStatusWithItems(campaignId, ResponseStatus.SUBMITTED);
+            for (FeedbackResponse response : responses) {
+                FeedbackEvaluatorAssignment assignment = response == null ? null : response.getEvaluatorAssignment();
+                FeedbackRequest request = assignment == null ? null : assignment.getFeedbackRequest();
+                Long targetEmployeeId = request == null ? null : request.getTargetEmployeeId();
+                if (targetEmployeeId == null) {
+                    continue;
+                }
+                responsesBySummaryKey.computeIfAbsent(summaryKey(campaignId, targetEmployeeId), ignored -> new ArrayList<>())
+                        .add(response);
+            }
+        }
+        return responsesBySummaryKey;
+    }
+
+    private String summaryKey(FeedbackSummary summary) {
+        Long campaignId = summary == null || summary.getCampaign() == null ? null : summary.getCampaign().getId();
+        Long targetEmployeeId = summary == null ? null : summary.getTargetEmployeeId();
+        return summaryKey(campaignId, targetEmployeeId);
+    }
+
+    private String summaryKey(Long campaignId, Long targetEmployeeId) {
+        return String.valueOf(campaignId) + ":" + String.valueOf(targetEmployeeId);
+    }
+
+    private List<FeedbackRelationshipPrivacyResponse> buildRelationshipPrivacy(
+            FeedbackSummary summary,
+            boolean protectRelationshipBreakdown
+    ) {
+        return List.of(
+                relationshipPrivacy(summary, FeedbackRelationshipType.SELF, protectRelationshipBreakdown),
+                relationshipPrivacy(summary, FeedbackRelationshipType.MANAGER, protectRelationshipBreakdown),
+                relationshipPrivacy(summary, FeedbackRelationshipType.PEER, protectRelationshipBreakdown),
+                relationshipPrivacy(summary, FeedbackRelationshipType.SUBORDINATE, protectRelationshipBreakdown)
+        );
+    }
+
+    private FeedbackRelationshipPrivacyResponse relationshipPrivacy(
+            FeedbackSummary summary,
+            FeedbackRelationshipType relationshipType,
+            boolean protectRelationshipBreakdown
+    ) {
+        long responseCount = relationshipResponseCount(summary, relationshipType);
+        boolean thresholdRequired = FeedbackPrivacyUtil.requiresGroupThreshold(relationshipType);
+        int minimumVisibleResponses = thresholdRequired ? FeedbackPrivacyUtil.MIN_PROTECTED_RELATIONSHIP_RESPONSES : 1;
+        boolean thresholdMet = FeedbackPrivacyUtil.hasEnoughProtectedResponses(relationshipType, responseCount);
+        boolean visibleOutsideHr = !protectRelationshipBreakdown || thresholdMet;
+        String hiddenReason = visibleOutsideHr ? null : FeedbackPrivacyUtil.protectedRelationshipThresholdMessage(relationshipType);
+        return FeedbackRelationshipPrivacyResponse.builder()
+                .relationshipType(relationshipType.name())
+                .label(relationshipDisplayLabel(relationshipType))
+                .responseCount(responseCount)
+                .minimumVisibleResponses(minimumVisibleResponses)
+                .thresholdRequired(thresholdRequired)
+                .thresholdMet(thresholdMet)
+                .visibleOutsideHr(visibleOutsideHr)
+                .hiddenReason(hiddenReason)
+                .build();
+    }
+
+    private List<FeedbackCompetencyResultResponse> buildEmployeeCompetencyBreakdown(
+            FeedbackSummary summary,
+            List<FeedbackResponse> submittedResponses,
+            boolean protectRelationshipBreakdown
+    ) {
+        if (submittedResponses == null || submittedResponses.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, CompetencyResultAggregate> aggregates = new LinkedHashMap<>();
+        for (FeedbackResponse response : submittedResponses) {
+            FeedbackEvaluatorAssignment assignment = response.getEvaluatorAssignment();
+            FeedbackRelationshipType relationshipType = assignment == null ? null : assignment.getRelationshipType();
+            if (relationshipType == null || response.getItems() == null) {
+                continue;
+            }
+
+            boolean relationshipVisible = isRelationshipDetailVisible(summary, relationshipType, protectRelationshipBreakdown);
+            String relationshipHiddenReason = relationshipVisible ? null : FeedbackPrivacyUtil.protectedRelationshipThresholdMessage(relationshipType);
+
+            for (FeedbackResponseItem item : response.getItems()) {
+                if (item == null || item.getRatingValue() == null) {
+                    continue;
+                }
+                FeedbackAssignmentQuestion question = item.getAssignmentQuestion();
+                if (question == null || !isScoredAssignmentQuestion(question)) {
+                    continue;
+                }
+                String competencyCode = normalizeCompetencyCode(question.getCompetencyCode());
+                String competencyName = resolveCompetencyName(question, competencyCode);
+                CompetencyResultAggregate aggregate = aggregates.computeIfAbsent(
+                        competencyCode,
+                        ignored -> new CompetencyResultAggregate(competencyCode, competencyName)
+                );
+                aggregate.addQuestion(questionKey(question));
+                aggregate.addRelationshipScore(
+                        relationshipType,
+                        feedback360ScoringService.normalizeQuestionScore(item.getRatingValue(), question),
+                        relationshipVisible,
+                        relationshipHiddenReason
+                );
+            }
+        }
+
+        return aggregates.values().stream()
+                .map(CompetencyResultAggregate::toResponse)
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(FeedbackCompetencyResultResponse::getCompetencyName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private boolean isRelationshipDetailVisible(
+            FeedbackSummary summary,
+            FeedbackRelationshipType relationshipType,
+            boolean protectRelationshipBreakdown
+    ) {
+        return !protectRelationshipBreakdown
+                || FeedbackPrivacyUtil.hasEnoughProtectedResponses(relationshipType, relationshipResponseCount(summary, relationshipType));
+    }
+
+    private List<FeedbackPublishedCommentResponse> buildPublishedComments(
+            FeedbackSummary summary,
+            List<FeedbackResponse> submittedResponses,
+            boolean protectRelationshipBreakdown
+    ) {
+        if (submittedResponses == null || submittedResponses.isEmpty()) {
+            return List.of();
+        }
+
+        List<FeedbackPublishedCommentResponse> comments = new ArrayList<>();
+        for (FeedbackResponse response : submittedResponses) {
+            FeedbackEvaluatorAssignment assignment = response == null ? null : response.getEvaluatorAssignment();
+            FeedbackRelationshipType relationshipType = assignment == null ? null : assignment.getRelationshipType();
+            if (relationshipType == null || response.getItems() == null) {
+                continue;
+            }
+            if (!isRelationshipDetailVisible(summary, relationshipType, protectRelationshipBreakdown)) {
+                continue;
+            }
+
+            for (FeedbackResponseItem item : response.getItems()) {
+                String comment = normalizeComment(item == null ? null : item.getComment());
+                if (comment == null) {
+                    continue;
+                }
+                FeedbackAssignmentQuestion question = item.getAssignmentQuestion();
+                if (question == null) {
+                    continue;
+                }
+
+                String competencyCode = normalizeCompetencyCode(question.getCompetencyCode());
+                comments.add(FeedbackPublishedCommentResponse.builder()
+                        .relationshipType(relationshipType.name())
+                        .label(relationshipDisplayLabel(relationshipType))
+                        .competencyCode(competencyCode)
+                        .competencyName(resolveCompetencyName(question, competencyCode))
+                        .questionCode(resolveQuestionCode(question))
+                        .questionText(resolveQuestionText(question))
+                        .comment(comment)
+                        .build());
+            }
+
+            String overallComment = normalizeComment(response.getComments());
+            if (overallComment != null) {
+                comments.add(FeedbackPublishedCommentResponse.builder()
+                        .relationshipType(relationshipType.name())
+                        .label(relationshipDisplayLabel(relationshipType))
+                        .competencyCode("OVERALL")
+                        .competencyName("Overall feedback")
+                        .questionCode("OVERALL_COMMENT")
+                        .questionText("Overall feedback")
+                        .comment(overallComment)
+                        .build());
+            }
+        }
+
+        return comments.stream()
+                .sorted(Comparator
+                        .comparing((FeedbackPublishedCommentResponse comment) -> relationshipSortOrder(comment.getRelationshipType()))
+                        .thenComparing(comment -> safeText(comment.getCompetencyName()), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(comment -> safeText(comment.getQuestionCode()), String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(comment -> safeText(comment.getComment()), String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private String normalizeComment(String comment) {
+        if (comment == null) {
+            return null;
+        }
+        String normalized = comment.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private String resolveQuestionCode(FeedbackAssignmentQuestion question) {
+        if (question == null) {
+            return "QUESTION";
+        }
+        if (question.getQuestionCode() != null && !question.getQuestionCode().isBlank()) {
+            return question.getQuestionCode().trim();
+        }
+        return question.getId() == null ? "QUESTION" : "QUESTION_" + question.getId();
+    }
+
+    private String resolveQuestionText(FeedbackAssignmentQuestion question) {
+        if (question == null) {
+            return "Feedback question";
+        }
+        if (question.getQuestionTextSnapshot() != null && !question.getQuestionTextSnapshot().isBlank()) {
+            return question.getQuestionTextSnapshot().trim();
+        }
+        return "Feedback question";
+    }
+
+    private int relationshipSortOrder(String relationshipType) {
+        if (relationshipType == null) {
+            return 99;
+        }
+        return switch (relationshipType.trim().toUpperCase()) {
+            case "SELF" -> 1;
+            case "MANAGER" -> 2;
+            case "PEER" -> 3;
+            case "SUBORDINATE" -> 4;
+            default -> 99;
+        };
+    }
+
+    private String safeText(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     private List<FeedbackResultItemResponse> mapResults(List<FeedbackSummary> summaries, Map<Long, String> employeeNames, boolean protectRelationshipBreakdown) {
+        Map<String, List<FeedbackResponse>> submittedResponsesBySummaryKey = loadSubmittedResponsesBySummaryKey(summaries);
         return summaries.stream()
-                .map(summary -> FeedbackResultItemResponse.builder()
-                        .campaignId(summary.getCampaign().getId())
-                        .campaignName(summary.getCampaign().getName())
-                        .targetEmployeeId(summary.getTargetEmployeeId())
-                        .targetEmployeeName(employeeNames.getOrDefault(
-                                summary.getTargetEmployeeId(),
-                                "Employee #" + summary.getTargetEmployeeId()
-                        ))
-                        .averageScore(summary.getAverageScore())
-                        .rawAverageScore(summary.getRawAverageScore())
-                        .scoreCategory(FeedbackScoreUtil.category(summary.getAverageScore()))
-                        .totalResponses(safeLong(summary.getTotalResponses()))
-                        .managerResponses(safeLong(summary.getManagerResponses()))
-                        .peerResponses(safeLong(summary.getPeerResponses()))
-                        .subordinateResponses(safeLong(summary.getSubordinateResponses()))
-                        .selfResponses(safeLong(summary.getSelfResponses()))
-                        .assignedEvaluatorCount(safeLong(summary.getAssignedEvaluatorCount()))
-                        .submittedEvaluatorCount(safeLong(summary.getSubmittedEvaluatorCount()))
-                        .pendingEvaluatorCount(safeLong(summary.getPendingEvaluatorCount()))
-                        .completionRate(safeDouble(summary.getCompletionRate()))
-                        .confidenceLevel(summary.getConfidenceLevel())
-                        .insufficientFeedback(Boolean.TRUE.equals(summary.getInsufficientFeedback()))
-                        .managerAverageScore(visibleRelationshipAverage(summary, FeedbackRelationshipType.MANAGER, protectRelationshipBreakdown))
-                        .peerAverageScore(visibleRelationshipAverage(summary, FeedbackRelationshipType.PEER, protectRelationshipBreakdown))
-                        .subordinateAverageScore(visibleRelationshipAverage(summary, FeedbackRelationshipType.SUBORDINATE, protectRelationshipBreakdown))
-                        .selfAverageScore(visibleRelationshipAverage(summary, FeedbackRelationshipType.SELF, protectRelationshipBreakdown))
-                        .scoreCalculationMethod(summary.getScoreCalculationMethod())
-                        .scoreCalculationNote(visibleScoreCalculationNote(summary, protectRelationshipBreakdown))
-                        .visibilityStatus(visibilityStatusName(summary))
-                        .publishedAt(summary.getPublishedAt())
-                        .publishedByUserId(summary.getPublishedByUserId())
-                        .publishNote(summary.getPublishNote())
-                        .summarizedAt(summary.getSummarizedAt())
-                        .build())
+                .map(summary -> {
+                    boolean showOverallScore = !protectRelationshipBreakdown || includeOverallScore(summary);
+                    boolean showSelfVsOthers = !protectRelationshipBreakdown || includeSelfVsOthers(summary);
+                    boolean showScoreExplanation = !protectRelationshipBreakdown || includeScoreExplanation(summary);
+                    boolean showCompetencyBreakdown = !protectRelationshipBreakdown || includeCompetencyBreakdown(summary);
+                    boolean showComments = !protectRelationshipBreakdown || includeComments(summary);
+
+                    List<FeedbackResponse> submittedResponses = submittedResponsesBySummaryKey.getOrDefault(summaryKey(summary), List.of());
+                    Double visibleAverageScore = showOverallScore ? summary.getAverageScore() : null;
+                    return FeedbackResultItemResponse.builder()
+                            .campaignId(summary.getCampaign().getId())
+                            .campaignName(summary.getCampaign().getName())
+                            .targetEmployeeId(summary.getTargetEmployeeId())
+                            .targetEmployeeName(employeeNames.getOrDefault(
+                                    summary.getTargetEmployeeId(),
+                                    "Employee #" + summary.getTargetEmployeeId()
+                            ))
+                            .averageScore(visibleAverageScore)
+                            .rawAverageScore(showOverallScore ? summary.getRawAverageScore() : null)
+                            .scoreCategory(showOverallScore ? FeedbackScoreUtil.category(summary.getAverageScore()) : null)
+                            .totalResponses(safeLong(summary.getTotalResponses()))
+                            .managerResponses(safeLong(summary.getManagerResponses()))
+                            .peerResponses(safeLong(summary.getPeerResponses()))
+                            .subordinateResponses(safeLong(summary.getSubordinateResponses()))
+                            .selfResponses(safeLong(summary.getSelfResponses()))
+                            .assignedEvaluatorCount(safeLong(summary.getAssignedEvaluatorCount()))
+                            .submittedEvaluatorCount(safeLong(summary.getSubmittedEvaluatorCount()))
+                            .pendingEvaluatorCount(safeLong(summary.getPendingEvaluatorCount()))
+                            .completionRate(safeDouble(summary.getCompletionRate()))
+                            .confidenceLevel(summary.getConfidenceLevel())
+                            .insufficientFeedback(Boolean.TRUE.equals(summary.getInsufficientFeedback()))
+                            .managerAverageScore(showSelfVsOthers ? visibleRelationshipAverage(summary, FeedbackRelationshipType.MANAGER, protectRelationshipBreakdown) : null)
+                            .peerAverageScore(showSelfVsOthers ? visibleRelationshipAverage(summary, FeedbackRelationshipType.PEER, protectRelationshipBreakdown) : null)
+                            .subordinateAverageScore(showSelfVsOthers ? visibleRelationshipAverage(summary, FeedbackRelationshipType.SUBORDINATE, protectRelationshipBreakdown) : null)
+                            .selfAverageScore(showSelfVsOthers ? visibleRelationshipAverage(summary, FeedbackRelationshipType.SELF, protectRelationshipBreakdown) : null)
+                            .scoreCalculationMethod(showScoreExplanation ? summary.getScoreCalculationMethod() : null)
+                            .scoreCalculationNote(showScoreExplanation ? visibleScoreCalculationNote(summary, protectRelationshipBreakdown) : null)
+                            .visibilityStatus(visibilityStatusName(summary))
+                            .publishedAt(summary.getPublishedAt())
+                            .publishedByUserId(summary.getPublishedByUserId())
+                            .publishNote(summary.getPublishNote())
+                            .includeOverallScore(includeOverallScore(summary))
+                            .includeCompetencyBreakdown(includeCompetencyBreakdown(summary))
+                            .includeSelfVsOthers(includeSelfVsOthers(summary))
+                            .includeComments(includeComments(summary))
+                            .includeScoreExplanation(includeScoreExplanation(summary))
+                            .relationshipPrivacy(buildRelationshipPrivacy(summary, protectRelationshipBreakdown))
+                            .competencyBreakdown(showCompetencyBreakdown
+                                    ? buildEmployeeCompetencyBreakdown(summary, submittedResponses, protectRelationshipBreakdown)
+                                    : List.of())
+                            .comments(showComments
+                                    ? buildPublishedComments(summary, submittedResponses, protectRelationshipBreakdown)
+                                    : List.of())
+                            .summarizedAt(summary.getSummarizedAt())
+                            .build();
+                })
                 .toList();
     }
 
@@ -1079,4 +1279,106 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
     private double roundToTwoDecimals(double value) {
         return Math.round(value * 100.0) / 100.0;
     }
+
+    private String relationshipDisplayLabel(FeedbackRelationshipType relationshipType) {
+        if (relationshipType == null) {
+            return "Reviewer";
+        }
+        return switch (relationshipType) {
+            case SELF -> "Self review";
+            case MANAGER -> "Manager reviewer";
+            case PEER -> "Peer reviewer";
+            case SUBORDINATE -> "Subordinate reviewer";
+        };
+    }
+
+    private final class CompetencyResultAggregate {
+        private final String competencyCode;
+        private final String competencyName;
+        private final Set<String> questionKeys = new HashSet<>();
+        private final Map<FeedbackRelationshipType, RelationshipScoreAggregate> relationships = new EnumMap<>(FeedbackRelationshipType.class);
+        private double visibleScoreTotal = 0.0;
+        private long visibleResponseCount = 0L;
+
+        private CompetencyResultAggregate(String competencyCode, String competencyName) {
+            this.competencyCode = competencyCode;
+            this.competencyName = competencyName;
+        }
+
+        private void addQuestion(String questionKey) {
+            if (questionKey != null && !questionKey.isBlank()) {
+                questionKeys.add(questionKey);
+            }
+        }
+
+        private void addRelationshipScore(
+                FeedbackRelationshipType relationshipType,
+                double score,
+                boolean visibleOutsideHr,
+                String hiddenReason
+        ) {
+            RelationshipScoreAggregate relationship = relationships.computeIfAbsent(
+                    relationshipType,
+                    ignored -> new RelationshipScoreAggregate(relationshipType)
+            );
+            relationship.addScore(score, visibleOutsideHr, hiddenReason);
+            if (visibleOutsideHr) {
+                visibleScoreTotal += score;
+                visibleResponseCount++;
+            }
+        }
+
+        private FeedbackCompetencyResultResponse toResponse() {
+            List<FeedbackRelationshipScoreResponse> relationshipBreakdown = relationships.values().stream()
+                    .map(RelationshipScoreAggregate::toResponse)
+                    .sorted(Comparator.comparing(FeedbackRelationshipScoreResponse::getRelationshipType))
+                    .toList();
+            if (relationshipBreakdown.isEmpty()) {
+                return null;
+            }
+            return FeedbackCompetencyResultResponse.builder()
+                    .competencyCode(competencyCode)
+                    .competencyName(competencyName)
+                    .averageScore(visibleResponseCount == 0 ? null : roundToTwoDecimals(visibleScoreTotal / visibleResponseCount))
+                    .responseCount(visibleResponseCount)
+                    .questionCount((long) questionKeys.size())
+                    .relationshipBreakdown(relationshipBreakdown)
+                    .build();
+        }
+    }
+
+    private final class RelationshipScoreAggregate {
+        private final FeedbackRelationshipType relationshipType;
+        private double scoreTotal = 0.0;
+        private long responseCount = 0L;
+        private boolean visibleOutsideHr = true;
+        private String hiddenReason;
+
+        private RelationshipScoreAggregate(FeedbackRelationshipType relationshipType) {
+            this.relationshipType = relationshipType;
+        }
+
+        private void addScore(double score, boolean visibleOutsideHr, String hiddenReason) {
+            responseCount++;
+            if (visibleOutsideHr) {
+                scoreTotal += score;
+            } else {
+                this.visibleOutsideHr = false;
+                this.hiddenReason = hiddenReason;
+            }
+        }
+
+        private FeedbackRelationshipScoreResponse toResponse() {
+            return FeedbackRelationshipScoreResponse.builder()
+                    .relationshipType(relationshipType.name())
+                    .label(relationshipDisplayLabel(relationshipType))
+                    .averageScore(visibleOutsideHr && responseCount > 0 ? roundToTwoDecimals(scoreTotal / responseCount) : null)
+                    .responseCount(responseCount)
+                    .visibleOutsideHr(visibleOutsideHr)
+                    .hiddenReason(visibleOutsideHr ? null : hiddenReason)
+                    .build();
+        }
+    }
+
+
 }
