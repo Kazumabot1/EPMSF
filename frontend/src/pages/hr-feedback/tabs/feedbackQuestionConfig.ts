@@ -27,7 +27,7 @@ export const EVALUATOR_ROLE_OPTIONS: Array<{
         value: 'MANAGER',
         label: 'Manager',
         short: 'M',
-        help: "The evaluated employee's direct reporting manager or supervisor.",
+        help: "The evaluated employee's manager reviewer.",
     },
     {
         value: 'PEER',
@@ -39,7 +39,7 @@ export const EVALUATOR_ROLE_OPTIONS: Array<{
         value: 'SUBORDINATE',
         label: 'Subordinate',
         short: 'S',
-        help: 'Employees who report to the evaluated employee.',
+        help: 'Eligible subordinate reviewers for the evaluated employee.',
     },
     {
         value: 'SELF',

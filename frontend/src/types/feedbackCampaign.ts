@@ -331,6 +331,22 @@ export const hasAnyEvaluatorSource = (config?: Partial<EvaluatorConfigInput> | n
 
 export type FeedbackRelationshipType = 'MANAGER' | 'PEER' | 'SUBORDINATE' | 'SELF';
 
+
+export interface FeedbackRelationshipCandidateResponse {
+  employeeId: number;
+  userId?: number | null;
+  employeeCode?: string | null;
+  employeeName?: string | null;
+  email?: string | null;
+  currentDepartmentId?: number | null;
+  currentDepartmentName?: string | null;
+  positionId?: number | null;
+  positionName?: string | null;
+  levelCode?: string | null;
+  relationshipType: FeedbackRelationshipType;
+  sourceLabel?: string | null;
+}
+
 export interface FeedbackRelationshipWeight {
   relationshipType: FeedbackRelationshipType | string;
   label: string;

@@ -126,7 +126,7 @@ export function useCampaignEvaluatorActions({
             return false;
         }
         if (payload.includeSubordinates && payload.subordinateMinCount > payload.subordinateMaxCount) {
-            setError('Direct report reviewer count is not valid.');
+            setError('Subordinate reviewer count is not valid.');
             return false;
         }
         return true;

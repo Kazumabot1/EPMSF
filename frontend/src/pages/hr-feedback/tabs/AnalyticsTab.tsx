@@ -125,7 +125,7 @@ const relationshipDisplayName = (relationshipType?: string | null) => {
   switch (String(relationshipType ?? '').toUpperCase()) {
     case 'MANAGER': return 'Manager';
     case 'PEER': return 'Peers';
-    case 'SUBORDINATE': return 'Direct reports';
+    case 'SUBORDINATE': return 'Subordinate reviewers';
     case 'SELF': return 'Self';
     default: return relationshipType || 'Relationship';
   }
@@ -154,13 +154,13 @@ const fallbackRelationshipPrivacy = (item: FeedbackResultItem): FeedbackRelation
   },
   {
     relationshipType: 'SUBORDINATE',
-    label: 'Direct reports',
+    label: 'Subordinate reviewers',
     responseCount: countValue(item.subordinateResponses),
     minimumVisibleResponses: 2,
     thresholdRequired: true,
     thresholdMet: countValue(item.subordinateResponses) >= 2,
     visibleOutsideHr: countValue(item.subordinateResponses) >= 2,
-    hiddenReason: countValue(item.subordinateResponses) >= 2 ? null : 'Direct report details are masked until at least 2 direct report responses are submitted.',
+    hiddenReason: countValue(item.subordinateResponses) >= 2 ? null : 'Subordinate reviewer details are masked until at least 2 subordinate reviewer responses are submitted.',
   },
   {
     relationshipType: 'SELF',
@@ -359,7 +359,7 @@ const QualityPrivacyPanel = ({ summary, readyItems, blockedItems, publishedCount
   const lowConfidenceCount = items.filter(item => String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
 
   const readinessRows = [
-    { icon: 'bi-check2-circle', title: 'Ready to publish', helper: 'Passed backend confidence and scoring checks.', value: readyItems.length, tone: 'good' },
+    { icon: 'bi-check2-circle', title: 'Ready to publish', helper: 'Passed confidence and scoring checks.', value: readyItems.length, tone: 'good' },
     { icon: 'bi-eye', title: 'Already published', helper: 'Employee-facing visibility is already enabled.', value: publishedCount, tone: 'neutral' },
     { icon: 'bi-person-dash', title: 'No submitted responses', helper: 'No calculated result is available for these employees.', value: noResponseCount, tone: noResponseCount ? 'danger' : 'good' },
     { icon: 'bi-exclamation-triangle', title: 'Insufficient feedback', helper: 'Blocked by confidence or minimum-feedback rules.', value: insufficientCount, tone: insufficientCount ? 'warning' : 'good' },
@@ -367,9 +367,9 @@ const QualityPrivacyPanel = ({ summary, readyItems, blockedItems, publishedCount
   ];
 
   const privacyRows = [
-    { icon: 'bi-shield-lock', title: 'Relationship details masked', helper: 'Peer/direct report detail remains hidden outside HR when thresholds are not met.', value: maskedRows.length },
-    { icon: 'bi-people', title: 'Peer threshold', helper: 'Uses backend relationship privacy metadata from Patch A.', value: `${allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? 2}+` },
-    { icon: 'bi-diagram-3', title: 'Direct report threshold', helper: 'Direct report details use the same privacy visibility rules.', value: `${allPrivacyRows.find(row => row.relationshipType === 'SUBORDINATE')?.minimumVisibleResponses ?? 2}+` },
+    { icon: 'bi-shield-lock', title: 'Relationship details masked', helper: 'Peer/subordinate reviewer detail remains hidden outside HR when thresholds are not met.', value: maskedRows.length },
+    { icon: 'bi-people', title: 'Peer threshold', helper: 'Uses campaign privacy settings.', value: `${allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? 2}+` },
+    { icon: 'bi-diagram-3', title: 'Subordinate reviewer threshold', helper: 'Subordinate reviewer details use the same privacy visibility rules.', value: `${allPrivacyRows.find(row => row.relationshipType === 'SUBORDINATE')?.minimumVisibleResponses ?? 2}+` },
     { icon: 'bi-incognito', title: 'Evaluator identity', helper: 'Analytics shows result groups only. Evaluator names are not exposed.', value: 'Hidden' },
   ];
 
@@ -379,7 +379,7 @@ const QualityPrivacyPanel = ({ summary, readyItems, blockedItems, publishedCount
           <div>
             <span className="hfa-eyebrow">Quality and privacy</span>
             <h3>Release readiness review</h3>
-            <p>HR can review internal analytics, while employee-facing details follow backend confidentiality metadata.</p>
+            <p>HR can review full analytics, while employee-facing details follow campaign confidentiality rules.</p>
           </div>
         </div>
         <div className="hfa-quality-grid">
@@ -405,7 +405,7 @@ const QualityPrivacyPanel = ({ summary, readyItems, blockedItems, publishedCount
             <div className="hfa-panel-head">
               <div>
                 <h3>Privacy controls</h3>
-                <p>Visibility is controlled by backend relationship thresholds.</p>
+                <p>Visibility is controlled by campaign privacy thresholds.</p>
               </div>
             </div>
             <div className="hfa-panel-list">
@@ -454,7 +454,7 @@ const AnalyticsCharts = ({ summary }: { summary: FeedbackCampaignSummary }) => {
           <div>
             <span className="hfa-eyebrow">Analytics charts</span>
             <h3>Campaign performance patterns</h3>
-            <p>Charts now use backend summary fields instead of temporary frontend-only calculations.</p>
+            <p>Charts use saved summary fields from submitted feedback.</p>
           </div>
         </div>
         <div className="hfa-chart-grid">
@@ -462,7 +462,7 @@ const AnalyticsCharts = ({ summary }: { summary: FeedbackCampaignSummary }) => {
           <HorizontalBarChart title="Relationship averages" subtitle="Average score by evaluator relationship" rows={relationshipRows} />
           <HorizontalBarChart title="Strongest competencies" subtitle="Highest scoring competency areas" rows={topCompetencies} />
           <HorizontalBarChart title="Development focus" subtitle="Lowest scoring competency areas" rows={developmentCompetencies} />
-          <DonutChart title="Confidence breakdown" subtitle="Backend result confidence by employee summary" rows={summary.confidenceBreakdown ?? []} />
+          <DonutChart title="Confidence breakdown" subtitle="Result confidence by employee summary" rows={summary.confidenceBreakdown ?? []} />
           <HorizontalBarChart
               title="Top employee results"
               subtitle="Highest overall scores in this campaign"
@@ -641,7 +641,7 @@ const ResultDetailDrawer = ({
                 {[
                   { label: 'Manager', score: item.managerAverageScore, count: item.managerResponses },
                   { label: 'Peers', score: item.peerAverageScore, count: item.peerResponses },
-                  { label: 'Direct reports', score: item.subordinateAverageScore, count: item.subordinateResponses },
+                  { label: 'Subordinate reviewers', score: item.subordinateAverageScore, count: item.subordinateResponses },
                   { label: 'Self', score: item.selfAverageScore, count: item.selfResponses },
                 ].map(row => (
                     <div className="hfa-bar-row" key={row.label}>
@@ -772,7 +772,7 @@ const PublishResultsModal = ({
                     <h4>Publish scope</h4>
                     <label className="hfa-option-card">
                       <input type="radio" checked={options.scope === 'ALL_READY'} onChange={() => setOptions(current => ({ ...current, scope: 'ALL_READY' }))} />
-                      <span><strong>All ready employees</strong><small>Publish every result marked ready by backend scoring, confidence, and privacy checks.</small></span>
+                      <span><strong>All ready employees</strong><small>Publish every result marked ready by scoring, confidence, and privacy checks.</small></span>
                     </label>
                     <label className="hfa-option-card">
                       <input type="radio" checked={options.scope === 'SELECTED_EMPLOYEES'} onChange={() => setOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} />
@@ -819,13 +819,13 @@ const PublishResultsModal = ({
                     <div className="hfa-review-row"><dt>Included sections</dt><dd>{contentSummary(options) || 'No content selected'}</dd></div>
                     <div className="hfa-review-row"><dt>Comments</dt><dd>{options.includeComments ? 'Included only where confidentiality allows' : 'Not included'}</dd></div>
                     <div className="hfa-review-row"><dt>Blocked results</dt><dd>{blockedItems.length} remain hidden</dd></div>
-                    <div className="hfa-review-row"><dt>Notification</dt><dd>Employees will be notified by backend publish flow</dd></div>
+                    <div className="hfa-review-row"><dt>Notification</dt><dd>Employees will be notified by the publish flow</dd></div>
                   </dl>
                 </section>
 
                 <label className="hfa-confirm-box">
                   <input type="checkbox" checked={options.confirmVisibility} onChange={event => setBooleanOption('confirmVisibility', event.target.checked)} />
-                  <span>I confirm these published results will be visible to employees, and relationship/comment detail must follow backend privacy rules.</span>
+                  <span>I confirm these published results will be visible to employees, and relationship/comment detail must follow campaign privacy rules.</span>
                 </label>
               </div>
           )}
@@ -1016,7 +1016,7 @@ export default function AnalyticsTab() {
 
   const exportCsv = () => {
     if (!filteredItems.length || !selectedId) return;
-    const header = ['Employee', 'Employee ID', 'Average Score', 'Score Band', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager Responses', 'Peer Responses', 'Direct Report Responses', 'Self Responses', 'Visibility', 'Calculation Note'];
+    const header = ['Employee', 'Employee ID', 'Average Score', 'Score Band', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager Responses', 'Peer Responses', 'Subordinate Responses', 'Self Responses', 'Visibility', 'Calculation Note'];
     const body = filteredItems.map(item => [
       item.targetEmployeeName,
       item.targetEmployeeId,
@@ -1097,7 +1097,7 @@ export default function AnalyticsTab() {
                       {scoringLoading
                           ? 'Loading campaign scoring rules…'
                           : scoringConfig?.relationshipWeightsReady
-                              ? 'Scoring weights are ready and backend summaries use submitted relationship data.'
+                              ? 'Scoring weights are ready and summaries use submitted relationship data.'
                               : 'Scoring weights should be reviewed in Campaign Setup before publishing.'}
                     </p>
                   </div>
@@ -1117,7 +1117,7 @@ export default function AnalyticsTab() {
                   />
                   <HorizontalBarChart
                       title="Submitted relationship averages"
-                      subtitle="Backend calculated average score by relationship."
+                      subtitle="Calculated average score by relationship."
                       rows={(summary.relationshipAverages ?? []).map(row => ({
                         label: row.label || relationshipDisplayName(row.relationshipType),
                         value: numberValue(row.averageScore),

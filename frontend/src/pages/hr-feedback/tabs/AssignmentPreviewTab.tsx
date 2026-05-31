@@ -9,6 +9,7 @@ import type {
   FeedbackRelationshipType,
   ManualAssignmentInput,
   FeedbackTargetEmployee,
+  FeedbackRelationshipCandidateResponse,
 } from '../../../types/feedbackCampaign';
 
 interface Props {
@@ -27,6 +28,22 @@ const formatCampaignOption = (campaign: FeedbackCampaign) =>
 const initials = (name: string) =>
     name.split(' ').filter(Boolean).slice(0, 2).map(word => word[0]?.toUpperCase() ?? '').join('') || '?';
 
+
+type RelationshipCandidateOption = FeedbackRelationshipCandidateResponse & {
+  id: number;
+  fullName: string;
+  currentDepartment: string | null;
+  positionTitle?: string | null;
+};
+
+const toRelationshipCandidateOption = (candidate: FeedbackRelationshipCandidateResponse): RelationshipCandidateOption => ({
+  ...candidate,
+  id: candidate.employeeId,
+  fullName: candidate.employeeName?.trim() || `Employee #${candidate.employeeId}`,
+  currentDepartment: candidate.currentDepartmentName ?? null,
+  positionTitle: candidate.positionName ?? null,
+});
+
 const sourceLabel = (source: string) => source.replaceAll('_', ' ').toLowerCase().replace(/(^|\s)\S/g, char => char.toUpperCase());
 
 const methodLabel = (method: string) => {
@@ -39,13 +56,13 @@ const methodLabel = (method: string) => {
 const relationshipHelp = (relationship: FeedbackRelationshipType) => {
   switch (relationship) {
     case 'MANAGER':
-      return 'Direct reporting manager from employee master data.';
+      return 'Eligible manager reviewer for this employee.';
     case 'SUBORDINATE':
-      return 'Direct report of the target employee.';
+      return 'Eligible subordinate reviewer for this employee.';
     case 'SELF':
       return 'The target employee evaluates themself.';
     default:
-      return 'Peer reviewer, usually from department/team/project scope.';
+      return 'Eligible peer reviewer for this employee.';
   }
 };
 
@@ -65,6 +82,9 @@ export default function AssignmentPreviewTab({
   const [result, setResult] = useState<FeedbackAssignmentGenerationResponse | null>(null);
   const [error, setError] = useState('');
   const [manualSearch, setManualSearch] = useState('');
+  const [relationshipCandidates, setRelationshipCandidates] = useState<RelationshipCandidateOption[]>([]);
+  const [relationshipCandidatesLoading, setRelationshipCandidatesLoading] = useState(false);
+  const [relationshipCandidatesError, setRelationshipCandidatesError] = useState('');
   const [manualForm, setManualForm] = useState<ManualAssignmentInput>({
     targetEmployeeId: targetIds[0] ?? 0,
     evaluatorEmployeeId: 0,
@@ -108,7 +128,12 @@ export default function AssignmentPreviewTab({
   );
 
   const selectedTargetEmployee = employeeMap.get(manualForm.targetEmployeeId) ?? null;
-  const selectedEvaluatorEmployee = employeeMap.get(manualForm.evaluatorEmployeeId) ?? null;
+  const selectedEvaluatorEmployee = useMemo(() => {
+    if (!manualForm.evaluatorEmployeeId) return null;
+    return relationshipCandidates.find(candidate => candidate.id === manualForm.evaluatorEmployeeId)
+        ?? employeeMap.get(manualForm.evaluatorEmployeeId)
+        ?? null;
+  }, [employeeMap, manualForm.evaluatorEmployeeId, relationshipCandidates]);
 
   const existingAssignmentsForManualTarget = useMemo(
       () => (result?.assignmentDetails ?? []).filter(item => item.targetEmployeeId === manualForm.targetEmployeeId),
@@ -122,17 +147,22 @@ export default function AssignmentPreviewTab({
 
   const evaluatorCandidates = useMemo(() => {
     const query = manualSearch.trim().toLowerCase();
-    return employees
+    return relationshipCandidates
         .filter(employee => {
-          if (manualForm.relationshipType === 'SELF' && employee.id !== manualForm.targetEmployeeId) return false;
-          if (manualForm.relationshipType !== 'SELF' && employee.id === manualForm.targetEmployeeId) return false;
           if (assignedEvaluatorIdsForManualTarget.has(employee.id)) return false;
           if (!query) return true;
-          return [employee.fullName, employee.currentDepartment ?? '', String(employee.id)]
-              .some(value => value.toLowerCase().includes(query));
+          return [
+            employee.fullName,
+            employee.employeeCode ?? '',
+            employee.email ?? '',
+            employee.currentDepartment ?? '',
+            employee.positionTitle ?? '',
+            employee.sourceLabel ?? '',
+            String(employee.id),
+          ].some(value => value.toLowerCase().includes(query));
         })
         .slice(0, 12);
-  }, [assignedEvaluatorIdsForManualTarget, employees, manualForm.relationshipType, manualForm.targetEmployeeId, manualSearch]);
+  }, [assignedEvaluatorIdsForManualTarget, manualSearch, relationshipCandidates]);
 
   useEffect(() => {
     setLoadingCampaigns(true);
@@ -173,6 +203,49 @@ export default function AssignmentPreviewTab({
           : knownTargetIds[0] ?? 0,
     }));
   }, [knownTargetIds.join(',')]);
+
+  useEffect(() => {
+    if (!activeCampaign?.id || !manualForm.targetEmployeeId || !manualForm.relationshipType) {
+      setRelationshipCandidates([]);
+      setRelationshipCandidatesError('');
+      setRelationshipCandidatesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRelationshipCandidatesLoading(true);
+    setRelationshipCandidatesError('');
+
+    feedbackCampaignApi.getRelationshipCandidates(
+        activeCampaign.id,
+        manualForm.targetEmployeeId,
+        manualForm.relationshipType,
+    )
+        .then(items => {
+          if (cancelled) return;
+          setRelationshipCandidates(items.map(toRelationshipCandidateOption));
+        })
+        .catch(error => {
+          if (cancelled) return;
+          setRelationshipCandidates([]);
+          setRelationshipCandidatesError(error instanceof Error ? error.message : 'Eligible reviewers could not be loaded.');
+        })
+        .finally(() => {
+          if (!cancelled) setRelationshipCandidatesLoading(false);
+        });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCampaign?.id, manualForm.relationshipType, manualForm.targetEmployeeId]);
+
+  useEffect(() => {
+    if (relationshipCandidatesLoading || !manualForm.evaluatorEmployeeId) return;
+    const allowed = relationshipCandidates.some(candidate => candidate.id === manualForm.evaluatorEmployeeId);
+    if (!allowed) {
+      setManualForm(current => ({ ...current, evaluatorEmployeeId: 0 }));
+    }
+  }, [manualForm.evaluatorEmployeeId, relationshipCandidates, relationshipCandidatesLoading]);
 
   useEffect(() => {
     if (!activeCampaign) {
@@ -313,6 +386,10 @@ export default function AssignmentPreviewTab({
     }
     if (assignedEvaluatorIdsForManualTarget.has(manualForm.evaluatorEmployeeId)) {
       setError('This evaluator is already assigned to the selected target employee.');
+      return;
+    }
+    if (!relationshipCandidates.some(candidate => candidate.id === manualForm.evaluatorEmployeeId)) {
+      setError('Choose an eligible reviewer from the candidate list.');
       return;
     }
     if (!manualForm.reason || manualForm.reason.trim().length < 5) {
@@ -494,7 +571,7 @@ export default function AssignmentPreviewTab({
                             className="hfd-input"
                             value={manualSearch}
                             onChange={event => setManualSearch(event.target.value)}
-                            placeholder="Search by name, department, or employee number..."
+                            placeholder="Search eligible reviewers..."
                         />
                       </label>
                       <label className="hfd-checkbox-label" style={{ paddingTop: 28 }}>
@@ -508,7 +585,13 @@ export default function AssignmentPreviewTab({
                     </div>
 
                     <div className="hfd-evaluator-pick-list">
-                      {evaluatorCandidates.map(employee => (
+                      {relationshipCandidatesLoading ? (
+                          <div className="hfd-muted">Loading eligible reviewers...</div>
+                      ) : relationshipCandidatesError ? (
+                          <div className="hfd-muted">Could not load eligible reviewers. Please try again.</div>
+                      ) : evaluatorCandidates.length === 0 ? (
+                          <div className="hfd-muted">No eligible reviewer matches this relationship.</div>
+                      ) : evaluatorCandidates.map(employee => (
                           <button
                               key={employee.id}
                               type="button"
@@ -516,10 +599,10 @@ export default function AssignmentPreviewTab({
                               onClick={() => setManualForm({ ...manualForm, evaluatorEmployeeId: employee.id })}
                           >
                             {renderPerson(employee.id, employee.fullName, true)}
+                            {employee.sourceLabel && <span className="hfd-muted">{employee.sourceLabel}</span>}
                             {manualForm.evaluatorEmployeeId === employee.id && <i className="bi bi-check-circle-fill" />}
                           </button>
                       ))}
-                      {evaluatorCandidates.length === 0 && <div className="hfd-muted">No evaluator matches your search.</div>}
                     </div>
 
                     {selectedEvaluatorEmployee && (
@@ -536,7 +619,7 @@ export default function AssignmentPreviewTab({
                           className="hfd-input"
                           value={manualForm.reason ?? ''}
                           onChange={event => setManualForm({ ...manualForm, reason: event.target.value })}
-                          placeholder="Example: Reporting hierarchy missing; HR confirms this evaluator."
+                          placeholder="Example: HR confirms this reviewer from the eligible reviewer list."
                           rows={3}
                       />
                       <span className="hfd-field-help">Required for audit. Minimum 5 characters.</span>
@@ -548,7 +631,7 @@ export default function AssignmentPreviewTab({
                         </div>
                     )}
 
-                    <button className="hfd-btn hfd-btn-primary" onClick={handleAddManual} style={{ marginTop: 12 }} disabled={!hasTargets || !manualForm.evaluatorEmployeeId || assignedEvaluatorIdsForManualTarget.has(manualForm.evaluatorEmployeeId) || !manualForm.reason || manualForm.reason.trim().length < 5}>
+                    <button className="hfd-btn hfd-btn-primary" onClick={handleAddManual} style={{ marginTop: 12 }} disabled={!hasTargets || relationshipCandidatesLoading || !manualForm.evaluatorEmployeeId || assignedEvaluatorIdsForManualTarget.has(manualForm.evaluatorEmployeeId) || !relationshipCandidates.some(candidate => candidate.id === manualForm.evaluatorEmployeeId) || !manualForm.reason || manualForm.reason.trim().length < 5}>
                       <i className="bi bi-plus-circle" /> Add Evaluator
                     </button>
 

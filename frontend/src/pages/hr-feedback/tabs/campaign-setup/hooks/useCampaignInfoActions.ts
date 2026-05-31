@@ -14,6 +14,17 @@ import { buildCampaignPayload, validateCampaignInfoForm } from '../utils/campaig
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
+
+const scrollToCampaignSetupMessage = () => {
+    window.setTimeout(() => {
+        const target = document.querySelector<HTMLElement>('.hfd-alert-error, .hfd-input.error, [aria-invalid="true"]');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+            target.focus({ preventScroll: true });
+        }
+    }, 0);
+};
+
 type CampaignInfoActionsParams = {
     campaigns: FeedbackCampaign[];
     selectedCampaign: FeedbackCampaign | null;
@@ -104,8 +115,14 @@ export function useCampaignInfoActions({
 
     const validate = () => {
         const nextErrors = validateCampaignInfoForm(form);
+        const isValid = Object.keys(nextErrors).length === 0;
         setErrors(nextErrors);
-        return Object.keys(nextErrors).length === 0;
+        if (!isValid) {
+            setError('Please complete the highlighted campaign details before saving.');
+            setSuccess('');
+            scrollToCampaignSetupMessage();
+        }
+        return isValid;
     };
 
     const handleSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -127,6 +144,7 @@ export function useCampaignInfoActions({
             applyForm(saved);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Campaign could not be saved.');
+            scrollToCampaignSetupMessage();
         } finally {
             setSaving(false);
         }

@@ -71,6 +71,7 @@ type CampaignTimePickerProps = {
     onChange: (value: string) => void;
     isTimeDisabled: (date: string, time: string) => boolean;
     label: string;
+    idBase: string;
 };
 
 function CampaignTimePicker({
@@ -81,6 +82,7 @@ function CampaignTimePicker({
                                 onChange,
                                 isTimeDisabled,
                                 label,
+                                idBase,
                             }: CampaignTimePickerProps) {
     const [draftParts, setDraftParts] = useState<TimeParts>(() => timeValueToParts(value));
 
@@ -120,31 +122,40 @@ function CampaignTimePicker({
     return (
         <div className="hfdc-time-picker" aria-label={label}>
             <select
+                id={`${idBase}-hour`}
+                name={`${idBase}Hour`}
                 className={`hfd-input hfdc-time-select ${hasError ? 'error' : ''}`}
                 value={draftParts.hour}
                 disabled={disabled}
                 onChange={(event) => updateParts({ hour: event.target.value })}
                 aria-label={`${label} hour`}
+                aria-invalid={hasError}
             >
                 <option value="">Hour</option>
                 {HOUR_OPTIONS.map((hour) => <option key={hour} value={hour} disabled={isHourDisabled(hour)}>{hour}</option>)}
             </select>
             <select
+                id={`${idBase}-minute`}
+                name={`${idBase}Minute`}
                 className={`hfd-input hfdc-time-select ${hasError ? 'error' : ''}`}
                 value={draftParts.minute}
                 disabled={disabled}
                 onChange={(event) => updateParts({ minute: event.target.value })}
                 aria-label={`${label} minute`}
+                aria-invalid={hasError}
             >
                 <option value="">Minute</option>
                 {MINUTE_OPTIONS.map((minute) => <option key={minute} value={minute} disabled={isMinuteDisabled(minute)}>{minute}</option>)}
             </select>
             <select
+                id={`${idBase}-meridiem`}
+                name={`${idBase}Meridiem`}
                 className={`hfd-input hfdc-time-select ${hasError ? 'error' : ''}`}
                 value={draftParts.meridiem}
                 disabled={disabled}
                 onChange={(event) => updateParts({ meridiem: event.target.value as Meridiem | '' })}
                 aria-label={`${label} AM or PM`}
+                aria-invalid={hasError}
             >
                 <option value="">AM/PM</option>
                 {MERIDIEM_OPTIONS.map((meridiem) => <option key={meridiem} value={meridiem} disabled={isMeridiemDisabled(meridiem)}>{meridiem}</option>)}
@@ -178,6 +189,7 @@ export function CampaignInfoStep({
     const todayInputDate = getTodayInputDate(now);
     const currentMinuteOfDay = (now.getHours() * 60) + now.getMinutes();
     const endDateMin = form.startDate && form.startDate > todayInputDate ? form.startDate : todayInputDate;
+    const formErrorMessages = Object.values(errors ?? {}).filter(Boolean);
 
     const isStartTimeDisabled = (date: string, time: string) => {
         if (!date || !time) return false;
@@ -227,7 +239,7 @@ export function CampaignInfoStep({
                     </div>
                 </div>
             ) : (
-                <form onSubmit={handleSave} noValidate>
+                <form id="feedback-campaign-details-form" name="feedbackCampaignDetailsForm" onSubmit={handleSave} noValidate>
                     <div className="hfdc-details-shell">
                         <div className="hfdc-details-main">
                             <div className="hfdc-section-title">
@@ -238,11 +250,14 @@ export function CampaignInfoStep({
                             <label className="hfdc-field full">
                                 <span>Campaign Name <em>*</em></span>
                                 <input
+                                    id="feedback-campaign-name"
+                                    name="campaignName"
                                     className={`hfd-input ${errors.name ? 'error' : ''}`}
                                     value={form.name}
                                     disabled={!canEditSelected}
                                     onChange={(e: any) => setForm((current: any) => ({ ...current, name: e.target.value }))}
                                     placeholder="Example: Q2 Leadership 360 Review"
+                                    aria-invalid={Boolean(errors.name)}
                                 />
                                 {errors.name ? <small className="hfd-error-msg">{errors.name}</small> : <small>Use a clear name employees and HR can recognize later.</small>}
                             </label>
@@ -250,6 +265,8 @@ export function CampaignInfoStep({
                             <label className="hfdc-field">
                                 <span>Review Year <em>*</em></span>
                                 <input
+                                    id="feedback-campaign-review-year"
+                                    name="reviewYear"
                                     type="number"
                                     min="2000"
                                     max="2100"
@@ -258,6 +275,7 @@ export function CampaignInfoStep({
                                     disabled={!canEditSelected}
                                     onChange={(e: any) => setForm((current: any) => ({ ...current, reviewYear: e.target.value === '' ? '' : Number(e.target.value) }))}
                                     placeholder="Example: 2026"
+                                    aria-invalid={Boolean(errors.reviewYear)}
                                 />
                                 {errors.reviewYear ? <small className="hfd-error-msg">{errors.reviewYear}</small> : <small>Used for filtering, reporting, and comparison.</small>}
                             </label>
@@ -274,6 +292,8 @@ export function CampaignInfoStep({
                                 <span>Start Date & Time <em>*</em></span>
                                 <div className="hfdc-date-time-grid hfdc-date-time-grid-expanded">
                                     <input
+                                        id="feedback-campaign-start-date"
+                                        name="startDate"
                                         type="date"
                                         min={todayInputDate}
                                         className={`hfd-input ${errors.startAt ? 'error' : ''}`}
@@ -289,6 +309,7 @@ export function CampaignInfoStep({
                                             });
                                         }}
                                         aria-label="Start date"
+                                        aria-invalid={Boolean(errors.startAt)}
                                     />
                                     <CampaignTimePicker
                                         date={form.startDate}
@@ -303,6 +324,7 @@ export function CampaignInfoStep({
                                             });
                                         }}
                                         label="Start time"
+                                        idBase="feedback-campaign-start-time"
                                     />
                                 </div>
                                 {errors.startAt ? <small className="hfd-error-msg">{errors.startAt}</small> : <small>Choose any valid hour and minute. Past date/time values are not selectable.</small>}
@@ -312,6 +334,8 @@ export function CampaignInfoStep({
                                 <span>End Date & Time <em>*</em></span>
                                 <div className="hfdc-date-time-grid hfdc-date-time-grid-expanded">
                                     <input
+                                        id="feedback-campaign-end-date"
+                                        name="endDate"
                                         type="date"
                                         min={endDateMin}
                                         className={`hfd-input ${errors.endAt ? 'error' : ''}`}
@@ -326,6 +350,7 @@ export function CampaignInfoStep({
                                             }));
                                         }}
                                         aria-label="End date"
+                                        aria-invalid={Boolean(errors.endAt)}
                                     />
                                     <CampaignTimePicker
                                         date={form.endDate}
@@ -335,6 +360,7 @@ export function CampaignInfoStep({
                                         isTimeDisabled={(date, time) => isEndTimeDisabled(date, time)}
                                         onChange={(nextEndTime) => setForm((current: any) => ({ ...current, endTime: nextEndTime }))}
                                         label="End time"
+                                        idBase="feedback-campaign-end-time"
                                     />
                                 </div>
                                 {errors.endAt ? <small className="hfd-error-msg">{errors.endAt}</small> : <small>End date/time must be after the start date/time.</small>}
@@ -346,12 +372,15 @@ export function CampaignInfoStep({
 
                             <label className="hfdc-field full">
                                 <textarea
+                                    id="feedback-campaign-announcement"
+                                    name="participantAnnouncement"
                                     className={`hfd-input hfdc-textarea ${errors.description ? 'error' : ''}`}
                                     rows={3}
                                     value={form.description}
                                     disabled={!canEditSelected}
                                     onChange={(e: any) => setForm((current: any) => ({ ...current, description: e.target.value }))}
                                     placeholder="Example: This cycle focuses on practical feedback that helps employees understand strengths and growth opportunities."
+                                    aria-invalid={Boolean(errors.description)}
                                 />
                                 <small className={form.description.length > DESCRIPTION_LIMIT ? 'hfd-error-msg' : ''}>{form.description.length}/{DESCRIPTION_LIMIT.toLocaleString()} characters</small>
                                 {errors.description ? <small className="hfd-error-msg">{errors.description}</small> : null}
@@ -363,18 +392,30 @@ export function CampaignInfoStep({
                                 </div>
                                 <div className="hfdc-visibility-grid">
                                     <label className="hfdc-toggle-card compact">
-                                        <input type="checkbox" checked={form.peerFeedbackAnonymous} disabled={!canEditSelected} onChange={(e: any) => setForm((current: any) => ({ ...current, peerFeedbackAnonymous: e.target.checked }))} />
+                                        <input id="feedback-campaign-peer-anonymous" name="peerFeedbackAnonymous" type="checkbox" checked={form.peerFeedbackAnonymous} disabled={!canEditSelected} onChange={(e: any) => setForm((current: any) => ({ ...current, peerFeedbackAnonymous: e.target.checked }))} />
                                         <span><strong>Peer feedback anonymous</strong><small>Recipient will not see individual peer names.</small></span>
                                     </label>
                                     <label className="hfdc-toggle-card compact">
-                                        <input type="checkbox" checked={form.subordinateFeedbackAnonymous} disabled={!canEditSelected} onChange={(e: any) => setForm((current: any) => ({ ...current, subordinateFeedbackAnonymous: e.target.checked }))} />
-                                        <span><strong>Direct report feedback anonymous</strong><small>Recipient will not see individual direct report names.</small></span>
+                                        <input id="feedback-campaign-subordinate-anonymous" name="subordinateFeedbackAnonymous" type="checkbox" checked={form.subordinateFeedbackAnonymous} disabled={!canEditSelected} onChange={(e: any) => setForm((current: any) => ({ ...current, subordinateFeedbackAnonymous: e.target.checked }))} />
+                                        <span><strong>Subordinate reviewer feedback anonymous</strong><small>Recipient will not see individual subordinate reviewer names.</small></span>
                                     </label>
                                 </div>
                                 <p className="hfdc-visibility-note">HR/Admin can still view evaluator identity for audit and assignment management.</p>
                             </div>
                         </div>
                     </div>
+
+                    {formErrorMessages.length > 0 ? (
+                        <div className="hfd-alert hfd-alert-error hfdc-form-error-summary" role="alert">
+                            <i className="bi bi-exclamation-triangle" />
+                            <div>
+                                <strong>Please complete the highlighted campaign details before saving.</strong>
+                                <ul>
+                                    {formErrorMessages.map((message, index) => <li key={`${message}-${index}`}>{message}</li>)}
+                                </ul>
+                            </div>
+                        </div>
+                    ) : null}
 
                     <div className="hfdc-form-actions">
                         {selectedCampaign?.status === 'DRAFT' && (

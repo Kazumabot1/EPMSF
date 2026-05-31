@@ -16,6 +16,7 @@ import com.epms.dto.FeedbackCampaignQuestionReviewResponse;
 import com.epms.dto.FeedbackCampaignQuestionReviewSaveRequest;
 import com.epms.dto.FeedbackTargetCandidateResponse;
 import com.epms.dto.FeedbackManualAssignmentRequest;
+import com.epms.dto.FeedbackRelationshipCandidateResponse;
 import com.epms.dto.FeedbackReminderRequest;
 import com.epms.dto.FeedbackReminderResponse;
 import com.epms.dto.FeedbackCampaignScoringConfigRequest;
@@ -23,6 +24,7 @@ import com.epms.dto.FeedbackCampaignScoringConfigResponse;
 import com.epms.dto.GenericApiResponse;
 import com.epms.entity.FeedbackCampaign;
 import com.epms.entity.FeedbackRequest;
+import com.epms.entity.enums.FeedbackRelationshipType;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.security.SecurityUtils;
 import com.epms.service.FeedbackCampaignService;
@@ -201,6 +203,20 @@ public class FeedbackCampaignController {
         ensureHrOrAdmin();
         FeedbackAssignmentGenerationResponse response = feedbackEvaluationService.getAssignmentPreview(campaignId);
         return ResponseEntity.ok(GenericApiResponse.success("Evaluator assignment preview retrieved successfully", response));
+    }
+
+
+    @GetMapping("/{campaignId}/targets/{targetEmployeeId}/relationship-candidates")
+    public ResponseEntity<GenericApiResponse<List<FeedbackRelationshipCandidateResponse>>> getRelationshipCandidates(
+            @PathVariable Long campaignId,
+            @PathVariable Long targetEmployeeId,
+            @RequestParam FeedbackRelationshipType relationshipType
+    ) {
+        ensureHrOrAdmin();
+        List<FeedbackRelationshipCandidateResponse> response = feedbackEvaluationService.getRelationshipCandidates(
+                campaignId, targetEmployeeId, relationshipType
+        );
+        return ResponseEntity.ok(GenericApiResponse.success("Feedback relationship candidates retrieved successfully", response));
     }
 
     @PostMapping("/{campaignId}/assignments/manual")

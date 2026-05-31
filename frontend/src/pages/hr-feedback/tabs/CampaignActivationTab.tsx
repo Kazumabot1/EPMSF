@@ -76,7 +76,7 @@ const progressFilterMatches = (row: FeedbackCompletionItem, filter: ProgressFilt
 const relationshipLabel = (role: string) => {
   if (role === 'MANAGER') return 'Manager';
   if (role === 'PEER') return 'Peer';
-  if (role === 'SUBORDINATE') return 'Direct Report';
+  if (role === 'SUBORDINATE') return 'Subordinate reviewer';
   if (role === 'SELF') return 'Self';
   return role;
 };
@@ -402,7 +402,7 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
     const parts = [
       ['Manager', row.managerEvaluators],
       ['Peer', row.peerEvaluators],
-      ['Direct Report', row.subordinateEvaluators],
+      ['Subordinate reviewer', row.subordinateEvaluators],
       ['Self', row.selfEvaluators],
     ].filter(([, count]) => sourceCount(count as number) > 0);
     if (!parts.length) return <span className="hfd-muted">No assignments</span>;

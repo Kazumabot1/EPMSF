@@ -53,11 +53,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
     private static final String DEFAULT_CAMPAIGN_TYPE = "360 Feedback";
 
-    private static final List<FeedbackCampaignStatus> OVERLAP_BLOCKING_STATUSES = List.of(
-            FeedbackCampaignStatus.DRAFT,
-            FeedbackCampaignStatus.READY_TO_ACTIVATE,
-            FeedbackCampaignStatus.ACTIVE
-    );
 
     private final FeedbackCampaignRepository feedbackCampaignRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
@@ -76,7 +71,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         CampaignWindow window = resolveWindow(request);
         applyCampaignDefaults(request, window);
         validateCampaignMetadata(request, window);
-        validateNoOverlappingOpenCampaign(window);
+        // Drafts may be saved for planning. Submission-window overlap is checked during launch readiness/activation.
         // New campaign setup is rule-based. formId is legacy-only and ignored here.
 
         FeedbackCampaign campaign = new FeedbackCampaign();
@@ -780,22 +775,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
     }
 
 
-    private void validateNoOverlappingOpenCampaign(CampaignWindow window) {
-        List<FeedbackCampaign> overlappingCampaigns = feedbackCampaignRepository.findOverlappingCampaigns(
-                window.startAt.toLocalDate(),
-                window.endAt.toLocalDate(),
-                OVERLAP_BLOCKING_STATUSES
-        );
-
-        if (!overlappingCampaigns.isEmpty()) {
-            FeedbackCampaign existing = overlappingCampaigns.get(0);
-            throw new BusinessValidationException(
-                    "Another open 360 campaign overlaps this submission window: " + existing.getName()
-                            + " (" + formatDeadline(existing.getStartAt()) + " - " + formatDeadline(existing.getEndAt()) + "). Close it or choose a non-overlapping window."
-            );
-        }
-    }
-
     private void ensureDraftCampaign(FeedbackCampaign campaign, String message) {
         if (campaign.getStatus() != FeedbackCampaignStatus.DRAFT) {
             throw new BusinessValidationException(message);
@@ -838,10 +817,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         return trimmed.length() > maxLength ? trimmed.substring(0, maxLength) : trimmed;
     }
 
-
-    private String formatDeadline(LocalDateTime value) {
-        return value == null ? "the campaign deadline" : value.toString().replace('T', ' ');
-    }
 
     private static class CampaignWindow {
         private final LocalDateTime startAt;

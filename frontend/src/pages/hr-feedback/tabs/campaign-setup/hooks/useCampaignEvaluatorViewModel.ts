@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { feedbackCampaignApi } from '../../../../../api/feedbackCampaignApi';
 import type {
     FeedbackAssignmentDetailItem,
     FeedbackAssignmentGenerationResponse,
+    FeedbackRelationshipCandidateResponse,
     FeedbackRelationshipType,
     FeedbackTargetCandidate,
     FeedbackTargetEmployee,
@@ -21,6 +23,7 @@ const defaultManualForm: ManualAssignmentInput = {
 };
 
 type UseCampaignEvaluatorViewModelParams = {
+    selectedCampaignId?: number | null;
     assignmentPreview: FeedbackAssignmentGenerationResponse;
     employees: FeedbackTargetEmployee[];
     candidates: FeedbackTargetCandidate[];
@@ -39,7 +42,54 @@ const formatDepartmentPosition = (employee: ManualEvaluatorCandidate) => [
     employee.positionTitle ?? employee.positionName,
 ].filter(Boolean).join(' · ');
 
+const searchableCandidateValues = (employee: ManualEvaluatorCandidate) => [
+    employee.fullName,
+    employee.employeeName ?? '',
+    employee.employeeCode ?? '',
+    employee.email ?? '',
+    employee.currentDepartment ?? '',
+    employee.positionTitle ?? '',
+    employee.positionName ?? '',
+    employee.positionLevelCode ?? '',
+    employee.levelCode ?? '',
+    employee.sourceLabel ?? '',
+    String(employee.id),
+];
+
+const toManualCandidate = (
+    candidate: FeedbackRelationshipCandidateResponse,
+    enrichedEmployeeMap: Map<number, ManualEvaluatorCandidate>,
+): ManualEvaluatorCandidate => {
+    const existing = enrichedEmployeeMap.get(candidate.employeeId);
+    return {
+        ...(existing ?? {
+            id: candidate.employeeId,
+            fullName: candidate.employeeName?.trim() || `Employee #${candidate.employeeId}`,
+            currentDepartmentId: candidate.currentDepartmentId ?? null,
+            currentDepartment: candidate.currentDepartmentName ?? null,
+            positionTitle: candidate.positionName ?? null,
+            positionLevelCode: candidate.levelCode ?? null,
+            userId: candidate.userId ?? null,
+        }),
+        id: candidate.employeeId,
+        userId: candidate.userId ?? existing?.userId ?? null,
+        fullName: candidate.employeeName?.trim() || existing?.fullName || `Employee #${candidate.employeeId}`,
+        currentDepartmentId: candidate.currentDepartmentId ?? existing?.currentDepartmentId ?? null,
+        currentDepartment: candidate.currentDepartmentName ?? existing?.currentDepartment ?? null,
+        positionTitle: candidate.positionName ?? existing?.positionTitle ?? null,
+        positionLevelCode: candidate.levelCode ?? existing?.positionLevelCode ?? null,
+        employeeName: candidate.employeeName ?? existing?.employeeName ?? existing?.fullName ?? null,
+        levelCode: candidate.levelCode ?? existing?.levelCode ?? existing?.positionLevelCode ?? null,
+        positionName: candidate.positionName ?? existing?.positionName ?? existing?.positionTitle ?? null,
+        employeeCode: candidate.employeeCode ?? existing?.employeeCode ?? null,
+        email: candidate.email ?? existing?.email ?? null,
+        sourceLabel: candidate.sourceLabel ?? existing?.sourceLabel ?? null,
+        relationshipType: candidate.relationshipType,
+    };
+};
+
 export function useCampaignEvaluatorViewModel({
+                                                  selectedCampaignId,
                                                   assignmentPreview,
                                                   employees,
                                                   candidates,
@@ -52,6 +102,9 @@ export function useCampaignEvaluatorViewModel({
                                               }: UseCampaignEvaluatorViewModelParams) {
     const [selectedEvaluatorTargetId, setSelectedEvaluatorTargetId] = useState<number>(0);
     const [manualForm, setManualForm] = useState<ManualAssignmentInput>(defaultManualForm);
+    const [relationshipCandidates, setRelationshipCandidates] = useState<FeedbackRelationshipCandidateResponse[]>([]);
+    const [relationshipCandidatesLoading, setRelationshipCandidatesLoading] = useState(false);
+    const [relationshipCandidatesError, setRelationshipCandidatesError] = useState<string | null>(null);
 
     const assignmentDetails = assignmentPreview.assignmentDetails ?? EMPTY_ASSIGNMENT_DETAILS;
     const employeeMap = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
@@ -75,7 +128,6 @@ export function useCampaignEvaluatorViewModel({
                 currentDepartment: employee.currentDepartment ?? hint?.currentDepartmentName ?? null,
                 positionTitle: employee.positionTitle ?? hint?.positionName ?? null,
                 positionLevelCode: employee.positionLevelCode ?? hint?.levelCode ?? null,
-                managerEmployeeId: hint?.managerEmployeeId ?? null,
                 employeeName: hint?.employeeName ?? employee.fullName,
                 levelCode: hint?.levelCode ?? employee.positionLevelCode ?? null,
                 positionName: hint?.positionName ?? employee.positionTitle ?? null,
@@ -154,41 +206,64 @@ export function useCampaignEvaluatorViewModel({
         [activeEvaluatorAssignments],
     );
 
+    useEffect(() => {
+        const campaignId = Number(selectedCampaignId ?? 0);
+        if (!campaignId || !activeEvaluatorTargetId || !manualForm.relationshipType) {
+            setRelationshipCandidates([]);
+            setRelationshipCandidatesError(null);
+            setRelationshipCandidatesLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setRelationshipCandidatesLoading(true);
+        setRelationshipCandidatesError(null);
+
+        feedbackCampaignApi.getRelationshipCandidates(campaignId, activeEvaluatorTargetId, manualForm.relationshipType)
+            .then(items => {
+                if (cancelled) return;
+                setRelationshipCandidates(items);
+            })
+            .catch(error => {
+                if (cancelled) return;
+                setRelationshipCandidates([]);
+                setRelationshipCandidatesError(error instanceof Error ? error.message : 'Eligible reviewers could not be loaded.');
+            })
+            .finally(() => {
+                if (!cancelled) setRelationshipCandidatesLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeEvaluatorTargetId, manualForm.relationshipType, selectedCampaignId]);
+
+    const allowedCandidateIds = useMemo(
+        () => new Set(relationshipCandidates.map(candidate => candidate.employeeId)),
+        [relationshipCandidates],
+    );
+
     const manualRelationshipCandidateSource = useMemo(() => {
         if (!activeEvaluatorTargetId || !activeEvaluatorTarget) return [] as ManualEvaluatorCandidate[];
         const query = evaluatorSearch.trim().toLowerCase();
-        const all = Array.from(enrichedEmployeeMap.values()).filter(employee => employee.id !== activeEvaluatorTargetId);
 
-        const relationshipType = manualForm.relationshipType;
-        let source = all;
-        if (relationshipType === 'MANAGER') {
-            source = activeEvaluatorTarget.managerEmployeeId
-                ? all.filter(employee => employee.id === activeEvaluatorTarget.managerEmployeeId)
-                : [];
-        } else if (relationshipType === 'SUBORDINATE') {
-            source = all.filter(employee => Number(employee.managerEmployeeId ?? 0) === Number(activeEvaluatorTarget.employeeId));
-        }
-
-        const withEligibility = source
+        const withEligibility = relationshipCandidates
+            .map(candidate => toManualCandidate(candidate, enrichedEmployeeMap))
             .map(employee => ({
                 ...employee,
                 eligibilityMessage: manualEvaluatorEligibilityMessage(
                     employee,
                     activeEvaluatorTarget,
-                    relationshipType,
+                    manualForm.relationshipType,
                     assignedEvaluatorIdsForActiveTarget,
+                    allowedCandidateIds,
                 ),
             }))
             .filter(employee => !employee.eligibilityMessage);
 
         const searched = query
-            ? withEligibility.filter(employee => [
-                employee.fullName,
-                employee.currentDepartment ?? '',
-                employee.positionTitle ?? '',
-                employee.positionLevelCode ?? '',
-                String(employee.id),
-            ].some(value => value.toLowerCase().includes(query)))
+            ? withEligibility.filter(employee => searchableCandidateValues(employee)
+                .some(value => value.toLowerCase().includes(query)))
             : withEligibility;
 
         return searched
@@ -198,27 +273,32 @@ export function useCampaignEvaluatorViewModel({
                 return left.fullName.localeCompare(right.fullName);
             })
             .slice(0, 20);
-    }, [activeEvaluatorTarget, activeEvaluatorTargetId, assignedEvaluatorIdsForActiveTarget, enrichedEmployeeMap, evaluatorSearch, manualForm.relationshipType]);
+    }, [activeEvaluatorTarget, activeEvaluatorTargetId, allowedCandidateIds, assignedEvaluatorIdsForActiveTarget, enrichedEmployeeMap, evaluatorSearch, manualForm.relationshipType, relationshipCandidates]);
 
     const manualCandidateNotice = useMemo(() => {
         if (!activeEvaluatorTarget) return 'Select a recipient before adding an evaluator.';
+        if (relationshipCandidatesLoading) return 'Loading eligible reviewers...';
+        if (relationshipCandidatesError) return relationshipCandidatesError;
         if (manualForm.relationshipType === 'MANAGER') {
-            return activeEvaluatorTarget.managerEmployeeId
-                ? 'Only the recorded Reports To manager is available for Manager review.'
-                : 'This recipient has no Reports To manager recorded.';
+            return 'Manager reviewers are selected from eligible reviewers for this recipient.';
         }
         if (manualForm.relationshipType === 'SUBORDINATE') {
-            return 'Only employees whose Reports To value points to this recipient are available.';
+            return 'Subordinate reviewers are selected from eligible reviewers for this recipient.';
         }
-        return 'Peer candidates are limited to the same department, same organization layer, and same or adjacent level.';
-    }, [activeEvaluatorTarget, manualForm.relationshipType]);
+        if (manualForm.relationshipType === 'SELF') {
+            return 'Self review uses the selected recipient as evaluator.';
+        }
+        return 'Peer reviewers are selected from eligible reviewers for this recipient.';
+    }, [activeEvaluatorTarget, manualForm.relationshipType, relationshipCandidatesError, relationshipCandidatesLoading]);
 
     const evaluatorCandidates = manualRelationshipCandidateSource;
 
-    const selectedManualEvaluator = useMemo(
-        () => enrichedEmployeeMap.get(manualForm.evaluatorEmployeeId) ?? null,
-        [enrichedEmployeeMap, manualForm.evaluatorEmployeeId],
-    );
+    const selectedManualEvaluator = useMemo(() => {
+        if (!manualForm.evaluatorEmployeeId) return null;
+        const selectedBackendCandidate = relationshipCandidates.find(candidate => candidate.employeeId === manualForm.evaluatorEmployeeId);
+        if (selectedBackendCandidate) return toManualCandidate(selectedBackendCandidate, enrichedEmployeeMap);
+        return enrichedEmployeeMap.get(manualForm.evaluatorEmployeeId) ?? null;
+    }, [enrichedEmployeeMap, manualForm.evaluatorEmployeeId, relationshipCandidates]);
 
     const manualEvaluatorEligibilityError = useMemo(
         () => manualForm.evaluatorEmployeeId
@@ -227,9 +307,10 @@ export function useCampaignEvaluatorViewModel({
                 activeEvaluatorTarget,
                 manualForm.relationshipType,
                 assignedEvaluatorIdsForActiveTarget,
+                allowedCandidateIds,
             )
             : '',
-        [activeEvaluatorTarget, assignedEvaluatorIdsForActiveTarget, manualForm.evaluatorEmployeeId, manualForm.relationshipType, selectedManualEvaluator],
+        [activeEvaluatorTarget, allowedCandidateIds, assignedEvaluatorIdsForActiveTarget, manualForm.evaluatorEmployeeId, manualForm.relationshipType, selectedManualEvaluator],
     );
 
     const activeAssignmentsByRelationship = useMemo(() => {
@@ -281,6 +362,13 @@ export function useCampaignEvaluatorViewModel({
         });
     }, [activeEvaluatorTargetId, assignedEvaluatorIdsForActiveTarget]);
 
+    useEffect(() => {
+        if (relationshipCandidatesLoading || !manualForm.evaluatorEmployeeId) return;
+        if (!allowedCandidateIds.has(manualForm.evaluatorEmployeeId)) {
+            setManualForm(current => ({ ...current, evaluatorEmployeeId: 0 }));
+        }
+    }, [allowedCandidateIds, manualForm.evaluatorEmployeeId, relationshipCandidatesLoading]);
+
     return {
         assignmentDetails,
         employeeMap,
@@ -298,6 +386,8 @@ export function useCampaignEvaluatorViewModel({
         activePreviewItem,
         assignedEvaluatorIdsForActiveTarget,
         evaluatorCandidates,
+        relationshipCandidatesLoading,
+        relationshipCandidatesError,
         manualCandidateNotice,
         selectedManualEvaluator,
         manualEvaluatorEligibilityError,

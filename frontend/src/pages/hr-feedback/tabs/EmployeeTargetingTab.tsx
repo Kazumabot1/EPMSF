@@ -250,10 +250,10 @@ export default function TargetEvaluatorTab({
     };
 
     const evalOptions = [
-        { key: 'includeManager' as const, label: 'Direct Manager', desc: 'Assigns the reporting manager as evaluator' },
+        { key: 'includeManager' as const, label: 'Manager reviewer', desc: 'Assigns eligible manager reviewers' },
         { key: 'includeDepartmentPeers' as const, label: 'Department Peers', desc: 'Random peers from the same department; works without teams' },
         { key: 'includeTeamPeers' as const, label: 'Team Peers', desc: 'Prioritizes members of the same active team' },
-        { key: 'includeSubordinates' as const, label: 'Direct Subordinates', desc: 'Direct reports provide upward feedback' },
+        { key: 'includeSubordinates' as const, label: 'Subordinate reviewers', desc: 'Subordinate reviewers provide upward feedback' },
         { key: 'includeSelf' as const, label: 'Self Feedback', desc: 'Target employee evaluates self' },
         { key: 'includeProjectPeers' as const, label: 'Project Peers', desc: 'Peers from shared project assignments' },
         { key: 'includeCrossTeamPeers' as const, label: 'Other-Team Peers', desc: 'Other active teams in the same department' },

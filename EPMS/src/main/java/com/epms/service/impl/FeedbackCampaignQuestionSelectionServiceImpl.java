@@ -212,9 +212,9 @@ public class FeedbackCampaignQuestionSelectionServiceImpl implements FeedbackCam
 
     private String relationshipLabel(FeedbackRelationshipType relationshipType) {
         return switch (relationshipType) {
-            case MANAGER -> "Direct Manager";
+            case MANAGER -> "Manager reviewer";
             case PEER -> "Peer";
-            case SUBORDINATE -> "Direct Subordinate";
+            case SUBORDINATE -> "Subordinate reviewer";
             case SELF -> "Self";
         };
     }
