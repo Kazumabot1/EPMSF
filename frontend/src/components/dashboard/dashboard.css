@@ -1,4 +1,4 @@
-:root {
+/*Z*/:root {
     --epms-primary: #2563eb;
     --epms-primary-hover: #1d4ed8;
     --epms-primary-soft: #dbeafe;
@@ -34,7 +34,7 @@
     --dashboard-success: #047857;
     --dashboard-warning: #b45309;
     --dashboard-danger: #dc2626;
-    --dashboard-purple: #7c3aed;
+    --dashboard-purple: #2563eb;
     --dashboard-radius-lg: 18px;
     --dashboard-radius-md: 14px;
     --dashboard-radius-sm: 10px;
@@ -79,7 +79,7 @@
     background:
             radial-gradient(circle at 8% 0%, rgba(124, 58, 237, 0.14), transparent 30%),
             radial-gradient(circle at 94% 8%, rgba(59, 130, 246, 0.12), transparent 28%),
-            linear-gradient(135deg, #f8fafc 0%, #f5f3ff 46%, #f8fafc 100%);
+            linear-gradient(135deg, #f8fafc 0%, #eff6ff 46%, #f8fafc 100%);
 }
 
 .dashboard-shell--amber {
@@ -289,14 +289,14 @@
     flex: 0 0 auto;
     border-radius: 1rem;
     background: #eef2ff;
-    color: #4f46e5;
+    color: #2563eb;
     font-size: 1.05rem;
 }
 
 .dashboard-metric-card--emerald .dashboard-metric-card__icon { background: #ecfdf5; color: #059669; }
 .dashboard-metric-card--amber .dashboard-metric-card__icon { background: #fffbeb; color: #d97706; }
 .dashboard-metric-card--rose .dashboard-metric-card__icon { background: #fff1f2; color: #e11d48; }
-.dashboard-metric-card--violet .dashboard-metric-card__icon { background: #f5f3ff; color: #7c3aed; }
+.dashboard-metric-card--violet .dashboard-metric-card__icon { background: #eff6ff; color: #2563eb; }
 .dashboard-metric-card--cyan .dashboard-metric-card__icon { background: #ecfeff; color: #0891b2; }
 .dashboard-metric-card--slate .dashboard-metric-card__icon { background: #f1f5f9; color: #334155; }
 
@@ -533,7 +533,7 @@
     position: absolute;
     inset: 0 auto 0 0;
     width: 0.28rem;
-    background: #4f46e5;
+    background: #2563eb;
 }
 
 .dashboard-insight-card--success::before { background: #10b981; }
@@ -556,7 +556,7 @@
     flex: 0 0 auto;
     border-radius: 0.9rem;
     background: #eef2ff;
-    color: #4f46e5;
+    color: #2563eb;
 }
 
 .dashboard-insight-card--success .dashboard-insight-card__icon { background: #ecfdf5; color: #059669; }
@@ -603,7 +603,7 @@
     margin: 0 auto 0.8rem;
     border-radius: 1.1rem;
     background: #eef2ff;
-    color: #4f46e5;
+    color: #2563eb;
     font-size: 1.2rem;
 }
 
@@ -831,14 +831,14 @@
 
 .dashboard-trend-chart__line {
     fill: none;
-    stroke: #4f46e5;
+    stroke: #2563eb;
     stroke-width: 3;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
 .dashboard-trend-chart__dot {
-    fill: #4f46e5;
+    fill: #2563eb;
     stroke: #ffffff;
     stroke-width: 2;
 }
@@ -1615,13 +1615,13 @@ section + .dashboard-grid {
     --dashboard-text: #17142a;
     --dashboard-muted: #747088;
     --dashboard-muted-strong: #56516b;
-    --dashboard-primary: #7657f4;
-    --dashboard-primary-dark: #5d3fdb;
+    --dashboard-primary: #2563eb;
+    --dashboard-primary-dark: #1d4ed8;
     --dashboard-info: #3b82f6;
     --dashboard-success: #35b79d;
     --dashboard-warning: #f0a742;
     --dashboard-danger: #ef6678;
-    --dashboard-purple: #8b5cf6;
+    --dashboard-purple: #3b82f6;
     --dashboard-radius-lg: 22px;
     --dashboard-radius-md: 18px;
     --dashboard-radius-sm: 12px;
@@ -1668,7 +1668,7 @@ section + .dashboard-grid {
 .dashboard-hero__orb--one {
     top: -142px;
     right: 18%;
-    background: #8b5cf6;
+    background: #3b82f6;
 }
 
 .dashboard-hero__orb--two {
@@ -1678,9 +1678,9 @@ section + .dashboard-grid {
 }
 
 .dashboard-hero__eyebrow {
-    color: #6846e7;
-    background: #f1edff;
-    border-color: #e1d9ff;
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #bfdbfe;
     letter-spacing: 0.045em;
 }
 
@@ -1748,7 +1748,7 @@ section + .dashboard-grid {
 .dashboard-metric-card--emerald .dashboard-metric-card__icon { color: #149982; background: #eafaf6; border-color: #c9f0e8; }
 .dashboard-metric-card--amber .dashboard-metric-card__icon { color: #cf7b16; background: #fff6e4; border-color: #ffe5b8; }
 .dashboard-metric-card--rose .dashboard-metric-card__icon { color: #e05267; background: #fff0f3; border-color: #ffd3dc; }
-.dashboard-metric-card--violet .dashboard-metric-card__icon { color: #7657f4; background: #f1edff; border-color: #e1d9ff; }
+.dashboard-metric-card--violet .dashboard-metric-card__icon { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
 .dashboard-metric-card--cyan .dashboard-metric-card__icon { color: #2389c8; background: #edf8ff; border-color: #d6efff; }
 
 .dashboard-donut-svg__track {
@@ -1857,14 +1857,14 @@ section + .dashboard-grid {
     width: min(35%, 30px);
     min-height: 7px;
     border-radius: 999px 999px 8px 8px;
-    background: linear-gradient(180deg, var(--bar-color-soft, rgba(124, 92, 255, 0.32)) 0%, var(--bar-color, #7c5cff) 100%);
+    background: linear-gradient(180deg, var(--bar-color-soft, rgba(124, 92, 255, 0.32)) 0%, var(--bar-color, #2563eb) 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 9px 18px rgba(91, 71, 168, 0.13);
 }
 
 .dashboard-comparison-chart__bar--primary {
     background:
         repeating-linear-gradient(135deg, rgba(255,255,255,0.24) 0 3px, rgba(255,255,255,0) 3px 7px),
-        linear-gradient(180deg, var(--bar-color-soft, rgba(124, 92, 255, 0.34)) 0%, var(--bar-color, #7c5cff) 100%);
+        linear-gradient(180deg, var(--bar-color-soft, rgba(124, 92, 255, 0.34)) 0%, var(--bar-color, #2563eb) 100%);
 }
 
 .dashboard-comparison-chart__bar--secondary {
@@ -2028,7 +2028,7 @@ section + .dashboard-grid {
             rgba(255, 255, 255, 0.28) 0 4px,
             rgba(255, 255, 255, 0) 4px 9px
         ),
-        linear-gradient(180deg, #9d83ff 0%, #6d3df2 100%);
+        linear-gradient(180deg, #60a5fa 0%, #1d4ed8 100%);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.38),
         0 14px 22px rgba(109, 61, 242, 0.18);
@@ -2056,8 +2056,8 @@ section + .dashboard-grid {
 
 /* Role performance dashboard: reference-style content, real reporting data, scoped by backend. */
 .role-performance-dashboard {
-    --role-purple: #7657f4;
-    --role-purple-dark: #5f3fe1;
+    --role-purple: #2563eb;
+    --role-purple-dark: #1d4ed8;
     --role-blue: #8ec5ff;
     --role-teal: #62cdbb;
     --role-gold: #ffbd72;
@@ -2115,7 +2115,7 @@ section + .dashboard-grid {
     width: 1.15rem;
     height: 1.15rem;
     border-radius: 999px;
-    border: 3px solid #ddd6fe;
+    border: 3px solid #bfdbfe;
     border-top-color: var(--role-purple);
     animation: role-dashboard-spin 800ms linear infinite;
 }
@@ -2225,7 +2225,7 @@ section + .dashboard-grid {
 .role-dashboard-chart-card--comparison .dashboard-comparison-chart__bar--primary {
     background:
         repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0 4px, rgba(255, 255, 255, 0) 4px 9px),
-        linear-gradient(180deg, #9d83ff 0%, #6d3df2 100%);
+        linear-gradient(180deg, #60a5fa 0%, #1d4ed8 100%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.38), 0 14px 24px rgba(109, 61, 242, 0.17);
 }
 
@@ -2293,7 +2293,7 @@ section + .dashboard-grid {
     width: 2.55rem;
     height: 2.55rem;
     border-radius: 0.95rem;
-    background: #f1edff;
+    background: #eff6ff;
     color: var(--role-purple);
     font-size: 1.05rem;
 }
@@ -2439,7 +2439,7 @@ section + .dashboard-grid {
 
 .role-dashboard-quick-action:hover {
     border-color: rgba(201, 190, 250, 0.95);
-    background: linear-gradient(135deg, #ffffff, #f1edff);
+    background: linear-gradient(135deg, #ffffff, #eff6ff);
     box-shadow: 0 14px 28px rgba(42, 36, 89, 0.075);
     color: var(--dashboard-text, #17142a);
     transform: translateY(-1px);
@@ -2452,9 +2452,9 @@ section + .dashboard-grid {
     flex: 0 0 auto;
     place-items: center;
     border-radius: 0.9rem;
-    background: #f1edff;
-    color: #7657f4;
-    box-shadow: inset 0 0 0 1px #e1d9ff;
+    background: #eff6ff;
+    color: #2563eb;
+    box-shadow: inset 0 0 0 1px #bfdbfe;
 }
 
 .role-dashboard-quick-action__body {
@@ -2484,7 +2484,7 @@ section + .dashboard-grid {
 
 .role-dashboard-quick-action__arrow {
     flex: 0 0 auto;
-    color: #7657f4;
+    color: #2563eb;
     font-size: 1.1rem;
 }
 
@@ -2498,4 +2498,112 @@ section + .dashboard-grid {
     .role-dashboard-quick-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Calendar-filtered reference dashboard polish */
+.role-dashboard-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: .7rem;
+}
+
+.role-dashboard-date-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .45rem;
+  padding: .45rem;
+  border: 1px solid #dbeafe;
+  border-radius: 1rem;
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 8px 20px rgba(15,23,42,.045);
+}
+
+.role-dashboard-date-filter button,
+.role-dashboard-date-filter input {
+  height: 36px;
+  border: 1px solid #dbeafe;
+  border-radius: .75rem;
+  background: #fff;
+  color: #1e3a8a;
+  font-size: .78rem;
+  font-weight: 850;
+  padding: 0 .7rem;
+}
+
+.role-dashboard-date-filter button:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.role-dashboard-date-filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: #64748b;
+  font-size: .7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.role-dashboard-date-filter input {
+  color: #0f172a;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.role-dashboard-date-filter__clear {
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+  background: #fff5f5 !important;
+}
+
+.role-dashboard-chart-card--comparison .dashboard-chart-card__body {
+  padding-top: .25rem;
+}
+
+.role-performance-dashboard .dashboard-comparison-chart {
+  min-height: 330px;
+}
+
+.role-performance-dashboard .dashboard-comparison-chart__plot {
+  --comparison-plot-height: 238px;
+}
+
+.role-performance-dashboard .dashboard-comparison-chart__bar--primary {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 22%),
+    linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.42), 0 14px 24px rgba(37,99,235,.18) !important;
+}
+
+.role-performance-dashboard .dashboard-comparison-chart__line {
+  stroke: rgba(37, 99, 235, .28) !important;
+}
+
+.role-performance-dashboard .dashboard-comparison-chart__area {
+  opacity: .46 !important;
+}
+
+.role-performance-dashboard .dashboard-comparison-chart__legend i {
+  border-radius: .24rem;
+}
+
+.role-dashboard-pill {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #dbeafe !important;
+}
+
+@media (max-width: 920px) {
+  .role-dashboard-actions {
+    justify-content: flex-start;
+  }
+
+  .role-dashboard-date-filter {
+    width: 100%;
+  }
 }

@@ -3,8 +3,10 @@ package com.epms.controller;
 import com.epms.dto.EvaluatorConfigDTO;
 import com.epms.dto.FeedbackAssignmentGenerationResponse;
 import com.epms.dto.FeedbackCampaignActivationReadinessResponse;
+import com.epms.dto.FeedbackCampaignCloseRequest;
 import com.epms.dto.FeedbackCampaignCreateRequest;
-import com.epms.dto.FeedbackCampaignMonitoringResponse;
+import com.epms.dto.FeedbackCampaignMonitoringDtos.FeedbackCampaignMonitoringResponse;
+import com.epms.dto.FeedbackCampaignMonitoringDtos.MonitoringActivityItemDto;
 import com.epms.dto.FeedbackCampaignEarlyCloseRequest;
 import com.epms.dto.FeedbackCampaignEarlyCloseReviewRequest;
 import com.epms.dto.FeedbackCampaignResponse;
@@ -14,6 +16,7 @@ import com.epms.dto.FeedbackCampaignQuestionReviewResponse;
 import com.epms.dto.FeedbackCampaignQuestionReviewSaveRequest;
 import com.epms.dto.FeedbackTargetCandidateResponse;
 import com.epms.dto.FeedbackManualAssignmentRequest;
+import com.epms.dto.FeedbackReminderRequest;
 import com.epms.dto.FeedbackReminderResponse;
 import com.epms.dto.FeedbackCampaignScoringConfigRequest;
 import com.epms.dto.FeedbackCampaignScoringConfigResponse;
@@ -23,11 +26,14 @@ import com.epms.entity.FeedbackRequest;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.security.SecurityUtils;
 import com.epms.service.FeedbackCampaignService;
+import com.epms.service.FeedbackCampaignMonitoringService;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackEvaluationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -50,6 +56,7 @@ import java.util.Locale;
 public class FeedbackCampaignController {
 
     private final FeedbackCampaignService feedbackCampaignService;
+    private final FeedbackCampaignMonitoringService feedbackCampaignMonitoringService;
     private final FeedbackCampaignQuestionReviewService questionReviewService;
     private final FeedbackEvaluationService feedbackEvaluationService;
 
@@ -233,8 +240,28 @@ public class FeedbackCampaignController {
         ensureHrOrAdmin();
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Campaign monitoring retrieved successfully",
-                feedbackCampaignService.getCampaignMonitoring(campaignId)
+                feedbackCampaignMonitoringService.getMonitoring(campaignId)
         ));
+    }
+
+    @GetMapping("/{campaignId}/monitoring/activity")
+    public ResponseEntity<GenericApiResponse<List<MonitoringActivityItemDto>>> getCampaignMonitoringActivity(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Campaign monitoring activity retrieved successfully",
+                feedbackCampaignMonitoringService.getActivity(campaignId)
+        ));
+    }
+
+    @GetMapping(value = "/{campaignId}/monitoring/export", produces = "text/csv")
+    public ResponseEntity<String> exportCampaignMonitoringCsv(@PathVariable Long campaignId) {
+        ensureHrOrAdmin();
+        String csv = feedbackCampaignMonitoringService.exportMonitoringCsv(campaignId, SecurityUtils.currentUserId().longValue());
+        String filename = "360-monitoring-campaign-" + campaignId + ".csv";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(new MediaType("text", "csv"))
+                .body(csv);
     }
 
     @GetMapping("/{campaignId}/question-review")
@@ -278,9 +305,16 @@ public class FeedbackCampaignController {
     }
 
     @PostMapping("/{campaignId}/close")
-    public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> closeCampaign(@PathVariable Long campaignId) {
+    public ResponseEntity<GenericApiResponse<FeedbackCampaignResponse>> closeCampaign(
+            @PathVariable Long campaignId,
+            @RequestBody(required = false) FeedbackCampaignCloseRequest request
+    ) {
         ensureHrOrAdmin();
-        FeedbackCampaign campaign = feedbackCampaignService.closeCampaign(campaignId, SecurityUtils.currentUserId().longValue());
+        FeedbackCampaign campaign = feedbackCampaignService.closeCampaignWithReadiness(
+                campaignId,
+                request,
+                SecurityUtils.currentUserId().longValue()
+        );
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Feedback campaign closed successfully",
                 mapCampaign(campaign)
@@ -394,6 +428,23 @@ public class FeedbackCampaignController {
         );
         return ResponseEntity.ok(GenericApiResponse.success(
                 "Pending evaluator reminders sent successfully",
+                response
+        ));
+    }
+
+    @PostMapping("/{campaignId}/reminders/scoped")
+    public ResponseEntity<GenericApiResponse<FeedbackReminderResponse>> sendScopedReminders(
+            @PathVariable Long campaignId,
+            @Valid @RequestBody FeedbackReminderRequest request
+    ) {
+        ensureHrOrAdmin();
+        FeedbackReminderResponse response = feedbackCampaignService.sendScopedEvaluatorReminders(
+                campaignId,
+                request,
+                SecurityUtils.currentUserId().longValue()
+        );
+        return ResponseEntity.ok(GenericApiResponse.success(
+                "Scoped evaluator reminders sent successfully",
                 response
         ));
     }

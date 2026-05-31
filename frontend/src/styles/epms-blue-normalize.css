@@ -1,0 +1,295 @@
+/* EPMS Blue UI Normalization
+   Purpose: make older pages visually consistent with the 360/dashboard design.
+   Scope: styling only. No layout routes, API calls, permissions, or data logic changed. by Z */
+:root {
+  --epms-brand: #2563eb;
+  --epms-brand-hover: #1d4ed8;
+  --epms-brand-soft: #dbeafe;
+  --epms-brand-bg: #eff6ff;
+  --epms-bg: #f8fafc;
+  --epms-surface: #ffffff;
+  --epms-surface-soft: #f8fafc;
+  --epms-border: #e2e8f0;
+  --epms-border-strong: #cbd5e1;
+  --epms-text: #0f172a;
+  --epms-muted: #64748b;
+  --epms-soft: #94a3b8;
+  --epms-success: #16a34a;
+  --epms-success-bg: #dcfce7;
+  --epms-warning: #d97706;
+  --epms-warning-bg: #fef3c7;
+  --epms-danger: #dc2626;
+  --epms-danger-bg: #fee2e2;
+  --epms-info: #0284c7;
+  --epms-info-bg: #e0f2fe;
+  --epms-radius-xl: 22px;
+  --epms-radius-lg: 18px;
+  --epms-radius-md: 14px;
+  --epms-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+  --epms-shadow-hover: 0 18px 42px rgba(15, 23, 42, 0.085);
+}
+
+html,
+body,
+#root {
+  background: var(--epms-bg) !important;
+  color: var(--epms-text);
+}
+
+/* Keep role dashboards intact; only normalize their blue tone. */
+.dashboard-shell,
+.dashboard-page-shell,
+.hr-shell,
+.app-shell,
+.app-main,
+.app-main-hr,
+.app-main-employee,
+.app-content-hr,
+.app-content-employee {
+  background: var(--epms-bg) !important;
+}
+
+/* Page containers used by older modules. */
+.app-content-hr > :is(div, main, section):not(.dashboard-shell):not(.dashboard-page-shell),
+.app-content-employee > :is(div, main, section):not(.dashboard-shell):not(.dashboard-page-shell),
+.hr-main-content > :is(div, main, section):not(.dashboard-shell):not(.dashboard-page-shell),
+.page-content > :is(div, main, section),
+.main-content > :is(div, main, section) {
+  color: var(--epms-text);
+}
+
+/* Normalize common page headers. */
+:is(.page-header, .section-header, .content-header, .module-header, .dashboard-header, .table-header, .list-header, .form-header, .settings-header, .reports-header, .employee-page-header, .team-page-header, .department-page-header, .position-page-header, .pip-page-header, .appraisal-page-header) {
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+:is(.page-header, .section-header, .content-header, .module-header, .dashboard-header, .form-header) h1,
+:is(.page-header, .section-header, .content-header, .module-header, .dashboard-header, .form-header) h2,
+:is(.page-title, .section-title, .module-title) {
+  color: var(--epms-text) !important;
+  letter-spacing: -0.035em;
+  font-weight: 900;
+}
+
+:is(.page-header, .section-header, .content-header, .module-header, .dashboard-header, .form-header) p,
+:is(.page-subtitle, .section-subtitle, .module-subtitle, .text-muted) {
+  color: var(--epms-muted) !important;
+}
+
+/* Give plain old panels/cards the same visual treatment. */
+:is(.card, .panel, .section-card, .content-card, .settings-card, .table-card, .form-card, .summary-card, .stat-card, .metric-card, .info-card, .detail-card, .team-card, .department-card, .employee-card, .position-card, .pip-card, .appraisal-card, .report-card, .notification-card, .audit-card):not(.dashboard-metric-card):not(.dashboard-chart-card) {
+  border: 1px solid var(--epms-border) !important;
+  border-radius: var(--epms-radius-lg) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: var(--epms-shadow) !important;
+}
+
+:is(.card, .panel, .section-card, .content-card, .settings-card, .table-card, .form-card, .summary-card, .stat-card, .metric-card, .info-card, .detail-card, .team-card, .department-card, .employee-card, .position-card, .pip-card, .appraisal-card, .report-card, .notification-card, .audit-card):not(.dashboard-metric-card):not(.dashboard-chart-card):hover {
+  border-color: #bfdbfe !important;
+}
+
+/* Reduce bulky spacing on old pages without flattening dashboard pages. */
+:is(.card, .panel, .section-card, .content-card, .settings-card, .table-card, .form-card, .summary-card, .info-card, .detail-card):not(.dashboard-chart-card):not(.dashboard-metric-card) {
+  padding: clamp(0.95rem, 1.6vw, 1.25rem);
+}
+
+:is(.page-actions, .section-actions, .table-actions, .form-actions, .modal-actions, .button-row, .action-row) {
+  gap: 0.55rem !important;
+  flex-wrap: wrap;
+}
+
+/* Buttons: compact, blue, consistent. */
+:is(button, .btn, .button, .action-button, .primary-button, .secondary-button, .submit-button, .cancel-button, .save-button, .create-button, .edit-button, .delete-button, .view-button) {
+  border-radius: 0.8rem;
+  font-weight: 800;
+  transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+}
+
+:is(button, .btn, .button, .action-button, .primary-button, .secondary-button, .submit-button, .cancel-button, .save-button, .create-button, .edit-button, .delete-button, .view-button):not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+:is(.btn-primary, .primary, .primary-button, .submit-button, .save-button, .create-button, button[type='submit']) {
+  background: var(--epms-brand) !important;
+  border-color: var(--epms-brand) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16) !important;
+}
+
+:is(.btn-primary, .primary, .primary-button, .submit-button, .save-button, .create-button, button[type='submit']):not(:disabled):hover {
+  background: var(--epms-brand-hover) !important;
+  border-color: var(--epms-brand-hover) !important;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.2) !important;
+}
+
+:is(.btn-secondary, .secondary, .secondary-button, .cancel-button, .ghost-button, .outline-button) {
+  background: #ffffff !important;
+  border-color: var(--epms-border) !important;
+  color: #334155 !important;
+  box-shadow: none !important;
+}
+
+:is(.btn-secondary, .secondary, .secondary-button, .cancel-button, .ghost-button, .outline-button):not(:disabled):hover {
+  background: var(--epms-brand-bg) !important;
+  border-color: #bfdbfe !important;
+  color: var(--epms-brand-hover) !important;
+}
+
+:is(.danger, .danger-button, .delete-button, .btn-danger) {
+  background: var(--epms-danger) !important;
+  border-color: var(--epms-danger) !important;
+  color: #ffffff !important;
+}
+
+:is(button, .btn, .button):disabled,
+:is(button, .btn, .button)[aria-disabled='true'] {
+  cursor: not-allowed !important;
+  opacity: 0.62 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Forms: avoid plain input look. */
+:is(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+  border-color: var(--epms-border);
+  border-radius: 0.8rem;
+  background: #ffffff;
+  color: var(--epms-text);
+}
+
+:is(input, select, textarea):not([type='checkbox']):not([type='radio']):focus {
+  outline: none;
+  border-color: #93c5fd !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1) !important;
+}
+
+:is(label, .form-label) {
+  color: #334155;
+  font-weight: 800;
+}
+
+:is(.helper-text, .form-help, .hint, .description) {
+  color: var(--epms-muted) !important;
+}
+
+/* Tables: same card/table language across modules. */
+:is(table) {
+  color: var(--epms-text);
+}
+
+:is(.table, table) thead th {
+  background: var(--epms-surface-soft) !important;
+  color: #475569 !important;
+  border-color: var(--epms-border) !important;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+:is(.table, table) tbody td {
+  border-color: #edf2f7 !important;
+  color: #334155;
+}
+
+:is(.table, table) tbody tr:hover td {
+  background: #f8fbff !important;
+}
+
+/* Pills and badges. */
+:is(.badge, .pill, .chip, .tag, .status-badge) {
+  border-radius: 999px !important;
+  font-weight: 850 !important;
+}
+
+:is(.badge-primary, .pill-primary, .chip-primary, .tag-primary, .status-primary) {
+  background: var(--epms-brand-bg) !important;
+  color: var(--epms-brand-hover) !important;
+  border-color: #bfdbfe !important;
+}
+
+:is(.badge-success, .pill-success, .status-success, .completed, .active) {
+  background: var(--epms-success-bg) !important;
+  color: #166534 !important;
+}
+
+:is(.badge-warning, .pill-warning, .status-warning, .pending, .draft) {
+  background: var(--epms-warning-bg) !important;
+  color: #92400e !important;
+}
+
+:is(.badge-danger, .pill-danger, .status-danger, .rejected, .inactive) {
+  background: var(--epms-danger-bg) !important;
+  color: #991b1b !important;
+}
+
+/* Override old purple/violet utility classes used in many JSX files. */
+.text-purple-50, .text-purple-100, .text-purple-200, .text-purple-300, .text-purple-400,
+.text-purple-500, .text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900,
+.text-violet-50, .text-violet-100, .text-violet-200, .text-violet-300, .text-violet-400,
+.text-violet-500, .text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900,
+.text-indigo-50, .text-indigo-100, .text-indigo-200, .text-indigo-300, .text-indigo-400,
+.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900 {
+  color: var(--epms-brand) !important;
+}
+
+.bg-purple-50, .bg-violet-50, .bg-indigo-50 { background-color: var(--epms-brand-bg) !important; }
+.bg-purple-100, .bg-violet-100, .bg-indigo-100 { background-color: var(--epms-brand-soft) !important; }
+.bg-purple-500, .bg-purple-600, .bg-purple-700,
+.bg-violet-500, .bg-violet-600, .bg-violet-700,
+.bg-indigo-500, .bg-indigo-600, .bg-indigo-700 {
+  background-color: var(--epms-brand) !important;
+}
+
+.border-purple-100, .border-purple-200, .border-purple-300,
+.border-violet-100, .border-violet-200, .border-violet-300,
+.border-indigo-100, .border-indigo-200, .border-indigo-300 {
+  border-color: #bfdbfe !important;
+}
+
+.from-purple-50, .from-violet-50, .from-indigo-50 { --tw-gradient-from: var(--epms-brand-bg) var(--tw-gradient-from-position) !important; }
+.to-purple-50, .to-violet-50, .to-indigo-50 { --tw-gradient-to: #ffffff var(--tw-gradient-to-position) !important; }
+.from-purple-500, .from-purple-600, .from-violet-500, .from-violet-600, .from-indigo-500, .from-indigo-600 { --tw-gradient-from: var(--epms-brand) var(--tw-gradient-from-position) !important; }
+.to-purple-500, .to-purple-600, .to-violet-500, .to-violet-600, .to-indigo-500, .to-indigo-600 { --tw-gradient-to: var(--epms-brand-hover) var(--tw-gradient-to-position) !important; }
+
+/* Keep page bodies from looking like plain text dumps. */
+:is(.plain-page, .route-placeholder, .empty-page, .coming-soon, .not-found, .placeholder-page) {
+  border: 1px solid var(--epms-border) !important;
+  border-radius: var(--epms-radius-xl) !important;
+  background: #ffffff !important;
+  box-shadow: var(--epms-shadow) !important;
+  padding: clamp(1.2rem, 2.5vw, 2rem) !important;
+  color: var(--epms-text) !important;
+}
+
+/* Modals / dialogs. */
+:is(.modal-content, .dialog, .dialog-content, .popup, .popover-panel) {
+  border: 1px solid var(--epms-border) !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18) !important;
+}
+
+:is(.modal-header, .dialog-header, .popup-header) {
+  border-color: var(--epms-border) !important;
+}
+
+/* Scrollbar polish. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}

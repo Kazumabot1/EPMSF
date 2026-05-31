@@ -1,11 +1,11 @@
-/* KPI Template UI System — polished, modern, and consistent */
+/* KPI Template UI System — polished, modern, and consistent By Z */
 
 :root {
-  --kpi-violet-900: #4c1d95;
-  --kpi-violet-700: #6d28d9;
-  --kpi-violet-600: #7c3aed;
-  --kpi-violet-500: #8b5cf6;
-  --kpi-violet-100: #ede9fe;
+  --kpi-violet-900: #1e3a8a;
+  --kpi-violet-700: #1d4ed8;
+  --kpi-violet-600: #2563eb;
+  --kpi-violet-500: #3b82f6;
+  --kpi-violet-100: #dbeafe;
   --kpi-slate-900: #0f172a;
   --kpi-slate-700: #334155;
   --kpi-slate-500: #64748b;
@@ -260,7 +260,7 @@
 .kpi-tpl-btn-secondary:hover {
   border-color: rgb(167 139 250 / 0.9);
   color: var(--kpi-violet-700);
-  background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
   box-shadow:
     0 4px 12px -8px rgb(76 29 149 / 0.22),
     inset 0 1px 0 rgb(255 255 255 / 0.8);
@@ -571,7 +571,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6d28d9;
+  color: #1d4ed8;
 }
 
 .kpi-tpl-modal-header h2 {
@@ -635,7 +635,7 @@
   border-radius: 999px;
   padding: 0.3rem 0.65rem;
   background: rgb(245 243 255);
-  color: #4c1d95;
+  color: #1e3a8a;
   font-size: 0.74rem;
   font-weight: 600;
 }

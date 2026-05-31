@@ -1,4 +1,4 @@
-.form-signature-picker {
+/*Z*/.form-signature-picker {
   display: grid;
   gap: 0.65rem;
 }
@@ -27,7 +27,7 @@
 .form-signature-picker-link {
   border: none;
   background: none;
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -66,15 +66,15 @@
 }
 
 .form-signature-picker-tabs button.active {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
 }
 
 .form-signature-picker-save {
   border: none;
   border-radius: 8px;
-  background: #4f46e5;
+  background: #2563eb;
   color: #fff;
   font-size: 0.82rem;
   font-weight: 700;

@@ -106,6 +106,17 @@ const RedirectWithMessage = ({ message, to }: RedirectWithMessageProps) => {
   return <Navigate to={destination} replace />;
 };
 
+const MyTeamRoute = () => {
+  const { user } = useAuth();
+  const role = resolveUserRole(user);
+
+  if (role === 'DepartmentHead') {
+    return <Navigate to="/department-head/teams" replace />;
+  }
+
+  return <MyTeamPage />;
+};
+
 function App() {
   return (
     <BrowserRouter>
@@ -145,6 +156,30 @@ function App() {
               element={<RedirectWithMessage message="Role Permissions is no longer available. Use Position Permissions instead." />}
             />
           </Route>
+            <Route element={<AppLayout />}>
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/notification-settings" element={<NotificationSettings />} />
+              <Route path="/my-team" element={<MyTeamRoute />} />
+              <Route path="/employee/notifications" element={<Notifications />} />
+              <Route path="/employee/notification-settings" element={<NotificationSettings />} />
+              <Route path="/my-kpis" element={<EmployeeKpiResultsPage />} />
+              <Route path="/pip/past-plans" element={<PipPastPlansPage />} />
+              <Route
+                  path="/permissions"
+                  element={<RedirectWithMessage message="Permission management has been moved to Position Permissions." />}
+              />
+              <Route
+                  path="/user-roles"
+                  element={
+                    <RedirectWithMessage message="User Roles is no longer available. Position roles now control dashboard access." />
+                  }
+              />
+              <Route
+                  path="/role-permissions"
+                  element={<RedirectWithMessage message="Role Permissions is no longer available. Use Position Permissions instead." />}
+              />
+            </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['HR', 'Manager', 'DepartmentHead']} />}>
             <Route element={<AppLayout />}>

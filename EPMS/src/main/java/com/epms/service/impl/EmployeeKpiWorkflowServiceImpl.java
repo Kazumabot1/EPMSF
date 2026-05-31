@@ -430,8 +430,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
         List<KpiForm> forms = period.getKpiForm() == null
                 ? links.stream()
-                  .map(link -> link.getKpiForm())
-                  .toList()
+                .map(link -> link.getKpiForm())
+                .toList()
                 : List.of(period.getKpiForm());
 
         int created = 0;
@@ -706,6 +706,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
 
+        processed += ensureActiveCyclePeriodSchedulesAndAssignments(today);
+
         for (KpiTemplateCyclePeriod period : kpiTemplateCyclePeriodRepository.findOpenPeriodsPastEnd(
                 KpiTemplateCyclePeriodStatus.OPEN,
                 today
@@ -741,6 +743,43 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             processed++;
         }
 
+        return processed;
+    }
+
+    private int ensureActiveCyclePeriodSchedulesAndAssignments(LocalDate today) {
+        int processed = 0;
+        for (KpiTemplateCycle cycle : kpiTemplateCycleRepository.findByStatus(KpiTemplateCycleStatus.ACTIVE)) {
+            List<KpiTemplateCycleForm> links = kpiTemplateCycleFormRepository.findWithFormsByCycleId(cycle.getId());
+            for (KpiTemplateCycleForm link : links) {
+                if (link.getKpiForm() == null || link.getKpiForm().getId() == null) {
+                    continue;
+                }
+
+                KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId()).orElse(null);
+                if (form == null) {
+                    continue;
+                }
+
+                List<KpiTemplateCyclePeriod> periods = ensureAllCycleFormPeriodsGenerated(cycle, form);
+                KpiTemplateCyclePeriod activePeriod = pickActivePeriodForAssignment(periods, today);
+                if (activePeriod == null || activePeriod.getId() == null) {
+                    continue;
+                }
+
+                if (!ACTIVE_PERIOD_STATUSES.contains(activePeriod.getStatus())) {
+                    continue;
+                }
+
+                if (employeeKpiFormRepository.existsByCyclePeriod_Id(activePeriod.getId())) {
+                    continue;
+                }
+
+                UseKpiTemplateResultDto result = useCyclePeriodForAllActiveDepartments(cycle.getId(), activePeriod.getId());
+                if (result != null && result.getAssignmentsCreated() > 0) {
+                    processed++;
+                }
+            }
+        }
         return processed;
     }
 
@@ -1122,7 +1161,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     String rowLabel = item == null
                             ? ("#" + row.getKpiFormItemId())
                             : Optional.ofNullable(item.getKpiItem()).map(KpiItem::getName).filter(s -> !s.isBlank())
-                              .orElse(Optional.ofNullable(item.getKpiLabel()).filter(s -> !s.isBlank()).orElse("#" + item.getId()));
+                            .orElse(Optional.ofNullable(item.getKpiLabel()).filter(s -> !s.isBlank()).orElse("#" + item.getId()));
                     throw new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "KPI row \"" + rowLabel + "\" has no valid target for (actual/target)×100."
@@ -1461,10 +1500,10 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     .collect(Collectors.joining(", "));
             String hrMessage = periodEndAuto
                     ? ("KPI \"" + form.getTitle() + "\" auto-finalized after period end for "
-                       + finalizedThisRun.size() + " employee(s): " + summary + ".")
+                    + finalizedThisRun.size() + " employee(s): " + summary + ".")
                     : ("KPI \"" + form.getTitle() + "\" finalized for "
-                       + finalizedThisRun.size() + " employee(s): " + summary + "."
-                       + firstReasonSummary(finalizedThisRun));
+                    + finalizedThisRun.size() + " employee(s): " + summary + "."
+                    + firstReasonSummary(finalizedThisRun));
             for (User hr : hrUsers) {
                 notificationService.sendEvent(hr.getId(), NotificationEventKey.KPI_HR_SUMMARY, "KPI finalized", hrMessage, TYPE_KPI_FINALIZED_HR, form.getId());
             }

@@ -1,4 +1,4 @@
-.department-page {
+/*Z*/.department-page {
   animation: departmentFadeIn 0.35s ease-out;
 }
 
@@ -26,7 +26,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #4f46e5;
+  color: #2563eb;
   background: #eef2ff;
   margin-bottom: 14px;
 }
@@ -83,7 +83,7 @@
 
 .department-btn.primary {
   color: #fff;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
 }
 
 .department-btn.primary:hover {
@@ -102,7 +102,7 @@
 }
 
 .department-btn.ghost {
-  color: #4f46e5;
+  color: #2563eb;
   background: transparent;
 }
 
@@ -248,7 +248,7 @@
 
 .department-form-group input:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
 }
 

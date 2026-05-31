@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/*Z*/import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
 import api from '../../services/api';
@@ -725,11 +725,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         to: '/profile',
         label: 'Profile',
         icon: 'bi bi-person',
-      },
-      hasMyTeams && {
-        to: '/my-team',
-        label: 'My Team',
-        icon: 'bi bi-diagram-3',
       },
       {
         to: '/department-head/self-assessment-forms',

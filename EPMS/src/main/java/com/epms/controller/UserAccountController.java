@@ -86,10 +86,14 @@ public class UserAccountController {
             throw new BadRequestException("Email is required");
         }
 
-        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
-            throw new BadRequestException("Email is already used by another user");
-        }
-
+        /*
+         * Do not reject here only because a login user already exists for this email.
+         * Employee creation can already provision a user account, and the Admin/HR
+         * account screen may be opened again for the same employee. The service below
+         * resolves the employee by email/employeeId and links or updates the existing
+         * user safely. True cross-employee conflicts are still blocked inside
+         * UserAccountProvisioningService.
+         */
         request.setEmail(email);
         request.setRoleName(normalizeRoleName(request.getRoleName()));
 
