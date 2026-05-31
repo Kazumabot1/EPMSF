@@ -38,7 +38,6 @@ import ManagerKpiScoringPage from './pages/manager/ManagerKpiScoringPage';
 import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 
 import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
-import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
 import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
 import DepartmentHeadEmployeeListsPage from './pages/department-head/DepartmentEmployeeListsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -192,7 +191,7 @@ function App() {
                 <Route path="/admin/kpi-scoring" element={<ManagerKpiScoringPage />} />
                 <Route path="/admin/kpi/history" element={<ManagerKpiHistoryPage />} />
                 <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
-                <Route path="/admin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
+} />
                 <Route path="/position-permissions" element={<PositionPermissions />} />
               </Route>
             </Route>

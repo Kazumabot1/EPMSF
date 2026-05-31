@@ -1089,9 +1089,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ManagerKpiTemplateSummaryDto> listKpiTemplatesForManagerDepartment() {
-        ensureActiveCyclePeriodSchedulesAndAssignments(LocalDate.now());
         List<Integer> employeeIds = currentEvaluatorScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();
@@ -1108,7 +1107,6 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public List<ManagerKpiAssignmentDto> listDepartmentAssignmentsForManager(Integer kpiFormId, Integer cyclePeriodId) {
-        ensureActiveCyclePeriodSchedulesAndAssignments(LocalDate.now());
         List<Integer> employeeIds = currentEvaluatorScopedEmployeeIds();
         if (employeeIds.isEmpty()) {
             return List.of();

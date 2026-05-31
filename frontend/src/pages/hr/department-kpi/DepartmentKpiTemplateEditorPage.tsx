@@ -1,0 +1,213 @@
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import KpiTemplateRowsTable from '../../../components/hr/kpi-template/KpiTemplateRowsTable';
+import '../../../components/hr/kpi-template/kpi-template.css';
+import { newKpiTemplateRow } from '../../../components/hr/kpi-template/kpiTemplateWorkflow';
+import { departmentKpiTemplateService } from '../../../services/departmentKpiService';
+import { fetchDepartments, type Department } from '../../../services/departmentService';
+import { kpiCategoryService } from '../../../services/kpiCategoryService';
+import { kpiItemService } from '../../../services/kpiItemService';
+import { kpiUnitService } from '../../../services/kpiUnitService';
+import type { KpiCategory } from '../../../types/kpiCategory';
+import type { KpiItem } from '../../../types/kpiItem';
+import type { KpiFormStatus, KpiTemplateRowDraft } from '../../../types/kpiTemplate';
+import type { KpiUnit } from '../../../types/kpiUnit';
+
+const fieldClass = 'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm';
+
+const DepartmentKpiTemplateEditorPage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isEdit = Boolean(id) && id !== 'new';
+  const templateId = isEdit ? Number(id) : NaN;
+
+  const [title, setTitle] = useState('');
+  const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
+  const [departmentIds, setDepartmentIds] = useState<number[]>([]);
+  const [rows, setRows] = useState<KpiTemplateRowDraft[]>([newKpiTemplateRow()]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [categories, setCategories] = useState<KpiCategory[]>([]);
+  const [units, setUnits] = useState<KpiUnit[]>([]);
+  const [items, setItems] = useState<KpiItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [deptRows, cats, unitRows, itemRows] = await Promise.all([
+          fetchDepartments(),
+          kpiCategoryService.getAll(),
+          kpiUnitService.getAll(),
+          kpiItemService.getAll(),
+        ]);
+        setDepartments(deptRows.filter((d) => d.status !== false));
+        setCategories(cats);
+        setUnits(unitRows);
+        setItems(itemRows);
+        if (isEdit && !Number.isNaN(templateId)) {
+          const template = await departmentKpiTemplateService.get(templateId);
+          setTitle(template.title);
+          setStatus(template.status);
+          setDepartmentIds(template.departments.map((d) => d.id));
+          setRows(template.items.length > 0 ? template.items.map((line) => ({
+            rowId: crypto.randomUUID(),
+            id: line.id ?? null,
+            kpiItemId: line.kpiItemId,
+            kpiLabel: line.kpiLabel ?? '',
+            kpiCategoryId: line.kpiCategoryId,
+            kpiCategoryLabel: line.kpiCategoryLabel ?? (line.kpiCategoryId == null ? line.kpiCategoryName ?? '' : ''),
+            kpiUnitId: line.kpiUnitId,
+            kpiUnitLabel: line.kpiUnitLabel ?? (line.kpiUnitId == null ? line.kpiUnitName ?? '' : ''),
+            target: line.target,
+            weight: line.weight,
+          })) : [newKpiTemplateRow()]);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load Department KPI form.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [isEdit, templateId]);
+
+  const totalWeight = useMemo(() => rows.reduce((sum, row) => sum + (row.weight ?? 0), 0), [rows]);
+
+  const validate = () => {
+    if (!title.trim()) return 'Title is required.';
+    if (departmentIds.length === 0) return 'Select at least one department.';
+    if (rows.length === 0) return 'Add at least one KPI row.';
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (row.kpiItemId == null && !row.kpiLabel.trim()) return `Row ${i + 1}: enter a KPI name or select a KPI item.`;
+      if ((row.kpiCategoryId == null && !row.kpiCategoryLabel.trim()) || (row.kpiUnitId == null && !row.kpiUnitLabel.trim()) || row.target == null || row.weight == null) {
+        return `Row ${i + 1}: category, unit, target, and weight are required.`;
+      }
+      if (!Number.isFinite(row.target) || row.target < 1 || row.target > 100) {
+        return `Row ${i + 1}: target must be between 1 and 100.`;
+      }
+      if (!Number.isFinite(row.weight) || row.weight < 1 || row.weight > 100) {
+        return `Row ${i + 1}: weight must be between 1 and 100.`;
+      }
+    }
+    if ((status === 'ACTIVE' || status === 'FINALIZED') && totalWeight !== 100) {
+      return 'Total weight must equal 100% before status can be ACTIVE or FINALIZED.';
+    }
+    return null;
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const message = validate();
+    if (message) {
+      toast.error(message);
+      return;
+    }
+    try {
+      setSaving(true);
+      const payload = {
+        title: title.trim(),
+        status,
+        departmentIds,
+        items: rows.map((row, index) => ({
+          id: row.id ?? null,
+          kpiLabel: row.kpiItemId == null ? row.kpiLabel.trim() || null : null,
+          kpiItemId: row.kpiItemId,
+          kpiItemName: null,
+          kpiCategoryId: row.kpiCategoryId,
+          kpiCategoryName: null,
+          kpiCategoryLabel: row.kpiCategoryId == null ? row.kpiCategoryLabel.trim() || null : null,
+          kpiUnitId: row.kpiUnitId,
+          kpiUnitName: null,
+          kpiUnitLabel: row.kpiUnitId == null ? row.kpiUnitLabel.trim() || null : null,
+          target: row.target,
+          weight: row.weight,
+          sortOrder: index,
+        })),
+      };
+      if (isEdit && !Number.isNaN(templateId)) {
+        await departmentKpiTemplateService.update(templateId, payload);
+        toast.success('Department KPI template updated.');
+      } else {
+        await departmentKpiTemplateService.create(payload);
+        toast.success('Department KPI template created.');
+      }
+      navigate('/hr/department-kpi-template');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save Department KPI template.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="kpi-tpl-page">
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Department KPI</p>
+            <h1 className="mt-1 text-2xl font-bold text-gray-900">{isEdit ? 'Edit Department KPI Template' : 'New Department KPI Template'}</h1>
+          </div>
+          <Link to="/hr/department-kpi-template" className="kpi-tpl-btn-secondary no-underline">Back</Link>
+        </div>
+
+        <form onSubmit={submit} className="space-y-6">
+          <section className="kpi-tpl-card p-6">
+            <div className="grid gap-5 md:grid-cols-3">
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Title</span>
+                <input className={fieldClass} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Finance Department KPI" />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</span>
+                <select className={fieldClass} value={status} onChange={(e) => setStatus(e.target.value as KpiFormStatus)}>
+                  <option value="DRAFT">DRAFT</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="FINALIZED">FINALIZED</option>
+                  <option value="ARCHIVED">ARCHIVED</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Departments</span>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {departments.map((department) => (
+                  <label key={department.id} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={departmentIds.includes(department.id)}
+                      onChange={(e) => {
+                        setDepartmentIds((prev) => e.target.checked ? [...prev, department.id] : prev.filter((id) => id !== department.id));
+                      }}
+                    />
+                    {department.departmentName}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <KpiTemplateRowsTable
+            rows={rows}
+            categories={categories}
+            units={units}
+            items={items}
+            onAddRow={() => setRows((prev) => [...prev, newKpiTemplateRow()])}
+            onRemoveRow={(rowId) => setRows((prev) => prev.length > 1 ? prev.filter((row) => row.rowId !== rowId) : prev)}
+            onRowChange={(rowId, patch) => setRows((prev) => prev.map((row) => row.rowId === rowId ? { ...row, ...patch } : row))}
+          />
+
+          <div className="flex justify-end gap-3">
+            <Link to="/hr/department-kpi-template" className="kpi-tpl-btn-secondary no-underline">Cancel</Link>
+            <button disabled={loading || saving} className="kpi-tpl-btn-primary" type="submit">{saving ? 'Saving...' : 'Save Template'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default DepartmentKpiTemplateEditorPage;
