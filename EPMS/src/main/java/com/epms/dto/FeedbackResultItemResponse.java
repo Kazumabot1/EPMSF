@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Value
 @Builder
@@ -37,5 +38,13 @@ public class FeedbackResultItemResponse {
     LocalDateTime publishedAt;
     Long publishedByUserId;
     String publishNote;
+    Boolean includeOverallScore;
+    Boolean includeCompetencyBreakdown;
+    Boolean includeSelfVsOthers;
+    Boolean includeComments;
+    Boolean includeScoreExplanation;
+    List<FeedbackRelationshipPrivacyResponse> relationshipPrivacy;
+    List<FeedbackCompetencyResultResponse> competencyBreakdown;
+    List<FeedbackPublishedCommentResponse> comments;
     LocalDateTime summarizedAt;
 }

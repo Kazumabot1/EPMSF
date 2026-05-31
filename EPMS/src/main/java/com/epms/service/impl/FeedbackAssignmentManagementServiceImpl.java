@@ -22,6 +22,7 @@ import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackAssignmentManagementService;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackOperationalService;
+import com.epms.service.FeedbackWorkRelationshipResolver;
 import com.epms.util.FeedbackEvaluatorConfigNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,6 +55,7 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
     private final UserRepository userRepository;
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackCampaignQuestionReviewService questionReviewService;
+    private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -310,25 +312,25 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
         }
 
         if (relationshipType == FeedbackRelationshipType.MANAGER) {
-            if (target.getManagerId() == null || !Objects.equals(target.getManagerId(), evaluator.getId())) {
-                throw new BusinessValidationException("Manager review must use the recipient's recorded Reports To manager.");
+            if (!workRelationshipResolver.isWorkContextManager(target, evaluator)) {
+                throw new BusinessValidationException("Manager review must use a work-context manager: active team leader, or department manager/head when no active team exists.");
             }
             return;
         }
 
         if (relationshipType == FeedbackRelationshipType.SUBORDINATE) {
-            if (!Objects.equals(evaluator.getManagerId(), target.getId())) {
-                throw new BusinessValidationException("Direct Report review must use an employee who reports to the selected recipient.");
+            if (!workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
+                throw new BusinessValidationException("Subordinate review must use a work-context subordinate from the target's active team or department scope.");
             }
             return;
         }
 
         if (relationshipType == FeedbackRelationshipType.PEER) {
-            if (Objects.equals(target.getManagerId(), evaluator.getId())) {
-                throw new BusinessValidationException("The recipient's manager cannot be added as a peer evaluator.");
+            if (workRelationshipResolver.isWorkContextManager(target, evaluator)) {
+                throw new BusinessValidationException("The recipient's work-context manager cannot be added as a peer evaluator.");
             }
-            if (Objects.equals(evaluator.getManagerId(), target.getId())) {
-                throw new BusinessValidationException("A direct report cannot be added as a peer evaluator.");
+            if (workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
+                throw new BusinessValidationException("A work-context subordinate cannot be added as a peer evaluator.");
             }
             if (hasHrAdminRole(evaluator)) {
                 throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
@@ -613,17 +615,12 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
         }
     }
 
-    private boolean sameManager(User left, User right) {
-        return left != null && right != null && left.getManagerId() != null && Objects.equals(left.getManagerId(), right.getManagerId());
-    }
-
     private String buildPeerSelectionReason(User target, User evaluator) {
         if (target == null || evaluator == null) {
             return "Suggested peer based on the best available work-context match.";
         }
         List<String> reasons = new ArrayList<>();
         if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), evaluator.getDepartmentId())) reasons.add("same department");
-        if (sameManager(target, evaluator)) reasons.add("same reporting group");
         int distance = levelDistance(target, evaluator);
         if (distance == 0) reasons.add("same level");
         else if (distance == 1) reasons.add("nearby level");

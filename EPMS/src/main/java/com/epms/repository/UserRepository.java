@@ -121,6 +121,30 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     List<User> findActiveManagersByDepartmentId(@Param("departmentId") Integer departmentId);
 
     @Query(value = """
+        SELECT DISTINCT u.*
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE u.department_id = :departmentId
+          AND (u.active IS NULL OR u.active = true)
+          AND UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_'))
+              IN ('MANAGER', 'PROJECT_MANAGER', 'PROJECTMANAGER', 'TEAM_MANAGER', 'PM')
+        """, nativeQuery = true)
+    List<User> findActiveFeedback360ManagersByDepartmentId(@Param("departmentId") Integer departmentId);
+
+    @Query(value = """
+        SELECT DISTINCT u.*
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE u.department_id = :departmentId
+          AND (u.active IS NULL OR u.active = true)
+          AND UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_'))
+              IN ('DEPARTMENT_HEAD', 'DEPARTMENTHEAD', 'DEPT_HEAD', 'DEPTHEAD', 'HEAD_OF_DEPARTMENT')
+        """, nativeQuery = true)
+    List<User> findActiveFeedback360DepartmentHeadsByDepartmentId(@Param("departmentId") Integer departmentId);
+
+    @Query(value = """
             SELECT
                 u.id AS userId,
                 COALESCE(NULLIF(u.full_name, ''), NULLIF(u.email, ''), CONCAT('User #', u.id)) AS displayName,
