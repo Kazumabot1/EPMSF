@@ -1249,3 +1249,15 @@
     flex: 1;
   }
 }
+.ess-rejected-edit-card {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fff7ed 0%, #fff1f2 100%);
+}
+
+.ess-rejected-edit-card > p {
+  margin: 0;
+  color: #7f1d1d;
+  font-size: 13px;
+  line-height: 1.7;
+  font-weight: 800;
+}

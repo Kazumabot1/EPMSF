@@ -88,7 +88,6 @@ public class EmployeeAssessmentService {
             AssessmentStatus.PENDING_HR,
             AssessmentStatus.APPROVED,
             AssessmentStatus.DECLINED,
-            AssessmentStatus.REJECTED,
             AssessmentStatus.CLOSED_REJECTED
     );
 
@@ -195,8 +194,16 @@ public class EmployeeAssessmentService {
         validateAssessmentBelongsToAssignedForm(assessment, form);
         validateRequestFormMatchesAssignedForm(request, form);
 
-        applyRequest(assessment, request, AssessmentStatus.DRAFT, form);
+        AssessmentStatus nextStatus = AssessmentStatus.REJECTED.equals(assessment.getStatus())
+                ? AssessmentStatus.REJECTED
+                : AssessmentStatus.DRAFT;
+
+        applyRequest(assessment, request, nextStatus, form);
         calculateScores(assessment, form);
+
+        if (AssessmentStatus.REJECTED.equals(nextStatus)) {
+            clearEmployeeSignature(assessment);
+        }
 
         return toResponse(assessmentRepository.save(assessment));
     }
@@ -214,14 +221,26 @@ public class EmployeeAssessmentService {
         validateAssessmentBelongsToAssignedForm(assessment, form);
         validateRequestFormMatchesAssignedForm(request, form);
 
-        applyRequest(assessment, request, AssessmentStatus.PENDING_MANAGER, form);
+        boolean resubmittingAfterHrRejection = AssessmentStatus.REJECTED.equals(assessment.getStatus())
+                && "HR".equalsIgnoreCase(clean(assessment.getRejectedByRole()));
+        AssessmentStatus nextStatus = resubmittingAfterHrRejection
+                ? AssessmentStatus.PENDING_HR
+                : AssessmentStatus.PENDING_MANAGER;
+
+        applyRequest(assessment, request, nextStatus, form);
         validateComplete(assessment);
         calculateScores(assessment, form);
         attachEmployeeSignature(assessment);
 
-        applyInitialManagerRouting(assessment);
+        if (resubmittingAfterHrRejection) {
+            clearHrSignature(assessment);
+            assessment.setStatus(AssessmentStatus.PENDING_HR);
+        } else {
+            clearManagerAndHrSignatures(assessment);
+            applyInitialManagerRouting(assessment);
+            assessment.setStatus(AssessmentStatus.PENDING_MANAGER);
+        }
 
-        assessment.setStatus(AssessmentStatus.PENDING_MANAGER);
         assessment.setSubmittedAt(LocalDateTime.now());
         assessment.setApprovedAt(null);
         assessment.setDeclinedAt(null);
@@ -284,7 +303,7 @@ public class EmployeeAssessmentService {
         String comment = clean(request == null ? null : request.getComment());
 
         if (canEmployeeReviseAfterRejection(assessment)) {
-            reopenRejectedAssessmentForEmployeeRevision(assessment, reason, comment, false);
+            markRejectedForEmployeeRevision(assessment, reason, comment, false);
         } else {
             closeRejectedAssessment(assessment, reason, comment, false);
         }
@@ -356,7 +375,7 @@ public class EmployeeAssessmentService {
         String comment = clean(request == null ? null : request.getComment());
 
         if (canEmployeeReviseAfterRejection(assessment)) {
-            reopenRejectedAssessmentForEmployeeRevision(assessment, reason, comment, true);
+            markRejectedForEmployeeRevision(assessment, reason, comment, true);
         } else {
             closeRejectedAssessment(assessment, reason, comment, true);
         }
@@ -635,6 +654,10 @@ public class EmployeeAssessmentService {
                 .departmentHeadComment(null)
                 .hrComment(null)
                 .declineReason(null)
+                .rejectedByRole(null)
+                .rejectedByUserId(null)
+                .rejectedByName(null)
+                .rejectedAt(null)
                 .sections(templateSectionsFromForm(form))
                 .scoreBands(selfAssessmentScoreBandService.getActiveBandsForAssessment())
                 .build();
@@ -684,6 +707,10 @@ public class EmployeeAssessmentService {
                 .hrComment(assessment.getHrComment())
                 .departmentHeadComment(assessment.getDepartmentHeadComment())
                 .declineReason(assessment.getDeclineReason())
+                .rejectedByRole(assessment.getRejectedByRole())
+                .rejectedByUserId(assessment.getRejectedByUserId())
+                .rejectedByName(assessment.getRejectedByName())
+                .rejectedAt(assessment.getRejectedAt())
                 .employeeSignatureId(assessment.getEmployeeSignatureId())
                 .employeeSignatureName(assessment.getEmployeeSignatureName())
                 .employeeSignatureImageData(assessment.getEmployeeSignatureImageData())
@@ -736,6 +763,11 @@ public class EmployeeAssessmentService {
                 .submittedAt(assessment.getSubmittedAt())
                 .approvedAt(assessment.getApprovedAt())
                 .declinedAt(assessment.getDeclinedAt())
+                .declineReason(assessment.getDeclineReason())
+                .rejectedByRole(assessment.getRejectedByRole())
+                .rejectedByUserId(assessment.getRejectedByUserId())
+                .rejectedByName(assessment.getRejectedByName())
+                .rejectedAt(assessment.getRejectedAt())
                 .employeeSigned(assessment.getEmployeeSignatureId() != null)
                 .managerSigned(assessment.getManagerSignatureId() != null)
                 .departmentHeadSigned(assessment.getDepartmentHeadSignatureId() != null)
@@ -1202,9 +1234,15 @@ public class EmployeeAssessmentService {
     }
 
     private void ensureEditable(EmployeeAssessment assessment) {
-        if (!AssessmentStatus.DRAFT.equals(assessment.getStatus())) {
-            throw new BadRequestException("This assessment has already been submitted and cannot be edited.");
+        if (AssessmentStatus.DRAFT.equals(assessment.getStatus())) {
+            return;
         }
+
+        if (AssessmentStatus.REJECTED.equals(assessment.getStatus()) && canEmployeeReviseAfterRejection(assessment)) {
+            return;
+        }
+
+        throw new BadRequestException("This assessment has already been submitted and cannot be edited.");
     }
 
     private String canonicalRole(String value) {
@@ -1500,25 +1538,21 @@ public class EmployeeAssessmentService {
         return form.getEndDate() == null || !now.isAfter(form.getEndDate());
     }
 
-    private void reopenRejectedAssessmentForEmployeeRevision(
+    private void markRejectedForEmployeeRevision(
             EmployeeAssessment assessment,
             String reason,
             String reviewerComment,
             boolean rejectedByHr
     ) {
-        assessment.setStatus(AssessmentStatus.DRAFT);
-        assessment.setDeclineReason(reason);
-        assessment.setDeclinedAt(LocalDateTime.now());
+        assessment.setStatus(AssessmentStatus.REJECTED);
+        applyRejectionAudit(assessment, reason, reviewerComment, rejectedByHr);
         assessment.setApprovedAt(null);
-        assessment.setSubmittedAt(null);
 
-        if (rejectedByHr) {
-            assessment.setHrComment(reviewerComment);
+        if (!rejectedByHr) {
+            clearManagerAndHrSignatures(assessment);
         } else {
-            assessment.setManagerComment(reviewerComment);
+            clearHrSignature(assessment);
         }
-
-        clearEmployeeSubmissionAndReviewSignatures(assessment);
     }
 
     private void closeRejectedAssessment(
@@ -1528,15 +1562,62 @@ public class EmployeeAssessmentService {
             boolean rejectedByHr
     ) {
         assessment.setStatus(AssessmentStatus.CLOSED_REJECTED);
-        assessment.setDeclineReason(reason);
-        assessment.setDeclinedAt(LocalDateTime.now());
+        applyRejectionAudit(assessment, reason, reviewerComment, rejectedByHr);
         assessment.setApprovedAt(null);
+    }
+
+    private void applyRejectionAudit(EmployeeAssessment assessment, String reason, String reviewerComment, boolean rejectedByHr) {
+        User reviewer = currentUserEntity();
+        LocalDateTime now = LocalDateTime.now();
+
+        assessment.setDeclineReason(reason);
+        assessment.setDeclinedAt(now);
+        assessment.setRejectedByRole(rejectedByHr ? "HR" : "MANAGER");
+        assessment.setRejectedByUserId(reviewer.getId());
+        assessment.setRejectedByName(displayName(reviewer));
+        assessment.setRejectedAt(now);
 
         if (rejectedByHr) {
             assessment.setHrComment(reviewerComment);
         } else {
+            assessment.setManagerUserId(reviewer.getId());
+            assessment.setManagerName(displayName(reviewer));
             assessment.setManagerComment(reviewerComment);
         }
+    }
+
+    private String displayName(User user) {
+        if (user == null) {
+            return "Unknown user";
+        }
+
+        String fullName = normalizeOptional(user.getFullName());
+        return fullName == null ? user.getEmail() : fullName;
+    }
+
+    private void clearEmployeeSignature(EmployeeAssessment assessment) {
+        assessment.setEmployeeSignatureId(null);
+        assessment.setEmployeeSignatureName(null);
+        assessment.setEmployeeSignatureImageData(null);
+        assessment.setEmployeeSignatureImageType(null);
+        assessment.setEmployeeSignedAt(null);
+    }
+
+    private void clearManagerAndHrSignatures(EmployeeAssessment assessment) {
+        assessment.setManagerSignatureId(null);
+        assessment.setManagerSignatureName(null);
+        assessment.setManagerSignatureImageData(null);
+        assessment.setManagerSignatureImageType(null);
+        assessment.setManagerSignedAt(null);
+        clearHrSignature(assessment);
+    }
+
+    private void clearHrSignature(EmployeeAssessment assessment) {
+        assessment.setHrSignatureId(null);
+        assessment.setHrSignatureName(null);
+        assessment.setHrSignatureImageData(null);
+        assessment.setHrSignatureImageType(null);
+        assessment.setHrSignedAt(null);
     }
 
     private void clearEmployeeSubmissionAndReviewSignatures(EmployeeAssessment assessment) {
