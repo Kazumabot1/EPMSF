@@ -1413,7 +1413,7 @@ public class FeedbackCampaignMonitoringServiceImpl implements FeedbackCampaignMo
         return switch (relationship) {
             case "MANAGER" -> "Manager";
             case "PEER" -> "Peer";
-            case "SUBORDINATE" -> "Direct Report";
+            case "SUBORDINATE" -> "Subordinate";
             case "SELF" -> "Self";
             default -> relationship == null ? "Unknown" : relationship.replace('_', ' ');
         };

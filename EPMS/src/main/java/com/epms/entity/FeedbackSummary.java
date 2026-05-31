@@ -91,6 +91,21 @@ public class FeedbackSummary {
     @Column(name = "publish_note", columnDefinition = "TEXT")
     private String publishNote;
 
+    @Column(name = "include_overall_score", nullable = false)
+    private Boolean includeOverallScore = true;
+
+    @Column(name = "include_competency_breakdown", nullable = false)
+    private Boolean includeCompetencyBreakdown = true;
+
+    @Column(name = "include_self_vs_others", nullable = false)
+    private Boolean includeSelfVsOthers = true;
+
+    @Column(name = "include_comments", nullable = false)
+    private Boolean includeComments = false;
+
+    @Column(name = "include_score_explanation", nullable = false)
+    private Boolean includeScoreExplanation = true;
+
     @Column(name = "manager_average_score")
     private Double managerAverageScore;
 
@@ -141,6 +156,11 @@ public class FeedbackSummary {
             scoreCalculationMethod = "SUBMITTED_RESPONSE_AVERAGE";
         }
         if (visibilityStatus == null) visibilityStatus = FeedbackSummaryVisibilityStatus.HIDDEN;
+        if (includeOverallScore == null) includeOverallScore = true;
+        if (includeCompetencyBreakdown == null) includeCompetencyBreakdown = true;
+        if (includeSelfVsOthers == null) includeSelfVsOthers = true;
+        if (includeComments == null) includeComments = false;
+        if (includeScoreExplanation == null) includeScoreExplanation = true;
         if (summarizedAt == null) summarizedAt = LocalDateTime.now();
     }
 }
