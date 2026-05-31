@@ -1,4 +1,4 @@
-export type AssessmentStatus =
+/*Z*/export type AssessmentStatus =
   | 'DRAFT'
   | 'SUBMITTED'
   | 'PENDING_MANAGER'
@@ -77,6 +77,10 @@ export interface EmployeeAssessment {
   hrComment?: string | null;
   departmentHeadComment?: string | null;
   declineReason?: string | null;
+  rejectedByRole?: string | null;
+  rejectedByUserId?: number | null;
+  rejectedByName?: string | null;
+  rejectedAt?: string | null;
 
   employeeSignatureId?: number | null;
   employeeSignatureName?: string | null;
@@ -156,6 +160,11 @@ export interface AssessmentScoreRow {
   submittedAt?: string | null;
   approvedAt?: string | null;
   declinedAt?: string | null;
+  declineReason?: string | null;
+  rejectedByRole?: string | null;
+  rejectedByUserId?: number | null;
+  rejectedByName?: string | null;
+  rejectedAt?: string | null;
 
   employeeSigned?: boolean;
   managerSigned?: boolean;

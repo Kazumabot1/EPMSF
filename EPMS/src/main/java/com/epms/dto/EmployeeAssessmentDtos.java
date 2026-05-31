@@ -130,6 +130,10 @@ public final class EmployeeAssessmentDtos {
         private String hrComment;
         private String departmentHeadComment;
         private String declineReason;
+        private String rejectedByRole;
+        private Integer rejectedByUserId;
+        private String rejectedByName;
+        private LocalDateTime rejectedAt;
 
         private Long employeeSignatureId;
         private String employeeSignatureName;
@@ -193,6 +197,11 @@ public final class EmployeeAssessmentDtos {
         private LocalDateTime submittedAt;
         private LocalDateTime approvedAt;
         private LocalDateTime declinedAt;
+        private String declineReason;
+        private String rejectedByRole;
+        private Integer rejectedByUserId;
+        private String rejectedByName;
+        private LocalDateTime rejectedAt;
 
         private Boolean employeeSigned;
         private Boolean managerSigned;
