@@ -4,12 +4,20 @@ import api from './api';
 export type DepartmentHeadEmployee = {
   id?: number;
   userId?: number;
+  employeeCode?: string;
   fullName?: string;
   firstName?: string;
   lastName?: string;
+  phoneNumber?: string;
   email?: string;
   positionTitle?: string;
   positionName?: string;
+  positionLevelCode?: string;
+  positionRoleName?: string;
+  dashboard?: string;
+  managerId?: number | null;
+  managerName?: string | null;
+  managerEmail?: string | null;
   active?: boolean;
   currentDepartmentId?: number | null;
   currentDepartment?: string | null;
@@ -188,6 +196,22 @@ export const fetchDepartmentHeadDashboard = async (
       );
     }
 
+    throw error;
+  }
+};
+
+
+export const fetchDepartmentHeadEmployees = async (
+  includeInactive = false,
+): Promise<DepartmentHeadEmployee[]> => {
+  try {
+    const response = await api.get('/department-head/employees', {
+      params: { includeInactive },
+    });
+    const data = unwrap<DepartmentHeadEmployee[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
     throw error;
   }
 };
