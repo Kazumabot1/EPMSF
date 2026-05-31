@@ -238,7 +238,6 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-bullseye',
         children: [
           { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
-          { to: '/admin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
         ],
       },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },

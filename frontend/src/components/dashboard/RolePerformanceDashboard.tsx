@@ -272,7 +272,6 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
       { icon: 'bi-upload', title: 'Import Employees', description: 'Bulk employee import', to: '/admin/employee/import' },
       { icon: 'bi-shield-check', title: 'Permissions', description: 'Position permissions', to: '/position-permissions' },
       { icon: 'bi-bullseye', title: 'KPI Approval', description: 'Approve KPI cycles', to: '/admin/approval/kpi' },
-      { icon: 'bi-building-check', title: 'Department KPI Approval', description: 'Approve department KPI', to: '/admin/approval/department-kpi' },
       { icon: 'bi-journal-text', title: 'Audit Logs', description: 'System activity', to: '/admin/audit-logs' },
     ];
   }
