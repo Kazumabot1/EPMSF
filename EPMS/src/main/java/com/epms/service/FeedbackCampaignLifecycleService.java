@@ -9,5 +9,6 @@ public interface FeedbackCampaignLifecycleService {
     FeedbackCampaign approveEarlyClose(Long campaignId, Long actorUserId, String reviewNote);
     FeedbackCampaign rejectEarlyClose(Long campaignId, Long actorUserId, String reviewNote);
     FeedbackCampaign closeCampaign(Long campaignId, Long actorUserId);
+    FeedbackCampaign closeCampaignWithReadiness(Long campaignId, Long actorUserId, String reason, boolean closeWithWarnings);
     int closeExpiredCampaigns();
 }

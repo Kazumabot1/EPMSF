@@ -54,6 +54,10 @@ public class TeamAccessService {
             "DEPT_HEAD_DASHBOARD"
     );
 
+    private static final Set<String> EMPLOYEE_ROLES = Set.of("EMPLOYEE");
+
+    private static final Set<String> EMPLOYEE_DASHBOARDS = Set.of("EMPLOYEE_DASHBOARD");
+
     private final TeamRepository teamRepository;
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
@@ -63,8 +67,9 @@ public class TeamAccessService {
     @Transactional(readOnly = true)
     public OneOnOneAccessContextResponseDto getOneOnOneContext() {
         UserPrincipal current = SecurityUtils.currentUser();
-        boolean canCreate = positionPermissionService.currentUserHasPermission("oneOnOneCreate")
-                || isManagerOrDepartmentHead(current);
+        boolean canCreate = !isEmployee(current)
+                && (positionPermissionService.currentUserHasPermission("oneOnOneCreate")
+                || isManagerOrDepartmentHead(current));
 
         if (!canCreate) {
             return OneOnOneAccessContextResponseDto.builder()
@@ -387,11 +392,34 @@ public class TeamAccessService {
     }
 
     private void assertCanCreateOneOnOne() {
-        boolean canCreate = positionPermissionService.currentUserHasPermission("oneOnOneCreate")
-                || isManagerOrDepartmentHead(SecurityUtils.currentUser());
+        UserPrincipal current = SecurityUtils.currentUser();
+        boolean canCreate = !isEmployee(current)
+                && (positionPermissionService.currentUserHasPermission("oneOnOneCreate")
+                || isManagerOrDepartmentHead(current));
         if (!canCreate) {
             throw new UnauthorizedActionException("Your position does not have permission to create one-on-one meetings.");
         }
+    }
+
+    private boolean isEmployee(UserPrincipal principal) {
+        if (principal == null || isManagerOrDepartmentHead(principal)) {
+            return false;
+        }
+
+        String dashboard = normalizeRoleToken(principal.getDashboard());
+        if (EMPLOYEE_DASHBOARDS.contains(dashboard)) {
+            return true;
+        }
+
+        if (principal.getRoles() != null) {
+            for (String role : principal.getRoles()) {
+                if (EMPLOYEE_ROLES.contains(normalizeRoleToken(role))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private boolean isManagerOrDepartmentHead(UserPrincipal principal) {

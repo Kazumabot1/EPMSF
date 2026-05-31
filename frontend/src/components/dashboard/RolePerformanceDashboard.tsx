@@ -101,6 +101,140 @@ const formatDate = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString();
 };
 
+const parseDashboardDate = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const toDateInputValue = (date: Date) => date.toISOString().slice(0, 10);
+
+const getMonthRange = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { start: toDateInputValue(start), end: toDateInputValue(end) };
+};
+
+const getQuarterRange = () => {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  const start = new Date(now.getFullYear(), quarterStartMonth, 1);
+  const end = new Date(now.getFullYear(), quarterStartMonth + 3, 0);
+  return { start: toDateInputValue(start), end: toDateInputValue(end) };
+};
+
+const getYearRange = () => {
+  const now = new Date();
+  return {
+    start: toDateInputValue(new Date(now.getFullYear(), 0, 1)),
+    end: toDateInputValue(new Date(now.getFullYear(), 11, 31)),
+  };
+};
+
+const isWithinDashboardRange = (value: Date | null, start?: string, end?: string) => {
+  if (!value) return false;
+  const startDate = start ? new Date(`${start}T00:00:00`) : null;
+  const endDate = end ? new Date(`${end}T23:59:59`) : null;
+  if (startDate && value < startDate) return false;
+  if (endDate && value > endDate) return false;
+  return true;
+};
+
+const getEmployeePerformanceDate = (row: EmployeePerformanceRow) =>
+  parseDashboardDate(row.approvedAt || row.submittedAt || row.assessmentDate);
+
+const getPipDate = (row: any) => parseDashboardDate(row.finishedAt || row.endDate || row.createdAt || row.startDate);
+
+const getFeedbackDate = (row: any) => parseDashboardDate(row.endDate || row.startDate);
+
+const buildDepartmentRowsFromEmployees = (rows: EmployeePerformanceRow[]): DepartmentPerformanceRow[] => {
+  const groups = new Map<string, EmployeePerformanceRow[]>();
+  rows.forEach((row) => {
+    const key = String(row.departmentId ?? row.departmentName ?? 'unknown');
+    groups.set(key, [...(groups.get(key) || []), row]);
+  });
+
+  return Array.from(groups.values()).map((items) => {
+    const first = items[0];
+    const approved = items.filter((item) => String(item.status || '').toUpperCase().includes('APPROVED') || Boolean(item.approvedAt));
+    const pending = items.filter((item) => String(item.status || '').toUpperCase().includes('PENDING'));
+    const scored = items.map((item) => numberValue(item.scorePercent)).filter((value) => value > 0);
+    const employees = new Set(items.map((item) => item.employeeId ?? item.userId ?? item.employeeCode ?? item.employeeName));
+
+    return {
+      departmentId: first.departmentId ?? null,
+      departmentName: first.departmentName || 'Unknown Department',
+      employeeCount: employees.size || items.length,
+      assessmentCount: items.length,
+      approvedCount: approved.length,
+      pendingCount: pending.length,
+      activePipCount: 0,
+      averageScore: average(scored),
+      performanceLabel: average(scored) >= 80 ? 'Outstanding' : average(scored) >= 60 ? 'Healthy' : 'Needs Review',
+    };
+  }).sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore));
+};
+
+const filterDashboardByDateRange = (source: ReportingDashboard, start?: string, end?: string): ReportingDashboard => {
+  if (!start && !end) return source;
+
+  const employeePerformance = source.employeePerformance.filter((row) =>
+    isWithinDashboardRange(getEmployeePerformanceDate(row), start, end),
+  );
+  const departmentPerformance = employeePerformance.length
+    ? buildDepartmentRowsFromEmployees(employeePerformance)
+    : [];
+  const pipStatusReport = source.pipStatusReport.filter((row) => isWithinDashboardRange(getPipDate(row), start, end));
+  const feedbackParticipation = source.feedbackParticipation.filter((row) => isWithinDashboardRange(getFeedbackDate(row), start, end));
+  const assessmentStatusBreakdown = source.assessmentStatusBreakdown;
+  const scored = employeePerformance.map((row) => numberValue(row.scorePercent)).filter((value) => value > 0);
+  const approved = employeePerformance.filter((row) => String(row.status || '').toUpperCase().includes('APPROVED') || Boolean(row.approvedAt));
+  const pending = employeePerformance.filter((row) => String(row.status || '').toUpperCase().includes('PENDING'));
+  const activePips = pipStatusReport.filter((row) => Boolean(row.active)).length;
+  const completionAverage = average(feedbackParticipation.map((row) => numberValue(row.completionRate)));
+
+  return {
+    ...source,
+    summary: {
+      ...source.summary,
+      totalAssessments: employeePerformance.length,
+      submittedAssessments: employeePerformance.length,
+      approvedAssessments: approved.length,
+      pendingAssessments: pending.length,
+      activePips,
+      completedPips: pipStatusReport.filter((row) => !row.active).length,
+      feedbackCampaigns: feedbackParticipation.length,
+      activeFeedbackCampaigns: feedbackParticipation.filter((row) => String(row.status || '').toUpperCase() === 'ACTIVE').length,
+      averageAssessmentScore: average(scored),
+      feedbackCompletionRate: completionAverage,
+      highPerformers: employeePerformance.filter((row) => numberValue(row.scorePercent) >= 80).length,
+      lowPerformers: employeePerformance.filter((row) => {
+        const score = numberValue(row.scorePercent);
+        return score > 0 && score < 60;
+      }).length,
+    },
+    departmentPerformance,
+    employeePerformance,
+    assessmentStatusBreakdown,
+    pipStatusReport,
+    feedbackParticipation,
+  };
+};
+
+const getAppraisalDate = (row: any) => parseDashboardDate(row.hrApprovedAt || row.deptHeadSubmittedAt || row.pmSubmittedAt || row.assessmentDate || row.createdAt);
+const getKpiDate = (row: any) => parseDashboardDate(row.finalizedAt || row.updatedAt || row.createdAt);
+
+const filterEmployeeSnapshotByDateRange = (snapshot: EmployeeSnapshot, start?: string, end?: string): EmployeeSnapshot => {
+  if (!start && !end) return snapshot;
+  return {
+    ...snapshot,
+    appraisalForms: snapshot.appraisalForms.filter((row) => isWithinDashboardRange(getAppraisalDate(row), start, end)),
+    kpiRows: snapshot.kpiRows.filter((row) => isWithinDashboardRange(getKpiDate(row), start, end)),
+  };
+};
+
+
 const getFirstName = (name?: string | null) => {
   const result = String(name ?? '').trim();
   return result ? result.split(/\s+/)[0] : 'there';
@@ -419,6 +553,8 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
   const [employeeSnapshot, setEmployeeSnapshot] = useState<EmployeeSnapshot>(emptyEmployeeSnapshot);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -466,9 +602,22 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
   }, [view]);
 
   const copy = getRoleCopy(view, user?.fullName || employeeSnapshot.profile?.fullName);
+  const dateFilterActive = Boolean(dateStart || dateEnd);
+  const filteredDashboard = useMemo(() => filterDashboardByDateRange(dashboard, dateStart, dateEnd), [dashboard, dateStart, dateEnd]);
+  const filteredEmployeeSnapshot = useMemo(() => filterEmployeeSnapshotByDateRange(employeeSnapshot, dateStart, dateEnd), [employeeSnapshot, dateStart, dateEnd]);
+  const applyPresetRange = (preset: 'month' | 'quarter' | 'year' | 'all') => {
+    if (preset === 'all') {
+      setDateStart('');
+      setDateEnd('');
+      return;
+    }
+    const range = preset === 'month' ? getMonthRange() : preset === 'quarter' ? getQuarterRange() : getYearRange();
+    setDateStart(range.start);
+    setDateEnd(range.end);
+  };
 
   const orgMetrics = useMemo(() => {
-    const summary = dashboard.summary;
+    const summary = filteredDashboard.summary;
     return [
       {
         title: 'Overall Score',
@@ -503,57 +652,57 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
         trend: { label: summary.activePips > 0 ? `${formatNumber(summary.activePips)} active PIP` : 'No active PIP', direction: summary.activePips > 0 ? 'down' as const : 'up' as const },
       },
     ];
-  }, [dashboard]);
+  }, [filteredDashboard]);
 
   const employeeMetrics = useMemo(() => {
-    const appraisalScore = average(employeeSnapshot.appraisalForms.map((row) => numberValue(row.scorePercent)));
-    const kpiScore = average(employeeSnapshot.kpiRows.map((row) => numberValue(row.totalWeightedScore ?? row.totalScore)));
-    const feedback = employeeSnapshot.feedbackDashboard;
+    const appraisalScore = average(filteredEmployeeSnapshot.appraisalForms.map((row) => numberValue(row.scorePercent)));
+    const kpiScore = average(filteredEmployeeSnapshot.kpiRows.map((row) => numberValue(row.totalWeightedScore ?? row.totalScore)));
+    const feedback = filteredEmployeeSnapshot.feedbackDashboard;
     const pendingFeedback = numberValue(feedback?.totalPendingAssignments);
-    const unread = employeeSnapshot.notifications.filter((notification: any) => !notification.read).length;
+    const unread = filteredEmployeeSnapshot.notifications.filter((notification: any) => !notification.read).length;
     const overall = average([appraisalScore, kpiScore, numberValue(feedback?.averageScore) > 5 ? numberValue(feedback?.averageScore) : numberValue(feedback?.averageScore) * 20]);
     const participation = feedback?.totalRequests ? (numberValue(feedback.totalResponses) / numberValue(feedback.totalRequests)) * 100 : 0;
 
     return [
       { title: 'My Overall Score', value: overall > 0 ? formatPercent(overall) : '—', detail: 'Combined available KPI, appraisal, and feedback score', icon: <i className="bi bi-star" />, tone: 'blue' as const, trend: { label: overall >= 70 ? 'Healthy' : 'Needs review', direction: overall >= 70 ? 'up' as const : 'flat' as const } },
       { title: '360 Participation', value: formatPercent(participation), detail: `${formatNumber(feedback?.totalResponses)} submitted of ${formatNumber(feedback?.totalRequests)} request(s)`, icon: <i className="bi bi-people" />, tone: 'cyan' as const, trend: { label: 'Personal feedback', direction: participation >= 70 ? 'up' as const : 'flat' as const } },
-      { title: 'Completed Reviews', value: formatNumber(employeeSnapshot.appraisalForms.filter((row) => ['COMPLETED', 'APPROVED', 'HR_APPROVED'].includes(String(row.status))).length), detail: `${formatNumber(employeeSnapshot.appraisalForms.length)} appraisal form(s)`, icon: <i className="bi bi-check2-circle" />, tone: 'emerald' as const, trend: { label: `${formatNumber(employeeSnapshot.kpiRows.length)} KPI result(s)`, direction: 'flat' as const } },
+      { title: 'Completed Reviews', value: formatNumber(filteredEmployeeSnapshot.appraisalForms.filter((row) => ['COMPLETED', 'APPROVED', 'HR_APPROVED'].includes(String(row.status))).length), detail: `${formatNumber(filteredEmployeeSnapshot.appraisalForms.length)} appraisal form(s)`, icon: <i className="bi bi-check2-circle" />, tone: 'emerald' as const, trend: { label: `${formatNumber(filteredEmployeeSnapshot.kpiRows.length)} KPI result(s)`, direction: 'flat' as const } },
       { title: 'Pending Actions', value: formatNumber(pendingFeedback + unread), detail: 'Feedback assignments and unread notifications', icon: <i className="bi bi-clock" />, tone: pendingFeedback + unread > 0 ? 'rose' as const : 'emerald' as const, trend: { label: pendingFeedback > 0 ? `${formatNumber(pendingFeedback)} feedback pending` : 'Clear', direction: pendingFeedback > 0 ? 'down' as const : 'up' as const } },
     ];
-  }, [employeeSnapshot]);
+  }, [filteredEmployeeSnapshot]);
 
   const comparisonData = useMemo(
-    () => (isEmployeeView(view) ? makeEmployeeComparison(employeeSnapshot) : makeDepartmentComparison(dashboard, view)),
-    [dashboard, employeeSnapshot, view],
+    () => (isEmployeeView(view) ? makeEmployeeComparison(filteredEmployeeSnapshot) : makeDepartmentComparison(filteredDashboard, view)),
+    [filteredDashboard, filteredEmployeeSnapshot, view],
   );
 
   const distributionData = useMemo(
-    () => (isEmployeeView(view) ? makeEmployeeDistribution(employeeSnapshot) : makeOrgDistribution(dashboard)),
-    [dashboard, employeeSnapshot, view],
+    () => (isEmployeeView(view) ? makeEmployeeDistribution(filteredEmployeeSnapshot) : makeOrgDistribution(filteredDashboard)),
+    [filteredDashboard, filteredEmployeeSnapshot, view],
   );
 
   const recentRows = useMemo(
-    () => (isEmployeeView(view) ? makeEmployeeRows(employeeSnapshot) : makeOrgRows(dashboard)),
-    [dashboard, employeeSnapshot, view],
+    () => (isEmployeeView(view) ? makeEmployeeRows(filteredEmployeeSnapshot) : makeOrgRows(filteredDashboard)),
+    [filteredDashboard, filteredEmployeeSnapshot, view],
   );
 
   const highlights = useMemo(() => {
     if (isEmployeeView(view)) {
-      const bestKpi = [...employeeSnapshot.kpiRows].sort((a, b) => numberValue(b.totalWeightedScore ?? b.totalScore) - numberValue(a.totalWeightedScore ?? a.totalScore))[0];
+      const bestKpi = [...filteredEmployeeSnapshot.kpiRows].sort((a, b) => numberValue(b.totalWeightedScore ?? b.totalScore) - numberValue(a.totalWeightedScore ?? a.totalScore))[0];
       return [
         { icon: 'bi-hand-thumbs-up', title: 'Best KPI Result', detail: bestKpi?.kpiTitle || 'No finalized KPI result yet', value: bestKpi ? formatPercent(bestKpi.totalWeightedScore ?? bestKpi.totalScore) : '—', tone: 'success' },
-        { icon: 'bi-chat-dots', title: '360 Feedback', detail: 'Average feedback score from available feedback records.', value: formatScoreOutOfFive(employeeSnapshot.feedbackDashboard?.averageScore), tone: 'info' },
-        { icon: 'bi-bell', title: 'Pending Attention', detail: 'Feedback assignments and unread notifications.', value: formatNumber(numberValue(employeeSnapshot.feedbackDashboard?.totalPendingAssignments) + employeeSnapshot.notifications.filter((item: any) => !item.read).length), tone: 'warning' },
+        { icon: 'bi-chat-dots', title: '360 Feedback', detail: 'Average feedback score from available feedback records.', value: formatScoreOutOfFive(filteredEmployeeSnapshot.feedbackDashboard?.averageScore), tone: 'info' },
+        { icon: 'bi-bell', title: 'Pending Attention', detail: 'Feedback assignments and unread notifications.', value: formatNumber(numberValue(filteredEmployeeSnapshot.feedbackDashboard?.totalPendingAssignments) + filteredEmployeeSnapshot.notifications.filter((item: any) => !item.read).length), tone: 'warning' },
       ];
     }
 
-    const topDepartment = [...dashboard.departmentPerformance].sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))[0];
+    const topDepartment = [...filteredDashboard.departmentPerformance].sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))[0];
     return [
       { icon: 'bi-hand-thumbs-up', title: 'Greatest Strength', detail: topDepartment?.departmentName ? `${topDepartment.departmentName} leads the current performance view.` : 'No department score available yet.', value: topDepartment?.averageScore ? formatPercent(topDepartment.averageScore) : '—', tone: 'success' },
-      { icon: 'bi-graph-up-arrow', title: 'Improvement Focus', detail: dashboard.summary.lowPerformers > 0 ? 'Low performers require HR/manager attention.' : 'No low performer risk currently reported.', value: formatNumber(dashboard.summary.lowPerformers), tone: dashboard.summary.lowPerformers > 0 ? 'warning' : 'success' },
-      { icon: 'bi-clipboard-check', title: 'Review Queue', detail: 'Assessments currently waiting in workflow.', value: formatNumber(dashboard.summary.pendingAssessments), tone: dashboard.summary.pendingAssessments > 0 ? 'warning' : 'success' },
+      { icon: 'bi-graph-up-arrow', title: 'Improvement Focus', detail: filteredDashboard.summary.lowPerformers > 0 ? 'Low performers require HR/manager attention.' : 'No low performer risk currently reported.', value: formatNumber(filteredDashboard.summary.lowPerformers), tone: filteredDashboard.summary.lowPerformers > 0 ? 'warning' : 'success' },
+      { icon: 'bi-clipboard-check', title: 'Review Queue', detail: 'Assessments currently waiting in workflow.', value: formatNumber(filteredDashboard.summary.pendingAssessments), tone: filteredDashboard.summary.pendingAssessments > 0 ? 'warning' : 'success' },
     ];
-  }, [dashboard, employeeSnapshot, view]);
+  }, [filteredDashboard, filteredEmployeeSnapshot, view]);
 
   const metrics = isEmployeeView(view) ? employeeMetrics : orgMetrics;
   const totalDistribution = distributionData.reduce((sum, item) => sum + toDashboardNumber(item.value), 0);
@@ -566,17 +715,31 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
       title={copy.title}
       description={copy.description}
       metaLabel="Scope"
-      metaValue={dashboard.access.scopeLabel || copy.scope}
+      metaValue={filteredDashboard.access.scopeLabel || copy.scope}
       metaDetail={isEmployeeView(view) ? 'Only your personal records are shown.' : 'Data is rendered from the secured reporting dashboard response.'}
       actions={
-        !isEmployeeView(view) ? (
-          <>
+        <div className="role-dashboard-actions">
+          <div className="role-dashboard-date-filter" aria-label="Dashboard result date filter">
+            <button type="button" onClick={() => applyPresetRange('month')}>Month</button>
+            <button type="button" onClick={() => applyPresetRange('quarter')}>Quarter</button>
+            <button type="button" onClick={() => applyPresetRange('year')}>Year</button>
+            <label>
+              <span>From</span>
+              <input type="date" value={dateStart} onChange={(event) => setDateStart(event.target.value)} />
+            </label>
+            <label>
+              <span>To</span>
+              <input type="date" value={dateEnd} onChange={(event) => setDateEnd(event.target.value)} />
+            </label>
+            {dateFilterActive ? <button type="button" className="role-dashboard-date-filter__clear" onClick={() => applyPresetRange('all')}>Clear</button> : null}
+          </div>
+          {!isEmployeeView(view) ? (
             <Link className="epms-dashboard-button epms-dashboard-button--secondary" to={view === 'hr' ? '/hr/reports/performance' : view === 'admin' ? '/admin/users' : view === 'ceo' ? '/executive/reports/performance' : view === 'manager' ? '/manager/reports/performance' : '/department-head/reports/performance'}>
               <i className="bi bi-bar-chart" aria-hidden="true" />
               View reports
             </Link>
-          </>
-        ) : null
+          ) : null}
+        </div>
       }
     >
       {loading ? <LoadingState /> : null}
@@ -600,7 +763,7 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
             <DashboardChartCard
               className="role-dashboard-chart-card role-dashboard-chart-card--comparison"
               title={copy.chartTitle}
-              subtitle={copy.chartSubtitle}
+              subtitle={dateFilterActive ? `${copy.chartSubtitle} Filtered by selected calendar range.` : copy.chartSubtitle}
               action={<span className="role-dashboard-pill">Score (%)</span>}
             >
               {comparisonData.length ? (

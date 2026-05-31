@@ -104,7 +104,7 @@ public class UserAccountProvisioningService {
         user.setFullName(buildFullName(employee));
         user.setEmail(email);
         user.setPosition(employee.getPosition());
-        user.setEmployeeCode(employee.getStaffNrc());
+        user.setEmployeeCode(employee.getEmployeeCode());
         user.setDashboard(selectedDashboard);
         user.setActive(employee.getActive() == null || Boolean.TRUE.equals(employee.getActive()));
         user.setUpdatedAt(new Date());
@@ -166,7 +166,7 @@ public class UserAccountProvisioningService {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(temporaryPassword));
         user.setFullName(buildFullName(employee));
-        user.setEmployeeCode(employee.getStaffNrc());
+        user.setEmployeeCode(employee.getEmployeeCode());
         user.setEmployeeId(employee.getId());
         user.setPosition(employee.getPosition());
         user.setDashboard(selectedDashboard);

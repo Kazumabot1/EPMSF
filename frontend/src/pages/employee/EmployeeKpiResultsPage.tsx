@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
 import type { EmployeeKpiResult } from '../../types/kpiWorkflow';
@@ -7,6 +7,17 @@ const formatWhen = (value: string | null) => {
   if (!value) return '—';
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+};
+
+const formatPercent = (value?: number | null) => {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  return `${Number(value).toFixed(2)}%`;
+};
+
+const average = (values: Array<number | null | undefined>) => {
+  const valid = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  if (!valid.length) return null;
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
 };
 
 const EmployeeKpiResultsPage = () => {
@@ -32,111 +43,121 @@ const EmployeeKpiResultsPage = () => {
     };
   }, []);
 
-  return (
-    <div style={{ padding: '2rem', maxWidth: '960px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-      <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1e293b', margin: '0 0 .35rem' }}>My KPI results</h1>
-      <p style={{ color: '#64748b', marginBottom: '1.75rem' }}>
-        Finalized scores and in-progress actuals entered by your evaluator appear here. New finalized
-        results also arrive as in-app notifications.
-      </p>
+  const stats = useMemo(() => {
+    const latest = [...rows].sort((a, b) => new Date(b.finalizedAt || '').getTime() - new Date(a.finalizedAt || '').getTime())[0];
+    const avgAchievement = average(rows.map((row) => row.totalScore));
+    const avgWeighted = average(rows.map((row) => row.totalWeightedScore));
+    return {
+      total: rows.length,
+      latestTitle: latest?.kpiTitle || 'No finalized KPI yet',
+      averageAchievement: avgAchievement,
+      averageWeighted: avgWeighted,
+    };
+  }, [rows]);
 
-      {loading && <p style={{ color: '#64748b' }}>Loading…</p>}
+  return (
+    <div className="epms-refined-page employee-kpi-page">
+      <section className="epms-refined-hero epms-refined-hero--light">
+        <div>
+          <p className="epms-refined-eyebrow">My Performance</p>
+          <h1>My KPI Results</h1>
+          <p>Finalized scores and in-progress actuals entered by your evaluator appear here.</p>
+        </div>
+        <div className="epms-refined-hero-stat">
+          <strong>{stats.total}</strong>
+          <span>KPI result(s)</span>
+        </div>
+      </section>
+
+      <section className="epms-refined-metric-grid epms-refined-metric-grid--three" aria-label="KPI summary">
+        <article className="epms-refined-metric-card">
+          <span>Latest KPI</span>
+          <strong>{stats.latestTitle}</strong>
+          <small>Most recent available result</small>
+        </article>
+        <article className="epms-refined-metric-card">
+          <span>Average Achievement</span>
+          <strong>{formatPercent(stats.averageAchievement)}</strong>
+          <small>Weighted achievement score</small>
+        </article>
+        <article className="epms-refined-metric-card">
+          <span>Weighted Score</span>
+          <strong>{formatPercent(stats.averageWeighted)}</strong>
+          <small>Average finalized weighted total</small>
+        </article>
+      </section>
+
+      {loading && <div className="epms-refined-card epms-refined-empty">Loading KPI results…</div>}
 
       {!loading && rows.length === 0 && (
-        <div
-          style={{
-            padding: '2rem',
-            borderRadius: '14px',
-            border: '1px dashed #cbd5e1',
-            background: '#f8fafc',
-            color: '#64748b',
-          }}
-        >
+        <div className="epms-refined-card epms-refined-empty">
           No KPI results yet. Scores appear here once your evaluator records actual values.
         </div>
       )}
 
-      {!loading &&
-        rows.map((r) => (
-          <article
-            key={r.employeeKpiFormId}
-            style={{
-              marginBottom: '1.5rem',
-              padding: '1.35rem',
-              borderRadius: '14px',
-              border: '1px solid #e2e8f0',
-              background: '#fff',
-            }}
-          >
-            <header style={{ marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#1e293b' }}>{r.kpiTitle}</h2>
-              <p style={{ margin: '.4rem 0 0', fontSize: '.82rem', color: '#64748b' }}>
-                {r.positionTitle && (
-                  <>
-                    Position: <strong style={{ color: '#0f172a' }}>{r.positionTitle}</strong> Â·{' '}
-                  </>
-                )}
-                {r.status === 'FINALIZED' ? `Finalized ${formatWhen(r.finalizedAt)}` : `Status: ${r.status?.replace(/_/g, ' ') ?? 'In progress'}`}
-                {r.totalScore != null && (
-                  <>
-                    {' '}
-                    · Avg achievement % (weighted):{' '}
-                    <strong style={{ color: '#0f172a' }}>{r.totalScore.toFixed(2)}</strong>
-                  </>
-                )}
-                {r.totalWeightedScore != null && (
-                  <>
-                    {' '}
-                    · Weighted score total:{' '}
-                    <strong style={{ color: '#0f172a' }}>{r.totalWeightedScore.toFixed(2)}</strong>
-                  </>
-                )}
-              </p>
+      {!loading && rows.length > 0 && (
+        <div className="epms-refined-stack">
+          {rows.map((r) => (
+            <article className="epms-refined-card employee-kpi-result-card" key={r.employeeKpiFormId}>
+              <header className="epms-refined-card-header">
+                <div>
+                  <p className="epms-refined-eyebrow">KPI Result</p>
+                  <h2>{r.kpiTitle}</h2>
+                  <p>
+                    {r.positionTitle && (
+                      <>
+                        Position: <strong>{r.positionTitle}</strong> ·{' '}
+                      </>
+                    )}
+                    {r.status === 'FINALIZED'
+                      ? `Finalized ${formatWhen(r.finalizedAt)}`
+                      : `Status: ${r.status?.replace(/_/g, ' ') ?? 'In progress'}`}
+                  </p>
+                </div>
+                <div className="epms-refined-score-pill">
+                  <strong>{formatPercent(r.totalWeightedScore ?? r.totalScore)}</strong>
+                  <span>Weighted total</span>
+                </div>
+              </header>
+
               {r.earlyFinalizedReason && (
-                <p style={{ margin: '.65rem 0 0', fontSize: '.82rem', color: '#475569' }}>
-                  Finalization reason: <strong style={{ color: '#0f172a' }}>{r.earlyFinalizedReason}</strong>
-                </p>
+                <div className="epms-refined-note">
+                  Finalization reason: <strong>{r.earlyFinalizedReason}</strong>
+                </div>
               )}
-            </header>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: '#64748b' }}>
-                    <th style={{ padding: '.45rem', borderBottom: '1px solid #e2e8f0' }}>KPI</th>
-                    <th style={{ padding: '.45rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Target</th>
-                    <th style={{ padding: '.45rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weight %</th>
-                    <th style={{ padding: '.45rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Actual</th>
-                    <th style={{ padding: '.45rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Achievement %</th>
-                    <th style={{ padding: '.45rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weighted score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {r.lines.map((line) => (
-                    <tr key={line.kpiFormItemId}>
-                      <td style={{ padding: '.5rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
-                        {line.kpiLabel ?? '—'}
-                      </td>
-                      <td style={{ padding: '.5rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{line.target ?? '—'}</td>
-                      <td style={{ padding: '.5rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{line.weight ?? '—'}</td>
-                      <td style={{ padding: '.5rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {line.actualValue != null ? line.actualValue : '—'}
-                      </td>
-                      <td style={{ padding: '.5rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {line.score != null ? Number(line.score).toFixed(2) : '—'}
-                      </td>
-                      <td style={{ padding: '.5rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                        {line.weightedScore != null ? line.weightedScore.toFixed(2) : '—'}
-                      </td>
+
+              <div className="epms-refined-table-wrap">
+                <table className="epms-refined-table">
+                  <thead>
+                    <tr>
+                      <th>KPI</th>
+                      <th className="text-end">Target</th>
+                      <th className="text-end">Weight %</th>
+                      <th className="text-end">Actual</th>
+                      <th className="text-end">Achievement %</th>
+                      <th className="text-end">Weighted Score</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        ))}
+                  </thead>
+                  <tbody>
+                    {r.lines.map((line) => (
+                      <tr key={line.kpiFormItemId}>
+                        <td>{line.kpiLabel ?? '—'}</td>
+                        <td className="text-end">{line.target ?? '—'}</td>
+                        <td className="text-end">{line.weight ?? '—'}</td>
+                        <td className="text-end">{line.actualValue != null ? line.actualValue : '—'}</td>
+                        <td className="text-end">{line.score != null ? Number(line.score).toFixed(2) : '—'}</td>
+                        <td className="text-end">{line.weightedScore != null ? line.weightedScore.toFixed(2) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
 export default EmployeeKpiResultsPage;
-
