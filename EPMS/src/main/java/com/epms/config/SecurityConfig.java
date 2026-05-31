@@ -75,6 +75,9 @@ public class SecurityConfig {
     );
 
     private static final Set<String> KPI_EVALUATOR_ROLES = Set.of(
+            "ADMIN",
+            "HRADMIN",
+            "HR_ADMIN",
             "MANAGER",
             "PROJECT_MANAGER",
             "TEAM_MANAGER",
@@ -146,6 +149,9 @@ public class SecurityConfig {
     );
 
     private static final Set<String> KPI_EVALUATOR_DASHBOARDS = Set.of(
+            "ADMIN_DASHBOARD",
+            "HRADMIN_DASHBOARD",
+            "HR_ADMIN_DASHBOARD",
             "MANAGER_DASHBOARD",
             "DEPARTMENT_HEAD_DASHBOARD",
             "DEPARTMENTHEAD_DASHBOARD",
