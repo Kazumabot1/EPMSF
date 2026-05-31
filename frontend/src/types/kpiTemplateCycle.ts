@@ -61,6 +61,24 @@ export interface KpiTemplateCycleStatusRequest {
   graceExtension?: KpiGraceExtension;
 }
 
+export interface KpiUnassignedEvaluator {
+  employeeId: number;
+  employeeName: string;
+  departmentId: number;
+  departmentName: string;
+  positionTitle: string;
+  reason: string;
+}
+
+export interface KpiCycleActivationReadiness {
+  cycleId: number;
+  cycleName: string;
+  ready: boolean;
+  targetEmployeeCount: number;
+  unassignedEvaluators: KpiUnassignedEvaluator[];
+  blockingIssues: string[];
+}
+
 export interface KpiTemplateCycleRequest {
   cycleName: string;
   startDate: string;
