@@ -118,7 +118,7 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'appraisalReview', 'appraisalApprove', 'appraisalView',
     'kpiCreate', 'kpiEdit', 'kpiView',
     'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentLock', 'selfAssessmentSign',
-    'feedbackFormCreate', 'continuousFeedbackView',
+    'feedbackFormCreate', 'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
     'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
   ],
   DEPARTMENTHEAD: [
@@ -151,7 +151,6 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'feedbackFormCreate', 'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
     'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
   ],
-  CEO: ['appraisalView', 'departmentComparisonView', 'kpiView'],
 };
 
 const teamAssignmentOptions: Array<{
@@ -165,14 +164,21 @@ const teamAssignmentOptions: Array<{
   { value: 'teamAssignAsMember', label: 'Can be Team Member', helper: 'This position can be selected as a normal member.' },
 ];
 
-const normalizeRoleName = (role?: string | null) =>
-  String(role ?? '')
+const normalizeRoleName = (role?: string | null) => {
+  const normalized = String(role ?? '')
     .replace(/^ROLE_/i, '')
     .replace(/([a-z])([A-Z])/g, '$1_$2')
     .replace(/[^A-Za-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
-    .toUpperCase()
-    .replace('DEPARTMENT_HEAD', 'DEPARTMENTHEAD');
+    .toUpperCase();
+
+  if (['HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR', 'ADMINISTRATOR'].includes(normalized)) return 'ADMIN';
+  if (['DEPARTMENT_HEAD', 'DEPARTMENTHEAD', 'DEPT_HEAD', 'HEAD_OF_DEPARTMENT'].includes(normalized)) return 'DEPARTMENTHEAD';
+  if (['CEO', 'EXECUTIVE', 'CEO_DASHBOARD', 'EXECUTIVE_DASHBOARD'].includes(normalized)) return 'CEO';
+  return normalized;
+};
+
+const isCeoAccessRole = (role?: string | null) => normalizeRoleName(role) === 'CEO';
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '-';
@@ -272,8 +278,13 @@ const PositionPermissions = () => {
     setIsError(false);
     try {
       const data = await positionService.getPositions();
-      setPositions(data);
-      setSelectedPositionId((prev) => (prev && data.some((item) => item.id === prev) ? prev : data[0]?.id ?? null));
+      const accessControlledPositions = data.filter((position) => !isCeoAccessRole(position.roleName));
+      setPositions(accessControlledPositions);
+      setSelectedPositionId((prev) => (
+        prev && accessControlledPositions.some((item) => item.id === prev)
+          ? prev
+          : accessControlledPositions[0]?.id ?? null
+      ));
     } catch (error) {
       setIsError(true);
       setMessage(error instanceof Error ? error.message : 'Failed to load positions.');
@@ -361,7 +372,7 @@ const PositionPermissions = () => {
           Access Control
         </span>
         <h1>Position Permissions</h1>
-        <p>Role controls dashboard. Position permissions control enabled actions.</p>
+        <p>Role controls dashboard. Position permissions control enabled actions. CEO access is not managed here.</p>
       </div>
 
       {message && <div className={`position-alert ${isError ? 'error' : 'success'}`}>{message}</div>}
