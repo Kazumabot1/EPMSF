@@ -215,13 +215,13 @@ const CeoDashboard = () => {
           display: 'flex',
           alignItems: 'center',
           gap: '.75rem',
-          background: '#ede9fe',
-          border: '1px solid #c4b5fd',
+          background: '#dbeafe',
+          border: '1px solid #bfdbfe',
           borderRadius: '12px',
           padding: '1rem 1.25rem',
           marginBottom: '1.5rem',
           fontSize: '.88rem',
-          color: '#5b21b6',
+          color: '#1e40af',
         }}
       >
         <i className="bi bi-info-circle-fill" style={{ fontSize: '1.1rem', flexShrink: 0 }} />
@@ -240,7 +240,7 @@ const CeoDashboard = () => {
         }}
       >
         {[
-          { label: 'Total Reports', value: summary.total, color: '#6366f1', icon: 'bi-files' },
+          { label: 'Total Reports', value: summary.total, color: '#2563eb', icon: 'bi-files' },
           { label: 'Manager Draft', value: summary.draft, color: '#64748b', icon: 'bi-pencil' },
           {
             label: 'Dept Head Pending',
@@ -496,7 +496,7 @@ const CeoDashboard = () => {
           type="button"
           onClick={() => navigate('/executive/reports')}
           style={{
-            border: '1px solid #ddd6fe',
+            border: '1px solid #bfdbfe',
             background: '#fff',
             borderRadius: 18,
             padding: '1.2rem',
@@ -512,7 +512,7 @@ const CeoDashboard = () => {
               borderRadius: 14,
               display: 'grid',
               placeItems: 'center',
-              background: '#faf5ff',
+              background: '#f8fbff',
               color: '#2563eb',
               fontSize: 20,
               marginBottom: 10,
@@ -650,9 +650,9 @@ const CeoDashboard = () => {
           onClick={load}
           disabled={loading}
           style={{
-            border: '1px solid #c4b5fd',
+            border: '1px solid #bfdbfe',
             background: '#fff',
-            color: '#6d28d9',
+            color: '#1d4ed8',
             borderRadius: 10,
             padding: '.65rem .95rem',
             fontWeight: 700,

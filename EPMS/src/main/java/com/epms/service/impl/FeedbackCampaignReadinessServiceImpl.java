@@ -39,6 +39,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignReadinessService {
 
+    private static final List<FeedbackCampaignStatus> LAUNCH_OVERLAP_BLOCKING_STATUSES = List.of(
+            FeedbackCampaignStatus.READY_TO_ACTIVATE,
+            FeedbackCampaignStatus.ACTIVE
+    );
+
     private final FeedbackCampaignRepository feedbackCampaignRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
@@ -70,6 +75,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
 
         addLifecycleCheck(campaign, checks);
         addCampaignInfoCheck(campaign, checks, blocking);
+        addSubmissionWindowOverlapCheck(campaign, checks, blocking);
         addTargetCheck(requests, checks, blocking, warnings);
         addAssignmentCheck(requests, assignments, checks, blocking);
         addQuestionReviewCheck(campaign, checks, blocking, warnings);
@@ -151,6 +157,82 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         checks.add(readinessCheck("CAMPAIGN_INFO", "Campaign information", "PASS", "Campaign name, review year, and submission window are complete."));
     }
 
+
+    private void addSubmissionWindowOverlapCheck(
+            FeedbackCampaign campaign,
+            List<FeedbackCampaignActivationReadinessResponse.FeedbackCampaignActivationCheck> checks,
+            List<String> blocking
+    ) {
+        if (campaign.getStartAt() == null || campaign.getEndAt() == null) {
+            return;
+        }
+        if (campaign.getId() == null) {
+            return;
+        }
+
+        List<FeedbackCampaign> overlappingCampaigns = feedbackCampaignRepository
+                .findPotentialOverlappingCampaignsExcludingCampaign(
+                        campaign.getId(),
+                        campaign.getStartAt().toLocalDate(),
+                        campaign.getEndAt().toLocalDate(),
+                        LAUNCH_OVERLAP_BLOCKING_STATUSES
+                )
+                .stream()
+                .filter(other -> other.getStartAt() != null && other.getEndAt() != null)
+                .filter(other -> submissionWindowsOverlap(
+                        campaign.getStartAt(),
+                        campaign.getEndAt(),
+                        other.getStartAt(),
+                        other.getEndAt()
+                ))
+                .toList();
+
+        if (overlappingCampaigns.isEmpty()) {
+            checks.add(readinessCheck(
+                    "SUBMISSION_WINDOW_OVERLAP",
+                    "Campaign window conflict",
+                    "PASS",
+                    "No launch-ready or active campaign overlaps this submission window."
+            ));
+            return;
+        }
+
+        FeedbackCampaign first = overlappingCampaigns.get(0);
+        String message = "Another launch-ready or active 360 campaign overlaps this submission window: "
+                + safeCampaignName(first)
+                + " (" + formatWindow(first) + "). Close it or choose a non-overlapping window before launch.";
+        blocking.add(message);
+        checks.add(readinessCheck(
+                "SUBMISSION_WINDOW_OVERLAP",
+                "Campaign window conflict",
+                "BLOCKED",
+                message
+        ));
+    }
+
+    private boolean submissionWindowsOverlap(
+            LocalDateTime startA,
+            LocalDateTime endA,
+            LocalDateTime startB,
+            LocalDateTime endB
+    ) {
+        return startA.isBefore(endB) && endA.isAfter(startB);
+    }
+
+    private String safeCampaignName(FeedbackCampaign campaign) {
+        if (campaign == null || campaign.getName() == null || campaign.getName().isBlank()) {
+            return "Untitled campaign";
+        }
+        return campaign.getName().trim();
+    }
+
+    private String formatWindow(FeedbackCampaign campaign) {
+        if (campaign == null || campaign.getStartAt() == null || campaign.getEndAt() == null) {
+            return "window not set";
+        }
+        return campaign.getStartAt() + " - " + campaign.getEndAt();
+    }
+
     private void addTargetCheck(
             List<FeedbackRequest> requests,
             List<FeedbackCampaignActivationReadinessResponse.FeedbackCampaignActivationCheck> checks,
@@ -200,7 +282,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
             FeedbackRequest request = assignment.getFeedbackRequest();
             if (request == null || assignment.getEvaluatorEmployeeId() == null || assignment.getRelationshipType() == null) return false;
             boolean samePerson = Objects.equals(request.getTargetEmployeeId(), assignment.getEvaluatorEmployeeId());
-            return assignment.getRelationshipType() == FeedbackRelationshipType.SELF ? !samePerson : samePerson;
+            return (assignment.getRelationshipType() == FeedbackRelationshipType.SELF) != samePerson;
         });
         if (invalidSelfRelationship) {
             assignmentIssues.add("Self assignments must use the recipient, and non-self assignments cannot use the recipient as evaluator.");
@@ -323,14 +405,14 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
     ) {
         List<String> anonymousRoles = new ArrayList<>();
         if (!Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) anonymousRoles.add("peer");
-        if (!Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) anonymousRoles.add("direct report");
+        if (!Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) anonymousRoles.add("subordinate reviewer");
 
         List<String> privacyWarnings = new ArrayList<>();
         if (Boolean.FALSE.equals(campaign.getPeerFeedbackAnonymous())) {
             privacyWarnings.add("Peer feedback is not anonymous. Confirm this policy before launching.");
         }
         if (Boolean.FALSE.equals(campaign.getSubordinateFeedbackAnonymous())) {
-            privacyWarnings.add("Direct report feedback is not anonymous. Confirm this policy before launching.");
+            privacyWarnings.add("Subordinate reviewer feedback is not anonymous. Confirm this policy before launching.");
         }
 
         if (!privacyWarnings.isEmpty()) {
@@ -345,7 +427,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         }
 
         String message = anonymousRoles.isEmpty()
-                ? "Peer and direct report feedback identity is visible to recipients."
+                ? "Peer and subordinate reviewer feedback identity is visible to recipients."
                 : "Grouped feedback identity is hidden from recipients for " + String.join(", ", anonymousRoles) + " feedback.";
         checks.add(readinessCheck("PRIVACY_POLICY", "Feedback visibility", "PASS", message));
     }

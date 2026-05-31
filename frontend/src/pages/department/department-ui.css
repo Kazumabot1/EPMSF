@@ -27,7 +27,7 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #2563eb;
-  background: #eef2ff;
+  background: #eff6ff;
   margin-bottom: 14px;
 }
 
@@ -88,7 +88,7 @@
 
 .department-btn.primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.28);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.28);
 }
 
 .department-btn.secondary {
@@ -107,7 +107,7 @@
 }
 
 .department-btn.ghost:hover {
-  background: #eef2ff;
+  background: #eff6ff;
 }
 
 .department-btn.danger {
@@ -249,7 +249,7 @@
 .department-form-group input:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
 .department-form-actions {

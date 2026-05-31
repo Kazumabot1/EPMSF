@@ -1,5 +1,4 @@
-/*Z*/
-import { useEffect, useMemo, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
 import type {
   AssessmentItem,
@@ -227,14 +226,16 @@ const handleManagerDecline = async () => {
       comment.trim() || undefined,
     );
 
-    if (updated.status === 'DRAFT') {
+    if (updated.status === 'REJECTED') {
       setActionMessage(
-        'Assessment returned to the employee for correction. The employee can edit and resubmit before the assessment period ends.',
+        'Assessment moved to the employee rejected list. The employee can correct it and resubmit directly to Manager review.',
       );
-    } else {
+    } else if (updated.status === 'CLOSED_REJECTED') {
       setActionMessage(
         'Assessment closed as rejected because the assessment period has ended.',
       );
+    } else {
+      setActionMessage('Assessment rejection saved.');
     }
 
     onSaved(updated);

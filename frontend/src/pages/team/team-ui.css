@@ -89,7 +89,7 @@
   gap: 8px;
   padding: 6px 12px;
   background: #f0f4ff;
-  color: #4f46e5;
+  color: #2563eb;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -189,13 +189,13 @@
 }
 
 .team-btn.primary {
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: white;
 }
 
 .team-btn.primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .team-btn.secondary {
@@ -214,7 +214,7 @@
 
 .team-btn.ghost:hover {
   background: #f1f5f9;
-  color: #4f46e5;
+  color: #2563eb;
 }
 
 .team-state {
@@ -263,8 +263,8 @@
 }
 
 .team-input:focus, .team-select:focus, .team-textarea:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   outline: none;
 }
 
@@ -1015,39 +1015,100 @@
   }
 }
 
-
-.team-row-clickable {
-  cursor: pointer;
-}
-
-.team-row-clickable:hover td {
+/* Department Head team list: view modal and primary-blue action cleanup */
+.team-action-btn-view {
+  border-color: #bfdbfe !important;
   background: #eff6ff !important;
+  color: #1d4ed8 !important;
 }
 
-.team-detail-member-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 10px;
+.team-action-btn-view:hover {
+  background: #dbeafe !important;
+  color: #1e40af !important;
 }
 
-.team-detail-member-card {
-  padding: 12px 14px;
-  border: 1px solid #dbeafe;
-  border-radius: 16px;
-  background: #f8fbff;
+.team-view-modal {
+  width: min(1040px, 100%);
 }
 
-.team-detail-member-card strong {
+.team-view-modal-header {
+  align-items: center;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 62%, #f8fbff 100%);
+}
+
+.team-view-modal-header > div > span {
   display: block;
+  margin-top: 0.35rem;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.team-view-modal-body {
+  gap: 18px;
+}
+
+.team-view-list-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.team-view-list-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.06);
+}
+
+.team-view-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-view-list-head h3 {
+  margin: 0;
   color: #0f172a;
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 900;
 }
 
-.team-detail-member-card span {
-  display: block;
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 700;
+.team-view-list-head span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.team-view-employees-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.team-view-employees-card .team-view-list-head {
+  padding: 16px 16px 0;
+}
+
+.team-view-member-table th,
+.team-view-member-table td {
+  vertical-align: middle;
+}
+
+@media (max-width: 760px) {
+  .team-view-list-grid {
+    grid-template-columns: 1fr;
+  }
 }

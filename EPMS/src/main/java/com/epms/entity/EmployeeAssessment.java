@@ -116,6 +116,18 @@ public class EmployeeAssessment {
     @Column(name = "decline_reason", columnDefinition = "TEXT")
     private String declineReason;
 
+    @Column(name = "rejected_by_role", length = 40)
+    private String rejectedByRole;
+
+    @Column(name = "rejected_by_user_id")
+    private Integer rejectedByUserId;
+
+    @Column(name = "rejected_by_name")
+    private String rejectedByName;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
+
     @Column(name = "employee_signature_id")
     private Long employeeSignatureId;
 

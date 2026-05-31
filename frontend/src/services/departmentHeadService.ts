@@ -25,6 +25,15 @@ export type DepartmentHeadEmployee = {
   parentDepartment?: string | null;
   workingDepartmentId?: number | null;
   workingDepartment?: string | null;
+  profileImageData?: string | null;
+  profileImageType?: string | null;
+  profile_image_data?: string | null;
+  profile_image_type?: string | null;
+  avatarData?: string | null;
+  avatarType?: string | null;
+  profilePictureData?: string | null;
+  profilePictureType?: string | null;
+  profilePicture?: string | null;
   [key: string]: unknown;
 };
 

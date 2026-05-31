@@ -118,7 +118,7 @@ const relationshipLabel = (type: FeedbackRelationshipType) => {
     case 'PEER':
       return 'Peer feedback';
     case 'SUBORDINATE':
-      return 'Direct report feedback';
+      return 'Subordinate reviewer feedback';
     case 'SELF':
       return 'Self feedback';
     default:
@@ -527,7 +527,7 @@ const FeedbackFormPage = () => {
             items={[
               {
                 title: 'Privacy note',
-                body: 'Your feedback will be used in aggregated 360 results. Peer and direct-report feedback may be hidden when the confidentiality threshold is not met.',
+                body: 'Your feedback will be used in aggregated 360 results. Peer and subordinate reviewer feedback may be hidden when the confidentiality threshold is not met.',
                 tone: 'info',
               },
               {

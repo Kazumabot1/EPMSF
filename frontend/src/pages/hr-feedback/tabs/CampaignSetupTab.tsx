@@ -185,6 +185,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     activeEvaluatorTarget,
     activePreviewItem,
     evaluatorCandidates,
+    relationshipCandidatesLoading,
+    relationshipCandidatesError,
     manualCandidateNotice,
     manualEvaluatorEligibilityError,
     activeAssignmentsByRelationship,
@@ -192,6 +194,7 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
     manualForm,
     setManualForm,
   } = useCampaignEvaluatorViewModel({
+    selectedCampaignId: selectedCampaign?.id ?? null,
     assignmentPreview,
     employees,
     candidates,
@@ -609,6 +612,8 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
             evaluatorSearch={evaluatorSearch}
             setEvaluatorSearch={setEvaluatorSearch}
             evaluatorCandidates={evaluatorCandidates}
+            relationshipCandidatesLoading={relationshipCandidatesLoading}
+            relationshipCandidatesError={relationshipCandidatesError}
             manualCandidateNotice={manualCandidateNotice}
             manualEvaluatorEligibilityError={manualEvaluatorEligibilityError}
             activeTargetSummary={activeTargetSummary}

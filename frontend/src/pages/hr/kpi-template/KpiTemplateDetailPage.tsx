@@ -43,7 +43,7 @@ const KpiTemplateDetailPage = () => {
     return (
       <div className="kpi-tpl-page">
         <div className="mx-auto flex max-w-6xl flex-col items-center px-4 py-28">
-          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-300 to-gray-200" />
+          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-300 to-gray-200" />
           <p className="text-sm font-medium text-gray-600">Loading template…</p>
         </div>
       </div>
@@ -98,7 +98,7 @@ const KpiTemplateDetailPage = () => {
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
         <header className="kpi-tpl-card--hero relative overflow-hidden p-6 sm:p-8">
-          <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-violet-400/15 blur-3xl" />
+          <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-400/15 blur-3xl" />
           <div className="relative flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-5">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 text-2xl text-white shadow-lg shadow-teal-900/15 ring-4 ring-teal-500/10">
@@ -131,7 +131,7 @@ const KpiTemplateDetailPage = () => {
           <dl className="relative mt-10 grid gap-4 border-t border-gray-200/90 pt-10">
             <div className="rounded-xl bg-gray-50/90 px-5 py-4 ring-1 ring-gray-200/90">
               <dt className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">
-                <i className="bi bi-people text-violet-600" aria-hidden />
+                <i className="bi bi-people text-blue-600" aria-hidden />
                 Positions
               </dt>
               <dd className="mt-2 text-sm font-medium leading-relaxed text-gray-800">
@@ -143,7 +143,7 @@ const KpiTemplateDetailPage = () => {
 
         <section className="mt-10">
           <h2 className="mb-4 flex items-center gap-2 px-1 text-xs font-bold uppercase tracking-wider text-gray-500">
-            <i className="bi bi-grid-3x3-gap text-violet-600" aria-hidden />
+            <i className="bi bi-grid-3x3-gap text-blue-600" aria-hidden />
             KPI definition grid
           </h2>
           <div className="kpi-tpl-card overflow-hidden p-0">
@@ -156,10 +156,10 @@ const KpiTemplateDetailPage = () => {
                       <th className="px-4 py-3.5">Category</th>
                       <th className="px-4 py-3.5 text-right">Target</th>
                       <th className="px-4 py-3.5">Unit</th>
-                      <th className="bg-violet-50 px-4 py-3.5 text-right text-violet-900">Actual</th>
+                      <th className="bg-blue-50 px-4 py-3.5 text-right text-blue-900">Actual</th>
                       <th className="px-4 py-3.5 text-right">Weight %</th>
-                      <th className="bg-violet-50 px-4 py-3.5 text-right text-violet-900">Score %</th>
-                      <th className="bg-violet-50 px-4 py-3.5 text-right text-violet-900">Weighted</th>
+                      <th className="bg-blue-50 px-4 py-3.5 text-right text-blue-900">Score %</th>
+                      <th className="bg-blue-50 px-4 py-3.5 text-right text-blue-900">Weighted</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
@@ -167,7 +167,7 @@ const KpiTemplateDetailPage = () => {
                       const kpiName = line.kpiItemName ?? line.kpiLabel ?? '—';
                       const added = isAddedLine(line);
                       return (
-                        <tr key={line.id ?? `${kpiName}-${line.sortOrder}`} className={added ? 'kpi-tpl-row-added' : 'hover:bg-violet-50/25'}>
+                        <tr key={line.id ?? `${kpiName}-${line.sortOrder}`} className={added ? 'kpi-tpl-row-added' : 'hover:bg-blue-50/25'}>
                           <td className="px-4 py-3.5 font-semibold text-gray-900">
                             <div className="flex flex-wrap items-center gap-2">
                               <span>{kpiName}</span>
@@ -177,14 +177,14 @@ const KpiTemplateDetailPage = () => {
                           <td className="px-4 py-3.5 text-gray-700">{line.kpiCategoryName ?? '—'}</td>
                           <td className="px-4 py-3.5 text-right tabular-nums text-gray-800">{line.target ?? '—'}</td>
                           <td className="px-4 py-3.5 text-gray-700">{line.kpiUnitName ?? '—'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">
+                          <td className="bg-blue-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-blue-600/75">
                             —
                           </td>
                           <td className="px-4 py-3.5 text-right font-bold tabular-nums text-gray-900">{line.weight ?? '—'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">
+                          <td className="bg-blue-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-blue-600/75">
                             —
                           </td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">
+                          <td className="bg-blue-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-blue-600/75">
                             —
                           </td>
                         </tr>
@@ -204,10 +204,10 @@ const KpiTemplateDetailPage = () => {
                           <td className="px-4 py-3.5 text-gray-700">{row.kpiCategoryName ?? 'â€”'}</td>
                           <td className="px-4 py-3.5 text-right tabular-nums text-gray-800">{row.target ?? 'â€”'}</td>
                           <td className="px-4 py-3.5 text-gray-700">{row.kpiUnitName ?? 'â€”'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">â€”</td>
+                          <td className="bg-blue-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-blue-600/75">â€”</td>
                           <td className="px-4 py-3.5 text-right font-bold tabular-nums text-gray-900">{row.weight ?? 'â€”'}</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">â€”</td>
-                          <td className="bg-violet-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-violet-600/75">â€”</td>
+                          <td className="bg-blue-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-blue-600/75">â€”</td>
+                          <td className="bg-blue-50/50 px-4 py-3.5 text-right text-xs font-medium tabular-nums text-blue-600/75">â€”</td>
                         </tr>
                       );
                     })}
@@ -218,7 +218,7 @@ const KpiTemplateDetailPage = () => {
                         Total weight
                       </td>
                       <td className="px-4 py-3.5 text-right tabular-nums text-gray-900">{totalWeight}%</td>
-                      <td colSpan={2} className="bg-violet-50/50 px-4 py-3.5 text-right text-xs tabular-nums text-violet-700/80">
+                      <td colSpan={2} className="bg-blue-50/50 px-4 py-3.5 text-right text-xs tabular-nums text-blue-700/80">
                         Total score — PM phase
                       </td>
                     </tr>
@@ -227,7 +227,7 @@ const KpiTemplateDetailPage = () => {
               </div>
             </div>
             <p className="border-t border-gray-100 bg-gray-50/80 px-6 py-3.5 text-xs leading-relaxed text-gray-600">
-              <i className="bi bi-info-circle mr-1.5 inline text-violet-600" aria-hidden />
+              <i className="bi bi-info-circle mr-1.5 inline text-blue-600" aria-hidden />
               Actual values and scores are captured when PM assigns and evaluates employee KPI forms.
             </p>
           </div>

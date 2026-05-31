@@ -121,13 +121,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.18);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
   transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
 }
 
 .reporting-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.22);
+  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.22);
 }
 
 .reporting-button:disabled {
@@ -267,8 +267,8 @@
   width: fit-content;
   border-radius: 999px;
   padding: 0.35rem 0.65rem;
-  background: #eef2ff;
-  color: #4338ca;
+  background: #eff6ff;
+  color: #1d4ed8;
   font-size: 0.76rem;
   font-weight: 1000;
 }
@@ -279,7 +279,7 @@
 }
 
 .report-pill--purple {
-  background: #faf5ff;
+  background: #f8fbff;
   color: #7e22ce;
 }
 

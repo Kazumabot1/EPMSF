@@ -231,22 +231,6 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
         Set<Long> employeeIdSet = new HashSet<>(workRelationshipResolver.resolveSubordinateEmployeeIds(managerUser));
 
-        managedTeams.forEach(team -> {
-            if (team.getTeamMembers() == null) {
-                return;
-            }
-            team.getTeamMembers().stream()
-                    .filter(member -> member.getEndedDate() == null)
-                    .map(member -> member.getMemberUser())
-                    .filter(Objects::nonNull)
-                    .filter(user -> user.getActive() == null || Boolean.TRUE.equals(user.getActive()))
-                    .filter(user -> !Objects.equals(user.getId(), managerUserId))
-                    .map(User::getEmployeeId)
-                    .filter(Objects::nonNull)
-                    .map(Integer::longValue)
-                    .forEach(employeeIdSet::add);
-        });
-
         List<Long> employeeIds = employeeIdSet.stream()
                 .sorted()
                 .toList();
@@ -255,15 +239,15 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
             return FeedbackTeamSummaryResponse.builder()
                     .managerUserId(userId)
                     .ownerUserId(userId)
-                    .viewScope("MANAGER_DIRECT_REPORTS")
+                    .viewScope("MANAGER_WORK_CONTEXT")
                     .totalDirectReports(0)
                     .totalDepartmentEmployees(0)
                     .totalManagedTeams(managedTeamCount)
                     .totalClosedResults(0)
-                    .accessTitle("Managed employee published 360 summary")
-                    .accessDescription("Managers can view published 360 results for employees in their 360 work-context scope: active team members, or department employees when no team exists.")
+                    .accessTitle("Published 360 summary")
+                    .accessDescription("Managers can view published 360 results only for employees included in their reviewer summary scope.")
                     .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and subordinate detail remains masked when confidentiality thresholds are not met.")
-                    .emptyStateMessage("No managed-employee 360 results are available yet. This view uses active teams and department work context.")
+                    .emptyStateMessage("No published 360 results are available yet.")
                     .items(List.of())
                     .build();
         }
@@ -277,15 +261,15 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         return FeedbackTeamSummaryResponse.builder()
                 .managerUserId(userId)
                 .ownerUserId(userId)
-                .viewScope("MANAGER_DIRECT_REPORTS")
+                .viewScope("MANAGER_WORK_CONTEXT")
                 .totalDirectReports(employeeIds.size())
                 .totalDepartmentEmployees(0)
                 .totalManagedTeams(managedTeamCount)
                 .totalClosedResults(summaries.size())
-                .accessTitle("Managed employee published 360 summary")
-                .accessDescription("Managers can view published 360 results for employees in their 360 work-context scope. If one manager handles multiple teams, all active team members are included once.")
+                .accessTitle("Published 360 summary")
+                .accessDescription("Managers can view published 360 results only for employees included in their reviewer summary scope.")
                 .privacyNotice("Only privacy-safe published summaries are shown. Anonymous peer and subordinate detail remains masked when confidentiality thresholds are not met.")
-                .emptyStateMessage("No published managed-employee 360 results are available yet.")
+                .emptyStateMessage("No published 360 results are available yet.")
                 .items(mapResults(summaries, loadEmployeeNames(employeeIds), true))
                 .build();
     }
@@ -375,7 +359,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                 .totalClosedResults(summaries.size())
                 .accessTitle("Department published 360 summary")
                 .accessDescription("Department Heads can view privacy-safe published 360 results for employees in their own department, whether or not the department uses teams.")
-                .privacyNotice("Department Head access is a department-level view. It does not create a separate evaluator relationship, and it is based on department scope plus the 360 work-context resolver.")
+                .privacyNotice("Department Head access is a department-level view. It does not create a separate evaluator relationship.")
                 .emptyStateMessage("No published 360 results are available for your department yet.")
                 .items(mapResults(summaries, loadEmployeeNames(employeeIds), true))
                 .build();
@@ -403,7 +387,11 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         String normalized = normalizeRoleName(role);
         return normalized.equals("MANAGER")
                 || normalized.equals("PROJECT_MANAGER")
-                || normalized.equals("TEAM_MANAGER");
+                || normalized.equals("PROJECTMANAGER")
+                || normalized.equals("TEAM_MANAGER")
+                || normalized.equals("PM")
+                || normalized.equals("TEAM_LEADER")
+                || normalized.equals("TEAMLEADER");
     }
 
     private boolean isDepartmentHeadViewer(User viewer) {

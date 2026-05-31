@@ -193,7 +193,7 @@ const AdminAuditLogsPage = () => {
             <label className="relative min-w-[260px] flex-1 max-w-md">
               <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-11 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search audit logs..."
@@ -201,7 +201,7 @@ const AdminAuditLogsPage = () => {
             </label>
 
             <select
-              className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               value={entityType}
               onChange={(event) => setEntityType(event.target.value)}
             >
@@ -211,7 +211,7 @@ const AdminAuditLogsPage = () => {
             </select>
 
             <select
-              className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               value={actorRole}
               onChange={(event) => setActorRole(event.target.value)}
             >
@@ -221,7 +221,7 @@ const AdminAuditLogsPage = () => {
             </select>
 
             <select
-              className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               value={action}
               onChange={(event) => setAction(event.target.value)}
             >

@@ -44,9 +44,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignmentManagementService {
 
-    private static final Set<String> HR_ADMIN_ROLE_NAMES = Set.of(
-            "ADMIN", "HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN"
-    );
     private static final Set<String> EXECUTIVE_ROLE_NAMES = Set.of("CEO", "EXECUTIVE");
 
     private final FeedbackEvaluatorAssignmentRepository assignmentRepository;
@@ -313,40 +310,21 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
 
         if (relationshipType == FeedbackRelationshipType.MANAGER) {
             if (!workRelationshipResolver.isWorkContextManager(target, evaluator)) {
-                throw new BusinessValidationException("Manager review must use a work-context manager: active team leader, or department manager/head when no active team exists.");
+                throw new BusinessValidationException("Manager review must use an eligible manager reviewer for the selected recipient.");
             }
             return;
         }
 
         if (relationshipType == FeedbackRelationshipType.SUBORDINATE) {
             if (!workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
-                throw new BusinessValidationException("Subordinate review must use a work-context subordinate from the target's active team or department scope.");
+                throw new BusinessValidationException("Subordinate review must use an eligible subordinate reviewer for the selected recipient.");
             }
             return;
         }
 
-        if (relationshipType == FeedbackRelationshipType.PEER) {
-            if (workRelationshipResolver.isWorkContextManager(target, evaluator)) {
-                throw new BusinessValidationException("The recipient's work-context manager cannot be added as a peer evaluator.");
-            }
-            if (workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
-                throw new BusinessValidationException("A work-context subordinate cannot be added as a peer evaluator.");
-            }
-            if (hasHrAdminRole(evaluator)) {
-                throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
-            }
-            if (isExecutivePeerMismatch(resolvePeerLayer(target), evaluator)) {
-                throw new BusinessValidationException("Executive users are not peer evaluators for this recipient layer.");
-            }
-            if (!sameDepartment(target, evaluator)) {
-                throw new BusinessValidationException("Peer reviewers must be from the same department by default.");
-            }
-            if (!isPeerLayerCompatible(target, evaluator)) {
-                throw new BusinessValidationException("This employee is not a close organizational peer for the selected recipient. Choose someone at the same organization layer.");
-            }
-            if (levelDistance(target, evaluator) > 1) {
-                throw new BusinessValidationException("Choose a peer from the same or adjacent level.");
-            }
+        if (relationshipType == FeedbackRelationshipType.PEER
+                && !workRelationshipResolver.isWorkContextPeer(target, evaluator)) {
+            throw new BusinessValidationException("Peer review must use an eligible peer reviewer for the selected recipient.");
         }
     }
 
@@ -470,7 +448,7 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
         }
         if (assignment.getRelationshipType() == FeedbackRelationshipType.PEER
                 && assignment.getSelectionMethod() == EvaluatorSelectionMethod.AUTO_RANKED) {
-            detailWarnings.add("Suggested peer selected by ranked work-context matching.");
+            detailWarnings.add("Suggested peer selected by reviewer eligibility ranking.");
         }
         Long evaluatorEmployeeId = assignment.getEvaluatorEmployeeId();
         if (evaluatorEmployeeId != null) {
@@ -534,43 +512,6 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
         return PeerLayer.INDIVIDUAL_CONTRIBUTOR;
     }
 
-    private boolean isPeerLayerCompatible(User target, User candidate) {
-        if (target == null || candidate == null) {
-            return false;
-        }
-        PeerLayer targetLayer = resolvePeerLayer(target);
-        PeerLayer candidateLayer = resolvePeerLayer(candidate);
-        if (targetLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR) {
-            return candidateLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR || candidateLayer == PeerLayer.LEAD_OR_SUPERVISOR;
-        }
-        if (targetLayer == PeerLayer.LEAD_OR_SUPERVISOR) {
-            return candidateLayer == PeerLayer.INDIVIDUAL_CONTRIBUTOR || candidateLayer == PeerLayer.LEAD_OR_SUPERVISOR;
-        }
-        if (targetLayer == PeerLayer.MANAGER) {
-            return candidateLayer == PeerLayer.MANAGER;
-        }
-        if (targetLayer == PeerLayer.DEPARTMENT_HEAD) {
-            return candidateLayer == PeerLayer.DEPARTMENT_HEAD;
-        }
-        return candidateLayer == PeerLayer.EXECUTIVE;
-    }
-
-
-    private boolean isExecutivePeerMismatch(PeerLayer targetLayer, User candidate) {
-        return targetLayer != PeerLayer.EXECUTIVE && !Collections.disjoint(normalizedRoleNames(candidate), EXECUTIVE_ROLE_NAMES);
-    }
-
-    private boolean sameDepartment(User target, User candidate) {
-        return target != null
-                && candidate != null
-                && target.getDepartmentId() != null
-                && Objects.equals(target.getDepartmentId(), candidate.getDepartmentId());
-    }
-
-    private boolean hasHrAdminRole(User user) {
-        return !Collections.disjoint(normalizedRoleNames(user), HR_ADMIN_ROLE_NAMES);
-    }
-
     private Set<String> normalizedRoleNames(User user) {
         if (user == null || user.getId() == null) {
             return Set.of();
@@ -617,7 +558,7 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
 
     private String buildPeerSelectionReason(User target, User evaluator) {
         if (target == null || evaluator == null) {
-            return "Suggested peer based on the best available work-context match.";
+            return "Suggested peer based on the best available eligible reviewer match.";
         }
         List<String> reasons = new ArrayList<>();
         if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), evaluator.getDepartmentId())) reasons.add("same department");
@@ -625,7 +566,7 @@ public class FeedbackAssignmentManagementServiceImpl implements FeedbackAssignme
         if (distance == 0) reasons.add("same level");
         else if (distance == 1) reasons.add("nearby level");
         if (resolvePeerLayer(target) == resolvePeerLayer(evaluator)) reasons.add("similar organization layer");
-        if (reasons.isEmpty()) return "Suggested peer based on the closest available eligible work-context match.";
+        if (reasons.isEmpty()) return "Suggested peer based on the closest available eligible reviewer match.";
         return "Suggested peer based on " + String.join(", ", reasons) + ".";
     }
 

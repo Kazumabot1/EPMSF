@@ -1178,7 +1178,7 @@ export default function QuestionRulesTab() {
                                                     {group.questions.map(question => <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>)}
                                                 </div>
                                                 <div>
-                                                    <strong>Resolver trace</strong>
+                                                    <strong>Rule match trace</strong>
                                                     <span>{group.rules.length} generated row{group.rules.length === 1 ? '' : 's'} · {group.active ? 'used in preview' : `ignored while ${ruleSetStatusLabel(group.ruleSetStatus).toLowerCase()}`}</span>
                                                     <span>{ruleScopeSpecificityLabel(group.rules[0])} scope</span>
                                                 </div>

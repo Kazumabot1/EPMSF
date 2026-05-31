@@ -1,10 +1,10 @@
 export const cleanEvaluatorNote = (message: string) => {
-    if (message.includes('No active direct manager')) return 'Manager not found.';
-    if (message.includes('No direct reports')) return 'No direct reports found.';
+    if (message.includes('No eligible manager reviewer')) return 'Manager not found.';
+    if (message.includes('No subordinates')) return 'No subordinate reviewers found.';
     if (message.includes('No active team')) return 'Team not set.';
     if (message.includes('No current department')) return 'Department not set.';
     if (message.includes('eligible peer')) return 'Fewer peer reviewers are available.';
-    if (message.includes('eligible subordinate')) return 'Fewer direct report reviewers are available.';
+    if (message.includes('eligible subordinate')) return 'Fewer subordinate reviewers are available.';
     if (message.includes('manual evaluator')) return 'Evaluator added by HR was kept.';
     return message;
 };

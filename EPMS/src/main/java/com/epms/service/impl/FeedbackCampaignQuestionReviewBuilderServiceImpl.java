@@ -979,9 +979,9 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
 
     private String relationshipLabel(com.epms.entity.enums.FeedbackRelationshipType relationshipType) {
         return switch (relationshipType) {
-            case MANAGER -> "Direct Manager";
+            case MANAGER -> "Manager reviewer";
             case PEER -> "Peer";
-            case SUBORDINATE -> "Direct Subordinate";
+            case SUBORDINATE -> "Subordinate reviewer";
             case SELF -> "Self";
         };
     }

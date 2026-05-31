@@ -34,11 +34,21 @@ import type {
   ManualAssignmentInput,
   FeedbackCampaignScoringConfig,
   FeedbackCampaignScoringConfigInput,
+  FeedbackRelationshipType,
+  FeedbackRelationshipCandidateResponse,
 } from '../types/feedbackCampaign';
 
 const FEEDBACK_BASE = '/v1/feedback';
 
 const unwrapEnvelope = <T>(response: { data: ApiEnvelope<T> }): T => response.data.data;
+
+const unwrapMaybeEnvelope = <T>(response: { data: ApiEnvelope<T> | T }): T => {
+  const body = response.data as ApiEnvelope<T> | T;
+  if (body && typeof body === 'object' && 'data' in body) {
+    return (body as ApiEnvelope<T>).data;
+  }
+  return body as T;
+};
 
 const buildTargetCandidateParams = (query: FeedbackTargetCandidateQuery = {}) => {
   const params = new URLSearchParams();
@@ -101,6 +111,23 @@ const mapAssignmentGenerationResponse = (response: FeedbackAssignmentGenerationR
   requests: response.requests ?? [],
   assignmentDetails: response.assignmentDetails ?? [],
   warnings: response.warnings ?? [],
+});
+
+
+const mapRelationshipCandidate = (candidate: FeedbackRelationshipCandidateResponse): FeedbackRelationshipCandidateResponse => ({
+  ...candidate,
+  employeeId: Number(candidate.employeeId ?? 0),
+  userId: candidate.userId ?? null,
+  employeeCode: candidate.employeeCode ?? null,
+  employeeName: candidate.employeeName?.trim() || `Employee #${candidate.employeeId}`,
+  email: candidate.email ?? null,
+  currentDepartmentId: candidate.currentDepartmentId ?? null,
+  currentDepartmentName: candidate.currentDepartmentName ?? null,
+  positionId: candidate.positionId ?? null,
+  positionName: candidate.positionName ?? null,
+  levelCode: candidate.levelCode ?? null,
+  relationshipType: candidate.relationshipType,
+  sourceLabel: candidate.sourceLabel ?? null,
 });
 
 const mapActivationReadinessResponse = (response: FeedbackCampaignActivationReadiness): FeedbackCampaignActivationReadiness => ({
@@ -413,6 +440,23 @@ export const feedbackCampaignApi = {
       return mapAssignmentGenerationResponse(unwrapEnvelope(response));
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Evaluator preview could not be loaded.'));
+    }
+  },
+
+
+  async getRelationshipCandidates(
+      campaignId: number,
+      targetEmployeeId: number,
+      relationshipType: FeedbackRelationshipType,
+  ): Promise<FeedbackRelationshipCandidateResponse[]> {
+    try {
+      const response = await api.get<ApiEnvelope<FeedbackRelationshipCandidateResponse[]> | FeedbackRelationshipCandidateResponse[]>(
+          `${FEEDBACK_BASE}/campaigns/${campaignId}/targets/${targetEmployeeId}/relationship-candidates?relationshipType=${encodeURIComponent(relationshipType)}`,
+      );
+      const data = unwrapMaybeEnvelope<FeedbackRelationshipCandidateResponse[]>(response);
+      return (Array.isArray(data) ? data : []).map(mapRelationshipCandidate);
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, 'Eligible reviewers could not be loaded.'));
     }
   },
 

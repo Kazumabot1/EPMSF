@@ -102,7 +102,7 @@ const ProjectManagerDashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 p-6">
       <div className="mx-auto max-w-7xl space-y-5">
         <section className="rounded-2xl border border-slate-200/70 bg-white/90 p-6 shadow-sm">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
             <i className="bi bi-kanban" />
             Project Manager
           </div>
@@ -118,7 +118,7 @@ const ProjectManagerDashboard = () => {
               </p>
             </div>
 
-            <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
               <i className="bi bi-info-circle me-2" />
               KPI Evaluation and stakeholder feedback modules can be connected here next.
             </div>
@@ -285,7 +285,7 @@ const ProjectManagerDashboard = () => {
             <div className="mt-5 space-y-3">
               <div className="rounded-xl border border-dashed border-slate-300 p-4">
                 <div className="flex items-center gap-3">
-                  <span className="rounded-xl bg-violet-50 p-2 text-violet-600">
+                  <span className="rounded-xl bg-blue-50 p-2 text-blue-600">
                     <i className="bi bi-kanban" />
                   </span>
 

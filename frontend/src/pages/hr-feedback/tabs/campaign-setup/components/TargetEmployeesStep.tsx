@@ -243,7 +243,7 @@ export function TargetEmployeesStep({
                                         </div>
                                         <div className="hfdt-recipient-cell hfdc-signal-cell">
                                             <strong>{candidate.managerName ?? 'Manager not set'}</strong>
-                                            <small>{candidate.peerCandidateCount} peers · {candidate.subordinateCandidateCount} direct reports</small>
+                                            <small>{candidate.peerCandidateCount} peers · {candidate.subordinateCandidateCount} subordinates</small>
                                         </div>
                                         <div className="hfdt-status-stack">
                                             <span className={`hfdt-badge ${availability}`}>{readinessLabel(candidate)}</span>

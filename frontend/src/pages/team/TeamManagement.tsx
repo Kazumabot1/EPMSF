@@ -103,6 +103,25 @@ const formatDate = (value?: string | null) => {
   });
 };
 
+
+const getTeamMemberName = (member: TeamResponse['members'][number]) =>
+  member.userName || member.employeeName || 'Unnamed member';
+
+const isSameTeamPerson = (
+  member: TeamResponse['members'][number],
+  userId?: number | null,
+  name?: string | null,
+) => {
+  if (userId && member.userId && Number(member.userId) === Number(userId)) {
+    return true;
+  }
+
+  const memberName = getTeamMemberName(member).trim().toLowerCase();
+  const expectedName = String(name ?? '').trim().toLowerCase();
+
+  return Boolean(memberName && expectedName && memberName === expectedName);
+};
+
 const TeamManagement: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -118,15 +137,14 @@ const TeamManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
- const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
- const [selectedDetailTeam, setSelectedDetailTeam] = useState<TeamResponse | null>(null);
- const [inactivatingTeam, setInactivatingTeam] = useState<TeamResponse | null>(null);
-
+  const [editingTeam, setEditingTeam] = useState<TeamResponse | null>(null);
+  const [inactivatingTeam, setInactivatingTeam] = useState<TeamResponse | null>(null);
   const [inactivateReason, setInactivateReason] = useState('');
   const [inactivateError, setInactivateError] = useState('');
   const [inactivating, setInactivating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<TeamResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [viewingTeam, setViewingTeam] = useState<TeamResponse | null>(null);
 
   const [canCreateTeam, setCanCreateTeam] = useState(false);
   const [canEditTeam, setCanEditTeam] = useState(false);
@@ -234,6 +252,18 @@ const TeamManagement: React.FC = () => {
     [teams],
   );
 
+  const viewingTeamEmployees = useMemo(() => {
+    if (!viewingTeam?.members?.length) {
+      return [];
+    }
+
+    return viewingTeam.members.filter(
+      (member) =>
+        !isSameTeamPerson(member, viewingTeam.teamLeaderId, viewingTeam.teamLeaderName) &&
+        !isSameTeamPerson(member, viewingTeam.projectManagerId, viewingTeam.projectManagerName),
+    );
+  }, [viewingTeam]);
+
   const handleDelete = async () => {
     if (!showDeleteConfirm) {
       return;
@@ -251,27 +281,6 @@ const TeamManagement: React.FC = () => {
       setDeleting(false);
     }
   };
-
-const openTeamDetail = (team: TeamResponse) => {
-  if (!isHr) {
-    return;
-  }
-
-  setSelectedDetailTeam(team);
-};
-
-const closeTeamDetail = () => {
-  setSelectedDetailTeam(null);
-};
-
-const memberName = (member: TeamResponse['members'][number]) =>
-  member.userName || member.employeeName || 'Unnamed member';
-
-const memberStartedDate = (member: TeamResponse['members'][number]) =>
-  member.startedDate ? formatDate(member.startedDate) : '—';
-
-const activeMembers = (team: TeamResponse | null) =>
-  Array.isArray(team?.members) ? team!.members : [];
 
   const openInactivateModal = (team: TeamResponse) => {
     setError('');
@@ -427,17 +436,17 @@ const activeMembers = (team: TeamResponse | null) =>
           <div className="team-table-wrap">
             <table className="team-table">
               <thead>
-              <tr>
-                <th>No.</th>
-                <th>Team</th>
-                <th>Department</th>
-                <th>Team Leader</th>
-                <th>Project Manager</th>
-                <th>Members</th>
-                <th>Status</th>
-                <th>Created</th>
-                {!isHr && <th>Actions</th>}
-              </tr>
+                <tr>
+                  <th>No.</th>
+                  <th>Team</th>
+                  <th>Department</th>
+                  <th>Team Leader</th>
+                  <th>Project Manager</th>
+                  <th>Members</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
               </thead>
 
               <tbody>
@@ -445,12 +454,7 @@ const activeMembers = (team: TeamResponse | null) =>
                   const isActiveTeam = team.status?.toLowerCase() === 'active';
 
                   return (
-                 <tr
-                   key={team.id}
-                   className={isHr ? 'team-row-clickable' : undefined}
-                   onClick={() => openTeamDetail(team)}
-                   title={isHr ? 'Click to view team details' : undefined}
-                 >
+                  <tr key={team.id}>
                     <td>{index + 1}</td>
 
                     <td>
@@ -512,43 +516,41 @@ const activeMembers = (team: TeamResponse | null) =>
 
                     <td>{formatDate(team.createdDate)}</td>
 
-{!isHr && (
-  <td>
-    {canShowEditTeam ? (
-      <div className="team-row-actions">
-        {isActiveTeam ? (
-          <>
-            <button
-              type="button"
-              className="team-action-btn"
-              onClick={(event) => {
-                event.stopPropagation();
-                setEditingTeam(team);
-              }}
-            >
-              Edit
-            </button>
+                    <td>
+                      <div className="team-row-actions">
+                        <button
+                          type="button"
+                          className="team-action-btn team-action-btn-view"
+                          onClick={() => setViewingTeam(team)}
+                        >
+                          View
+                        </button>
 
-            <button
-              type="button"
-              className="team-action-btn team-action-btn-danger"
-              onClick={(event) => {
-                event.stopPropagation();
-                openInactivateModal(team);
-              }}
-            >
-              Inactivate
-            </button>
-          </>
-        ) : (
-          <span className="team-muted">Inactive</span>
-        )}
-      </div>
-    ) : (
-      <span className="team-muted">View only</span>
-    )}
-  </td>
-)}
+                        {canShowEditTeam && isActiveTeam && (
+                          <>
+                            <button
+                              type="button"
+                              className="team-action-btn"
+                              onClick={() => setEditingTeam(team)}
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              className="team-action-btn team-action-btn-danger"
+                              onClick={() => openInactivateModal(team)}
+                            >
+                              Inactivate
+                            </button>
+                          </>
+                        )}
+
+                        {canShowEditTeam && !isActiveTeam && (
+                          <span className="team-muted">Inactive</span>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                   );
                 })}
@@ -558,6 +560,152 @@ const activeMembers = (team: TeamResponse | null) =>
         )}
       </div>
 
+
+      {viewingTeam && (
+        <div className="team-modal-overlay" onClick={() => setViewingTeam(null)}>
+          <div
+            className="team-modal team-modal-wide team-view-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="team-modal-header team-view-modal-header">
+              <div>
+                <p className="team-eyebrow">Team Details</p>
+                <h2>{viewingTeam.teamName}</h2>
+                <span>{viewingTeam.departmentName || 'Department not assigned'}</span>
+              </div>
+
+              <button
+                type="button"
+                className="team-modal-close"
+                onClick={() => setViewingTeam(null)}
+                aria-label="Close team details"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="team-modal-body team-view-modal-body">
+              <div className="team-detail-grid">
+                <div>
+                  <span>Department</span>
+                  <strong>{viewingTeam.departmentName || '—'}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{viewingTeam.status || '—'}</strong>
+                </div>
+                <div>
+                  <span>Employees</span>
+                  <strong>{viewingTeamEmployees.length}</strong>
+                </div>
+                <div>
+                  <span>Created</span>
+                  <strong>{formatDate(viewingTeam.createdDate)}</strong>
+                </div>
+              </div>
+
+              {viewingTeam.teamGoal && (
+                <div className="team-detail-section">
+                  <h3>Team Goal</h3>
+                  <p>{viewingTeam.teamGoal}</p>
+                </div>
+              )}
+
+              <div className="team-view-list-grid">
+                <section className="team-view-list-card">
+                  <div className="team-view-list-head">
+                    <h3>Team Leader</h3>
+                    <span>{viewingTeam.teamLeaderName ? 1 : 0}</span>
+                  </div>
+
+                  {viewingTeam.teamLeaderName ? (
+                    <ProfileNameCell
+                      person={{
+                        userId: viewingTeam.teamLeaderId,
+                        fullName: viewingTeam.teamLeaderName,
+                        departmentName: viewingTeam.departmentName,
+                      }}
+                      subtitle="Team Leader"
+                    />
+                  ) : (
+                    <p className="team-muted">No team leader recorded.</p>
+                  )}
+                </section>
+
+                <section className="team-view-list-card">
+                  <div className="team-view-list-head">
+                    <h3>Manager</h3>
+                    <span>{viewingTeam.projectManagerName ? 1 : 0}</span>
+                  </div>
+
+                  {viewingTeam.projectManagerName ? (
+                    <ProfileNameCell
+                      person={{
+                        userId: viewingTeam.projectManagerId,
+                        fullName: viewingTeam.projectManagerName,
+                        departmentName: viewingTeam.departmentName,
+                      }}
+                      subtitle={
+                        viewingTeam.projectManagerTeams
+                          ? `Project Manager • Also PM in ${viewingTeam.projectManagerTeams}`
+                          : 'Project Manager'
+                      }
+                    />
+                  ) : (
+                    <p className="team-muted">No project manager recorded.</p>
+                  )}
+                </section>
+              </div>
+
+              <section className="team-view-list-card team-view-employees-card">
+                <div className="team-view-list-head">
+                  <h3>Employees</h3>
+                  <span>{viewingTeamEmployees.length}</span>
+                </div>
+
+                {viewingTeamEmployees.length > 0 ? (
+                  <div className="team-table-wrap">
+                    <table className="team-table team-view-member-table">
+                      <thead>
+                        <tr>
+                          <th>No.</th>
+                          <th>Employee</th>
+                          <th>Joined</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingTeamEmployees.map((member, index) => {
+                          const memberName = getTeamMemberName(member);
+
+                          return (
+                            <tr key={`${member.userId ?? member.employeeId ?? index}-${memberName}`}>
+                              <td>{index + 1}</td>
+                              <td>
+                                <ProfileNameCell
+                                  person={{
+                                    userId: member.userId,
+                                    fullName: memberName,
+                                    departmentName: viewingTeam.departmentName,
+                                  }}
+                                  subtitle="Employee"
+                                />
+                              </td>
+                              <td>{formatDate(member.startedDate)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="team-muted">No employee members are recorded for this team.</p>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TeamEditModal
         open={Boolean(editingTeam)}
         team={editingTeam}
@@ -566,117 +714,6 @@ const activeMembers = (team: TeamResponse | null) =>
         onClose={() => setEditingTeam(null)}
         onSaved={loadTeams}
       />
-
-      {isHr && selectedDetailTeam && (
-        <div className="team-modal-overlay" onClick={closeTeamDetail}>
-          <div
-            className="team-modal team-modal-wide"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="team-modal-header">
-              <div>
-                <p className="team-eyebrow">Team Details</p>
-                <h2>{selectedDetailTeam.teamName}</h2>
-              </div>
-
-              <button
-                type="button"
-                className="team-modal-close"
-                onClick={closeTeamDetail}
-                aria-label="Close team detail"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="team-modal-body">
-              <div className="team-detail-grid">
-                <div>
-                  <span>Team</span>
-                  <strong>{selectedDetailTeam.teamName || '—'}</strong>
-                </div>
-
-                <div>
-                  <span>Department</span>
-                  <strong>{selectedDetailTeam.departmentName || '—'}</strong>
-                </div>
-
-                <div>
-                  <span>Status</span>
-                  <strong>{selectedDetailTeam.status || '—'}</strong>
-                </div>
-
-                <div>
-                  <span>Created</span>
-                  <strong>{formatDate(selectedDetailTeam.createdDate)}</strong>
-                </div>
-
-                <div>
-                  <span>Team Leader</span>
-                  <strong>{selectedDetailTeam.teamLeaderName || '—'}</strong>
-                </div>
-
-                <div>
-                  <span>Project Manager</span>
-                  <strong>{selectedDetailTeam.projectManagerName || '—'}</strong>
-                </div>
-
-                <div>
-                  <span>Members</span>
-                  <strong>{activeMembers(selectedDetailTeam).length}</strong>
-                </div>
-
-                <div>
-                  <span>Created By</span>
-                  <strong>{selectedDetailTeam.createdByName || '—'}</strong>
-                </div>
-              </div>
-
-              <div className="team-detail-section">
-                <h3>Team Goal</h3>
-                <p>{selectedDetailTeam.teamGoal || 'No team goal recorded.'}</p>
-              </div>
-
-              {selectedDetailTeam.projectManagerTeams && (
-                <div className="team-detail-section">
-                  <h3>Other Teams Managed by Project Manager</h3>
-                  <p>{selectedDetailTeam.projectManagerTeams}</p>
-                </div>
-              )}
-
-              <div className="team-detail-section">
-                <h3>Team Members</h3>
-
-                {activeMembers(selectedDetailTeam).length === 0 ? (
-                  <p>No active members in this team.</p>
-                ) : (
-                  <div className="team-detail-member-list">
-                    {activeMembers(selectedDetailTeam).map((member, index) => (
-                      <div
-                        key={`${member.userId ?? member.employeeId ?? index}-${index}`}
-                        className="team-detail-member-card"
-                      >
-                        <strong>{memberName(member)}</strong>
-                        <span>Started: {memberStartedDate(member)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="team-modal-footer">
-                <button
-                  type="button"
-                  className="team-btn team-btn-secondary"
-                  onClick={closeTeamDetail}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {inactivatingTeam && (
         <div className="team-modal-overlay" onClick={closeInactivateModal}>

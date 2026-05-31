@@ -199,7 +199,7 @@ const ImageCropModal = ({
           <div className="flex flex-col items-center">
             <div className="rounded-[2rem] bg-slate-100 p-5 shadow-inner">
               <div
-                className="relative overflow-hidden rounded-full border-4 border-indigo-100 bg-white shadow-lg"
+                className="relative overflow-hidden rounded-full border-4 border-blue-100 bg-white shadow-lg"
                 style={{ width: PROFILE_IMAGE_PREVIEW_SIZE, height: PROFILE_IMAGE_PREVIEW_SIZE }}
               >
                 <img
@@ -239,7 +239,7 @@ const ImageCropModal = ({
                 step="0.05"
                 value={zoom}
                 onChange={(event) => setZoom(Number(event.target.value))}
-                className="w-full accent-indigo-600"
+                className="w-full accent-blue-600"
               />
             </label>
 
@@ -253,7 +253,7 @@ const ImageCropModal = ({
                   step="1"
                   value={offsetX}
                   onChange={(event) => setOffsetX(Number(event.target.value))}
-                  className="w-full accent-indigo-600"
+                  className="w-full accent-blue-600"
                 />
               </label>
 
@@ -266,7 +266,7 @@ const ImageCropModal = ({
                   step="1"
                   value={offsetY}
                   onChange={(event) => setOffsetY(Number(event.target.value))}
-                  className="w-full accent-indigo-600"
+                  className="w-full accent-blue-600"
                 />
               </label>
             </div>
@@ -313,7 +313,7 @@ const ImageCropModal = ({
                 type="button"
                 disabled={applying}
                 onClick={() => void applyCrop()}
-                className="rounded-2xl bg-indigo-600 px-5 py-2 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-2xl bg-blue-600 px-5 py-2 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {applying ? 'Applying...' : 'Apply Crop'}
               </button>

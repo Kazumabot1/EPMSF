@@ -25,7 +25,7 @@ export const RELATIONSHIP_ORDER = ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'] as 
 export const relationshipOptions: RelationshipOption[] = [
     { value: 'MANAGER', label: 'Manager' },
     { value: 'PEER', label: 'Peer' },
-    { value: 'SUBORDINATE', label: 'Direct Report' },
+    { value: 'SUBORDINATE', label: 'Subordinate' },
 ];
 
 export const defaultForm = (): CampaignInfoForm => ({

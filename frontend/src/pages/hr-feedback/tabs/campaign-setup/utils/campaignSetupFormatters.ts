@@ -39,7 +39,7 @@ export const readinessClass = (item: FeedbackTargetCandidate) => {
 export const recipientDetailItems = (item: FeedbackTargetCandidate) => [
     { label: 'Manager', value: item.managerName ?? 'Not set' },
     { label: 'Possible peers', value: String(item.peerCandidateCount ?? 0) },
-    { label: 'Direct reports', value: String(item.subordinateCandidateCount ?? 0) },
+    { label: 'Subordinate reviewers', value: String(item.subordinateCandidateCount ?? 0) },
     { label: 'Teams', value: item.activeTeamNames.length > 0 ? item.activeTeamNames.join(', ') : 'Not set' },
 ];
 
@@ -64,7 +64,7 @@ export const relationshipLabel = (type: FeedbackRelationshipType | string) => {
         case 'PEER':
             return 'Peer';
         case 'SUBORDINATE':
-            return 'Direct Report';
+            return 'Subordinate';
         case 'SELF':
             return 'Self';
         default:

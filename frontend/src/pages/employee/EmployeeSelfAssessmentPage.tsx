@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/*Z*/import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
 import FormSignaturePicker, { type FormSignatureValue } from '../../components/signature/FormSignaturePicker';
@@ -13,7 +13,7 @@ import type {
 } from '../../types/employeeAssessment';
 import './employee-self-assessment.css';
 
-const EDITABLE_STATUSES: AssessmentStatus[] = ['DRAFT'];
+const EDITABLE_STATUSES: AssessmentStatus[] = ['DRAFT', 'REJECTED'];
 
 const FINAL_SCORE_VISIBLE_STATUSES: AssessmentStatus[] = ['APPROVED', 'CLOSED_REJECTED'];
 
@@ -65,7 +65,7 @@ type Toast = {
   msg: string;
 };
 
-type TabKey = 'ongoing' | 'past';
+type TabKey = 'ongoing' | 'pending' | 'rejected' | 'past';
 
 let toastSeq = 0;
 
@@ -210,7 +210,7 @@ const isEditableAssessment = (assessment?: EmployeeAssessment | null) => {
 };
 
 const getRowDate = (row: AssessmentScoreRow) => {
-  return row.approvedAt ?? row.declinedAt ?? row.submittedAt ?? null;
+  return row.approvedAt ?? row.declinedAt ?? row.rejectedAt ?? row.submittedAt ?? null;
 };
 
 const EmployeeSelfAssessmentPage = () => {
@@ -292,6 +292,11 @@ const EmployeeSelfAssessmentPage = () => {
             submittedAt: latest.submittedAt ?? null,
             approvedAt: latest.approvedAt ?? null,
             declinedAt: latest.declinedAt ?? null,
+            declineReason: latest.declineReason ?? null,
+            rejectedByRole: latest.rejectedByRole ?? null,
+            rejectedByUserId: latest.rejectedByUserId ?? null,
+            rejectedByName: latest.rejectedByName ?? null,
+            rejectedAt: latest.rejectedAt ?? null,
             employeeSigned: Boolean(latest.employeeSignatureId),
             managerSigned: Boolean(latest.managerSignatureId),
             departmentHeadSigned: Boolean(latest.departmentHeadSignatureId),
@@ -301,7 +306,16 @@ const EmployeeSelfAssessmentPage = () => {
       }
 
       setPastRows(rows);
-      setActiveTab(isLatestEditable ? 'ongoing' : 'past');
+
+      if (isLatestEditable) {
+        setActiveTab('ongoing');
+      } else if (rows.some((row) => ['SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(row.status))) {
+        setActiveTab('pending');
+      } else if (rows.some((row) => ['REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(row.status))) {
+        setActiveTab('rejected');
+      } else {
+        setActiveTab('past');
+      }
     } catch (error) {
       toast('error', errMsg(error, 'Unable to load self-assessment.'));
     } finally {
@@ -326,6 +340,28 @@ const EmployeeSelfAssessmentPage = () => {
   }, []);
 
   const progress = useMemo(() => answerProgress(ongoingAssessment), [ongoingAssessment]);
+
+  const pendingRows = useMemo(
+    () => pastRows.filter((row) => ['SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(row.status)),
+    [pastRows],
+  );
+
+  const rejectedRows = useMemo(
+    () => pastRows.filter((row) => ['REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(row.status)),
+    [pastRows],
+  );
+
+  const approvedRows = useMemo(
+    () => pastRows.filter((row) => row.status === 'APPROVED'),
+    [pastRows],
+  );
+
+  const currentListRows = useMemo(() => {
+    if (activeTab === 'pending') return pendingRows;
+    if (activeTab === 'rejected') return rejectedRows;
+    if (activeTab === 'past') return approvedRows;
+    return [];
+  }, [activeTab, approvedRows, pendingRows, rejectedRows]);
 
   const doSave = async (draft: EmployeeAssessment) => {
     if (!isEditableAssessment(draft)) return draft;
@@ -502,6 +538,11 @@ const EmployeeSelfAssessmentPage = () => {
           submittedAt: submitted.submittedAt ?? null,
           approvedAt: submitted.approvedAt ?? null,
           declinedAt: submitted.declinedAt ?? null,
+          declineReason: submitted.declineReason ?? null,
+          rejectedByRole: submitted.rejectedByRole ?? null,
+          rejectedByUserId: submitted.rejectedByUserId ?? null,
+          rejectedByName: submitted.rejectedByName ?? null,
+          rejectedAt: submitted.rejectedAt ?? null,
           employeeSigned: Boolean(submitted.employeeSignatureId),
           managerSigned: Boolean(submitted.managerSignatureId),
           departmentHeadSigned: Boolean(submitted.departmentHeadSignatureId),
@@ -510,7 +551,7 @@ const EmployeeSelfAssessmentPage = () => {
         ...previous.filter((row) => Number(row.id) !== Number(submitted.id)),
       ]);
       setActiveTab('past');
-      toast('success', 'Assessment submitted. It is now waiting for review.');
+      toast('success', submitted.status === 'PENDING_HR' ? 'Assessment resubmitted. It is now waiting for HR review.' : 'Assessment submitted. It is now waiting for Manager review.');
     } catch (error) {
       toast('error', errMsg(error, 'Could not submit assessment.'));
     } finally {
@@ -541,7 +582,14 @@ const EmployeeSelfAssessmentPage = () => {
   const renderSignatureGrid = (assessment: EmployeeAssessment, editable: boolean) => (
     <div className="ess-sig-grid">
       <div className="ess-sig-slot">
-        {assessment.employeeSignatureImageData ? (
+        {editable ? (
+          <FormSignaturePicker
+            label="Employee Signature"
+            value={employeeSignature}
+            onChange={setEmployeeSignature}
+            disabled={submitting || saving}
+          />
+        ) : assessment.employeeSignatureImageData ? (
           <>
             <span className="ess-sig-label">Employee Signature</span>
             <img
@@ -559,13 +607,6 @@ const EmployeeSelfAssessmentPage = () => {
               {assessment.employeeSignatureName || assessment.employeeName}
             </small>
           </>
-        ) : editable ? (
-          <FormSignaturePicker
-            label="Employee Signature"
-            value={employeeSignature}
-            onChange={setEmployeeSignature}
-            disabled={submitting || saving}
-          />
         ) : (
           <>
             <span className="ess-sig-label">Employee Signature</span>
@@ -834,8 +875,9 @@ const EmployeeSelfAssessmentPage = () => {
 
         {assessment.declineReason && (
           <div className="ess-comment-block danger">
-            <h4>Rejection Reason</h4>
+            <h4>Rejected by {assessment.rejectedByRole || 'Reviewer'}</h4>
             <p>{assessment.declineReason}</p>
+            {assessment.rejectedByName && <small>{assessment.rejectedByName}</small>}
           </div>
         )}
       </div>
@@ -959,6 +1001,23 @@ const EmployeeSelfAssessmentPage = () => {
       <div className="ess-layout">
         <form ref={formRef} onSubmit={handleSubmit}>
           {renderInfoGrid(ongoingAssessment, true)}
+          {ongoingAssessment.status === 'REJECTED' && (
+            <div className="ess-card ess-review-card ess-rejected-edit-card">
+              <h3>Returned for correction</h3>
+              <p>
+                This form was rejected by {ongoingAssessment.rejectedByRole || 'the reviewer'}. Update your answers and submit again.
+                {ongoingAssessment.rejectedByRole === 'HR'
+                  ? ' After resubmission, it will go directly back to HR.'
+                  : ' After resubmission, it will go back to your Manager.'}
+              </p>
+              {ongoingAssessment.declineReason && (
+                <div className="ess-comment-block danger">
+                  <h4>Reason</h4>
+                  <p>{ongoingAssessment.declineReason}</p>
+                </div>
+              )}
+            </div>
+          )}
           {renderAssessmentSubjects(ongoingAssessment, true)}
 
           <div className="ess-card">
@@ -1023,15 +1082,15 @@ const EmployeeSelfAssessmentPage = () => {
   };
 
   const renderPastRows = () => {
-    if (pastRows.length === 0) {
+    if (currentListRows.length === 0) {
       return (
         <div className="ess-card">
           <div className="ess-state">
             <div className="ess-state-icon">
               <i className="bi bi-clock-history" />
             </div>
-            <h3>No Past Self-Assessments</h3>
-            <p>Your submitted, approved, and closed rejected forms will appear here.</p>
+            <h3>No {activeTab === 'pending' ? 'Pending' : activeTab === 'rejected' ? 'Rejected' : 'Past'} Self-Assessments</h3>
+            <p>{activeTab === 'pending' ? 'Submitted forms waiting for Manager or HR review will appear here.' : activeTab === 'rejected' ? 'Rejected forms will appear here. You can revise an open rejected form from Ongoing.' : 'Approved final records will appear here.'}</p>
           </div>
         </div>
       );
@@ -1039,7 +1098,7 @@ const EmployeeSelfAssessmentPage = () => {
 
     return (
       <div className="ess-past-grid">
-        {pastRows.map((row) => {
+        {currentListRows.map((row) => {
           const scoreVisible = FINAL_SCORE_VISIBLE_STATUSES.includes(row.status);
 
           return (
@@ -1061,9 +1120,15 @@ const EmployeeSelfAssessmentPage = () => {
                   <span>{fmtDateTime(row.submittedAt)}</span>
                 </div>
                 <div>
-                  <label>Final Date</label>
-                  <span>{fmtDateTime(row.approvedAt ?? row.declinedAt)}</span>
+                  <label>{row.status === 'REJECTED' ? 'Rejected Date' : 'Final Date'}</label>
+                  <span>{fmtDateTime(row.approvedAt ?? row.declinedAt ?? row.rejectedAt)}</span>
                 </div>
+                {row.rejectedByRole && (
+                  <div>
+                    <label>Rejected By</label>
+                    <span>{row.rejectedByRole}</span>
+                  </div>
+                )}
               </div>
 
               {scoreVisible ? (
@@ -1076,6 +1141,16 @@ const EmployeeSelfAssessmentPage = () => {
                   <strong>Hidden</strong>
                   <span>Waiting for final review</span>
                 </div>
+              )}
+
+              {row.status === 'REJECTED' && ongoingAssessment?.id === row.id && (
+                <button
+                  type="button"
+                  className="ess-btn ghost wide"
+                  onClick={() => setActiveTab('ongoing')}
+                >
+                  Revise & Resubmit
+                </button>
               )}
 
               <button
@@ -1178,7 +1253,7 @@ const EmployeeSelfAssessmentPage = () => {
             </div>
             <h3>Submit Assessment?</h3>
             <p>
-              Once submitted, this form will move to Past and cannot be edited unless a reviewer returns it before the assessment period ends.
+              Once submitted, this form will move to review. If this is a rejected correction, it will return to the reviewer who rejected it.
             </p>
 
             <div className="ess-modal-actions">
@@ -1210,7 +1285,7 @@ const EmployeeSelfAssessmentPage = () => {
           <div>
             <p className="ess-kicker">Self-Assessment</p>
             <h1>Employee Self-Assessment</h1>
-            <p>Complete your current form and review past submitted assessments.</p>
+            <p>Complete your current form and track pending, rejected, and approved self-assessment records.</p>
           </div>
 
           <button type="button" className="ess-refresh-btn" onClick={() => void loadPage()}>
@@ -1232,12 +1307,32 @@ const EmployeeSelfAssessmentPage = () => {
 
           <button
             type="button"
+            className={activeTab === 'pending' ? 'active' : ''}
+            onClick={() => setActiveTab('pending')}
+          >
+            <i className="bi bi-hourglass-split" />
+            Pending
+            <span>{pendingRows.length}</span>
+          </button>
+
+          <button
+            type="button"
+            className={activeTab === 'rejected' ? 'active' : ''}
+            onClick={() => setActiveTab('rejected')}
+          >
+            <i className="bi bi-x-circle" />
+            Rejected
+            <span>{rejectedRows.length}</span>
+          </button>
+
+          <button
+            type="button"
             className={activeTab === 'past' ? 'active' : ''}
             onClick={() => setActiveTab('past')}
           >
             <i className="bi bi-clock-history" />
             Past
-            <span>{pastRows.length}</span>
+            <span>{approvedRows.length}</span>
           </button>
         </div>
 

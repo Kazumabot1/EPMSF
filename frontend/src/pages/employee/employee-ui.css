@@ -26,7 +26,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: #eef2ff;
+  background: #eff6ff;
   color: #2563eb;
   border-radius: 999px;
   font-size: 0.75rem;
@@ -98,7 +98,7 @@
 }
 
 .employee-stat-icon.blue { background: #dbeafe; color: #2563eb; }
-.employee-stat-icon.indigo { background: #e0e7ff; color: #2563eb; }
+.employee-stat-icon.indigo { background: #dbeafe; color: #2563eb; }
 .employee-stat-icon.pink { background: #fce7f3; color: #db2777; }
 .employee-stat-icon.green { background: #dcfce7; color: #15803d; }
 
@@ -149,7 +149,7 @@
 .employee-toolbar input:focus,
 .employee-toolbar select:focus {
   border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
 }
 
 .employee-table-wrap {
@@ -217,7 +217,7 @@
 }
 
 .employee-btn.primary:hover:not(:disabled) {
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
 
@@ -508,7 +508,7 @@
 .employee-form-select:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .employee-form-hint {
@@ -602,7 +602,7 @@
 }
 
 .employee-container .filters button:hover {
-  background: #4338ca;
+  background: #1d4ed8;
 }
 
 @media (max-width: 768px) {

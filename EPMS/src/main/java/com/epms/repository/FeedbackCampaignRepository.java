@@ -29,4 +29,21 @@ public interface FeedbackCampaignRepository extends JpaRepository<FeedbackCampai
             @Param("endDate") LocalDate endDate,
             @Param("statuses") Collection<FeedbackCampaignStatus> statuses
     );
+
+
+    @Query("""
+            SELECT c
+            FROM FeedbackCampaign c
+            WHERE c.id <> :campaignId
+              AND c.status IN :statuses
+              AND c.startDate <= :endDate
+              AND c.endDate >= :startDate
+            ORDER BY c.startDate ASC, c.id ASC
+            """)
+    List<FeedbackCampaign> findPotentialOverlappingCampaignsExcludingCampaign(
+            @Param("campaignId") Long campaignId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("statuses") Collection<FeedbackCampaignStatus> statuses
+    );
 }

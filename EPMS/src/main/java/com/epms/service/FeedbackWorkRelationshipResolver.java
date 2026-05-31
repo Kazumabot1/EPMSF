@@ -11,7 +11,7 @@ import java.util.Set;
  * Central 360 feedback relationship resolver.
  *
  * This service intentionally does NOT use users.manager_id / employee.manager_id.
- * Manager, subordinate, and peer candidates are resolved only from current work context:
+ * Manager, subordinate, and peer candidates are resolved only from current reviewer eligibility:
  * active teams, team leaders, active department managers, and department heads.
  */
 public interface FeedbackWorkRelationshipResolver {

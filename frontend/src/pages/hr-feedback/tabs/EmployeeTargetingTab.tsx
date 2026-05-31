@@ -250,10 +250,10 @@ export default function TargetEvaluatorTab({
     };
 
     const evalOptions = [
-        { key: 'includeManager' as const, label: 'Direct Manager', desc: 'Assigns the reporting manager as evaluator' },
+        { key: 'includeManager' as const, label: 'Manager reviewer', desc: 'Assigns eligible manager reviewers' },
         { key: 'includeDepartmentPeers' as const, label: 'Department Peers', desc: 'Random peers from the same department; works without teams' },
         { key: 'includeTeamPeers' as const, label: 'Team Peers', desc: 'Prioritizes members of the same active team' },
-        { key: 'includeSubordinates' as const, label: 'Direct Subordinates', desc: 'Direct reports provide upward feedback' },
+        { key: 'includeSubordinates' as const, label: 'Subordinate reviewers', desc: 'Subordinate reviewers provide upward feedback' },
         { key: 'includeSelf' as const, label: 'Self Feedback', desc: 'Target employee evaluates self' },
         { key: 'includeProjectPeers' as const, label: 'Project Peers', desc: 'Peers from shared project assignments' },
         { key: 'includeCrossTeamPeers' as const, label: 'Other-Team Peers', desc: 'Other active teams in the same department' },
@@ -328,7 +328,7 @@ export default function TargetEvaluatorTab({
             )}
 
             <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 700, color: '#374151' }}>
-                <i className="bi bi-person-check" style={{ marginRight: 6, color: '#6366f1' }} />
+                <i className="bi bi-person-check" style={{ marginRight: 6, color: '#2563eb' }} />
                 1. Select Target Employees
                 <span className="hfd-selected-count" style={{ marginLeft: 10 }}>
           <i className="bi bi-check2" /> {selected.size} selected
@@ -365,7 +365,7 @@ export default function TargetEvaluatorTab({
                             <div className="hfd-employee-name">{emp.fullName}</div>
                             <div className="hfd-employee-dept">{emp.currentDepartment ?? 'No dept'}</div>
                         </div>
-                        {selected.has(emp.id) && <i className="bi bi-check-circle-fill" style={{ color: '#6366f1', marginLeft: 'auto' }} />}
+                        {selected.has(emp.id) && <i className="bi bi-check-circle-fill" style={{ color: '#2563eb', marginLeft: 'auto' }} />}
                     </div>
                 ))}
             </div>
@@ -389,7 +389,7 @@ export default function TargetEvaluatorTab({
             <hr style={{ margin: '24px 0', borderColor: '#f1f5f9' }} />
 
             <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 700, color: '#374151' }}>
-                <i className="bi bi-person-lines-fill" style={{ marginRight: 6, color: '#6366f1' }} />
+                <i className="bi bi-person-lines-fill" style={{ marginRight: 6, color: '#2563eb' }} />
                 2. Evaluator Configuration
             </h3>
 

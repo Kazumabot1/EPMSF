@@ -1118,7 +1118,7 @@ public class FeedbackCampaignMonitoringServiceImpl implements FeedbackCampaignMo
         relationships.stream()
                 .filter(item -> "SUBORDINATE".equals(item.getRelationshipType()) && item.getTargetsFailingPrivacy() > 0)
                 .findFirst()
-                .ifPresent(item -> alerts.add(alert(AlertType.SUBORDINATE_PRIVACY_THRESHOLD_NOT_MET, AlertSeverity.WARNING, "Direct report anonymity coverage not ready", item.getTargetsFailingPrivacy() + " target" + plural(item.getTargetsFailingPrivacy()) + " need enough direct report submissions.", item.getTargetsFailingPrivacy(), "OPEN_SUBORDINATE_PRIVACY_RISKS", "relationship:subordinate:privacy")));
+                .ifPresent(item -> alerts.add(alert(AlertType.SUBORDINATE_PRIVACY_THRESHOLD_NOT_MET, AlertSeverity.WARNING, "Subordinate reviewer anonymity coverage not ready", item.getTargetsFailingPrivacy() + " target" + plural(item.getTargetsFailingPrivacy()) + " need enough subordinate reviewer submissions.", item.getTargetsFailingPrivacy(), "OPEN_SUBORDINATE_PRIVACY_RISKS", "relationship:subordinate:privacy")));
 
         int heavyEvaluatorCount = (int) evaluators.stream()
                 .filter(item -> "HEAVY".equals(item.getWorkloadStatus()) || "OVERLOADED".equals(item.getWorkloadStatus()))
@@ -1394,7 +1394,7 @@ public class FeedbackCampaignMonitoringServiceImpl implements FeedbackCampaignMo
             case "MANAGER" -> "Manager evaluator is missing.";
             case "PEER" -> "Peer evaluators are missing.";
             case "SELF" -> "Self evaluator assignment is missing.";
-            case "SUBORDINATE" -> "Direct report evaluators are missing.";
+            case "SUBORDINATE" -> "Subordinate reviewer evaluators are missing.";
             default -> label(relationship) + " evaluator is missing.";
         };
     }
@@ -1404,7 +1404,7 @@ public class FeedbackCampaignMonitoringServiceImpl implements FeedbackCampaignMo
             case "MANAGER" -> "Manager feedback is still pending.";
             case "PEER" -> "Peer feedback is still pending.";
             case "SELF" -> "Self feedback is still pending.";
-            case "SUBORDINATE" -> "Direct report feedback is still pending.";
+            case "SUBORDINATE" -> "Subordinate reviewer feedback is still pending.";
             default -> label(relationship) + " feedback is still pending.";
         };
     }
