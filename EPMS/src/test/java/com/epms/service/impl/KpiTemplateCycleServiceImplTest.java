@@ -20,6 +20,7 @@ import com.epms.repository.UserRepository;
 import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeKpiWorkflowService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,8 +31,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -67,8 +72,17 @@ class KpiTemplateCycleServiceImplTest {
     @Mock
     private EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private KpiTemplateCycleServiceImpl service;
+
+    @BeforeEach
+    void setUpClock() {
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-06-01T00:00:00Z"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Rangoon"));
+    }
 
     @AfterEach
     void clearSecurityContext() {
@@ -228,6 +242,7 @@ class KpiTemplateCycleServiceImplTest {
                 .kpiForm(form)
                 .build();
         authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
         when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection()))
                 .thenReturn(List.of(link));
 
@@ -260,8 +275,8 @@ class KpiTemplateCycleServiceImplTest {
 
     private void stubCycle(KpiTemplateCycle cycle) {
         when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
-        when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of());
-        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(100)).thenReturn(Optional.empty());
+        lenient().when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of());
+        lenient().when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(100)).thenReturn(Optional.empty());
     }
 
     private KpiTemplateCycle activeCycle() {

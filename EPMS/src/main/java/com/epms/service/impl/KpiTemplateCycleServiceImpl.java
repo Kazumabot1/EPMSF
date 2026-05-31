@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -53,6 +54,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -210,7 +212,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     public KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason) {
         KpiTemplateCycle cycle = requirePendingApproval(id);
         User reviewer = currentUser();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         KpiGraceExtension extension = cycle.getGraceExtension();
         if (extension == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
@@ -234,7 +236,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCycle cycle = requirePendingApproval(id);
         User reviewer = currentUser();
         cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
-        cycle.setEarlyCloseReviewedAt(LocalDateTime.now());
+        cycle.setEarlyCloseReviewedAt(now());
         cycle.setEarlyCloseReviewedByUser(reviewer);
         cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
         cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
@@ -266,7 +268,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
         cycle.setEarlyCloseReason(reason);
         cycle.setGraceExtension(request.getGraceExtension());
-        cycle.setEarlyCloseRequestedAt(LocalDateTime.now());
+        cycle.setEarlyCloseRequestedAt(now());
         cycle.setEarlyCloseRequestedByUser(currentUser());
         cycle.setEarlyCloseReviewedAt(null);
         cycle.setEarlyCloseReviewedByUser(null);
@@ -283,7 +285,15 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 )
                 .map(KpiTemplateCyclePeriod::getEndDate)
                 .orElse(cycle.getEndDate());
-        return officialEnd != null && LocalDate.now().isBefore(officialEnd);
+        return officialEnd != null && today().isBefore(officialEnd);
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock);
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 
     private void validateRequest(KpiTemplateCycleRequestDTO dto) {

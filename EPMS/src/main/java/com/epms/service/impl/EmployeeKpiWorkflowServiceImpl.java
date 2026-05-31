@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -74,6 +75,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private final DepartmentRepository departmentRepository;
     private final PositionRepository positionRepository;
     private final NotificationService notificationService;
+    private final Clock clock;
 
     private static final List<KpiTemplateCyclePeriodStatus> ACTIVE_PERIOD_STATUSES =
             List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING);
@@ -416,7 +418,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             KpiForm form = kpiFormRepository.findDetailWithItemsById(link.getKpiForm().getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template not found."));
             List<KpiTemplateCyclePeriod> periods = ensureAllCycleFormPeriodsGenerated(cycle, form);
-            KpiTemplateCyclePeriod period = ensurePeriodOpen(pickActivePeriodForAssignment(periods, LocalDate.now()));
+            KpiTemplateCyclePeriod period = ensurePeriodOpen(pickActivePeriodForAssignment(periods, today()));
             if (period == null) {
                 continue;
             }
@@ -578,7 +580,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             existing.sort(Comparator.comparing(p -> p.getPeriodNumber() == null ? 0 : p.getPeriodNumber()));
         }
 
-        KpiTemplateCyclePeriod toOpen = pickActivePeriodForAssignment(existing, LocalDate.now());
+        KpiTemplateCyclePeriod toOpen = pickActivePeriodForAssignment(existing, today());
         KpiTemplateCyclePeriod opened = ensurePeriodOpen(toOpen);
         if (opened != null) {
             for (int i = 0; i < existing.size(); i++) {
@@ -657,7 +659,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public void startCycleClosingGrace(Integer cycleId) {
-        startCycleClosingGrace(cycleId, LocalDateTime.now().plusDays(KPI_GRACE_DAYS));
+        startCycleClosingGrace(cycleId, now().plusDays(KPI_GRACE_DAYS));
     }
 
     @Override
@@ -665,7 +667,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     public void startCycleClosingGrace(Integer cycleId, LocalDateTime graceEnds) {
         KpiTemplateCycle cycle = kpiTemplateCycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found."));
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
 
         cycle.setStatus(KpiTemplateCycleStatus.CLOSING);
         cycle.setClosingRequestedAt(now);
@@ -735,8 +737,8 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Transactional
     public int runCycleMaintenance() {
         int processed = 0;
-        LocalDate today = LocalDate.now();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = today();
+        LocalDateTime now = now();
 
         processed += ensureActiveCyclePeriodSchedulesAndAssignments(today);
 
@@ -925,7 +927,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             return;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         LocalDateTime graceEnds = now.plusDays(KPI_GRACE_DAYS);
         for (EmployeeKpiForm oldAssignment : openAssignments) {
             oldAssignment.setGraceReason(KpiGraceReason.POSITION_CHANGE);
@@ -965,7 +967,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                         assignmentIds,
                         KpiPositionTransitionStatus.PENDING
                 );
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         for (EmployeeKpiPositionTransition transition : transitions) {
             transition.setStatus(expired ? KpiPositionTransitionStatus.EXPIRED : KpiPositionTransitionStatus.COMPLETED);
             transition.setCompletedAt(now);
@@ -1003,7 +1005,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     continue;
                 }
                 List<KpiTemplateCyclePeriod> periods = ensureAllCycleFormPeriodsGenerated(cycle, form);
-                KpiTemplateCyclePeriod period = ensurePeriodOpen(pickActivePeriodForAssignment(periods, LocalDate.now()));
+                KpiTemplateCyclePeriod period = ensurePeriodOpen(pickActivePeriodForAssignment(periods, today()));
                 if (period == null) {
                     continue;
                 }
@@ -1227,7 +1229,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             validateWeightScoreWithinWeight(ekf, sc);
 
             sc.setEvaluatedByUser(managerUser);
-            sc.setEvaluatedAt(LocalDateTime.now());
+            sc.setEvaluatedAt(now());
         }
 
         ekf.calculateTotals();
@@ -1310,7 +1312,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         }
 
         List<EmployeeKpiForm> finalizedThisRun = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         User managerUser = currentUserEntity();
 
         for (EmployeeKpiForm ekf : forms) {
@@ -1374,7 +1376,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Finalization reason is required.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         ekf.calculateTotals();
         ekf.setStatus(EmployeeKpiStatus.FINALIZED);
         ekf.setFinalizedAt(now);
@@ -1392,14 +1394,14 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Override
     @Transactional
     public int runAutoFinalizePastDueAssignments() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = today();
         List<EmployeeKpiForm> candidates = employeeKpiFormRepository.findNonFinalizedPastPeriodEnd(
                 today,
                 EmployeeKpiStatus.FINALIZED
         );
 
         List<EmployeeKpiForm> finalizedThisRun = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
 
         for (EmployeeKpiForm ekf : candidates) {
             if (ekf.getStatus() == EmployeeKpiStatus.FINALIZED || ekf.getStatus() == EmployeeKpiStatus.CLOSED) {
@@ -1662,7 +1664,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
     private boolean isBeforeOrOnPeriodEnd(EmployeeKpiForm ekf) {
         LocalDate endDate = periodEndDate(ekf);
-        return endDate != null && !LocalDate.now().isAfter(endDate);
+        return endDate != null && !today().isAfter(endDate);
     }
 
     private User currentUserEntity() {
@@ -2418,6 +2420,14 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     form.getId()
             );
         }
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock);
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 
     private static String fullName(Employee e) {
