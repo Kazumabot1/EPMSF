@@ -5,6 +5,46 @@ export type ApiEnvelope<T> = {
   timestamp: string;
 };
 
+
+export interface FeedbackRelationshipPrivacy {
+  relationshipType: string;
+  label?: string | null;
+  responseCount: number;
+  minimumVisibleResponses: number;
+  thresholdRequired: boolean;
+  thresholdMet: boolean;
+  visibleOutsideHr: boolean;
+  hiddenReason?: string | null;
+}
+
+export interface FeedbackRelationshipScore {
+  relationshipType: string;
+  label?: string | null;
+  averageScore?: number | null;
+  responseCount: number;
+  visibleOutsideHr?: boolean;
+  hiddenReason?: string | null;
+}
+
+export interface FeedbackCompetencyResult {
+  competencyCode: string;
+  competencyName: string;
+  averageScore?: number | null;
+  responseCount: number;
+  questionCount: number;
+  relationshipBreakdown?: FeedbackRelationshipScore[];
+}
+
+export interface FeedbackPublishedComment {
+  relationshipType: string;
+  label?: string | null;
+  competencyCode?: string | null;
+  competencyName?: string | null;
+  questionCode?: string | null;
+  questionText?: string | null;
+  comment: string;
+}
+
 export interface FeedbackResultItem {
   campaignId: number;
   campaignName: string;
@@ -36,6 +76,9 @@ export interface FeedbackResultItem {
   includeSelfVsOthers?: boolean;
   includeComments?: boolean;
   includeScoreExplanation?: boolean;
+  relationshipPrivacy?: FeedbackRelationshipPrivacy[];
+  competencyBreakdown?: FeedbackCompetencyResult[];
+  comments?: FeedbackPublishedComment[];
   publishedAt?: string | null;
   publishedByUserId?: number | null;
   publishNote?: string | null;
@@ -167,6 +210,9 @@ export interface FeedbackIntegrationScore {
   includeSelfVsOthers?: boolean;
   includeComments?: boolean;
   includeScoreExplanation?: boolean;
+  relationshipPrivacy?: FeedbackRelationshipPrivacy[];
+  competencyBreakdown?: FeedbackCompetencyResult[];
+  comments?: FeedbackPublishedComment[];
   publishedAt?: string | null;
   publishedByUserId?: number | null;
   publishNote?: string | null;

@@ -25,6 +25,7 @@ import com.epms.repository.UserRepository;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackCampaignTargetService;
 import com.epms.service.FeedbackOperationalService;
+import com.epms.service.FeedbackWorkRelationshipResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +61,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
     private final TeamMemberRepository teamMemberRepository;
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackCampaignQuestionReviewService questionReviewService;
+    private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -249,7 +251,8 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             parentDepartment = currentDepartment;
         }
 
-        User managerUser = user != null && user.getManagerId() != null ? usersById.get(user.getManagerId()) : null;
+        List<User> managerUsers = user == null ? List.of() : workRelationshipResolver.resolveManagerUsers(user);
+        User managerUser = managerUsers.isEmpty() ? null : managerUsers.get(0);
         Employee managerEmployee = managerUser != null && managerUser.getEmployeeId() != null
                 ? employeesById.get(managerUser.getEmployeeId())
                 : null;
@@ -300,7 +303,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             warnings.add("Current department is missing.");
         }
         if (user != null && (managerUser == null || !isUserActive(managerUser))) {
-            warnings.add("No active manager found.");
+            warnings.add("No work-context manager found.");
         }
         if (activeTeamIds.isEmpty()) {
             notes.add("No active team found.");
@@ -339,22 +342,21 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             return;
         }
 
-        Set<Long> subordinateEmployeeIds = contexts.stream()
-                .filter(other -> other.userId != null && Objects.equals(other.managerUserId, context.userId))
-                .filter(this::isEligibleEvaluatorContext)
-                .map(other -> other.employeeId)
-                .collect(Collectors.toSet());
+        User targetUser = userRepository.findByEmployeeId(context.employeeId.intValue()).orElse(null);
+        Set<Long> subordinateEmployeeIds = targetUser == null
+                ? Set.of()
+                : workRelationshipResolver.resolveSubordinateEmployeeIds(targetUser);
         context.subordinateCandidateCount = subordinateEmployeeIds.size();
 
-        context.peerCandidateCount = (int) contexts.stream()
-                .filter(other -> isPeerCandidate(context, other, subordinateEmployeeIds))
-                .count();
+        context.peerCandidateCount = targetUser == null
+                ? 0
+                : workRelationshipResolver.resolvePeerEmployeeIds(targetUser).size();
 
         if (context.peerCandidateCount < 2 && context.blockReasons.isEmpty()) {
             context.warnings.add("Limited peer options found.");
         }
         if (context.subordinateCandidateCount == 0) {
-            context.notes.add("No direct reports found.");
+            context.notes.add("No work-context subordinates found.");
         }
     }
 

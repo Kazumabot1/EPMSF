@@ -27,6 +27,7 @@ import com.epms.repository.projection.PendingEvaluatorProjection;
 import com.epms.service.FeedbackEvaluationService;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackOperationalService;
+import com.epms.service.FeedbackWorkRelationshipResolver;
 import com.epms.service.ProjectPeerDirectory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,6 @@ import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -64,6 +64,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
     private final ProjectPeerDirectory projectPeerDirectory;
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackCampaignQuestionReviewService questionReviewService;
+    private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     /**
      * Backward-compatible overload for existing tests/older callers.
@@ -142,9 +143,10 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                             "No user account is linked to target employee " + request.getTargetEmployeeId() + "."
                     ));
 
-            Set<Integer> targetTeamIds = findActiveTeamIds(targetUser);
+            Set<Integer> targetTeamIds = workRelationshipResolver.resolveActiveTeamIds(targetUser);
             Set<Long> assignedEvaluatorEmployeeIds = new LinkedHashSet<>();
-            Set<Long> subordinateEmployeeIds = findDirectSubordinateEmployeeIds(targetUser);
+            Set<Long> managerEmployeeIds = workRelationshipResolver.resolveManagerEmployeeIds(targetUser);
+            Set<Long> subordinateEmployeeIds = workRelationshipResolver.resolveSubordinateEmployeeIds(targetUser);
             Integer workingDepartmentId = resolveWorkingDepartmentId(request, targetUser);
             List<FeedbackEvaluatorAssignment> preservedManualAssignments = manualAssignmentsByRequestId
                     .getOrDefault(request.getId(), List.of());
@@ -159,7 +161,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                             Collectors.counting()
                     ));
 
-            Long managerEmployeeId = null;
             int managerAssignments = manualCountsByType.getOrDefault(FeedbackRelationshipType.MANAGER, 0L).intValue();
             int selfAssignments = manualCountsByType.getOrDefault(FeedbackRelationshipType.SELF, 0L).intValue();
             int subordinateAssignments = manualCountsByType.getOrDefault(FeedbackRelationshipType.SUBORDINATE, 0L).intValue();
@@ -168,22 +169,24 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             int manualAssignmentsForTarget = preservedManualAssignments.size();
 
             if (Boolean.TRUE.equals(config.getIncludeManager())) {
-                managerEmployeeId = resolveManagerEmployeeId(targetUser);
-                if (managerEmployeeId != null && !Objects.equals(managerEmployeeId, request.getTargetEmployeeId())) {
-                    if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, managerEmployeeId,
-                            FeedbackRelationshipType.MANAGER, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
-                        managerAssignments++;
-                        autoAssignmentsForTarget++;
-                        incrementEvaluatorLoad(evaluatorLoadByEmployeeId, managerEmployeeId);
+                if (managerEmployeeIds.isEmpty()) {
+                    targetWarnings.add("No work-context manager found. Manager feedback will be skipped for this target.");
+                }
+                for (Long managerEmployeeId : managerEmployeeIds) {
+                    if (managerEmployeeId != null && !Objects.equals(managerEmployeeId, request.getTargetEmployeeId())) {
+                        if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, managerEmployeeId,
+                                FeedbackRelationshipType.MANAGER, EvaluatorSelectionMethod.AUTO_RELATIONSHIP)) {
+                            managerAssignments++;
+                            autoAssignmentsForTarget++;
+                            incrementEvaluatorLoad(evaluatorLoadByEmployeeId, managerEmployeeId);
+                        }
                     }
-                } else {
-                    targetWarnings.add("No active direct manager found. Department Head is assigned as Manager only when the employee directly reports to them.");
                 }
             }
 
             if (Boolean.TRUE.equals(config.getIncludeSelf())) {
                 if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, request.getTargetEmployeeId(),
-                        FeedbackRelationshipType.SELF, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
+                        FeedbackRelationshipType.SELF, EvaluatorSelectionMethod.AUTO_RELATIONSHIP)) {
                     selfAssignments++;
                     autoAssignmentsForTarget++;
                     incrementEvaluatorLoad(evaluatorLoadByEmployeeId, request.getTargetEmployeeId());
@@ -191,10 +194,9 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             }
 
             if (Boolean.TRUE.equals(config.getIncludeSubordinates())) {
-                Long excludedManagerEmployeeId = managerEmployeeId;
                 List<Long> selectedSubordinates = subordinateEmployeeIds.stream()
                         .filter(employeeId -> !Objects.equals(employeeId, request.getTargetEmployeeId()))
-                        .filter(employeeId -> !Objects.equals(employeeId, excludedManagerEmployeeId))
+                        .filter(employeeId -> !managerEmployeeIds.contains(employeeId))
                         .filter(employeeId -> !assignedEvaluatorEmployeeIds.contains(employeeId))
                         .filter(this::hasActiveUserForEmployeeId)
                         .sorted()
@@ -202,7 +204,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                         .toList();
 
                 if (subordinateEmployeeIds.isEmpty()) {
-                    targetWarnings.add("No direct reports found. Subordinate feedback will be skipped for this target.");
+                    targetWarnings.add("No work-context subordinates found. Subordinate feedback will be skipped for this target.");
                 }
                 if (selectedSubordinates.size() < requestedSubordinateMinCount(config)) {
                     targetWarnings.add("Only " + selectedSubordinates.size()
@@ -212,7 +214,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
                 for (Long subordinateEmployeeId : selectedSubordinates) {
                     if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, subordinateEmployeeId,
-                            FeedbackRelationshipType.SUBORDINATE, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, persist)) {
+                            FeedbackRelationshipType.SUBORDINATE, EvaluatorSelectionMethod.AUTO_RELATIONSHIP)) {
                         subordinateAssignments++;
                         autoAssignmentsForTarget++;
                         incrementEvaluatorLoad(evaluatorLoadByEmployeeId, subordinateEmployeeId);
@@ -251,7 +253,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                     peerPool,
                     targetUser,
                     request.getTargetEmployeeId(),
-                    managerEmployeeId,
+                    managerEmployeeIds,
                     subordinateEmployeeIds,
                     assignedEvaluatorEmployeeIds,
                     targetWarnings
@@ -260,7 +262,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             int requestedPeerMinCount = requestedPeerMinCount(config);
             int requestedPeerMaxCount = requestedPeerMaxCount(config);
             List<Long> selectedPeers = isPeerSelectionEnabled(config)
-                    ? selectPeers(peerPool, requestedPeerMaxCount, campaignId, targetUser, targetTeamIds, evaluatorLoadByEmployeeId)
+                    ? selectPeers(peerPool, requestedPeerMaxCount, targetUser, targetTeamIds, evaluatorLoadByEmployeeId)
                     : List.of();
             if (isPeerSelectionEnabled(config) && selectedPeers.size() < requestedPeerMinCount) {
                 targetWarnings.add("Only " + selectedPeers.size()
@@ -269,7 +271,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             }
             for (Long peerEmployeeId : selectedPeers) {
                 if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, peerEmployeeId,
-                        FeedbackRelationshipType.PEER, EvaluatorSelectionMethod.AUTO_RANKED, persist)) {
+                        FeedbackRelationshipType.PEER, EvaluatorSelectionMethod.AUTO_RANKED)) {
                     peerAssignments++;
                     autoAssignmentsForTarget++;
                     incrementEvaluatorLoad(evaluatorLoadByEmployeeId, peerEmployeeId);
@@ -300,7 +302,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
         if (!Boolean.TRUE.equals(config.getFlexibleMode())) {
             List<String> blockingWarnings = warnings.stream()
-                    .filter(warning -> warning.contains("minimum rule") || warning.contains("No active direct manager"))
+                    .filter(warning -> warning.contains("minimum rule") || warning.contains("No work-context manager"))
                     .distinct()
                     .toList();
             if (!blockingWarnings.isEmpty()) {
@@ -346,7 +348,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
     @Transactional(readOnly = true)
     public FeedbackAssignmentGenerationResponse getAssignmentPreview(Long campaignId) {
         getCampaignOrThrow(campaignId);
-        return buildAssignmentResponse(campaignId, null, List.of());
+        return buildAssignmentResponse(campaignId, List.of());
     }
 
     @Override
@@ -394,7 +396,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 "Manual 360 feedback evaluator assignment added"
         );
 
-        return buildAssignmentResponse(campaignId, null, List.of(
+        return buildAssignmentResponse(campaignId, List.of(
                 "Manual evaluator #" + request.getEvaluatorEmployeeId()
                         + " added for target employee #" + request.getTargetEmployeeId() + "."
         ));
@@ -431,7 +433,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 "360 feedback evaluator assignment removed"
         );
 
-        return buildAssignmentResponse(campaignId, null, List.of(
+        return buildAssignmentResponse(campaignId, List.of(
                 "Evaluator #" + evaluatorEmployeeId + " removed from target employee #" + targetEmployeeId + "."
         ));
     }
@@ -505,25 +507,25 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         }
 
         if (relationshipType == FeedbackRelationshipType.MANAGER) {
-            if (target.getManagerId() == null || !Objects.equals(target.getManagerId(), evaluator.getId())) {
-                throw new BusinessValidationException("Manager review must use the recipient's recorded Reports To manager.");
+            if (!workRelationshipResolver.isWorkContextManager(target, evaluator)) {
+                throw new BusinessValidationException("Manager review must use a work-context manager: active team leader, or department manager/head when no active team exists.");
             }
             return;
         }
 
         if (relationshipType == FeedbackRelationshipType.SUBORDINATE) {
-            if (!Objects.equals(evaluator.getManagerId(), target.getId())) {
-                throw new BusinessValidationException("Direct Report review must use an employee who reports to the selected recipient.");
+            if (!workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
+                throw new BusinessValidationException("Subordinate review must use a work-context subordinate from the target's active team or department scope.");
             }
             return;
         }
 
         if (relationshipType == FeedbackRelationshipType.PEER) {
-            if (Objects.equals(target.getManagerId(), evaluator.getId())) {
-                throw new BusinessValidationException("The recipient's manager cannot be added as a peer evaluator.");
+            if (workRelationshipResolver.isWorkContextManager(target, evaluator)) {
+                throw new BusinessValidationException("The recipient's work-context manager cannot be added as a peer evaluator.");
             }
-            if (Objects.equals(evaluator.getManagerId(), target.getId())) {
-                throw new BusinessValidationException("A direct report cannot be added as a peer evaluator.");
+            if (workRelationshipResolver.isWorkContextSubordinate(target, evaluator)) {
+                throw new BusinessValidationException("A work-context subordinate cannot be added as a peer evaluator.");
             }
             if (hasHrAdminRole(evaluator)) {
                 throw new BusinessValidationException("HR/Admin users cannot be added as peer evaluators.");
@@ -545,7 +547,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
     private FeedbackAssignmentGenerationResponse buildAssignmentResponse(
             Long campaignId,
-            EvaluatorConfigDTO config,
             List<String> extraWarnings
     ) {
         List<FeedbackRequest> requests = feedbackRequestRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaignId);
@@ -562,7 +563,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 .campaignId(campaignId)
                 .totalTargets(requests.size())
                 .totalEvaluatorsGenerated(assignments.size())
-                .evaluatorConfig(config)
+                .evaluatorConfig(null)
                 .requests(previewItems)
                 .assignmentDetails(buildAssignmentDetails(assignments))
                 .warnings(warnings.stream().distinct().toList())
@@ -614,10 +615,10 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
     private List<FeedbackAssignmentDetailItemResponse> buildAssignmentDetails(List<FeedbackEvaluatorAssignment> assignments) {
         Set<Integer> employeeIds = assignments.stream()
-                .flatMap(assignment -> List.of(
+                .flatMap(assignment -> java.util.stream.Stream.of(
                         assignment.getFeedbackRequest().getTargetEmployeeId(),
                         assignment.getEvaluatorEmployeeId()
-                ).stream())
+                ))
                 .filter(Objects::nonNull)
                 .map(Long::intValue)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -750,16 +751,13 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         }
     }
 
-    private boolean hasPeerSource(EvaluatorConfigDTO config) {
-        return isPeerSelectionEnabled(config);
-    }
 
     private boolean isPeerSelectionEnabled(EvaluatorConfigDTO config) {
         if (config == null) {
             return false;
         }
         if (config.getIncludePeers() != null) {
-            return Boolean.TRUE.equals(config.getIncludePeers())
+            return config.getIncludePeers()
                     && (isTeamPeerSelectionEnabled(config)
                     || isDepartmentPeerSelectionEnabled(config)
                     || Boolean.TRUE.equals(config.getIncludeProjectPeers())
@@ -818,25 +816,13 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             FeedbackRequest request,
             Long evaluatorEmployeeId,
             FeedbackRelationshipType relationshipType,
-            EvaluatorSelectionMethod selectionMethod,
-            boolean persist
+            EvaluatorSelectionMethod selectionMethod
     ) {
         if (evaluatorEmployeeId == null || !assignedEvaluatorEmployeeIds.add(evaluatorEmployeeId)) {
             return false;
         }
         assignmentsToSave.add(createAssignment(request, evaluatorEmployeeId, relationshipType, selectionMethod));
         return true;
-    }
-
-    private boolean addAssignment(
-            List<FeedbackEvaluatorAssignment> assignmentsToSave,
-            Set<Long> assignedEvaluatorEmployeeIds,
-            FeedbackRequest request,
-            Long evaluatorEmployeeId,
-            FeedbackRelationshipType relationshipType,
-            EvaluatorSelectionMethod selectionMethod
-    ) {
-        return addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, evaluatorEmployeeId, relationshipType, selectionMethod, true);
     }
 
     private FeedbackEvaluatorAssignment createAssignment(
@@ -899,32 +885,11 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed;
     }
 
-    private Long resolveManagerEmployeeId(User targetUser) {
-        if (targetUser.getManagerId() == null) {
-            return null;
-        }
-        return userRepository.findById(targetUser.getManagerId())
-                .filter(manager -> !Boolean.FALSE.equals(manager.getActive()))
-                .map(User::getEmployeeId)
-                .filter(Objects::nonNull)
-                .map(Integer::longValue)
-                .filter(managerEmployeeId -> !Objects.equals(managerEmployeeId, targetUser.getEmployeeId()))
-                .orElse(null);
-    }
-
-    private Set<Long> findDirectSubordinateEmployeeIds(User targetUser) {
-        return userRepository.findByManagerIdAndActiveTrue(targetUser.getId()).stream()
-                .map(User::getEmployeeId)
-                .filter(Objects::nonNull)
-                .map(Integer::longValue)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
     private LinkedHashSet<Long> filterEligiblePeerPool(
             Set<Long> rawPeerPool,
             User targetUser,
             Long targetEmployeeId,
-            Long managerEmployeeId,
+            Set<Long> managerEmployeeIds,
             Set<Long> subordinateEmployeeIds,
             Set<Long> alreadyAssignedEmployeeIds,
             List<String> targetWarnings
@@ -933,8 +898,8 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         int originalSize = filtered.size();
         filtered.remove(null);
         filtered.remove(targetEmployeeId);
-        if (managerEmployeeId != null) {
-            filtered.remove(managerEmployeeId);
+        if (managerEmployeeIds != null) {
+            managerEmployeeIds.forEach(filtered::remove);
         }
         if (subordinateEmployeeIds != null) {
             subordinateEmployeeIds.forEach(filtered::remove);
@@ -957,7 +922,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         if (targetWarnings != null && originalSize > eligible.size()) {
-            targetWarnings.add("Some peer candidates were excluded because they were inactive, HR/Admin users, direct managers, direct reports, outside the recipient department, or not at the same organization layer.");
+            targetWarnings.add("Some peer candidates were excluded because they were inactive, HR/Admin users, work-context managers, work-context subordinates, outside the recipient department, or not at the same organization layer.");
         }
         return eligible;
     }
@@ -1089,13 +1054,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return Math.abs(targetRank - candidateRank);
     }
 
-    private boolean sameManager(User left, User right) {
-        return left != null
-                && right != null
-                && left.getManagerId() != null
-                && Objects.equals(left.getManagerId(), right.getManagerId());
-    }
-
     private boolean sharesActiveTeam(User target, User candidate, Set<Integer> targetTeamIds) {
         if (target == null || candidate == null || targetTeamIds == null || targetTeamIds.isEmpty()) {
             return false;
@@ -1107,7 +1065,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         int score = 0;
         if (sharesActiveTeam(target, candidate, targetTeamIds)) score += 45;
         if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), candidate.getDepartmentId())) score += 35;
-        if (sameManager(target, candidate)) score += 25;
         int distance = levelDistance(target, candidate);
         if (distance == 0) score += 20;
         else if (distance == 1) score += 12;
@@ -1145,7 +1102,6 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
     private List<Long> selectPeers(
             Set<Long> peerPool,
             int peerCount,
-            Long campaignId,
             User targetUser,
             Set<Integer> targetTeamIds,
             Map<Long, Integer> evaluatorLoadByEmployeeId
@@ -1182,8 +1138,9 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), evaluator.getDepartmentId())) {
             reasons.add("same department");
         }
-        if (sameManager(target, evaluator)) {
-            reasons.add("same reporting group");
+        Set<Integer> targetTeamIds = workRelationshipResolver.resolveActiveTeamIds(target);
+        if (sharesActiveTeam(target, evaluator, targetTeamIds)) {
+            reasons.add("same active team");
         }
         int distance = levelDistance(target, evaluator);
         if (distance == 0) {

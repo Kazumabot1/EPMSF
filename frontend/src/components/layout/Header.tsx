@@ -85,7 +85,7 @@ const cleanHeaderRole = (value?: string | null) => {
       .replace(/_/g, ' ')
       .trim();
 
-  if (/^admin$/i.test(normalized)) return 'Admin';
+  if (/^admin$/i.test(normalized)) return 'HR Admin';
   if (/^hr$/i.test(normalized) || /human resource/i.test(normalized)) return 'HR';
   if (/department head/i.test(normalized) || /departmenthead/i.test(normalized)) return 'Department Head';
   if (/manager/i.test(normalized)) return 'Manager';

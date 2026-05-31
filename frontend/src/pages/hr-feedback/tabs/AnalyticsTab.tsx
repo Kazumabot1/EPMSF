@@ -1,24 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackAnalyticsApi } from '../../../api/feedbackAnalyticsApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import type {
   FeedbackCampaign,
   FeedbackCampaignScoringConfig,
-  FeedbackRelationshipWeight,
 } from '../../../types/feedbackCampaign';
 import type {
   FeedbackCampaignSummary,
   FeedbackCompetencyAverage,
+  FeedbackConfidenceBreakdown,
+  FeedbackRelationshipPrivacy,
   FeedbackResultItem,
+  FeedbackScoreDistribution,
   FeedbackSummaryPublishRequest,
 } from '../../../types/feedbackAnalytics';
+import './feedback-analytics.css';
 
 type PublishFilter = 'ALL' | 'HIDDEN' | 'READY_TO_PUBLISH' | 'PUBLISHED';
 type ConfidenceFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
-type AnalyticsSort = 'SCORE_ASC' | 'SCORE_DESC' | 'COMPLETION_ASC' | 'COMPLETION_DESC' | 'RESPONSES_DESC';
+type AnalyticsSort = 'SCORE_DESC' | 'SCORE_ASC' | 'COMPLETION_DESC' | 'COMPLETION_ASC' | 'RESPONSES_DESC';
 type PublishStep = 1 | 2;
 type PublishScope = 'ALL_READY' | 'SELECTED_EMPLOYEES';
+type Tone = 'good' | 'warning' | 'danger' | 'neutral';
 
 type PublishOptions = {
   scope: PublishScope;
@@ -29,6 +34,20 @@ type PublishOptions = {
   includeComments: boolean;
   includeScoreExplanation: boolean;
   confirmVisibility: boolean;
+};
+
+type MetricCard = {
+  label: string;
+  value: string | number;
+  helper?: string;
+  icon: string;
+  tone?: Tone;
+};
+
+type BarRow = {
+  label: string;
+  value: number;
+  meta?: string;
 };
 
 const defaultPublishOptions = (): PublishOptions => ({
@@ -42,38 +61,56 @@ const defaultPublishOptions = (): PublishOptions => ({
   confirmVisibility: false,
 });
 
-const formatScore = (value?: number | null, digits = 1) => value == null ? '—' : `${Number(value).toFixed(digits)}%`;
-const sourceCount = (value?: number | null) => Number(value ?? 0);
-const visibilityLabel = (status?: string | null) => status === 'PUBLISHED' ? 'Published' : status === 'READY_TO_PUBLISH' ? 'Ready' : 'Hidden';
+const numberValue = (value?: number | null) => Number(value ?? 0);
+const countValue = (value?: number | null) => Number(value ?? 0);
+
+const formatScore = (value?: number | null, digits = 1) => {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  return `${Number(value).toFixed(digits)}%`;
+};
+
+const formatCount = (value?: number | null) => Number(value ?? 0).toLocaleString();
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const visibilityLabel = (status?: string | null) => {
+  switch (String(status ?? 'HIDDEN').toUpperCase()) {
+    case 'PUBLISHED': return 'Published';
+    case 'READY_TO_PUBLISH': return 'Ready';
+    default: return 'Hidden';
+  }
+};
+
+const visibilityClass = (status?: string | null) => {
+  switch (String(status ?? 'HIDDEN').toUpperCase()) {
+    case 'PUBLISHED': return 'hfa-pill-published';
+    case 'READY_TO_PUBLISH': return 'hfa-pill-ready';
+    default: return 'hfa-pill-hidden';
+  }
+};
+
+const confidenceClass = (item: FeedbackResultItem) => {
+  if (item.insufficientFeedback) return 'hfa-pill-danger';
+  switch (String(item.confidenceLevel ?? '').toUpperCase()) {
+    case 'HIGH': return 'hfa-pill-published';
+    case 'MEDIUM': return 'hfa-pill-warning';
+    case 'LOW': return 'hfa-pill-danger';
+    default: return 'hfa-pill-hidden';
+  }
+};
+
 const confidenceLabel = (item: FeedbackResultItem) => item.insufficientFeedback ? 'Insufficient' : item.confidenceLevel || 'Not calculated';
-const MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES = 2;
-const isPublished = (item: FeedbackResultItem) => item.visibilityStatus === 'PUBLISHED';
-const isReadyToPublish = (item: FeedbackResultItem) => sourceCount(item.totalResponses) > 0 && !item.insufficientFeedback && !isPublished(item);
-
-const relationshipDisplayName = (relationshipType?: string | null) => {
-  switch (String(relationshipType ?? '').toUpperCase()) {
-    case 'MANAGER': return 'Manager';
-    case 'PEER': return 'Peers';
-    case 'SUBORDINATE': return 'Direct Reports';
-    case 'SELF': return 'Self';
-    default: return relationshipType || 'Relationship';
-  }
-};
-
-const relationshipPrivacyThreshold = (relationshipType?: string | null) => {
-  const normalized = String(relationshipType ?? '').toUpperCase();
-  return normalized === 'PEER' || normalized === 'SUBORDINATE' ? MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES : 1;
-};
-
-const relationshipDescription = (relationshipType?: string | null) => {
-  switch (String(relationshipType ?? '').toUpperCase()) {
-    case 'MANAGER': return 'Manager ratings are shown when at least one manager response exists.';
-    case 'PEER': return `Peer results are masked outside HR analytics until at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} peer responses exist.`;
-    case 'SUBORDINATE': return `Direct report results are masked outside HR analytics until at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} direct report responses exist.`;
-    case 'SELF': return 'Self review is included only when configured and submitted.';
-    default: return 'This evaluator relationship contributes only when responses exist.';
-  }
-};
 
 const scoreBand = (score?: number | null) => {
   if (score == null) return 'No score';
@@ -83,6 +120,76 @@ const scoreBand = (score?: number | null) => {
   if (score >= 40) return 'Needs improvement';
   return 'Unsatisfactory';
 };
+
+const relationshipDisplayName = (relationshipType?: string | null) => {
+  switch (String(relationshipType ?? '').toUpperCase()) {
+    case 'MANAGER': return 'Manager';
+    case 'PEER': return 'Peers';
+    case 'SUBORDINATE': return 'Direct reports';
+    case 'SELF': return 'Self';
+    default: return relationshipType || 'Relationship';
+  }
+};
+
+const fallbackRelationshipPrivacy = (item: FeedbackResultItem): FeedbackRelationshipPrivacy[] => [
+  {
+    relationshipType: 'MANAGER',
+    label: 'Manager',
+    responseCount: countValue(item.managerResponses),
+    minimumVisibleResponses: 1,
+    thresholdRequired: false,
+    thresholdMet: countValue(item.managerResponses) >= 1,
+    visibleOutsideHr: countValue(item.managerResponses) >= 1,
+    hiddenReason: countValue(item.managerResponses) >= 1 ? null : 'No manager response submitted.',
+  },
+  {
+    relationshipType: 'PEER',
+    label: 'Peers',
+    responseCount: countValue(item.peerResponses),
+    minimumVisibleResponses: 2,
+    thresholdRequired: true,
+    thresholdMet: countValue(item.peerResponses) >= 2,
+    visibleOutsideHr: countValue(item.peerResponses) >= 2,
+    hiddenReason: countValue(item.peerResponses) >= 2 ? null : 'Peer details are masked until at least 2 peer responses are submitted.',
+  },
+  {
+    relationshipType: 'SUBORDINATE',
+    label: 'Direct reports',
+    responseCount: countValue(item.subordinateResponses),
+    minimumVisibleResponses: 2,
+    thresholdRequired: true,
+    thresholdMet: countValue(item.subordinateResponses) >= 2,
+    visibleOutsideHr: countValue(item.subordinateResponses) >= 2,
+    hiddenReason: countValue(item.subordinateResponses) >= 2 ? null : 'Direct report details are masked until at least 2 direct report responses are submitted.',
+  },
+  {
+    relationshipType: 'SELF',
+    label: 'Self',
+    responseCount: countValue(item.selfResponses),
+    minimumVisibleResponses: 1,
+    thresholdRequired: false,
+    thresholdMet: countValue(item.selfResponses) >= 1,
+    visibleOutsideHr: countValue(item.selfResponses) >= 1,
+    hiddenReason: countValue(item.selfResponses) >= 1 ? null : 'Self review was not submitted.',
+  },
+];
+
+const privacyRowsFor = (item: FeedbackResultItem) => {
+  const rows = item.relationshipPrivacy?.length ? item.relationshipPrivacy : fallbackRelationshipPrivacy(item);
+  return rows.map(row => ({
+    ...row,
+    label: row.label || relationshipDisplayName(row.relationshipType),
+    responseCount: countValue(row.responseCount),
+    minimumVisibleResponses: Number(row.minimumVisibleResponses ?? 1),
+    thresholdRequired: Boolean(row.thresholdRequired),
+    thresholdMet: row.thresholdMet !== false,
+    visibleOutsideHr: row.visibleOutsideHr !== false,
+  }));
+};
+
+const isPublished = (item: FeedbackResultItem) => String(item.visibilityStatus ?? '').toUpperCase() === 'PUBLISHED';
+const isReadyToPublish = (item: FeedbackResultItem) => String(item.visibilityStatus ?? '').toUpperCase() === 'READY_TO_PUBLISH'
+    || (countValue(item.totalResponses) > 0 && !item.insufficientFeedback && !isPublished(item));
 
 const employeeSearchText = (item: FeedbackResultItem) => [
   item.targetEmployeeName,
@@ -99,333 +206,646 @@ const confidenceMatches = (item: FeedbackResultItem, filter: ConfidenceFilter) =
   return String(item.confidenceLevel ?? '').toUpperCase() === filter;
 };
 
-const relationshipBreakdown = (item: FeedbackResultItem) => [
-  { label: 'Manager', count: item.managerResponses, score: item.managerAverageScore, threshold: 1 },
-  { label: 'Peer', count: item.peerResponses, score: item.peerAverageScore, threshold: MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES },
-  { label: 'Direct Report', count: item.subordinateResponses, score: item.subordinateAverageScore, threshold: MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES },
-  { label: 'Self', count: item.selfResponses ?? 0, score: item.selfAverageScore, threshold: 1 },
-].filter(row => sourceCount(row.count) > 0);
+const escapeCsv = (value: string | number | null | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
-const escapeCsv = (value: string | number | null | undefined) => {
-  const text = String(value ?? '');
-  return `"${text.replace(/"/g, '""')}"`;
+const initials = (name?: string | null) => {
+  const parts = String(name ?? 'Employee').trim().split(/\s+/).slice(0, 2);
+  return parts.map(part => part[0]?.toUpperCase()).join('') || 'E';
 };
 
-const StatCard = ({ label, value, helper }: { label: string; value: string | number; helper?: string }) => (
-    <div className="hfd-analytics-stat-card">
-      <strong>{value}</strong>
-      <span>{label}</span>
-      {helper && <small>{helper}</small>}
-    </div>
-);
+const chartRowsFromDistribution = (distribution: FeedbackScoreDistribution[] | undefined, items: FeedbackResultItem[]): BarRow[] => {
+  if (distribution?.length) {
+    return distribution.map(row => ({
+      label: row.label || row.band,
+      value: countValue(row.count),
+      meta: formatCount(row.count),
+    }));
+  }
 
-const BarList = ({
-                   title,
-                   subtitle,
-                   rows,
-                 }: {
-  title: string;
-  subtitle?: string;
-  rows: Array<{ label: string; value: number; meta?: string }>;
-}) => {
-  const max = Math.max(1, ...rows.map(row => row.value));
-  return (
-      <div className="hfd-analytics-chart-card">
-        <div className="hfd-monitor-chart-heading">
-          <h3>{title}</h3>
-          {subtitle && <span>{subtitle}</span>}
-        </div>
-        <div className="hfd-analytics-bars">
-          {rows.length === 0 ? <p className="hfd-muted">No data yet.</p> : rows.map((row, index) => (
-              <div className="hfd-analytics-bar-row" key={`${row.label}-${index}`}>
-                <span>{row.label}</span>
-                <div className="hfd-monitor-bar-track"><div className="hfd-monitor-bar-fill" style={{ width: `${Math.max(2, (row.value / max) * 100)}%` }} /></div>
-                <strong>{row.meta ?? row.value}</strong>
-              </div>
-          ))}
-        </div>
-      </div>
-  );
-};
-
-const ScoreDistributionChart = ({ summary }: { summary: FeedbackCampaignSummary }) => {
-  const rows = summary.scoreDistribution?.length
-      ? summary.scoreDistribution.map(row => ({ label: `${row.band} ${row.label}`, value: sourceCount(row.count), meta: `${row.count}` }))
-      : [
-        { key: 'Outstanding', min: 86, max: 100 },
-        { key: 'Good', min: 71, max: 85 },
-        { key: 'Meets requirement', min: 60, max: 70 },
-        { key: 'Needs improvement', min: 40, max: 59 },
-        { key: 'Unsatisfactory', min: 0, max: 39 },
-      ].map(band => ({
-        label: band.key,
-        value: (summary.items ?? []).filter(item => item.averageScore != null && item.averageScore >= band.min && item.averageScore <= band.max).length,
-      }));
-  return <BarList title="Score distribution" subtitle="Employees by band" rows={rows} />;
-};
-
-const RelationshipAverageChart = ({ summary }: { summary: FeedbackCampaignSummary }) => {
-  const rows = summary.relationshipAverages?.length
-      ? summary.relationshipAverages.map(row => ({ label: row.label ?? row.relationshipType, value: Number(row.averageScore ?? 0), meta: `${formatScore(row.averageScore)} · ${row.responseCount} responses` }))
-      : [
-        { label: 'Manager', getScore: (item: FeedbackResultItem) => item.managerAverageScore, getCount: (item: FeedbackResultItem) => item.managerResponses },
-        { label: 'Peer', getScore: (item: FeedbackResultItem) => item.peerAverageScore, getCount: (item: FeedbackResultItem) => item.peerResponses },
-        { label: 'Direct Report', getScore: (item: FeedbackResultItem) => item.subordinateAverageScore, getCount: (item: FeedbackResultItem) => item.subordinateResponses },
-        { label: 'Self', getScore: (item: FeedbackResultItem) => item.selfAverageScore, getCount: (item: FeedbackResultItem) => item.selfResponses ?? 0 },
-      ].map(role => {
-        const rowsForRole = (summary.items ?? []).filter(item => sourceCount(role.getCount(item)) > 0 && role.getScore(item) != null);
-        const average = rowsForRole.length ? rowsForRole.reduce((total, item) => total + Number(role.getScore(item) ?? 0), 0) / rowsForRole.length : 0;
-        return { label: role.label, value: average, meta: formatScore(average) };
-      });
-  return <BarList title="Average by evaluator role" subtitle="Self vs others source data" rows={rows} />;
-};
-
-const CompetencyChart = ({ competencies }: { competencies: FeedbackCompetencyAverage[] }) => {
-  const top = competencies.slice(0, 5).map(row => ({ label: row.competencyName, value: Number(row.averageScore ?? 0), meta: `${formatScore(row.averageScore)} · ${row.responseCount} ratings` }));
-  const needs = [...competencies].sort((a, b) => Number(a.averageScore ?? 999) - Number(b.averageScore ?? 999)).slice(0, 5)
-      .map(row => ({ label: row.competencyName, value: Number(row.averageScore ?? 0), meta: `${formatScore(row.averageScore)} · ${row.responseCount} ratings` }));
-  return (
-      <div className="hfd-analytics-two-col">
-        <BarList title="Top competencies" subtitle="Highest average scores" rows={top} />
-        <BarList title="Needs attention" subtitle="Lowest average scores" rows={needs} />
-      </div>
-  );
-};
-
-const scoringRelationshipRows = (scoringConfig: FeedbackCampaignScoringConfig | null, summary: FeedbackCampaignSummary | null) => {
-  const apiRows = scoringConfig?.relationshipWeights?.length ? scoringConfig.relationshipWeights : [];
-  const summaryRows = summary?.relationshipAverages ?? [];
-  const allTypes = Array.from(new Set([
-    ...apiRows.map(row => String(row.relationshipType ?? '').toUpperCase()).filter(Boolean),
-    ...summaryRows.map(row => String(row.relationshipType ?? '').toUpperCase()).filter(Boolean),
-    'MANAGER',
-    'PEER',
-    'SUBORDINATE',
-    'SELF',
-  ]));
-
-  const findWeight = (type: string): FeedbackRelationshipWeight | undefined => apiRows.find(row => String(row.relationshipType ?? '').toUpperCase() === type);
-  const findSummary = (type: string) => summaryRows.find(row => String(row.relationshipType ?? '').toUpperCase() === type);
-
-  return allTypes.map(type => {
-    const weight = findWeight(type);
-    const relationshipAverage = findSummary(type);
-    return {
-      type,
-      label: relationshipDisplayName(weight?.relationshipType ?? relationshipAverage?.relationshipType ?? type),
-      weightPercent: Number(weight?.weightPercent ?? 0),
-      assignmentCount: Number(weight?.assignmentCount ?? 0),
-      targetCountWithRole: Number(weight?.targetCountWithRole ?? 0),
-      currentlyAvailable: weight?.currentlyAvailable !== false,
-      averageScore: relationshipAverage?.averageScore ?? null,
-      responseCount: Number(relationshipAverage?.responseCount ?? 0),
-      threshold: relationshipPrivacyThreshold(type),
-      description: relationshipDescription(type),
-    };
-  }).filter(row => row.weightPercent > 0 || row.responseCount > 0 || row.assignmentCount > 0);
-};
-
-type AnalyticsInsight = {
-  icon: string;
-  label: string;
-  value: string | number;
-  helper: string;
-  tone?: 'good' | 'warning' | 'danger' | 'neutral';
-};
-
-const ScoringExplanationPanel = ({
-                                   summary,
-                                   scoringConfig,
-                                   scoringLoading,
-                                 }: {
-  summary: FeedbackCampaignSummary;
-  scoringConfig: FeedbackCampaignScoringConfig | null;
-  scoringLoading: boolean;
-}) => {
-  const rows = scoringRelationshipRows(scoringConfig, summary);
-  const calculationNote = summary.items?.find(item => item.scoreCalculationNote)?.scoreCalculationNote;
-  const method = summary.items?.find(item => item.scoreCalculationMethod)?.scoreCalculationMethod;
-
-  return (
-      <section className="hfd-analytics-explain-card hfd-analytics-score-explain">
-        <div className="hfd-analytics-section-heading">
-          <div>
-            <span className="hfd-eyebrow">Score explanation</span>
-            <h3>How this campaign score is calculated</h3>
-            <p>Relationship weights come from Campaign Setup. Only submitted responses are counted, then privacy rules decide what employees can see.</p>
-          </div>
-          <span className={`hfd-status-chip ${scoringConfig?.relationshipWeightsReady ? 'published' : 'hidden'}`}>
-            {scoringLoading ? 'Loading weights' : scoringConfig?.relationshipWeightsReady ? 'Weights ready' : 'Review weights'}
-          </span>
-        </div>
-
-        <div className="hfd-score-method-box">
-          <strong>{method || 'Relationship-weighted average'}</strong>
-          <span>{calculationNote || 'Final score combines submitted evaluator ratings using the configured relationship weights and available response data.'}</span>
-          <small>Missing role handling: {scoringConfig?.redistributeMissingRelationshipWeight ? 'Redistribute available weighted roles' : 'Require configured weighted roles when available'}</small>
-        </div>
-
-        <div className="hfd-score-weight-grid">
-          {rows.length === 0 ? (
-              <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-sliders" /><strong>No scoring weights loaded</strong><p>Open Campaign Setup to review relationship weights for this campaign.</p></div>
-          ) : rows.map(row => (
-              <article key={row.type} className="hfd-score-weight-card">
-                <div>
-                  <strong>{row.label}</strong>
-                  <span>{row.description}</span>
-                </div>
-                <div className="hfd-score-weight-meter" aria-label={`${row.label} weight ${row.weightPercent}%`}>
-                  <i style={{ width: `${Math.min(100, Math.max(0, row.weightPercent))}%` }} />
-                </div>
-                <dl>
-                  <div><dt>Weight</dt><dd>{row.weightPercent}%</dd></div>
-                  <div><dt>Avg.</dt><dd>{row.responseCount > 0 ? formatScore(row.averageScore) : 'No responses'}</dd></div>
-                  <div><dt>Responses</dt><dd>{row.responseCount}</dd></div>
-                  <div><dt>Visibility threshold</dt><dd>{row.threshold}</dd></div>
-                </dl>
-              </article>
-          ))}
-        </div>
-
-        {scoringConfig?.warnings?.length ? (
-            <div className="hfd-analytics-note-list warning">
-              {scoringConfig.warnings.map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
-            </div>
-        ) : null}
-      </section>
-  );
-};
-
-const PrivacyAndConfidencePanel = ({ summary }: { summary: FeedbackCampaignSummary }) => {
-  const items = summary.items ?? [];
-  const peerMasked = items.filter(item => sourceCount(item.peerResponses) > 0 && sourceCount(item.peerResponses) < MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES).length;
-  const subordinateMasked = items.filter(item => sourceCount(item.subordinateResponses) > 0 && sourceCount(item.subordinateResponses) < MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES).length;
-  const lowConfidence = items.filter(item => String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
-  const insufficient = items.filter(item => Boolean(item.insufficientFeedback)).length;
-  const insights: AnalyticsInsight[] = [
-    {
-      icon: 'bi-shield-lock',
-      label: 'Peer masking',
-      value: peerMasked,
-      helper: `Peer score/comment visibility needs at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} submitted peer responses.`,
-      tone: peerMasked > 0 ? 'warning' : 'good',
-    },
-    {
-      icon: 'bi-people',
-      label: 'Direct report masking',
-      value: subordinateMasked,
-      helper: `Direct report visibility needs at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} submitted direct report responses.`,
-      tone: subordinateMasked > 0 ? 'warning' : 'good',
-    },
-    {
-      icon: 'bi-exclamation-diamond',
-      label: 'Insufficient summaries',
-      value: insufficient,
-      helper: 'These employee summaries cannot be published until they pass backend confidence checks.',
-      tone: insufficient > 0 ? 'danger' : 'good',
-    },
-    {
-      icon: 'bi-activity',
-      label: 'Low confidence',
-      value: lowConfidence,
-      helper: 'Low confidence results should be reviewed before HR publishes employee summaries.',
-      tone: lowConfidence > 0 ? 'warning' : 'good',
-    },
+  const bands = [
+    { label: 'Outstanding', min: 86, max: 100 },
+    { label: 'Good', min: 71, max: 85 },
+    { label: 'Meets requirement', min: 60, max: 70 },
+    { label: 'Needs improvement', min: 40, max: 59 },
+    { label: 'Unsatisfactory', min: 0, max: 39 },
   ];
 
-  return (
-      <section className="hfd-analytics-explain-card">
-        <div className="hfd-analytics-section-heading">
-          <div>
-            <span className="hfd-eyebrow">Privacy and confidence</span>
-            <h3>What HR can publish safely</h3>
-            <p>HR analytics can show internal review data, but employee-facing results remain masked when confidentiality thresholds are not met.</p>
-          </div>
-          <span className="hfd-status-chip hidden">Threshold {MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES}</span>
-        </div>
-        <div className="hfd-analytics-insight-grid">
-          {insights.map(item => (
-              <article key={item.label} className={`hfd-analytics-insight-card ${item.tone ?? 'neutral'}`}>
-                <i className={`bi ${item.icon}`} />
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-                <small>{item.helper}</small>
-              </article>
-          ))}
-        </div>
-      </section>
-  );
-};
-
-const PublishReadinessPanel = ({
-                                 readyCount,
-                                 blockedItems,
-                                 publishedCount,
-                                 totalEmployees,
-                               }: {
-  readyCount: number;
-  blockedItems: FeedbackResultItem[];
-  publishedCount: number;
-  totalEmployees: number;
-}) => {
-  const noResponses = blockedItems.filter(item => sourceCount(item.totalResponses) === 0).length;
-  const insufficient = blockedItems.filter(item => Boolean(item.insufficientFeedback)).length;
-  const blockedButHasResponses = Math.max(0, blockedItems.length - noResponses - insufficient);
-  const rows = [
-    { label: 'Ready to publish', value: readyCount, helper: 'Passed response and confidence checks.', tone: 'good' },
-    { label: 'Already published', value: publishedCount, helper: 'Currently visible to employees and HR.', tone: 'neutral' },
-    { label: 'No submitted responses', value: noResponses, helper: 'Cannot calculate an employee result yet.', tone: noResponses ? 'danger' : 'good' },
-    { label: 'Insufficient feedback', value: insufficient, helper: 'Blocked by confidence or minimum feedback checks.', tone: insufficient ? 'warning' : 'good' },
-    { label: 'Needs HR review', value: blockedButHasResponses, helper: 'Has data but still not ready for employee publishing.', tone: blockedButHasResponses ? 'warning' : 'good' },
-  ];
-
-  return (
-      <section className="hfd-analytics-explain-card hfd-publish-readiness-panel">
-        <div className="hfd-analytics-section-heading">
-          <div>
-            <span className="hfd-eyebrow">Publish readiness</span>
-            <h3>Publication status before release</h3>
-            <p>{readyCount} of {totalEmployees} employee summaries are ready for publishing. Blocked results stay hidden from employees.</p>
-          </div>
-        </div>
-        <div className="hfd-publish-readiness-list">
-          {rows.map(row => (
-              <article key={row.label} className={`hfd-publish-readiness-item ${row.tone}`}>
-                <strong>{row.value}</strong>
-                <div><span>{row.label}</span><small>{row.helper}</small></div>
-              </article>
-          ))}
-        </div>
-      </section>
-  );
-};
-
-const EmployeeRelationshipDetail = ({ item }: { item: FeedbackResultItem }) => {
-  const rows = relationshipBreakdown(item);
-  return (
-      <div className="hfd-relationship-detail-grid">
-        {rows.map(row => {
-          const count = sourceCount(row.count);
-          const visible = count >= row.threshold;
-          return (
-              <article key={row.label} className={visible ? 'visible' : 'masked'}>
-                <strong>{row.label}</strong>
-                <span>{visible ? formatScore(row.score) : 'Masked'}</span>
-                <small>{count} response{count === 1 ? '' : 's'} · {visible ? 'Visible when published' : `Needs ${row.threshold} responses`}</small>
-              </article>
-          );
-        })}
-      </div>
-  );
+  return bands.map(band => ({
+    label: band.label,
+    value: items.filter(item => item.averageScore != null && item.averageScore >= band.min && item.averageScore <= band.max).length,
+  }));
 };
 
 const contentSummary = (options: PublishOptions) => [
-  options.includeOverallScore && 'Overall score and rating band',
-  options.includeCompetencyBreakdown && 'Competency breakdown',
-  options.includeSelfVsOthers && 'Self vs others comparison',
-  options.includeComments && 'Anonymous written comments',
-  options.includeScoreExplanation && 'Score explanation',
+  options.includeOverallScore ? 'overall score' : null,
+  options.includeCompetencyBreakdown ? 'competency breakdown' : null,
+  options.includeSelfVsOthers ? 'self vs others' : null,
+  options.includeComments ? 'anonymous comments' : null,
+  options.includeScoreExplanation ? 'score explanation' : null,
 ].filter(Boolean).join(', ');
+
+const MetricCards = ({ cards }: { cards: MetricCard[] }) => (
+    <div className="hfa-metric-grid">
+      {cards.map(card => (
+          <article key={card.label} className={`hfa-metric-card ${card.tone ?? 'neutral'}`}>
+            <div>
+              <i className={`bi ${card.icon}`} />
+              <strong>{card.value}</strong>
+              <span>{card.label}</span>
+            </div>
+            {card.helper && <small>{card.helper}</small>}
+          </article>
+      ))}
+    </div>
+);
+
+const HorizontalBarChart = ({ title, subtitle, rows, maxValue = 100 }: { title: string; subtitle?: string; rows: BarRow[]; maxValue?: number }) => {
+  const max = maxValue === 100 ? 100 : Math.max(1, ...rows.map(row => row.value));
+  return (
+      <section className="hfa-chart-card">
+        <div className="hfa-chart-head">
+          <div>
+            <h3>{title}</h3>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+        </div>
+        <div className="hfa-bar-list">
+          {rows.length === 0 ? <p className="hfa-muted">No data available yet.</p> : rows.map((row, index) => (
+              <div className="hfa-bar-row" key={`${row.label}-${index}`}>
+                <span className="hfa-bar-label" title={row.label}>{row.label}</span>
+                <div className="hfa-bar-track">
+                  <div className="hfa-bar-fill" style={{ width: `${Math.max(3, Math.min(100, (row.value / max) * 100))}%` }} />
+                </div>
+                <span className="hfa-bar-meta">{row.meta ?? formatScore(row.value)}</span>
+              </div>
+          ))}
+        </div>
+      </section>
+  );
+};
+
+const DonutChart = ({ title, subtitle, rows }: { title: string; subtitle?: string; rows: FeedbackConfidenceBreakdown[] }) => {
+  const total = rows.reduce((sum, row) => sum + countValue(row.count), 0);
+  const first = total ? (countValue(rows[0]?.count) / total) * 100 : 0;
+  const second = first + (total ? (countValue(rows[1]?.count) / total) * 100 : 0);
+  const third = second + (total ? (countValue(rows[2]?.count) / total) * 100 : 0);
+
+  return (
+      <section className="hfa-chart-card">
+        <div className="hfa-chart-head">
+          <div>
+            <h3>{title}</h3>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+        </div>
+        {rows.length === 0 ? <p className="hfa-muted">No confidence data available yet.</p> : (
+            <div className="hfa-donut-layout">
+              <div
+                  className="hfa-donut"
+                  style={{
+                    '--hfa-donut-a': `${first}%`,
+                    '--hfa-donut-b': `${second}%`,
+                    '--hfa-donut-c': `${third}%`,
+                  } as CSSProperties}
+              >
+                <div className="hfa-donut-center"><div><strong>{total}</strong><span>results</span></div></div>
+              </div>
+              <div className="hfa-legend">
+                {rows.map((row, index) => (
+                    <div className="hfa-legend-row" key={row.level || row.label}>
+                      <span className="hfa-legend-left"><i className={`hfa-dot hfa-dot-${index + 1}`} />{row.label || row.level}</span>
+                      <strong>{formatCount(row.count)}</strong>
+                    </div>
+                ))}
+              </div>
+            </div>
+        )}
+      </section>
+  );
+};
+
+const CampaignResultHeader = ({ summary, campaign }: { summary: FeedbackCampaignSummary; campaign?: FeedbackCampaign }) => (
+    <section className="hfa-result-header">
+      <div>
+        <div className="hfa-result-meta">
+          <span className="hfa-pill"><i className="bi bi-flag" /> {summary.status}</span>
+          <span className={`hfa-pill ${visibilityClass(summary.visibilityStatus)}`}><i className="bi bi-eye" /> {visibilityLabel(summary.visibilityStatus)}</span>
+          <span className="hfa-pill"><i className="bi bi-calendar-check" /> Closed {formatDateTime(campaign?.closedAt)}</span>
+          <span className="hfa-pill"><i className="bi bi-clock-history" /> Updated {formatDateTime(summary.summarizedAt)}</span>
+        </div>
+        <h3>{campaign?.name ?? summary.campaignName}</h3>
+        <p>Closed-campaign analytics for HR review. Campaign status stays closed; employee visibility is controlled by each result summary.</p>
+      </div>
+      <div className="hfa-result-score">
+        <div>
+          <strong>{formatScore(summary.overallAverageScore)}</strong>
+          <span>{summary.overallScoreCategory || scoreBand(summary.overallAverageScore)}</span>
+        </div>
+      </div>
+    </section>
+);
+
+const QualityPrivacyPanel = ({ summary, readyItems, blockedItems, publishedCount }: {
+  summary: FeedbackCampaignSummary;
+  readyItems: FeedbackResultItem[];
+  blockedItems: FeedbackResultItem[];
+  publishedCount: number;
+}) => {
+  const items = summary.items ?? [];
+  const allPrivacyRows = items.flatMap(privacyRowsFor);
+  const maskedRows = allPrivacyRows.filter(row => row.thresholdRequired && !row.thresholdMet && row.responseCount > 0);
+  const noResponseCount = blockedItems.filter(item => countValue(item.totalResponses) === 0).length;
+  const insufficientCount = blockedItems.filter(item => item.insufficientFeedback).length;
+  const lowConfidenceCount = items.filter(item => String(item.confidenceLevel ?? '').toUpperCase() === 'LOW').length;
+
+  const readinessRows = [
+    { icon: 'bi-check2-circle', title: 'Ready to publish', helper: 'Passed backend confidence and scoring checks.', value: readyItems.length, tone: 'good' },
+    { icon: 'bi-eye', title: 'Already published', helper: 'Employee-facing visibility is already enabled.', value: publishedCount, tone: 'neutral' },
+    { icon: 'bi-person-dash', title: 'No submitted responses', helper: 'No calculated result is available for these employees.', value: noResponseCount, tone: noResponseCount ? 'danger' : 'good' },
+    { icon: 'bi-exclamation-triangle', title: 'Insufficient feedback', helper: 'Blocked by confidence or minimum-feedback rules.', value: insufficientCount, tone: insufficientCount ? 'warning' : 'good' },
+    { icon: 'bi-activity', title: 'Low confidence', helper: 'Review carefully before publishing.', value: lowConfidenceCount, tone: lowConfidenceCount ? 'warning' : 'good' },
+  ];
+
+  const privacyRows = [
+    { icon: 'bi-shield-lock', title: 'Relationship details masked', helper: 'Peer/direct report detail remains hidden outside HR when thresholds are not met.', value: maskedRows.length },
+    { icon: 'bi-people', title: 'Peer threshold', helper: 'Uses backend relationship privacy metadata from Patch A.', value: `${allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? 2}+` },
+    { icon: 'bi-diagram-3', title: 'Direct report threshold', helper: 'Direct report details use the same privacy visibility rules.', value: `${allPrivacyRows.find(row => row.relationshipType === 'SUBORDINATE')?.minimumVisibleResponses ?? 2}+` },
+    { icon: 'bi-incognito', title: 'Evaluator identity', helper: 'Analytics shows result groups only. Evaluator names are not exposed.', value: 'Hidden' },
+  ];
+
+  return (
+      <section>
+        <div className="hfa-section-title">
+          <div>
+            <span className="hfa-eyebrow">Quality and privacy</span>
+            <h3>Release readiness review</h3>
+            <p>HR can review internal analytics, while employee-facing details follow backend confidentiality metadata.</p>
+          </div>
+        </div>
+        <div className="hfa-quality-grid">
+          <div className="hfa-panel">
+            <div className="hfa-panel-head">
+              <div>
+                <h3>Result quality</h3>
+                <p>What can be published safely.</p>
+              </div>
+            </div>
+            <div className="hfa-panel-list">
+              {readinessRows.map(row => (
+                  <article key={row.title} className="hfa-quality-item">
+                    <i className={`bi ${row.icon}`} />
+                    <div><strong>{row.title}</strong><small>{row.helper}</small></div>
+                    <span className="hfa-quality-value">{row.value}</span>
+                  </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="hfa-panel">
+            <div className="hfa-panel-head">
+              <div>
+                <h3>Privacy controls</h3>
+                <p>Visibility is controlled by backend relationship thresholds.</p>
+              </div>
+            </div>
+            <div className="hfa-panel-list">
+              {privacyRows.map(row => (
+                  <article key={row.title} className="hfa-privacy-item">
+                    <i className={`bi ${row.icon}`} />
+                    <div><strong>{row.title}</strong><small>{row.helper}</small></div>
+                    <span className="hfa-quality-value">{row.value}</span>
+                  </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+  );
+};
+
+const AnalyticsCharts = ({ summary }: { summary: FeedbackCampaignSummary }) => {
+  const distributionRows = chartRowsFromDistribution(summary.scoreDistribution, summary.items ?? []);
+  const relationshipRows = (summary.relationshipAverages ?? []).map(row => ({
+    label: row.label || relationshipDisplayName(row.relationshipType),
+    value: numberValue(row.averageScore),
+    meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)} responses`,
+  }));
+  const topCompetencies = [...(summary.competencyAverages ?? [])]
+      .sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))
+      .slice(0, 6)
+      .map(row => ({
+        label: row.competencyName || row.competencyCode,
+        value: numberValue(row.averageScore),
+        meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)} ratings`,
+      }));
+  const developmentCompetencies = [...(summary.competencyAverages ?? [])]
+      .filter(row => row.averageScore != null)
+      .sort((a, b) => numberValue(a.averageScore) - numberValue(b.averageScore))
+      .slice(0, 6)
+      .map(row => ({
+        label: row.competencyName || row.competencyCode,
+        value: numberValue(row.averageScore),
+        meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)} ratings`,
+      }));
+
+  return (
+      <section>
+        <div className="hfa-section-title">
+          <div>
+            <span className="hfa-eyebrow">Analytics charts</span>
+            <h3>Campaign performance patterns</h3>
+            <p>Charts now use backend summary fields instead of temporary frontend-only calculations.</p>
+          </div>
+        </div>
+        <div className="hfa-chart-grid">
+          <HorizontalBarChart title="Score distribution" subtitle="Employees by performance band" rows={distributionRows} maxValue={Math.max(1, ...distributionRows.map(row => row.value))} />
+          <HorizontalBarChart title="Relationship averages" subtitle="Average score by evaluator relationship" rows={relationshipRows} />
+          <HorizontalBarChart title="Strongest competencies" subtitle="Highest scoring competency areas" rows={topCompetencies} />
+          <HorizontalBarChart title="Development focus" subtitle="Lowest scoring competency areas" rows={developmentCompetencies} />
+          <DonutChart title="Confidence breakdown" subtitle="Backend result confidence by employee summary" rows={summary.confidenceBreakdown ?? []} />
+          <HorizontalBarChart
+              title="Top employee results"
+              subtitle="Highest overall scores in this campaign"
+              rows={[...(summary.items ?? [])]
+                  .filter(item => item.averageScore != null)
+                  .sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))
+                  .slice(0, 8)
+                  .map(item => ({ label: item.targetEmployeeName, value: numberValue(item.averageScore), meta: formatScore(item.averageScore) }))}
+          />
+        </div>
+      </section>
+  );
+};
+
+const RelationshipMini = ({ item }: { item: FeedbackResultItem }) => {
+  const rows = privacyRowsFor(item).filter(row => row.responseCount > 0 || ['MANAGER', 'PEER', 'SUBORDINATE', 'SELF'].includes(String(row.relationshipType ?? '').toUpperCase()));
+  return (
+      <div className="hfa-relationship-mini">
+        {rows.map(row => (
+            <span key={row.relationshipType} className={`hfa-mini-chip ${row.thresholdMet ? 'good' : row.responseCount > 0 ? 'masked' : ''}`} title={row.hiddenReason ?? undefined}>
+          {relationshipDisplayName(row.relationshipType)} {row.responseCount}
+        </span>
+        ))}
+      </div>
+  );
+};
+
+const EmployeeResultsTable = ({
+                                items,
+                                searchTerm,
+                                setSearchTerm,
+                                publishFilter,
+                                setPublishFilter,
+                                confidenceFilter,
+                                setConfidenceFilter,
+                                sortBy,
+                                setSortBy,
+                                onOpen,
+                                onExport,
+                              }: {
+  items: FeedbackResultItem[];
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+  publishFilter: PublishFilter;
+  setPublishFilter: (value: PublishFilter) => void;
+  confidenceFilter: ConfidenceFilter;
+  setConfidenceFilter: (value: ConfidenceFilter) => void;
+  sortBy: AnalyticsSort;
+  setSortBy: (value: AnalyticsSort) => void;
+  onOpen: (item: FeedbackResultItem) => void;
+  onExport: () => void;
+}) => (
+    <section className="hfa-table-card">
+      <div className="hfa-table-head">
+        <div>
+          <span className="hfa-eyebrow">Employee result review</span>
+          <h3>Review every employee summary before publishing</h3>
+          <p>Use the drawer to inspect scoring, privacy, relationship coverage, and employee-facing publish content.</p>
+        </div>
+        <button className="hfa-btn hfa-btn-secondary" type="button" onClick={onExport} disabled={items.length === 0}>
+          <i className="bi bi-download" /> Export CSV
+        </button>
+      </div>
+
+      <div className="hfa-table-toolbar">
+        <input className="hfa-input" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search employee, score band, confidence…" />
+        <select className="hfa-select" value={publishFilter} onChange={event => setPublishFilter(event.target.value as PublishFilter)}>
+          <option value="ALL">All visibility</option>
+          <option value="HIDDEN">Hidden</option>
+          <option value="READY_TO_PUBLISH">Ready</option>
+          <option value="PUBLISHED">Published</option>
+        </select>
+        <select className="hfa-select" value={confidenceFilter} onChange={event => setConfidenceFilter(event.target.value as ConfidenceFilter)}>
+          <option value="ALL">All confidence</option>
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+          <option value="INSUFFICIENT">Insufficient</option>
+        </select>
+        <select className="hfa-select" value={sortBy} onChange={event => setSortBy(event.target.value as AnalyticsSort)}>
+          <option value="SCORE_DESC">Highest score</option>
+          <option value="SCORE_ASC">Lowest score</option>
+          <option value="COMPLETION_DESC">Highest completion</option>
+          <option value="COMPLETION_ASC">Lowest completion</option>
+          <option value="RESPONSES_DESC">Most responses</option>
+        </select>
+        <span className="hfa-pill">{items.length} results</span>
+      </div>
+
+      <div className="hfa-table-wrap">
+        <table className="hfa-table">
+          <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Score</th>
+            <th>Completion</th>
+            <th>Responses</th>
+            <th>Relationship coverage</th>
+            <th>Confidence</th>
+            <th>Visibility</th>
+            <th />
+          </tr>
+          </thead>
+          <tbody>
+          {items.length === 0 ? (
+              <tr><td colSpan={8} className="hfa-muted">No employee result matches the current filters.</td></tr>
+          ) : items.map(item => (
+              <tr key={item.targetEmployeeId}>
+                <td>
+                  <div className="hfa-employee-cell">
+                    <span className="hfa-avatar">{initials(item.targetEmployeeName)}</span>
+                    <div><strong>{item.targetEmployeeName}</strong><small>ID {item.targetEmployeeId}</small></div>
+                  </div>
+                </td>
+                <td><div className="hfa-score-cell"><strong>{formatScore(item.averageScore)}</strong><small>{item.scoreCategory || scoreBand(item.averageScore)}</small></div></td>
+                <td>
+                  <div className="hfa-progress">
+                    <div className="hfa-progress-track"><div className="hfa-progress-fill" style={{ width: `${Math.min(100, Math.max(0, numberValue(item.completionRate)))}%` }} /></div>
+                    <span>{formatScore(item.completionRate, 0)}</span>
+                  </div>
+                </td>
+                <td>{formatCount(item.submittedEvaluatorCount ?? item.totalResponses)} / {formatCount(item.assignedEvaluatorCount)}</td>
+                <td><RelationshipMini item={item} /></td>
+                <td><span className={`hfa-pill ${confidenceClass(item)}`}>{confidenceLabel(item)}</span></td>
+                <td><span className={`hfa-pill ${visibilityClass(item.visibilityStatus)}`}>{visibilityLabel(item.visibilityStatus)}</span></td>
+                <td><button type="button" className="hfa-action-link" onClick={() => onOpen(item)}>Review</button></td>
+              </tr>
+          ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+);
+
+const ResultDetailDrawer = ({
+                              item,
+                              competencies,
+                              onClose,
+                            }: {
+  item: FeedbackResultItem | null;
+  competencies: FeedbackCompetencyAverage[];
+  onClose: () => void;
+}) => {
+  if (!item) return null;
+  const privacyRows = privacyRowsFor(item);
+  const included = [
+    item.includeOverallScore !== false ? 'Overall score' : null,
+    item.includeCompetencyBreakdown !== false ? 'Competency breakdown' : null,
+    item.includeSelfVsOthers !== false ? 'Self vs others' : null,
+    item.includeComments ? 'Anonymous comments' : null,
+    item.includeScoreExplanation !== false ? 'Score explanation' : null,
+  ].filter(Boolean);
+
+  return (
+      <div className="hfa-drawer-backdrop" role="dialog" aria-modal="true">
+        <aside className="hfa-drawer">
+          <div className="hfa-drawer-header">
+            <div className="hfa-drawer-title">
+              <span className="hfa-eyebrow">Employee result detail</span>
+              <h3>{item.targetEmployeeName}</h3>
+              <p>Review final score, relationship coverage, confidence, and employee-facing visibility.</p>
+            </div>
+            <button type="button" className="hfa-icon-btn" onClick={onClose} aria-label="Close result detail">×</button>
+          </div>
+
+          <div className="hfa-drawer-body">
+            <div className="hfa-drawer-score-grid">
+              <article className="hfa-drawer-score-card"><strong>{formatScore(item.averageScore)}</strong><span>Overall score</span></article>
+              <article className="hfa-drawer-score-card"><strong>{formatScore(item.rawAverageScore)}</strong><span>Raw score</span></article>
+              <article className="hfa-drawer-score-card"><strong>{formatScore(item.completionRate, 0)}</strong><span>Completion</span></article>
+            </div>
+
+            <section className="hfa-drawer-section">
+              <h4>Relationship breakdown</h4>
+              <div className="hfa-bar-list">
+                {[
+                  { label: 'Manager', score: item.managerAverageScore, count: item.managerResponses },
+                  { label: 'Peers', score: item.peerAverageScore, count: item.peerResponses },
+                  { label: 'Direct reports', score: item.subordinateAverageScore, count: item.subordinateResponses },
+                  { label: 'Self', score: item.selfAverageScore, count: item.selfResponses },
+                ].map(row => (
+                    <div className="hfa-bar-row" key={row.label}>
+                      <span className="hfa-bar-label">{row.label}</span>
+                      <div className="hfa-bar-track"><div className="hfa-bar-fill" style={{ width: `${Math.max(3, Math.min(100, numberValue(row.score)))}%` }} /></div>
+                      <span className="hfa-bar-meta">{formatScore(row.score)} · {formatCount(row.count)}</span>
+                    </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="hfa-drawer-section">
+              <h4>Privacy metadata</h4>
+              <div className="hfa-privacy-grid">
+                {privacyRows.map(row => (
+                    <div className="hfa-privacy-row" key={row.relationshipType}>
+                      <strong>{row.label}</strong>
+                      <small>{row.hiddenReason || (row.visibleOutsideHr ? 'Visible outside HR when this section is published.' : 'Hidden outside HR.')}</small>
+                      <span className={`hfa-pill ${row.thresholdMet ? 'hfa-pill-published' : 'hfa-pill-warning'}`}>
+                    {row.responseCount}/{row.minimumVisibleResponses}
+                  </span>
+                    </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="hfa-drawer-section">
+              <h4>Competency snapshot</h4>
+              <div className="hfa-bar-list">
+                {competencies.length === 0 ? <p className="hfa-muted">No competency averages returned yet.</p> : competencies.slice(0, 6).map(row => (
+                    <div className="hfa-bar-row" key={row.competencyCode}>
+                      <span className="hfa-bar-label" title={row.competencyName}>{row.competencyName}</span>
+                      <div className="hfa-bar-track"><div className="hfa-bar-fill" style={{ width: `${Math.max(3, Math.min(100, numberValue(row.averageScore)))}%` }} /></div>
+                      <span className="hfa-bar-meta">{formatScore(row.averageScore)}</span>
+                    </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="hfa-drawer-section">
+              <h4>Employee-facing preview</h4>
+              <div className="hfa-publish-preview">
+                <strong>{visibilityLabel(item.visibilityStatus)} result content</strong>
+                <ul>
+                  {included.length ? included.map(entry => <li key={entry}>{entry}</li>) : <li>No employee-facing content is currently selected.</li>}
+                </ul>
+              </div>
+            </section>
+
+            <section className="hfa-drawer-section">
+              <h4>Calculation note</h4>
+              <p>{item.scoreCalculationNote || 'Final score uses the configured 360 relationship weights and submitted response data.'}</p>
+              <span className={`hfa-pill ${confidenceClass(item)}`}>{confidenceLabel(item)}</span>
+            </section>
+          </div>
+        </aside>
+      </div>
+  );
+};
+
+const PublishResultsModal = ({
+                               open,
+                               step,
+                               setStep,
+                               options,
+                               setOptions,
+                               readyItems,
+                               blockedItems,
+                               publishedCount,
+                               selectedReadyCount,
+                               publishReady,
+                               actionLoading,
+                               onClose,
+                               onPublish,
+                             }: {
+  open: boolean;
+  step: PublishStep;
+  setStep: (value: PublishStep) => void;
+  options: PublishOptions;
+  setOptions: (updater: (current: PublishOptions) => PublishOptions) => void;
+  readyItems: FeedbackResultItem[];
+  blockedItems: FeedbackResultItem[];
+  publishedCount: number;
+  selectedReadyCount: number;
+  publishReady: boolean;
+  actionLoading: boolean;
+  onClose: () => void;
+  onPublish: () => void;
+}) => {
+  if (!open) return null;
+
+  const toggleEmployee = (employeeId: number) => {
+    setOptions(current => ({
+      ...current,
+      selectedEmployeeIds: current.selectedEmployeeIds.includes(employeeId)
+          ? current.selectedEmployeeIds.filter(id => id !== employeeId)
+          : [...current.selectedEmployeeIds, employeeId],
+    }));
+  };
+
+  const selectAllReady = () => setOptions(current => ({ ...current, selectedEmployeeIds: readyItems.map(item => item.targetEmployeeId) }));
+
+  const setBooleanOption = (key: keyof Pick<PublishOptions, 'includeOverallScore' | 'includeCompetencyBreakdown' | 'includeSelfVsOthers' | 'includeComments' | 'includeScoreExplanation' | 'confirmVisibility'>, value: boolean) => {
+    setOptions(current => ({ ...current, [key]: value }));
+  };
+
+  return (
+      <div className="hfa-modal-backdrop" role="dialog" aria-modal="true">
+        <div className="hfa-modal">
+          <div className="hfa-modal-header">
+            <div className="hfa-modal-title">
+              <span className="hfa-eyebrow">Publish center</span>
+              <h3>Publish employee 360 results</h3>
+              <p>Choose who receives results and exactly which sections employees can see.</p>
+            </div>
+            <button type="button" className="hfa-icon-btn" onClick={onClose} aria-label="Close publish modal">×</button>
+          </div>
+
+          <div className="hfa-steps">
+            <span className={`hfa-step ${step === 1 ? 'active' : ''}`}>1. Setup</span>
+            <span className={`hfa-step ${step === 2 ? 'active' : ''}`}>2. Review & publish</span>
+          </div>
+
+          {step === 1 ? (
+              <div className="hfa-modal-body">
+                <div className="hfa-modal-grid">
+                  <section className="hfa-option-panel">
+                    <h4>Publish scope</h4>
+                    <label className="hfa-option-card">
+                      <input type="radio" checked={options.scope === 'ALL_READY'} onChange={() => setOptions(current => ({ ...current, scope: 'ALL_READY' }))} />
+                      <span><strong>All ready employees</strong><small>Publish every result marked ready by backend scoring, confidence, and privacy checks.</small></span>
+                    </label>
+                    <label className="hfa-option-card">
+                      <input type="radio" checked={options.scope === 'SELECTED_EMPLOYEES'} onChange={() => setOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} />
+                      <span><strong>Selected employees only</strong><small>Choose specific ready employee results to publish now.</small></span>
+                    </label>
+
+                    {options.scope === 'SELECTED_EMPLOYEES' && (
+                        <div className="hfa-employee-picker">
+                          <button className="hfa-btn hfa-btn-secondary" type="button" onClick={selectAllReady}>Select all ready</button>
+                          {readyItems.map(item => (
+                              <label key={item.targetEmployeeId}>
+                                <input type="checkbox" checked={options.selectedEmployeeIds.includes(item.targetEmployeeId)} onChange={() => toggleEmployee(item.targetEmployeeId)} />
+                                <span>{item.targetEmployeeName}</span>
+                                <small>{formatScore(item.averageScore)}</small>
+                              </label>
+                          ))}
+                        </div>
+                    )}
+                  </section>
+
+                  <section className="hfa-option-panel">
+                    <h4>Employee result content</h4>
+                    <div className="hfa-check-list">
+                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeOverallScore} onChange={event => setBooleanOption('includeOverallScore', event.target.checked)} /><span><strong>Overall score</strong><small>Final score and score band.</small></span></label>
+                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeCompetencyBreakdown} onChange={event => setBooleanOption('includeCompetencyBreakdown', event.target.checked)} /><span><strong>Competency breakdown</strong><small>Strengths and development areas.</small></span></label>
+                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeSelfVsOthers} onChange={event => setBooleanOption('includeSelfVsOthers', event.target.checked)} /><span><strong>Self vs others</strong><small>Comparison view when submitted and allowed.</small></span></label>
+                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeComments} onChange={event => setBooleanOption('includeComments', event.target.checked)} /><span><strong>Anonymous comments</strong><small>Only visible when confidentiality allows it.</small></span></label>
+                      <label className="hfa-check-row"><input type="checkbox" checked={options.includeScoreExplanation} onChange={event => setBooleanOption('includeScoreExplanation', event.target.checked)} /><span><strong>Score explanation</strong><small>Show how the final score was calculated.</small></span></label>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="hfa-alert hfa-alert-info">
+                  <i className="bi bi-shield-lock" /> {blockedItems.length} blocked result{blockedItems.length === 1 ? '' : 's'} stay hidden. {publishedCount} result{publishedCount === 1 ? '' : 's'} are already published.
+                </div>
+              </div>
+          ) : (
+              <div className="hfa-modal-body">
+                <section className="hfa-option-panel">
+                  <h4>Review before publishing</h4>
+                  <dl className="hfa-review-list">
+                    <div className="hfa-review-row"><dt>Results to publish</dt><dd>{selectedReadyCount} employee{selectedReadyCount === 1 ? '' : 's'}</dd></div>
+                    <div className="hfa-review-row"><dt>Visible to</dt><dd>Employee and HR</dd></div>
+                    <div className="hfa-review-row"><dt>Included sections</dt><dd>{contentSummary(options) || 'No content selected'}</dd></div>
+                    <div className="hfa-review-row"><dt>Comments</dt><dd>{options.includeComments ? 'Included only where confidentiality allows' : 'Not included'}</dd></div>
+                    <div className="hfa-review-row"><dt>Blocked results</dt><dd>{blockedItems.length} remain hidden</dd></div>
+                    <div className="hfa-review-row"><dt>Notification</dt><dd>Employees will be notified by backend publish flow</dd></div>
+                  </dl>
+                </section>
+
+                <label className="hfa-confirm-box">
+                  <input type="checkbox" checked={options.confirmVisibility} onChange={event => setBooleanOption('confirmVisibility', event.target.checked)} />
+                  <span>I confirm these published results will be visible to employees, and relationship/comment detail must follow backend privacy rules.</span>
+                </label>
+              </div>
+          )}
+
+          <div className="hfa-modal-footer">
+            <button className="hfa-btn hfa-btn-secondary" type="button" onClick={() => step === 1 ? onClose() : setStep(1)}>
+              {step === 1 ? 'Cancel' : 'Back'}
+            </button>
+            {step === 1 ? (
+                <button className="hfa-btn hfa-btn-primary" type="button" onClick={() => setStep(2)} disabled={selectedReadyCount === 0}>Review publish</button>
+            ) : (
+                <button className="hfa-btn hfa-btn-primary" type="button" onClick={onPublish} disabled={!publishReady || actionLoading}>
+                  {actionLoading ? 'Publishing…' : 'Publish results'}
+                </button>
+            )}
+          </div>
+        </div>
+      </div>
+  );
+};
 
 export default function AnalyticsTab() {
   const [campaigns, setCampaigns] = useState<FeedbackCampaign[]>([]);
@@ -441,15 +861,16 @@ export default function AnalyticsTab() {
   const [publishFilter, setPublishFilter] = useState<PublishFilter>('ALL');
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>('ALL');
   const [sortBy, setSortBy] = useState<AnalyticsSort>('SCORE_DESC');
-  const [expandedEmployeeId, setExpandedEmployeeId] = useState<number | null>(null);
+  const [selectedResult, setSelectedResult] = useState<FeedbackResultItem | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishStep, setPublishStep] = useState<PublishStep>(1);
   const [publishOptions, setPublishOptions] = useState<PublishOptions>(defaultPublishOptions);
 
   const closedCampaigns = useMemo(
-      () => campaigns.filter(campaign => campaign.status === 'CLOSED' || campaign.status === 'PUBLISHED'),
+      () => campaigns.filter(campaign => ['CLOSED', 'PUBLISHED'].includes(String(campaign.status ?? '').toUpperCase())),
       [campaigns],
   );
+
   const selectedCampaign = closedCampaigns.find(campaign => campaign.id === selectedId);
 
   useEffect(() => {
@@ -457,12 +878,12 @@ export default function AnalyticsTab() {
         .then(items => {
           setCampaigns(items);
           setSelectedId(current => {
-            if (current && items.some(c => c.id === current && (c.status === 'CLOSED' || c.status === 'PUBLISHED'))) return current;
-            const firstClosed = items.find(c => c.status === 'CLOSED' || c.status === 'PUBLISHED');
+            if (current && items.some(campaign => campaign.id === current && ['CLOSED', 'PUBLISHED'].includes(String(campaign.status ?? '').toUpperCase()))) return current;
+            const firstClosed = items.find(campaign => ['CLOSED', 'PUBLISHED'].includes(String(campaign.status ?? '').toUpperCase()));
             return firstClosed?.id ?? '';
           });
         })
-        .catch(e => setError(e.message));
+        .catch(e => setError(e instanceof Error ? e.message : 'Failed to load campaigns.'));
   }, []);
 
   const refreshSummary = () => {
@@ -471,14 +892,17 @@ export default function AnalyticsTab() {
       setScoringConfig(null);
       return;
     }
+
     setLoading(true);
     setScoringLoading(true);
     setError('');
-    feedbackAnalyticsApi.getCampaignSummary(selectedId as number)
+
+    feedbackAnalyticsApi.getCampaignSummary(selectedId)
         .then(setSummary)
-        .catch(e => setError(e.message))
+        .catch(e => setError(e instanceof Error ? e.message : 'Failed to load analytics.'))
         .finally(() => setLoading(false));
-    feedbackCampaignApi.getScoringConfig(selectedId as number)
+
+    feedbackCampaignApi.getScoringConfig(selectedId)
         .then(setScoringConfig)
         .catch(() => setScoringConfig(null))
         .finally(() => setScoringLoading(false));
@@ -489,63 +913,49 @@ export default function AnalyticsTab() {
     setSearchTerm('');
     setPublishFilter('ALL');
     setConfidenceFilter('ALL');
-    setExpandedEmployeeId(null);
+    setSelectedResult(null);
     setNotice('');
     setPublishOpen(false);
   }, [selectedId]);
 
-  const readyItems = useMemo(() => (summary?.items ?? []).filter(isReadyToPublish), [summary?.items]);
+  const readyItems = useMemo(() => (summary?.items ?? []).filter(item => isReadyToPublish(item) && !isPublished(item)), [summary?.items]);
   const blockedItems = useMemo(() => (summary?.items ?? []).filter(item => !isReadyToPublish(item) && !isPublished(item)), [summary?.items]);
   const publishedCount = useMemo(() => (summary?.items ?? []).filter(isPublished).length, [summary?.items]);
-  const readyCount = readyItems.length;
+
   const selectedReadyCount = publishOptions.scope === 'ALL_READY'
-      ? readyCount
+      ? readyItems.length
       : readyItems.filter(item => publishOptions.selectedEmployeeIds.includes(item.targetEmployeeId)).length;
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
-    return (summary?.items ?? [])
+    return [...(summary?.items ?? [])]
         .filter(item => !normalizedSearch || employeeSearchText(item).includes(normalizedSearch))
-        .filter(item => publishFilter === 'ALL' || String(item.visibilityStatus ?? 'HIDDEN') === publishFilter)
+        .filter(item => publishFilter === 'ALL' || String(item.visibilityStatus ?? 'HIDDEN').toUpperCase() === publishFilter)
         .filter(item => confidenceMatches(item, confidenceFilter))
         .sort((a, b) => {
           switch (sortBy) {
-            case 'SCORE_ASC': return Number(a.averageScore ?? 999) - Number(b.averageScore ?? 999);
-            case 'COMPLETION_ASC': return Number(a.completionRate ?? 999) - Number(b.completionRate ?? 999);
-            case 'COMPLETION_DESC': return Number(b.completionRate ?? -1) - Number(a.completionRate ?? -1);
-            case 'RESPONSES_DESC': return Number(b.totalResponses ?? 0) - Number(a.totalResponses ?? 0);
+            case 'SCORE_ASC': return numberValue(a.averageScore ?? 999) - numberValue(b.averageScore ?? 999);
+            case 'COMPLETION_ASC': return numberValue(a.completionRate ?? 999) - numberValue(b.completionRate ?? 999);
+            case 'COMPLETION_DESC': return numberValue(b.completionRate ?? -1) - numberValue(a.completionRate ?? -1);
+            case 'RESPONSES_DESC': return countValue(b.totalResponses) - countValue(a.totalResponses);
             case 'SCORE_DESC':
-            default: return Number(b.averageScore ?? -1) - Number(a.averageScore ?? -1);
+            default: return numberValue(b.averageScore ?? -1) - numberValue(a.averageScore ?? -1);
           }
         });
   }, [confidenceFilter, publishFilter, searchTerm, sortBy, summary?.items]);
 
-  const employeeRankingRows = useMemo(
-      () => [...(summary?.items ?? [])]
-          .sort((a, b) => Number(b.averageScore ?? -1) - Number(a.averageScore ?? -1))
-          .slice(0, 10)
-          .map(item => ({ label: item.targetEmployeeName, value: Number(item.averageScore ?? 0), meta: formatScore(item.averageScore) })),
-      [summary?.items],
-  );
-
-  const openPublishPanel = () => {
-    setPublishStep(1);
-    setPublishOptions(defaultPublishOptions());
-    setPublishOpen(true);
-  };
-
-  const toggleSelectedEmployee = (employeeId: number) => {
-    setPublishOptions(current => ({
-      ...current,
-      selectedEmployeeIds: current.selectedEmployeeIds.includes(employeeId)
-          ? current.selectedEmployeeIds.filter(id => id !== employeeId)
-          : [...current.selectedEmployeeIds, employeeId],
-    }));
-  };
-
-  const selectAllReadyEmployees = () => {
-    setPublishOptions(current => ({ ...current, selectedEmployeeIds: readyItems.map(item => item.targetEmployeeId) }));
-  };
+  const metricCards: MetricCard[] = useMemo(() => {
+    if (!summary) return [];
+    const blockedCount = blockedItems.length;
+    return [
+      { label: 'Overall average', value: formatScore(summary.overallAverageScore), helper: summary.overallScoreCategory || scoreBand(summary.overallAverageScore), icon: 'bi-stars', tone: 'good' },
+      { label: 'Employees reviewed', value: formatCount(summary.totalEmployees), helper: `${formatCount(summary.totalResponses)} submitted responses`, icon: 'bi-people' },
+      { label: 'Completion', value: formatScore(summary.completionRate, 0), helper: `${formatCount(summary.submittedEvaluatorCount)} / ${formatCount(summary.assignedEvaluatorCount)} evaluators`, icon: 'bi-clipboard-check', tone: numberValue(summary.completionRate) >= 80 ? 'good' : 'warning' },
+      { label: 'Ready to publish', value: readyItems.length, helper: `${blockedCount} blocked`, icon: 'bi-send-check', tone: readyItems.length ? 'good' : 'warning' },
+      { label: 'Insufficient', value: formatCount(summary.insufficientFeedbackCount), helper: 'Blocked by confidence checks', icon: 'bi-exclamation-diamond', tone: countValue(summary.insufficientFeedbackCount) ? 'danger' : 'good' },
+      { label: 'Published', value: `${publishedCount}/${formatCount(summary.totalEmployees)}`, helper: 'Employee-facing visibility', icon: 'bi-eye', tone: publishedCount ? 'good' : 'neutral' },
+    ];
+  }, [blockedItems.length, publishedCount, readyItems.length, summary]);
 
   const publishPayload = (): FeedbackSummaryPublishRequest => ({
     scope: publishOptions.scope,
@@ -558,13 +968,18 @@ export default function AnalyticsTab() {
     notifyEmployees: true,
   });
 
-  const publishReady = selectedReadyCount > 0
-      && publishOptions.confirmVisibility
-      && (publishOptions.includeOverallScore
-          || publishOptions.includeCompetencyBreakdown
-          || publishOptions.includeSelfVsOthers
-          || publishOptions.includeComments
-          || publishOptions.includeScoreExplanation);
+  const hasPublishContent = publishOptions.includeOverallScore
+      || publishOptions.includeCompetencyBreakdown
+      || publishOptions.includeSelfVsOthers
+      || publishOptions.includeComments
+      || publishOptions.includeScoreExplanation;
+  const publishReady = selectedReadyCount > 0 && hasPublishContent && publishOptions.confirmVisibility;
+
+  const openPublishModal = () => {
+    setPublishOptions(defaultPublishOptions());
+    setPublishStep(1);
+    setPublishOpen(true);
+  };
 
   const runPublish = async () => {
     if (!selectedId || !publishReady) return;
@@ -572,10 +987,10 @@ export default function AnalyticsTab() {
     setNotice('');
     setError('');
     try {
-      const nextSummary = await feedbackAnalyticsApi.publishCampaignSummary(selectedId as number, publishPayload());
+      const nextSummary = await feedbackAnalyticsApi.publishCampaignSummary(selectedId, publishPayload());
       setSummary(nextSummary);
-      setNotice('Results published. Employees with published results have been notified. Results are visible to the employee and HR only.');
       setPublishOpen(false);
+      setNotice('Results published successfully. Employee visibility now follows each saved result summary and publish option.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to publish results.');
     } finally {
@@ -589,9 +1004,9 @@ export default function AnalyticsTab() {
     setNotice('');
     setError('');
     try {
-      const nextSummary = await feedbackAnalyticsApi.unpublishCampaignSummary(selectedId as number);
+      const nextSummary = await feedbackAnalyticsApi.unpublishCampaignSummary(selectedId);
       setSummary(nextSummary);
-      setNotice('Results unpublished. Employees can no longer view these 360 feedback results.');
+      setNotice('Results unpublished. Employee-facing visibility has been turned off for this campaign.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to unpublish results.');
     } finally {
@@ -600,13 +1015,13 @@ export default function AnalyticsTab() {
   };
 
   const exportCsv = () => {
-    if (!filteredItems.length) return;
-    const header = ['Employee', 'Employee ID', 'Average Score', 'Score Band', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager', 'Peer', 'Direct Report', 'Self', 'Publish Status', 'Calculation Note'];
+    if (!filteredItems.length || !selectedId) return;
+    const header = ['Employee', 'Employee ID', 'Average Score', 'Score Band', 'Confidence', 'Completion Rate', 'Assigned', 'Submitted', 'Pending', 'Manager Responses', 'Peer Responses', 'Direct Report Responses', 'Self Responses', 'Visibility', 'Calculation Note'];
     const body = filteredItems.map(item => [
       item.targetEmployeeName,
       item.targetEmployeeId,
       item.averageScore ?? '',
-      scoreBand(item.averageScore),
+      item.scoreCategory || scoreBand(item.averageScore),
       confidenceLabel(item),
       item.completionRate ?? '',
       item.assignedEvaluatorCount ?? '',
@@ -630,292 +1045,145 @@ export default function AnalyticsTab() {
   };
 
   return (
-      <div className="hfd-analytics-page">
-        <div className="hfd-card-header hfd-monitor-header">
-          <div className="hfd-card-title">
-            <i className="bi bi-bar-chart-line" />
+      <div className="hfa-page">
+        <div className="hfa-topbar">
+          <div className="hfa-title-block">
+            <span className="hfa-title-icon"><i className="bi bi-graph-up-arrow" /></span>
             <div>
               <h2>360 Feedback Analytics</h2>
-              <p>Review closed-campaign results, compare scores, and publish employee summaries.</p>
+              <p>Review closed-campaign results, validate confidence and privacy, then publish employee summaries from one production workspace.</p>
             </div>
           </div>
-          <button className="hfd-btn hfd-btn-secondary" type="button" onClick={refreshSummary} disabled={!selectedId || loading}>
-            <i className="bi bi-arrow-repeat" /> Refresh Analytics
-          </button>
+
+          <div className="hfa-topbar-actions">
+            <label className="hfa-select-wrap">
+              <span className="hfa-label">Closed campaign</span>
+              <select className="hfa-select" value={selectedId} onChange={event => setSelectedId(event.target.value ? Number(event.target.value) : '')}>
+                <option value="">Select campaign</option>
+                {closedCampaigns.map(campaign => (
+                    <option key={campaign.id} value={campaign.id}>{campaign.name} · {campaign.status}</option>
+                ))}
+              </select>
+            </label>
+            <button className="hfa-btn hfa-btn-secondary" type="button" onClick={refreshSummary} disabled={!selectedId || loading}>
+              <i className="bi bi-arrow-repeat" /> Refresh
+            </button>
+          </div>
         </div>
 
-        <div className="hfd-alert hfd-alert-info">
-          <i className="bi bi-shield-lock" /> Published results are visible to employees and HR only. Evaluator names are never shown.
+        <div className="hfa-alert hfa-alert-info">
+          <i className="bi bi-shield-lock" /> Campaign lifecycle and result visibility are now separate. Closed campaigns stay closed; published visibility is controlled by saved result summaries.
         </div>
-        {notice && <div className="hfd-alert hfd-alert-success"><i className="bi bi-check-circle" />{notice}</div>}
-        {error && <div className="hfd-alert hfd-alert-error"><i className="bi bi-exclamation-triangle" />{error}</div>}
+        {notice && <div className="hfa-alert hfa-alert-success"><i className="bi bi-check-circle" /> {notice}</div>}
+        {error && <div className="hfa-alert hfa-alert-error"><i className="bi bi-exclamation-triangle" /> {error}</div>}
 
-        <div className="hfd-campaign-select-bar">
-          <label className="hfd-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Closed campaign</label>
-          <select className="hfd-select" value={selectedId} onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : '')}>
-            <option value="">— Select closed campaign —</option>
-            {closedCampaigns.map(campaign => (
-                <option key={campaign.id} value={campaign.id}>{campaign.name} · {campaign.status}</option>
-            ))}
-          </select>
-        </div>
-
-        {closedCampaigns.length === 0 && (
-            <div className="hfd-empty">
-              <i className="bi bi-lock" />
-              <p>Analytics will be available after a feedback campaign is closed.</p>
-            </div>
+        {closedCampaigns.length === 0 && !loading && (
+            <div className="hfa-empty"><i className="bi bi-lock" />Analytics becomes available after a 360 feedback campaign is closed.</div>
         )}
 
-        {loading && <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading analytics…</div>}
+        {loading && <div className="hfa-loading"><i className="bi bi-arrow-repeat" /> Loading production analytics…</div>}
 
         {summary && !loading && (
             <>
-              <div className="hfd-analytics-summary-banner">
-                <div>
-                  <span className={`hfd-status-chip ${String(summary.visibilityStatus ?? '').toLowerCase()}`}>{visibilityLabel(summary.visibilityStatus)}</span>
-                  <h3>{selectedCampaign?.name ?? summary.campaignName}</h3>
-                  <p>{summary.status} campaign · {summary.totalEmployees} employees · {summary.totalResponses} submitted responses</p>
-                </div>
-                <strong>{formatScore(summary.overallAverageScore)}</strong>
-              </div>
+              <CampaignResultHeader summary={summary} campaign={selectedCampaign} />
+              <MetricCards cards={metricCards} />
 
-              <div className="hfd-analytics-stat-grid">
-                <StatCard label="Overall average" value={formatScore(summary.overallAverageScore)} helper={summary.overallScoreCategory} />
-                <StatCard label="Employees evaluated" value={summary.totalEmployees} />
-                <StatCard label="Ready to publish" value={readyCount} helper={`${blockedItems.length} blocked`} />
-                <StatCard label="Completion" value={formatScore(summary.completionRate)} />
-                <StatCard label="Insufficient feedback" value={sourceCount(summary.insufficientFeedbackCount)} />
-                <StatCard label="Published" value={`${publishedCount}/${summary.totalEmployees}`} />
-              </div>
-
-              <div className="hfd-analytics-explain-grid">
-                <ScoringExplanationPanel summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
-                <PrivacyAndConfidencePanel summary={summary} />
-                <PublishReadinessPanel readyCount={readyCount} blockedItems={blockedItems} publishedCount={publishedCount} totalEmployees={summary.totalEmployees} />
-              </div>
-
-              <div className="hfd-analytics-chart-grid">
-                <ScoreDistributionChart summary={summary} />
-                <RelationshipAverageChart summary={summary} />
-                <BarList title="Employee ranking" subtitle="Top score overview" rows={employeeRankingRows} />
-                <BarList title="Confidence" subtitle="Result quality" rows={(summary.confidenceBreakdown ?? []).map(row => ({ label: row.label, value: row.count, meta: `${row.count}` }))} />
-              </div>
-
-              <CompetencyChart competencies={summary.competencyAverages ?? []} />
-
-              <div className="hfd-analytics-publish-panel hfd-publish-v1-card">
-                <div>
-                  <h3>Publish employee results</h3>
-                  <p>Release published 360 feedback results to employees. HR keeps access automatically.</p>
-                  <div className="hfd-publish-mini-stats">
-                    <span>{readyCount} ready</span>
-                    <span>{blockedItems.length} blocked</span>
-                    <span>{publishedCount} published</span>
-                  </div>
-                </div>
-                <div className="hfd-monitor-action-buttons">
-                  <button className="hfd-btn hfd-btn-secondary" type="button" onClick={runUnpublish} disabled={actionLoading || publishedCount === 0}>
-                    <i className="bi bi-eye-slash" /> Unpublish
-                  </button>
-                  <button className="hfd-btn hfd-btn-primary" type="button" onClick={openPublishPanel} disabled={actionLoading || readyCount === 0}>
-                    <i className="bi bi-send-check" /> Publish Results
-                  </button>
-                </div>
-              </div>
-
-              <div className="hfd-monitor-table-card">
-                <div className="hfd-monitor-table-toolbar">
+              <section className="hfa-panel">
+                <div className="hfa-panel-head">
                   <div>
-                    <h3>Employee results</h3>
-                    <p>Review score, confidence, completion, self-vs-others readiness, and publish state.</p>
+                    <span className="hfa-eyebrow">Scoring configuration</span>
+                    <h3>Relationship-weighted calculation</h3>
+                    <p>
+                      {scoringLoading
+                          ? 'Loading campaign scoring rules…'
+                          : scoringConfig?.relationshipWeightsReady
+                              ? 'Scoring weights are ready and backend summaries use submitted relationship data.'
+                              : 'Scoring weights should be reviewed in Campaign Setup before publishing.'}
+                    </p>
                   </div>
-                  <div className="hfd-monitor-controls">
-                    <input className="hfd-input" placeholder="Search employee or score note…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                    <select className="hfd-select" value={publishFilter} onChange={e => setPublishFilter(e.target.value as PublishFilter)}>
-                      <option value="ALL">All publish states</option>
-                      <option value="HIDDEN">Hidden</option>
-                      <option value="READY_TO_PUBLISH">Ready</option>
-                      <option value="PUBLISHED">Published</option>
-                    </select>
-                    <select className="hfd-select" value={confidenceFilter} onChange={e => setConfidenceFilter(e.target.value as ConfidenceFilter)}>
-                      <option value="ALL">All confidence</option>
-                      <option value="HIGH">High</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="LOW">Low</option>
-                      <option value="INSUFFICIENT">Insufficient</option>
-                    </select>
-                    <select className="hfd-select" value={sortBy} onChange={e => setSortBy(e.target.value as AnalyticsSort)}>
-                      <option value="SCORE_DESC">Score high to low</option>
-                      <option value="SCORE_ASC">Score low to high</option>
-                      <option value="COMPLETION_DESC">Completion high to low</option>
-                      <option value="COMPLETION_ASC">Completion low to high</option>
-                      <option value="RESPONSES_DESC">Responses high to low</option>
-                    </select>
-                    <button className="hfd-btn hfd-btn-secondary" type="button" onClick={exportCsv} disabled={!filteredItems.length}>Export CSV</button>
+                  <span className={`hfa-pill ${scoringConfig?.relationshipWeightsReady ? 'hfa-pill-published' : 'hfa-pill-warning'}`}>
+                {scoringConfig?.relationshipWeightsReady ? 'Weights ready' : 'Review weights'}
+              </span>
+                </div>
+                <div className="hfa-chart-grid">
+                  <HorizontalBarChart
+                      title="Configured relationship weights"
+                      subtitle={scoringConfig?.redistributeMissingRelationshipWeight ? 'Missing relationship weight is redistributed.' : 'Configured relationships are used when available.'}
+                      rows={(scoringConfig?.relationshipWeights ?? []).map(row => ({
+                        label: relationshipDisplayName(row.relationshipType),
+                        value: Number(row.weightPercent ?? 0),
+                        meta: `${Number(row.weightPercent ?? 0)}%`,
+                      }))}
+                  />
+                  <HorizontalBarChart
+                      title="Submitted relationship averages"
+                      subtitle="Backend calculated average score by relationship."
+                      rows={(summary.relationshipAverages ?? []).map(row => ({
+                        label: row.label || relationshipDisplayName(row.relationshipType),
+                        value: numberValue(row.averageScore),
+                        meta: `${formatScore(row.averageScore)} · ${formatCount(row.responseCount)}`,
+                      }))}
+                  />
+                </div>
+              </section>
+
+              <AnalyticsCharts summary={summary} />
+              <QualityPrivacyPanel summary={summary} readyItems={readyItems} blockedItems={blockedItems} publishedCount={publishedCount} />
+
+              <section className="hfa-panel">
+                <div className="hfa-panel-head">
+                  <div>
+                    <span className="hfa-eyebrow">Publish center</span>
+                    <h3>Release employee summaries</h3>
+                    <p>{readyItems.length} ready, {blockedItems.length} blocked, and {publishedCount} already published.</p>
+                  </div>
+                  <div className="hfa-topbar-actions">
+                    <button className="hfa-btn hfa-btn-danger" type="button" onClick={runUnpublish} disabled={actionLoading || publishedCount === 0}>
+                      <i className="bi bi-eye-slash" /> Unpublish
+                    </button>
+                    <button className="hfa-btn hfa-btn-primary" type="button" onClick={openPublishModal} disabled={actionLoading || readyItems.length === 0}>
+                      <i className="bi bi-send-check" /> Publish ready results
+                    </button>
                   </div>
                 </div>
+              </section>
 
-                <div className="hfd-table-wrap">
-                  <table className="hfd-preview-table hfd-monitor-table">
-                    <thead>
-                    <tr>
-                      <th>Employee</th>
-                      <th>Score</th>
-                      <th>Band</th>
-                      <th>Confidence</th>
-                      <th>Completion</th>
-                      <th>Self vs others</th>
-                      <th>Publish state</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {filteredItems.length === 0 && <tr><td colSpan={7}>No employee results match the current filters.</td></tr>}
-                    {filteredItems.map(item => (
-                        <tr key={`${item.campaignId}-${item.targetEmployeeId}`} onClick={() => setExpandedEmployeeId(current => current === item.targetEmployeeId ? null : item.targetEmployeeId)}>
-                          <td><strong>{item.targetEmployeeName}</strong><small>ID {item.targetEmployeeId}</small></td>
-                          <td><strong>{formatScore(item.averageScore)}</strong></td>
-                          <td>{scoreBand(item.averageScore)}</td>
-                          <td><span className={`hfd-confidence-chip ${String(confidenceLabel(item)).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>{confidenceLabel(item)}</span></td>
-                          <td>{formatScore(item.completionRate)}</td>
-                          <td>
-                            <div className="hfd-monitor-chip-list">
-                              {relationshipBreakdown(item).map(row => (
-                                  <span key={row.label}>{row.label}: {sourceCount(row.count) >= row.threshold ? formatScore(row.score, 0) : 'Not enough feedback'}</span>
-                              ))}
-                            </div>
-                          </td>
-                          <td><span className={`hfd-status-chip ${String(item.visibilityStatus ?? '').toLowerCase()}`}>{visibilityLabel(item.visibilityStatus)}</span></td>
-                        </tr>
-                    ))}
-                    </tbody>
-                  </table>
-                </div>
+              <EmployeeResultsTable
+                  items={filteredItems}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  publishFilter={publishFilter}
+                  setPublishFilter={setPublishFilter}
+                  confidenceFilter={confidenceFilter}
+                  setConfidenceFilter={setConfidenceFilter}
+                  sortBy={sortBy}
+                  setSortBy={setSortBy}
+                  onOpen={setSelectedResult}
+                  onExport={exportCsv}
+              />
 
-                {expandedEmployeeId && (
-                    <div className="hfd-monitor-row-detail">
-                      {(() => {
-                        const item = filteredItems.find(row => row.targetEmployeeId === expandedEmployeeId);
-                        if (!item) return null;
-                        return (
-                            <>
-                              <strong>{item.targetEmployeeName}</strong>
-                              <span>{item.scoreCalculationNote ?? 'Score is calculated from submitted 360 feedback responses.'}</span>
-                              <EmployeeRelationshipDetail item={item} />
-                              <span>{item.insufficientFeedback ? 'Publishing blocked: this employee result does not have enough reliable feedback yet.' : item.visibilityStatus === 'PUBLISHED' ? 'Published result is visible to the employee and HR.' : 'Ready results can be published after HR confirms visibility.'}</span>
-                            </>
-                        );
-                      })()}
-                    </div>
-                )}
-              </div>
+              <ResultDetailDrawer
+                  item={selectedResult}
+                  competencies={summary.competencyAverages ?? []}
+                  onClose={() => setSelectedResult(null)}
+              />
+
+              <PublishResultsModal
+                  open={publishOpen}
+                  step={publishStep}
+                  setStep={setPublishStep}
+                  options={publishOptions}
+                  setOptions={setPublishOptions}
+                  readyItems={readyItems}
+                  blockedItems={blockedItems}
+                  publishedCount={publishedCount}
+                  selectedReadyCount={selectedReadyCount}
+                  publishReady={publishReady}
+                  actionLoading={actionLoading}
+                  onClose={() => setPublishOpen(false)}
+                  onPublish={runPublish}
+              />
             </>
-        )}
-
-        {publishOpen && summary && (
-            <div className="hfd-modal-backdrop" role="presentation">
-              <div className="hfd-publish-modal" role="dialog" aria-modal="true" aria-label="Publish Results">
-                <div className="hfd-publish-modal-head">
-                  <div>
-                    <h3>Publish Results</h3>
-                    <p>Employee-facing results will be visible to the employee and HR only.</p>
-                  </div>
-                  <button type="button" className="hfd-icon-btn" onClick={() => setPublishOpen(false)} aria-label="Close publish panel">×</button>
-                </div>
-
-                <div className="hfd-publish-steps">
-                  <span className={publishStep === 1 ? 'active' : ''}>1. Publish setup</span>
-                  <span className={publishStep === 2 ? 'active' : ''}>2. Review & publish</span>
-                </div>
-
-                {publishStep === 1 ? (
-                    <div className="hfd-publish-step-body">
-                      <div className="hfd-publish-readiness-grid">
-                        <strong>{readyCount} ready employees</strong>
-                        <span>{blockedItems.length} blocked by confidence or confidentiality checks. {publishedCount} already published.</span>
-                        <small>Peer and direct report detail remains masked when the relationship response threshold is not met.</small>
-                      </div>
-
-                      <section className="hfd-publish-section">
-                        <h4>Publish results for</h4>
-                        <label className="hfd-radio-card">
-                          <input type="radio" checked={publishOptions.scope === 'ALL_READY'} onChange={() => setPublishOptions(current => ({ ...current, scope: 'ALL_READY' }))} />
-                          <span><strong>All ready employees</strong><small>Publish every employee result that passed backend scoring, confidence, and confidentiality checks.</small></span>
-                        </label>
-                        <label className="hfd-radio-card">
-                          <input type="radio" checked={publishOptions.scope === 'SELECTED_EMPLOYEES'} onChange={() => setPublishOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} />
-                          <span><strong>Selected employees only</strong><small>Choose specific ready employee results to publish.</small></span>
-                        </label>
-                        {publishOptions.scope === 'SELECTED_EMPLOYEES' && (
-                            <div className="hfd-publish-employee-picker">
-                              <button type="button" className="hfd-btn hfd-btn-secondary" onClick={selectAllReadyEmployees}>Select all ready</button>
-                              {readyItems.map(item => (
-                                  <label key={item.targetEmployeeId}>
-                                    <input type="checkbox" checked={publishOptions.selectedEmployeeIds.includes(item.targetEmployeeId)} onChange={() => toggleSelectedEmployee(item.targetEmployeeId)} />
-                                    <span>{item.targetEmployeeName}</span>
-                                    <small>{formatScore(item.averageScore)} · {scoreBand(item.averageScore)}</small>
-                                  </label>
-                              ))}
-                            </div>
-                        )}
-                      </section>
-
-                      <section className="hfd-publish-section">
-                        <h4>Included in employee result</h4>
-                        <label><input type="checkbox" checked={publishOptions.includeOverallScore} onChange={e => setPublishOptions(current => ({ ...current, includeOverallScore: e.target.checked }))} /> Overall score and rating band</label>
-                        <label><input type="checkbox" checked={publishOptions.includeCompetencyBreakdown} onChange={e => setPublishOptions(current => ({ ...current, includeCompetencyBreakdown: e.target.checked }))} /> Competency breakdown</label>
-                        <label><input type="checkbox" checked={publishOptions.includeSelfVsOthers} onChange={e => setPublishOptions(current => ({ ...current, includeSelfVsOthers: e.target.checked }))} /> Self vs others comparison</label>
-                        <label><input type="checkbox" checked={publishOptions.includeComments} onChange={e => setPublishOptions(current => ({ ...current, includeComments: e.target.checked }))} /> Anonymous written comments</label>
-                        <label><input type="checkbox" checked={publishOptions.includeScoreExplanation} onChange={e => setPublishOptions(current => ({ ...current, includeScoreExplanation: e.target.checked }))} /> Score explanation</label>
-                        {publishOptions.includeComments && (
-                            <p className="hfd-publish-helper">Comments are grouped by question and evaluator role. Peer and direct report comments stay hidden when there is not enough feedback.</p>
-                        )}
-                      </section>
-
-                      <section className="hfd-publish-section hfd-publish-fixed-visibility">
-                        <h4>Visible to</h4>
-                        <strong>Employee and HR only</strong>
-                        <p>Manager and Department Head visibility can be added later if required.</p>
-                      </section>
-                    </div>
-                ) : (
-                    <div className="hfd-publish-step-body">
-                      <section className="hfd-publish-review-box">
-                        <h4>Review before publishing</h4>
-                        <dl>
-                          <div><dt>Results to publish</dt><dd>{selectedReadyCount} employees</dd></div>
-                          <div><dt>Visible to</dt><dd>Employee and HR</dd></div>
-                          <div><dt>Notification</dt><dd>Employees will be notified</dd></div>
-                          <div><dt>Included</dt><dd>{contentSummary(publishOptions) || 'No content selected'}</dd></div>
-                          <div><dt>Comments</dt><dd>{publishOptions.includeComments ? 'Anonymous comments included when confidentiality allows' : 'Not included'}</dd></div>
-                          <div><dt>Blocked results</dt><dd>{blockedItems.length} remain hidden</dd></div>
-                          <div><dt>Confidentiality rule</dt><dd>Peer/direct report detail requires {MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES}+ submitted responses</dd></div>
-                        </dl>
-                      </section>
-                      <div className="hfd-alert hfd-alert-info">
-                        <i className="bi bi-shield-lock" /> Peer and direct report breakdowns require at least {MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} submitted responses before they can be shown outside HR analytics.
-                      </div>
-                      <label className="hfd-confirm-check">
-                        <input type="checkbox" checked={publishOptions.confirmVisibility} onChange={e => setPublishOptions(current => ({ ...current, confirmVisibility: e.target.checked }))} />
-                        <span>I understand that published results will be visible to employees.</span>
-                      </label>
-                    </div>
-                )}
-
-                <div className="hfd-publish-modal-actions">
-                  <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => publishStep === 1 ? setPublishOpen(false) : setPublishStep(1)}>
-                    {publishStep === 1 ? 'Cancel' : 'Back'}
-                  </button>
-                  {publishStep === 1 ? (
-                      <button className="hfd-btn hfd-btn-primary" type="button" onClick={() => setPublishStep(2)} disabled={selectedReadyCount === 0}>Review</button>
-                  ) : (
-                      <button className="hfd-btn hfd-btn-primary" type="button" onClick={runPublish} disabled={!publishReady || actionLoading}>
-                        {actionLoading ? 'Publishing…' : 'Publish Results'}
-                      </button>
-                  )}
-                </div>
-              </div>
-            </div>
         )}
       </div>
   );

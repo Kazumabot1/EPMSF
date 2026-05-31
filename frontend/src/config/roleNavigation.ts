@@ -78,11 +78,20 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   ],
 
   Admin: [
-    { label: 'Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
+    { label: 'HR Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
+    {
+      label: 'KPI Approvals',
+      path: '/admin/approval/kpi',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+        { label: 'Department KPI Approval', path: '/admin/approval/department-kpi', icon: 'bi-building-check' },
+      ],
+    },
     {
       label: 'Access Control',
       path: '/position-permissions',
@@ -402,24 +411,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    {
-      label: 'KPI Management',
-      path: '/executive/kpi-scoring',
-      icon: 'bi-bullseye',
-      children: [
-        { label: 'KPI Scoring', path: '/executive/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
-        { label: 'KPI History', path: '/executive/kpi/history', icon: 'bi-clock-history' },
-      ],
-    },
-    {
-      label: 'Approval',
-      path: '/executive/approval/kpi',
-      icon: 'bi-shield-check',
-      children: [
-        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
-        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check' },
-      ],
-    },
+    { label: 'People Change Review', path: '/executive/approval/changes', icon: 'bi-person-check' },
     {
       label: 'Reports',
       path: '/executive/reports',
@@ -508,5 +500,6 @@ export const dashboardPathByRole: Record<UserRole, string> = {
 export const displayRoleName = (role: UserRole) => {
   if (role === 'DepartmentHead') return 'Department Head';
   if (role === 'Executive') return 'CEO';
+  if (role === 'Admin') return 'HR Admin';
   return role;
 };
