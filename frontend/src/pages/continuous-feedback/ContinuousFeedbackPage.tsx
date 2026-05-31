@@ -14,6 +14,7 @@ import {
 import type { TeamEmployeeOption, TeamOption } from '../../services/oneOnOneService';
 
 const categories = ['Positive', 'Improvement', 'General'];
+type HistoryTab = 'received' | 'given';
 
 const formatDate = (value?: string | null) => {
   if (!value) return '-';
@@ -25,11 +26,15 @@ const formatDate = (value?: string | null) => {
 const ContinuousFeedbackPage = () => {
   const location = useLocation();
   const isEmployeeView = location.pathname.startsWith('/employee');
+  const canGiveFeedback = !isEmployeeView;
 
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [employees, setEmployees] = useState<TeamEmployeeOption[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [history, setHistory] = useState<ContinuousFeedback[]>([]);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [receivedHistory, setReceivedHistory] = useState<ContinuousFeedback[]>([]);
+  const [givenHistory, setGivenHistory] = useState<ContinuousFeedback[]>([]);
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('received');
 
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -57,12 +62,18 @@ const ContinuousFeedbackPage = () => {
     [teams, selectedTeamId],
   );
 
-  const loadHistory = async () => {
-    const data = isEmployeeView
-      ? await getReceivedContinuousFeedback()
-      : await getGivenContinuousFeedback();
+  const activeHistory = historyTab === 'given' ? givenHistory : receivedHistory;
 
-    setHistory(Array.isArray(data) ? data : []);
+  const loadHistories = async () => {
+    const receivedData = await getReceivedContinuousFeedback();
+    setReceivedHistory(Array.isArray(receivedData) ? receivedData : []);
+
+    if (canGiveFeedback) {
+      const givenData = await getGivenContinuousFeedback();
+      setGivenHistory(Array.isArray(givenData) ? givenData : []);
+    } else {
+      setGivenHistory([]);
+    }
   };
 
   useEffect(() => {
@@ -70,33 +81,42 @@ const ContinuousFeedbackPage = () => {
 
     const loadInitial = async () => {
       setLoading(true);
+      setProfileLoaded(false);
       setError('');
+      setSuccess('');
+      setHistoryTab('received');
 
       try {
-        if (!isEmployeeView) {
-          const [teamData, employeeData, profileData] = await Promise.all([
+        const profileData = await profileService.getMyProfile().catch(() => null);
+        const receivedData = await getReceivedContinuousFeedback();
+
+        if (!mounted) return;
+
+        setProfile(profileData);
+        setReceivedHistory(Array.isArray(receivedData) ? receivedData : []);
+
+        if (canGiveFeedback) {
+          const [teamData, givenData] = await Promise.all([
             getContinuousFeedbackTeams(),
-            getContinuousFeedbackEmployees(null),
-            profileService.getMyProfile().catch(() => null),
+            getGivenContinuousFeedback(),
           ]);
-          if (mounted) {
-            setTeams(Array.isArray(teamData) ? teamData : []);
-            setProfile(profileData);
-            const currentId = profileData?.employeeId ?? null;
-            const safeEmployees = Array.isArray(employeeData) ? employeeData.filter((employee) => employee.employeeId !== currentId) : [];
-            setEmployees(safeEmployees);
-          }
+
+          if (!mounted) return;
+
+          setTeams(Array.isArray(teamData) ? teamData : []);
+          setGivenHistory(Array.isArray(givenData) ? givenData : []);
+        } else {
+          setTeams([]);
+          setEmployees([]);
+          setGivenHistory([]);
         }
-
-        const historyData = isEmployeeView
-          ? await getReceivedContinuousFeedback()
-          : await getGivenContinuousFeedback();
-
-        if (mounted) setHistory(Array.isArray(historyData) ? historyData : []);
       } catch (err) {
         if (mounted) setError(extractErrorMessage(err, 'Failed to load continuous feedback.'));
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setProfileLoaded(true);
+          setLoading(false);
+        }
       }
     };
 
@@ -105,13 +125,13 @@ const ContinuousFeedbackPage = () => {
     return () => {
       mounted = false;
     };
-  }, [isEmployeeView]);
+  }, [canGiveFeedback]);
 
   useEffect(() => {
     let mounted = true;
 
     const loadEmployees = async () => {
-      if (isEmployeeView) {
+      if (!canGiveFeedback || !profileLoaded) {
         return;
       }
 
@@ -137,7 +157,7 @@ const ContinuousFeedbackPage = () => {
     return () => {
       mounted = false;
     };
-  }, [isEmployeeView, selectedTeamId, removeCurrentUser]);
+  }, [canGiveFeedback, profileLoaded, selectedTeamId, removeCurrentUser]);
 
   const resetForm = () => {
     setSelectedEmployeeId('');
@@ -181,8 +201,9 @@ const ContinuousFeedbackPage = () => {
       });
 
       setSuccess('Continuous feedback submitted successfully.');
+      setHistoryTab('given');
       resetForm();
-      await loadHistory();
+      await loadHistories();
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to submit continuous feedback.'));
     } finally {
@@ -190,21 +211,57 @@ const ContinuousFeedbackPage = () => {
     }
   };
 
+  const renderFeedbackList = (items: ContinuousFeedback[], mode: HistoryTab) => {
+    if (loading) {
+      return <p>Loading feedback...</p>;
+    }
+
+    if (items.length === 0) {
+      return <p>No continuous feedback found.</p>;
+    }
+
+    return (
+      <div style={{ display: 'grid', gap: 12 }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              padding: 14,
+              background: '#fff',
+            }}
+          >
+            <strong>{item.category}</strong>
+            {item.rating ? <span> • Rating: {item.rating}/5</span> : null}
+            <p style={{ margin: '8px 0' }}>{item.feedbackText}</p>
+            <small>
+              {mode === 'received'
+                ? `From: ${item.giverName || '-'}${item.giverEmail ? ` (${item.giverEmail})` : ''}`
+                : `To: ${item.employeeName || '-'}${item.employeeEmail ? ` (${item.employeeEmail})` : ''}`}
+              {' • '}Team: {item.teamName || '-'} • {formatDate(item.createdAt)}
+            </small>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="oom-page continuous-feedback-page">
       <div className="oom-header continuous-feedback-hero">
         <h1>Continuous Feedback</h1>
         <p>
-          {isEmployeeView
-            ? 'View continuous feedback you received.'
-            : 'Give feedback to eligible employees in your department. Your own account is excluded automatically.'}
+          {canGiveFeedback
+            ? 'Give continuous feedback and review feedback that was shared with you.'
+            : 'View continuous feedback that was shared with you.'}
         </p>
       </div>
 
       {error && <div className="oom-alert oom-alert--error">{error}</div>}
       {success && <div className="oom-alert oom-alert--success">{success}</div>}
 
-      {!isEmployeeView && (
+      {canGiveFeedback && (
         <div className="oom-card">
           <form className="oom-form" onSubmit={handleSubmit}>
             <div className="oom-field">
@@ -317,35 +374,44 @@ const ContinuousFeedbackPage = () => {
       )}
 
       <div className="oom-card" style={{ marginTop: 20 }}>
-        <h2>{isEmployeeView ? 'Received Continuous Feedback' : 'Given Feedback'}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>{historyTab === 'received' ? 'Feedback Received by Me' : 'Feedback I Gave'}</h2>
 
-        {loading ? (
-          <p>Loading feedback...</p>
-        ) : history.length === 0 ? (
-          <p>No continuous feedback found.</p>
-        ) : (
-          <div style={{ display: 'grid', gap: 12 }}>
-            {history.map((item) => (
-              <div
-                key={item.id}
+          {canGiveFeedback && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setHistoryTab('received')}
                 style={{
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 14,
-                  background: '#fff',
+                  border: historyTab === 'received' ? '1px solid #2563eb' : '1px solid #dbe3ef',
+                  background: historyTab === 'received' ? '#eff6ff' : '#fff',
+                  color: historyTab === 'received' ? '#1d4ed8' : '#475569',
+                  borderRadius: 999,
+                  padding: '8px 14px',
+                  fontWeight: 700,
                 }}
               >
-                <strong>{item.category}</strong>
-                {item.rating ? <span> • Rating: {item.rating}/5</span> : null}
-                <p style={{ margin: '8px 0' }}>{item.feedbackText}</p>
-                <small>
-                  Team: {item.teamName || '-'} • Employee: {item.employeeName || '-'} • Given by:{' '}
-                  {item.giverName || '-'} • {formatDate(item.createdAt)}
-                </small>
-              </div>
-            ))}
-          </div>
-        )}
+                Received by Me ({receivedHistory.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryTab('given')}
+                style={{
+                  border: historyTab === 'given' ? '1px solid #2563eb' : '1px solid #dbe3ef',
+                  background: historyTab === 'given' ? '#eff6ff' : '#fff',
+                  color: historyTab === 'given' ? '#1d4ed8' : '#475569',
+                  borderRadius: 999,
+                  padding: '8px 14px',
+                  fontWeight: 700,
+                }}
+              >
+                Given by Me ({givenHistory.length})
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 16 }}>{renderFeedbackList(activeHistory, historyTab)}</div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import api from './api';
+/*Z*/import api from './api';
 import type { TeamEmployeeOption, TeamOption } from './oneOnOneService';
 
 export interface ContinuousFeedback {
@@ -7,6 +7,7 @@ export interface ContinuousFeedback {
   teamName?: string | null;
   employeeId: number;
   employeeName: string;
+  employeeEmail?: string | null;
   giverUserId: number;
   giverName: string;
   giverEmail?: string | null;

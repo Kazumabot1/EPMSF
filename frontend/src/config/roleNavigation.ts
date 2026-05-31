@@ -67,6 +67,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
     { label: '360 Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
+    { label: 'Continuous Feedback', path: '/employee/continuous-feedback', icon: 'bi-chat-dots' },
     { label: 'One-on-Ones', path: '/employee/one-on-ones', icon: 'bi-calendar-check' },
     {
       label: 'PIP',
