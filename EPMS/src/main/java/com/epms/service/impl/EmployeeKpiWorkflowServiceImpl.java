@@ -39,12 +39,26 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     public static final String TYPE_KPI_POSITION_CHANGE_GRACE = "KPI_POSITION_CHANGE_GRACE";
 
     private static final int KPI_GRACE_DAYS = 7;
-    private static final List<String> MANAGER_ROLE_NAMES = List.of("MANAGER", "PROJECT_MANAGER", "TEAM_MANAGER");
+    private static final List<String> MANAGER_ROLE_NAMES = List.of(
+            "MANAGER", "PROJECT_MANAGER", "TEAM_MANAGER", "PM"
+    );
+    private static final List<String> KPI_SCORER_ROLE_NAMES = List.of(
+            "MANAGER", "PROJECT_MANAGER", "TEAM_MANAGER", "TEAM_LEADER", "TEAMLEADER", "PM"
+    );
     private static final List<String> DEPARTMENT_HEAD_ROLE_NAMES = List.of(
             "DEPARTMENT_HEAD", "DEPARTMENTHEAD", "DEPT_HEAD", "HEAD_OF_DEPARTMENT"
     );
-    private static final List<String> HR_ROLE_NAMES = List.of("HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER", "HR_ADMIN");
+    private static final List<String> HR_ROLE_NAMES = List.of("HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER");
+    private static final List<String> HR_ADMIN_ROLE_NAMES = List.of("ADMIN", "HRADMIN", "HR_ADMIN", "HR_ADMINISTRATOR");
     private static final List<String> EXECUTIVE_ROLE_NAMES = List.of("CEO", "EXECUTIVE");
+
+    private static final List<String> MANAGER_DASHBOARD_NAMES = List.of("MANAGER_DASHBOARD");
+    private static final List<String> DEPARTMENT_HEAD_DASHBOARD_NAMES = List.of(
+            "DEPARTMENT_HEAD_DASHBOARD", "DEPARTMENTHEAD_DASHBOARD", "DEPT_HEAD_DASHBOARD"
+    );
+    private static final List<String> HR_DASHBOARD_NAMES = List.of("HR_DASHBOARD");
+    private static final List<String> HR_ADMIN_DASHBOARD_NAMES = List.of("ADMIN_DASHBOARD", "HRADMIN_DASHBOARD", "HR_ADMIN_DASHBOARD");
+    private static final List<String> EXECUTIVE_DASHBOARD_NAMES = List.of("EXECUTIVE_DASHBOARD", "CEO_DASHBOARD");
 
     private final KpiFormRepository kpiFormRepository;
     private final KpiTemplateCycleRepository kpiTemplateCycleRepository;
@@ -1724,8 +1738,13 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         List<Integer> storedEmployeeIds = employeeKpiFormEvaluatorRepository.findEmployeeIdsByEvaluatorUserId(evaluator.getId());
         LinkedHashSet<Integer> scoped = new LinkedHashSet<>(storedEmployeeIds == null ? List.of() : storedEmployeeIds);
 
+        if (hasHrAdminScope(principal)) {
+            scoped.addAll(hrAdminScopedEmployeeIds(evaluator.getId()));
+            return scoped.stream().toList();
+        }
+
         if (hasExecutiveScope(principal)) {
-            scoped.addAll(executiveScopedEmployeeIds(evaluator.getId()));
+            scoped.addAll(executiveFallbackScopedEmployeeIds(evaluator.getId()));
             return scoped.stream().toList();
         }
 
@@ -1774,15 +1793,15 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                     .addAll(departmentHeadScopedEmployeeIds(departmentId, departmentHead.getId()));
         }
 
-        LinkedHashSet<Integer> executiveTargetIds = executiveScopedEmployeeIds(null).stream()
+        LinkedHashSet<Integer> seniorTargetIds = seniorScopedEmployeeIds(null).stream()
                 .filter(activeDepartmentEmployees::containsKey)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (!executiveTargetIds.isEmpty()) {
-            for (User executive : activeUsersByRoles(EXECUTIVE_ROLE_NAMES)) {
-                if (isActiveUser(executive)) {
+        if (!seniorTargetIds.isEmpty()) {
+            for (Integer employeeId : seniorTargetIds) {
+                for (User evaluator : seniorKpiEvaluatorUsersForTarget(employeeId, null)) {
                     evaluatorEmployeeIds
-                            .computeIfAbsent(executive.getId(), ignored -> new LinkedHashSet<>())
-                            .addAll(executiveTargetIds);
+                            .computeIfAbsent(evaluator.getId(), ignored -> new LinkedHashSet<>())
+                            .add(employeeId);
                 }
             }
         }
@@ -1809,17 +1828,24 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
             Integer teamLeaderEmployeeId = teamLeader == null ? null : teamLeader.getEmployeeId();
             if (isActiveUser(teamLeader)
                     && teamLeaderEmployeeId != null
-                    && managerAssignableEmployees.containsKey(teamLeaderEmployeeId)) {
+                    && activeDepartmentEmployees.containsKey(teamLeaderEmployeeId)) {
                 activeTeamLeaderEmployeeIds.add(teamLeaderEmployeeId);
                 activeProjectManagerTeamEmployeeIds.add(teamLeaderEmployeeId);
             }
 
             User manager = team.getProjectManager();
-            if (!isActiveUser(manager)) {
-                continue;
+            boolean hasActiveProjectManager = isActiveUser(manager) && manager.getEmployeeId() != null;
+            if (hasActiveProjectManager) {
+                managersWithActiveTeams.add(manager.getId());
             }
-            managersWithActiveTeams.add(manager.getId());
-            LinkedHashSet<Integer> scopedIds = managerEmployeeIds.computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>());
+
+            LinkedHashSet<Integer> projectManagerScopedIds = hasActiveProjectManager
+                    ? managerEmployeeIds.computeIfAbsent(manager.getId(), ignored -> new LinkedHashSet<>())
+                    : null;
+            LinkedHashSet<Integer> teamLeaderScopedIds = isActiveUser(teamLeader)
+                    ? managerEmployeeIds.computeIfAbsent(teamLeader.getId(), ignored -> new LinkedHashSet<>())
+                    : null;
+
             if (team.getTeamMembers() == null) {
                 continue;
             }
@@ -1830,12 +1856,18 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                         || member.getEndedDate() != null
                         || !isActiveUser(memberUser)
                         || employeeId == null
-                        || !managerAssignableEmployees.containsKey(employeeId)
-                        || Objects.equals(employeeId, manager.getEmployeeId())) {
+                        || !managerAssignableEmployees.containsKey(employeeId)) {
                     continue;
                 }
-                scopedIds.add(employeeId);
+
                 activeProjectManagerTeamEmployeeIds.add(employeeId);
+
+                if (projectManagerScopedIds != null && !Objects.equals(employeeId, manager.getEmployeeId())) {
+                    projectManagerScopedIds.add(employeeId);
+                }
+                if (teamLeaderScopedIds != null && !Objects.equals(employeeId, teamLeader.getEmployeeId())) {
+                    teamLeaderScopedIds.add(employeeId);
+                }
             }
         }
 
@@ -1881,8 +1913,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     }
 
     private LinkedHashSet<Integer> departmentHeadScopedEmployeeIds(Integer departmentId, Integer evaluatorUserId) {
-        return userRepository.findActiveManagersByDepartmentId(departmentId).stream()
-                .filter(this::isActiveUser)
+        return activeManagerUsersByDepartment(departmentId).stream()
                 .filter(user -> !Objects.equals(user.getId(), evaluatorUserId))
                 .filter(user -> user.getEmployeeId() != null)
                 .filter(user -> hasActiveEmployeeAccount(user.getEmployeeId()))
@@ -1890,15 +1921,32 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private LinkedHashSet<Integer> executiveScopedEmployeeIds(Integer evaluatorUserId) {
+    private LinkedHashSet<Integer> hrAdminScopedEmployeeIds(Integer evaluatorUserId) {
+        return seniorScopedEmployeeIds(evaluatorUserId);
+    }
+
+    private LinkedHashSet<Integer> executiveFallbackScopedEmployeeIds(Integer evaluatorUserId) {
+        return seniorScopedEmployeeIds(evaluatorUserId).stream()
+                .filter(employeeId -> seniorKpiEvaluatorUsersForTarget(employeeId, evaluatorUserId).stream()
+                        .anyMatch(user -> Objects.equals(user.getId(), evaluatorUserId)))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private LinkedHashSet<Integer> seniorScopedEmployeeIds(Integer evaluatorUserId) {
         LinkedHashSet<Integer> ids = new LinkedHashSet<>();
-        activeUsersByRoles(DEPARTMENT_HEAD_ROLE_NAMES).stream()
+        activeUsersByRolesOrDashboardOrPosition(DEPARTMENT_HEAD_ROLE_NAMES, DEPARTMENT_HEAD_DASHBOARD_NAMES).stream()
                 .filter(user -> !Objects.equals(user.getId(), evaluatorUserId))
                 .map(User::getEmployeeId)
                 .filter(Objects::nonNull)
                 .filter(this::hasActiveEmployeeAccount)
                 .forEach(ids::add);
-        activeUsersByRoles(HR_ROLE_NAMES).stream()
+        activeUsersByRolesOrDashboardOrPosition(HR_ROLE_NAMES, HR_DASHBOARD_NAMES).stream()
+                .filter(user -> !Objects.equals(user.getId(), evaluatorUserId))
+                .map(User::getEmployeeId)
+                .filter(Objects::nonNull)
+                .filter(this::hasActiveEmployeeAccount)
+                .forEach(ids::add);
+        activeUsersByRolesOrDashboardOrPosition(HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES).stream()
                 .filter(user -> !Objects.equals(user.getId(), evaluatorUserId))
                 .map(User::getEmployeeId)
                 .filter(Objects::nonNull)
@@ -1907,19 +1955,70 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         return ids;
     }
 
+    private List<User> seniorKpiEvaluatorUsersForTarget(Integer targetEmployeeId, Integer requiredEvaluatorUserId) {
+        List<User> hrAdmins = activeUsersByRolesOrDashboardOrPosition(HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES).stream()
+                .filter(user -> requiredEvaluatorUserId == null || Objects.equals(user.getId(), requiredEvaluatorUserId))
+                .filter(user -> !Objects.equals(user.getEmployeeId(), targetEmployeeId))
+                .toList();
+        if (!hrAdmins.isEmpty()) {
+            return hrAdmins;
+        }
+        return activeUsersByRolesOrDashboardOrPosition(EXECUTIVE_ROLE_NAMES, EXECUTIVE_DASHBOARD_NAMES).stream()
+                .filter(user -> requiredEvaluatorUserId == null || Objects.equals(user.getId(), requiredEvaluatorUserId))
+                .filter(user -> !Objects.equals(user.getEmployeeId(), targetEmployeeId))
+                .toList();
+    }
+
     private Set<Integer> privilegedTargetEmployeeIds() {
         LinkedHashSet<Integer> ids = new LinkedHashSet<>();
-        activeUsersByRoles(MANAGER_ROLE_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRoles(DEPARTMENT_HEAD_ROLE_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRoles(HR_ROLE_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
-        activeUsersByRoles(EXECUTIVE_ROLE_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
+        activeManagerUsers().stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
+        activeUsersByRolesOrDashboardOrPosition(DEPARTMENT_HEAD_ROLE_NAMES, DEPARTMENT_HEAD_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
+        activeUsersByRolesOrDashboardOrPosition(HR_ROLE_NAMES, HR_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
+        activeUsersByRolesOrDashboardOrPosition(HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
+        activeUsersByRolesOrDashboardOrPosition(EXECUTIVE_ROLE_NAMES, EXECUTIVE_DASHBOARD_NAMES).stream().map(User::getEmployeeId).filter(Objects::nonNull).forEach(ids::add);
         return ids;
+    }
+
+    private List<User> activeManagerUsers() {
+        return activeUsersByRolesOrDashboardOrPosition(MANAGER_ROLE_NAMES, MANAGER_DASHBOARD_NAMES);
+    }
+
+    private List<User> activeManagerUsersByDepartment(Integer departmentId) {
+        if (departmentId == null) {
+            return List.of();
+        }
+        return activeManagerUsers().stream()
+                .filter(user -> Objects.equals(user.getDepartmentId(), departmentId))
+                .toList();
     }
 
     private List<User> activeUsersByRoles(Collection<String> roleNames) {
         return userRepository.findActiveUsersByNormalizedRoleNames(roleNames).stream()
                 .filter(this::isActiveUser)
                 .toList();
+    }
+
+    private List<User> activeUsersByRolesOrDashboardOrPosition(Collection<String> roleNames, Collection<String> dashboardNames) {
+        LinkedHashMap<Integer, User> byId = new LinkedHashMap<>();
+        for (User user : activeUsersByRoles(roleNames)) {
+            byId.put(user.getId(), user);
+        }
+
+        Set<String> normalizedRoles = roleNames.stream().map(this::normalizeAuthorityName).collect(Collectors.toSet());
+        Set<String> normalizedDashboards = dashboardNames.stream().map(this::normalizeAuthorityName).collect(Collectors.toSet());
+        for (User user : userRepository.findAll()) {
+            if (!isActiveUser(user)) {
+                continue;
+            }
+            String dashboard = normalizeAuthorityName(user.getDashboard());
+            String position = normalizeAuthorityName(user.getPosition() == null ? null : user.getPosition().getPositionTitle());
+            boolean dashboardMatches = normalizedDashboards.contains(dashboard);
+            boolean positionMatches = !position.isBlank() && normalizedRoles.stream().anyMatch(position::contains);
+            if (dashboardMatches || positionMatches) {
+                byId.put(user.getId(), user);
+            }
+        }
+        return new ArrayList<>(byId.values());
     }
 
     private void ensureActiveEmployeeAccount(Employee employee) {
@@ -1954,19 +2053,19 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     }
 
     private boolean hasManagerScope(UserPrincipal principal) {
-        return hasAnyAuthority(principal, MANAGER_ROLE_NAMES, Set.of("MANAGER_DASHBOARD"));
+        return hasAnyAuthority(principal, KPI_SCORER_ROLE_NAMES, MANAGER_DASHBOARD_NAMES);
     }
 
     private boolean hasDepartmentHeadScope(UserPrincipal principal) {
-        return hasAnyAuthority(
-                principal,
-                DEPARTMENT_HEAD_ROLE_NAMES,
-                Set.of("DEPARTMENT_HEAD_DASHBOARD", "DEPARTMENTHEAD_DASHBOARD", "DEPT_HEAD_DASHBOARD")
-        );
+        return hasAnyAuthority(principal, DEPARTMENT_HEAD_ROLE_NAMES, DEPARTMENT_HEAD_DASHBOARD_NAMES);
+    }
+
+    private boolean hasHrAdminScope(UserPrincipal principal) {
+        return hasAnyAuthority(principal, HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES);
     }
 
     private boolean hasExecutiveScope(UserPrincipal principal) {
-        return hasAnyAuthority(principal, EXECUTIVE_ROLE_NAMES, Set.of("EXECUTIVE_DASHBOARD", "CEO_DASHBOARD"));
+        return hasAnyAuthority(principal, EXECUTIVE_ROLE_NAMES, EXECUTIVE_DASHBOARD_NAMES);
     }
 
     private boolean hasAnyAuthority(UserPrincipal principal, Collection<String> roleNames, Collection<String> dashboardNames) {

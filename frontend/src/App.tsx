@@ -188,6 +188,8 @@ function App() {
                 <Route path="/admin/users" element={<AdminDashboard />} />
                 <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
                 <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
+                <Route path="/admin/kpi-scoring" element={<ManagerKpiScoringPage />} />
+                <Route path="/admin/kpi/history" element={<ManagerKpiHistoryPage />} />
                 <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
                 <Route path="/admin/approval/department-kpi" element={<DepartmentKpiApprovalPage />} />
                 <Route path="/position-permissions" element={<PositionPermissions />} />

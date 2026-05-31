@@ -84,6 +84,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
+      label: 'KPI Scoring',
+      path: '/admin/kpi-scoring',
+      icon: 'bi-ui-checks-grid',
+      children: [
+        { label: 'Score Senior KPIs', path: '/admin/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
+        { label: 'KPI History', path: '/admin/kpi/history', icon: 'bi-clock-history' },
+      ],
+    },
+    {
       label: 'KPI Approvals',
       path: '/admin/approval/kpi',
       icon: 'bi-bullseye',
@@ -442,7 +451,14 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
   const dashboard = normalizeRoleName(user.dashboard ?? '');
   const normalizedPosition = normalizeRoleName(user.position ?? '');
 
-  if (normalizedRoles.includes('ADMIN') || dashboard === 'ADMIN_DASHBOARD') {
+  if (
+      normalizedRoles.includes('ADMIN') ||
+      normalizedRoles.includes('HRADMIN') ||
+      normalizedRoles.includes('HR_ADMIN') ||
+      dashboard === 'ADMIN_DASHBOARD' ||
+      dashboard === 'HRADMIN_DASHBOARD' ||
+      dashboard === 'HR_ADMIN_DASHBOARD'
+  ) {
     return 'Admin';
   }
 

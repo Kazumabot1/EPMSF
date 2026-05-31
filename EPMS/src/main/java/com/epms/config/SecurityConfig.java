@@ -38,7 +38,11 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final PositionPermissionService positionPermissionService;
 
-    private static final Set<String> ADMIN_ROLES = Set.of("ADMIN");
+    private static final Set<String> ADMIN_ROLES = Set.of(
+            "ADMIN",
+            "HRADMIN",
+            "HR_ADMIN"
+    );
 
     private static final Set<String> HR_ROLES = Set.of(
             "HR",
@@ -116,7 +120,9 @@ public class SecurityConfig {
     );
 
     private static final Set<String> ADMIN_DASHBOARDS = Set.of(
-            "ADMIN_DASHBOARD"
+            "ADMIN_DASHBOARD",
+            "HRADMIN_DASHBOARD",
+            "HR_ADMIN_DASHBOARD"
     );
 
     private static final Set<String> HR_DASHBOARDS = Set.of(
@@ -340,14 +346,14 @@ public class SecurityConfig {
                                 hasHrPermissionOrNonHrRole(authentication.get(), "departmentCrud")
                         )
 
-                      /*  .requestMatchers(
-                                "/api/employees",
-                                "/api/employees/**",
-                                "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                        )*/
+                        /*  .requestMatchers(
+                                  "/api/employees",
+                                  "/api/employees/**",
+                                  "/api/hr/employee-accounts",
+                                  "/api/hr/employee-accounts/**"
+                          ).access((authentication, context) ->
+                                  hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
+                          )*/
                         .requestMatchers(HttpMethod.GET, "/api/employees")
                         .access((authentication, context) ->
                                 hasHrDashboardOrNonHrRole(authentication.get())
@@ -580,6 +586,15 @@ public class SecurityConfig {
                                 "/api/department-head/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS)
+                        )
+
+                        .requestMatchers(
+                                "/api/executive/kpi-approvals",
+                                "/api/executive/kpi-approvals/**",
+                                "/api/executive/department-kpi-approvals",
+                                "/api/executive/department-kpi-approvals/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )
 
                         .requestMatchers(

@@ -21,9 +21,11 @@ import java.util.List;
 @RequestMapping("/api/executive/department-kpi-approvals")
 @RequiredArgsConstructor
 @PreAuthorize(
-        "hasRole('ADMIN') "
-                + "or hasAuthority('ROLE_ADMIN') "
-                + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+        "hasAnyRole('ADMIN','HRADMIN','HR_ADMIN') "
+                + "or hasAnyAuthority('ROLE_ADMIN','ROLE_HRADMIN','ROLE_HR_ADMIN','ADMIN','HRADMIN','HR_ADMIN') "
+                + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'HRADMIN_DASHBOARD' "
+                + "or authentication.principal.dashboard == 'HR_ADMIN_DASHBOARD'"
 )
 public class DepartmentKpiApprovalController {
 
