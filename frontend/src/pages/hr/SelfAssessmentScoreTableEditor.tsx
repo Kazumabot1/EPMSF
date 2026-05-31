@@ -273,9 +273,8 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
   };
 
   return (
-    <div className="sat-backdrop">
-      <div className="sat-modal">
-        <div className="sat-header">
+    <section className="sat-inline-panel">
+      <div className="sat-header">
           <div>
             <p className="sat-eyebrow">
               <i className="bi bi-sliders" />
@@ -369,58 +368,8 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
                 </div>
               </div>
 
-              <div className="sat-table-card">
-                <div className="sat-section-title">
-                  <h3>Audit History</h3>
-                  <span>{audits.length} latest record(s)</span>
-                </div>
-
-                {audits.length === 0 ? (
-                  <div className="sat-empty">
-                    <i className="bi bi-clock-history" />
-                    No score table audit history yet.
-                  </div>
-                ) : (
-                  <div className="sat-table-scroll">
-                    <table className="sat-table sat-audit-table">
-                      <thead>
-                        <tr>
-                          <th>Changed By</th>
-                          <th>Part</th>
-                          <th>Old Value</th>
-                          <th>New Value</th>
-                          <th>Reason</th>
-                          <th>When</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {audits.map((audit) => (
-                          <tr key={audit.id}>
-                            <td>
-                              <strong>{audit.changedByName}</strong>
-                              <small>{audit.changedByRole || '-'}</small>
-                            </td>
-                            <td>{audit.changedPart}</td>
-                            <td>{audit.oldValue || '-'}</td>
-                            <td>{audit.newValue || '-'}</td>
-                            <td>{audit.reason || '-'}</td>
-                            <td>{formatDateTime(audit.changedAt)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {editState && (
-        <div className="sat-nested-backdrop">
-          <div className="sat-edit-modal">
+              {editState && (
+                <div className="sat-edit-panel">
             <div className="sat-edit-header">
               <div>
                 <h3>Edit Score Row</h3>
@@ -568,10 +517,58 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
                 {saving ? 'Saving...' : 'Save Change'}
               </button>
             </div>
-          </div>
+                </div>
+              )}
+
+
+              <div className="sat-table-card">
+                <div className="sat-section-title">
+                  <h3>Audit History</h3>
+                  <span>{audits.length} latest record(s)</span>
+                </div>
+
+                {audits.length === 0 ? (
+                  <div className="sat-empty">
+                    <i className="bi bi-clock-history" />
+                    No score table audit history yet.
+                  </div>
+                ) : (
+                  <div className="sat-table-scroll">
+                    <table className="sat-table sat-audit-table">
+                      <thead>
+                        <tr>
+                          <th>Changed By</th>
+                          <th>Part</th>
+                          <th>Old Value</th>
+                          <th>New Value</th>
+                          <th>Reason</th>
+                          <th>When</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {audits.map((audit) => (
+                          <tr key={audit.id}>
+                            <td>
+                              <strong>{audit.changedByName}</strong>
+                              <small>{audit.changedByRole || '-'}</small>
+                            </td>
+                            <td>{audit.changedPart}</td>
+                            <td>{audit.oldValue || '-'}</td>
+                            <td>{audit.newValue || '-'}</td>
+                            <td>{audit.reason || '-'}</td>
+                            <td>{formatDateTime(audit.changedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      )}
-    </div>
+    </section>
   );
 };
 
