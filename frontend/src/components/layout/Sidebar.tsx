@@ -728,6 +728,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-person',
       },
       {
+        to: '/department-head/employee-lists',
+        label: 'Department Employee Lists',
+        icon: 'bi bi-people',
+      },
+      {
         to: '/department-head/self-assessment-forms',
         label: 'View Self-assessment Form',
         icon: 'bi bi-eye',

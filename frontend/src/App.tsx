@@ -40,6 +40,7 @@ import ManagerKpiHistoryPage from './pages/manager/ManagerKpiHistoryPage';
 import KpiApprovalPage from './pages/ceo/KpiApprovalPage';
 import DepartmentKpiApprovalPage from './pages/ceo/DepartmentKpiApprovalPage';
 import DepartmentHeadSelfAssessmentViewPage from './pages/department-head/DepartmentHeadSelfAssessmentViewPage';
+import DepartmentHeadEmployeeListsPage from './pages/department-head/DepartmentEmployeeListsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
 import AssessmentFormBuilderPage from './pages/hr/assessment-form/AssessmentFormBuilderPage';
@@ -287,6 +288,7 @@ function App() {
               <Route element={<AppLayout />}>
                 <Route path="/department-head/dashboard" element={<RolePerformanceDashboard view="departmentHead" />} />
                 <Route path="/department-head/my-team" element={<Navigate to="/department-head/teams" replace />} />
+                <Route path="/department-head/employee-lists" element={<DepartmentHeadEmployeeListsPage />} />
                 <Route path="/department-head/kpis" element={<EmployeeKpiResultsPage />} />
                 <Route path="/department-head/self-assessment" element={<Navigate to="/department-head/self-assessment-forms" replace />} />
                 <Route path="/department-head/self-assessment-forms" element={<DepartmentHeadSelfAssessmentViewPage />} />

@@ -1,0 +1,347 @@
+.dept-employee-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+.dept-employee-list-hero {
+  align-items: center;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 52%, #a855f7 100%);
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 40px rgba(79, 70, 229, 0.24);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  min-height: 150px;
+  overflow: hidden;
+  padding: 2rem;
+  position: relative;
+}
+
+.dept-employee-list-hero::after {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  content: '';
+  height: 220px;
+  position: absolute;
+  right: -70px;
+  top: -80px;
+  width: 220px;
+}
+
+.dept-employee-list-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.5rem;
+  opacity: 0.8;
+  text-transform: uppercase;
+}
+
+.dept-employee-list-hero h1 {
+  font-size: clamp(1.75rem, 3vw, 2.6rem);
+  font-weight: 900;
+  margin: 0 0 0.5rem;
+}
+
+.dept-employee-list-hero p:last-child {
+  font-size: 1rem;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.dept-employee-list-hero-icon {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 1.25rem;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 2.4rem;
+  height: 82px;
+  justify-content: center;
+  position: relative;
+  width: 82px;
+  z-index: 1;
+}
+
+.dept-employee-list-summary-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dept-employee-list-summary-card {
+  background: #fff;
+  border: 1px solid #dbe4f0;
+  border-radius: 1.25rem;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  padding: 1.25rem;
+}
+
+.dept-employee-list-summary-card span {
+  color: #64748b;
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+}
+
+.dept-employee-list-summary-card strong {
+  color: #0f172a;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.dept-employee-list-panel {
+  background: #fff;
+  border: 1px solid #dbe4f0;
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.dept-employee-list-toolbar {
+  align-items: end;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(280px, 1fr) minmax(170px, 0.34fr) minmax(150px, 0.28fr) auto;
+  padding: 1.25rem;
+}
+
+.dept-employee-list-search,
+.dept-employee-list-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dept-employee-list-search > span,
+.dept-employee-list-filter > span {
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dept-employee-list-search > div {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.9rem;
+  display: flex;
+  gap: 0.65rem;
+  min-height: 46px;
+  padding: 0 0.95rem;
+}
+
+.dept-employee-list-search i {
+  color: #64748b;
+}
+
+.dept-employee-list-search input,
+.dept-employee-list-filter select {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.9rem;
+  color: #0f172a;
+  font: inherit;
+  min-height: 46px;
+  outline: none;
+  width: 100%;
+}
+
+.dept-employee-list-search input {
+  border: 0;
+  min-height: auto;
+}
+
+.dept-employee-list-filter select {
+  padding: 0 0.95rem;
+}
+
+.dept-employee-list-search input:focus,
+.dept-employee-list-filter select:focus {
+  box-shadow: none;
+}
+
+.dept-employee-list-clear {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.9rem;
+  color: #334155;
+  font-weight: 800;
+  min-height: 46px;
+  padding: 0 1.1rem;
+}
+
+.dept-employee-list-clear:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+  color: #3730a3;
+}
+
+.dept-employee-list-alert {
+  align-items: center;
+  background: #fff7ed;
+  border-bottom: 1px solid #fed7aa;
+  color: #9a3412;
+  display: flex;
+  gap: 0.6rem;
+  font-weight: 700;
+  padding: 0.95rem 1.25rem;
+}
+
+.dept-employee-list-table-wrap {
+  overflow-x: auto;
+}
+
+.dept-employee-list-table {
+  border-collapse: collapse;
+  min-width: 1060px;
+  width: 100%;
+}
+
+.dept-employee-list-table th {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  padding: 1rem;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dept-employee-list-table td {
+  border-bottom: 1px solid #edf2f7;
+  color: #334155;
+  font-size: 0.92rem;
+  padding: 1rem;
+  vertical-align: middle;
+}
+
+.dept-employee-list-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.dept-employee-list-person {
+  align-items: center;
+  display: flex;
+  gap: 0.85rem;
+  min-width: 230px;
+}
+
+.dept-employee-list-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, #4f46e5, #a855f7);
+  border-radius: 999px;
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  font-weight: 900;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.dept-employee-list-person strong,
+.dept-employee-list-table td > strong {
+  color: #0f172a;
+  display: block;
+  font-weight: 900;
+}
+
+.dept-employee-list-person span,
+.dept-employee-list-person small,
+.dept-employee-list-table td > span {
+  color: #64748b;
+  display: block;
+  font-size: 0.82rem;
+  margin-top: 0.16rem;
+}
+
+.dept-employee-list-role,
+.dept-employee-list-status,
+.dept-employee-list-team-stack span {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  min-height: 28px;
+  padding: 0.25rem 0.72rem;
+}
+
+.dept-employee-list-role.manager {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.dept-employee-list-role.team_leader {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.dept-employee-list-role.employee {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.dept-employee-list-status.active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.dept-employee-list-status.inactive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.dept-employee-list-team-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.dept-employee-list-team-stack span {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.dept-employee-list-empty {
+  color: #64748b;
+  font-weight: 800;
+  padding: 2rem;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .dept-employee-list-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dept-employee-list-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dept-employee-list-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+
+  .dept-employee-list-summary-grid,
+  .dept-employee-list-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
