@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import { authStorage } from '../../services/authStorage';
 import { employeeAssessmentService } from '../../services/employeeAssessmentService';
 import type {
@@ -783,11 +783,6 @@ const AssessmentScoreTablePage = () => {
 
   return (
    <div className="ast-page">
-     <SelfAssessmentScoreTableEditor
-       open={scoreEditorOpen}
-       onClose={() => setScoreEditorOpen(false)}
-       onUpdated={() => void loadScoreTable()}
-     />
       {selectedAssessment && (
         <AssessmentDetailModal
           assessment={selectedAssessment}
@@ -831,6 +826,14 @@ const AssessmentScoreTablePage = () => {
          </button>
        </div>
         </div>
+
+        {scoreEditorOpen && (
+          <SelfAssessmentScoreTableEditor
+            open={scoreEditorOpen}
+            onClose={() => setScoreEditorOpen(false)}
+            onUpdated={() => void loadScoreTable()}
+          />
+        )}
 
         <div className="ast-stat-grid">
           <div className="ast-stat-card">

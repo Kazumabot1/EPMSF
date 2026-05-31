@@ -38,7 +38,11 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final PositionPermissionService positionPermissionService;
 
-    private static final Set<String> ADMIN_ROLES = Set.of("ADMIN");
+    private static final Set<String> ADMIN_ROLES = Set.of(
+            "ADMIN",
+            "HRADMIN",
+            "HR_ADMIN"
+    );
 
     private static final Set<String> HR_ROLES = Set.of(
             "HR",
@@ -116,7 +120,9 @@ public class SecurityConfig {
     );
 
     private static final Set<String> ADMIN_DASHBOARDS = Set.of(
-            "ADMIN_DASHBOARD"
+            "ADMIN_DASHBOARD",
+            "HRADMIN_DASHBOARD",
+            "HR_ADMIN_DASHBOARD"
     );
 
     private static final Set<String> HR_DASHBOARDS = Set.of(
@@ -340,14 +346,14 @@ public class SecurityConfig {
                                 hasHrPermissionOrNonHrRole(authentication.get(), "departmentCrud")
                         )
 
-                      /*  .requestMatchers(
-                                "/api/employees",
-                                "/api/employees/**",
-                                "/api/hr/employee-accounts",
-                                "/api/hr/employee-accounts/**"
-                        ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
-                        )*/
+                        /*  .requestMatchers(
+                                  "/api/employees",
+                                  "/api/employees/**",
+                                  "/api/hr/employee-accounts",
+                                  "/api/hr/employee-accounts/**"
+                          ).access((authentication, context) ->
+                                  hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
+                          )*/
                         .requestMatchers(HttpMethod.GET, "/api/employees")
                         .access((authentication, context) ->
                                 hasHrDashboardOrNonHrRole(authentication.get())
@@ -439,6 +445,20 @@ public class SecurityConfig {
                                         authentication.get(),
                                         "feedback360Permission"
                                 )
+                        )
+
+                        /*
+                         * Employees must be able to view meetings assigned to them even when
+                         * their position does not have the create/manage One-on-One permission.
+                         * Service-level queries still restrict employee results to their own meetings.
+                         */
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/one-on-one-meetings/upcoming",
+                                "/api/one-on-one-meetings/ongoing",
+                                "/api/one-on-one-meetings/past"
+                        ).access((authentication, context) ->
+                                hasOneOnOneReadAccess(authentication.get())
                         )
 
                         .requestMatchers(
@@ -580,6 +600,15 @@ public class SecurityConfig {
                                 "/api/department-head/**"
                         ).access((authentication, context) ->
                                 hasRoleDashboardOrPosition(authentication.get(), DEPARTMENT_HEAD_ROLES, DEPARTMENT_HEAD_DASHBOARDS)
+                        )
+
+                        .requestMatchers(
+                                "/api/executive/kpi-approvals",
+                                "/api/executive/kpi-approvals/**",
+                                "/api/executive/department-kpi-approvals",
+                                "/api/executive/department-kpi-approvals/**"
+                        ).access((authentication, context) ->
+                                hasRoleDashboardOrPosition(authentication.get(), ADMIN_ROLES, ADMIN_DASHBOARDS)
                         )
 
                         .requestMatchers(
@@ -787,6 +816,36 @@ public class SecurityConfig {
                                 Set.of("EMPLOYEE_DASHBOARD")
                         ).isGranted()
                 )
+        );
+    }
+
+    private AuthorizationDecision hasOneOnOneReadAccess(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            return new AuthorizationDecision(currentPositionHasPermission("oneOnOnePermission"));
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationManager(authentication))
+                || Boolean.TRUE.equals(isCurrentAuthenticationDepartmentHead(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        /*
+         * Employee one-on-one page is read-only. Employees should be able to see
+         * meetings assigned to them; create/update/delete stays blocked by
+         * hasOneOnOneApiAccess below unless the position explicitly allows it.
+         */
+        return hasRoleDashboardOrPosition(
+                authentication,
+                Set.of("EMPLOYEE"),
+                Set.of("EMPLOYEE_DASHBOARD")
         );
     }
 

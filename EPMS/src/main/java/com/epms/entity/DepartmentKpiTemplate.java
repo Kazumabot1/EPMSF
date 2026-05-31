@@ -7,7 +7,9 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "department_kpi_template")
@@ -37,6 +39,7 @@ public class DepartmentKpiTemplate {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")
     @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private User createdByUser;
 
     @Column(name = "created_at")
@@ -45,6 +48,7 @@ public class DepartmentKpiTemplate {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by", referencedColumnName = "id")
     @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private User updatedByUser;
 
     @Column(name = "updated_at")
@@ -54,12 +58,14 @@ public class DepartmentKpiTemplate {
     @OneToMany(mappedBy = "template", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sortOrder ASC")
     @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private List<DepartmentKpiTemplateRow> rows = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "template", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude
-    private List<DepartmentKpiTemplateDepartment> departments = new ArrayList<>();
+    @ToString.Exclude
+    private Set<DepartmentKpiTemplateDepartment> departments = new LinkedHashSet<>();
 
     @PrePersist
     public void prePersist() {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import {
   assessmentFormService,
   type AssessmentFormPayload,
@@ -423,24 +423,24 @@ const canDeactivate = (item: AssessmentFormResponse) => {
 };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/60 to-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 shadow-xl">
-          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10" />
-          <div className="absolute -bottom-20 right-20 h-56 w-56 rounded-full bg-white/10" />
+        <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white p-6 shadow-sm shadow-blue-100/70">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-blue-100/70" />
+          <div className="pointer-events-none absolute -bottom-20 right-20 h-56 w-56 rounded-full bg-sky-100/70" />
 
           <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-center">
             <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
                 <i className="bi bi-ui-checks-grid" />
                 HR Assessment Forms
               </p>
 
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-bold text-slate-950">
                 Self-Assessment Form Builder
               </h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-indigo-100">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                 Create reusable self-assessment forms first. Activate a form only when the assessment period is ready.
               </p>
             </div>
@@ -448,7 +448,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 shadow-lg shadow-indigo-950/20 transition hover:-translate-y-0.5 hover:bg-indigo-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-blue-700"
             >
               <i className="bi bi-plus-circle" />
               Create Form
@@ -513,7 +513,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
             <div className="p-10 text-center text-sm font-semibold text-slate-500">Loading forms...</div>
           ) : forms.length === 0 ? (
             <div className="p-10 text-center">
-              <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-2xl text-indigo-600">
+              <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-2xl text-blue-600">
                 <i className="bi bi-ui-checks" />
               </div>
               <h3 className="font-black text-slate-900">No assessment forms yet</h3>
@@ -531,16 +531,16 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                         {item.isActive ? 'Active' : 'Inactive'}
                       </span>
 
-                      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-700">Employee</span>
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">Employee</span>
                     </div>
 
                     <p className="mt-1 text-sm text-slate-500">{item.description || 'No description'}</p>
 
                     <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
-                      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
                         {formatDate(item.startDate)} - {formatDate(item.endDate)}
                       </span>
-                      <span className="rounded-full bg-purple-50 px-2.5 py-1 text-purple-700">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
                         {getQuestionCount(item)} assessment subject(s)
                       </span>
                     </div>
@@ -613,7 +613,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     value={form.formName}
                     onChange={(event) => setForm((prev) => ({ ...prev, formName: event.target.value }))}
                     disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                     placeholder="Employee Self-assessment Form"
                   />
                 </label>
@@ -624,7 +624,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     value={form.companyName ?? ''}
                     onChange={(event) => setForm((prev) => ({ ...prev, companyName: event.target.value }))}
                     disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                     placeholder="ACE Data Systems Ltd."
                   />
                 </label>
@@ -637,7 +637,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                   disabled={viewOnly}
                   rows={3}
-                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                   placeholder="Short description for HR reference"
                 />
               </label>
@@ -655,7 +655,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     <button
                       type="button"
                       onClick={addSubject}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                     >
                       <i className="bi bi-plus-circle" />
                       Add Assessment
@@ -667,7 +667,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   {subjects.map((subject, index) => (
                     <div key={`${subject.id ?? 'new'}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start">
-                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-sm font-black text-indigo-700">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-50 text-sm font-black text-blue-700">
                           {index + 1}
                         </div>
 
@@ -676,7 +676,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                           onChange={(event) => updateSubject(index, event.target.value)}
                           disabled={viewOnly}
                           rows={2}
-                          className="min-h-[72px] flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                          className="min-h-[72px] flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                           placeholder="Type assessment subject, for example: I completed my assigned tasks on time"
                         />
 
@@ -734,7 +734,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   type="button"
                   onClick={saveForm}
                   disabled={saving}
-                  className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? 'Saving...' : 'Create Form'}
                 </button>
@@ -777,7 +777,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                    min={nowDateTimeLocal()}
                    max={oneYearFromNowDateTimeLocal()}
                    onChange={(event) => setActivationStartDate(event.target.value)}
-                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                  />
                 </label>
 
@@ -789,7 +789,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                    min={activationStartDate || nowDateTimeLocal()}
                    max={oneYearFromNowDateTimeLocal()}
                    onChange={(event) => setActivationEndDate(event.target.value)}
-                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                  />
                 </label>
               </div>
@@ -799,7 +799,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   type="checkbox"
                   checked={activationWarningAccepted}
                   onChange={(event) => setActivationWarningAccepted(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600"
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
                 />
                 <span>
                   I understand this form will become active for the selected period and can only be set inactive before the start date.

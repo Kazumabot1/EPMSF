@@ -4,6 +4,8 @@ import com.epms.entity.Employee;
 import com.epms.entity.EmployeeCodeSequence;
 import com.epms.entity.Position;
 import com.epms.repository.EmployeeCodeSequenceRepository;
+import com.epms.repository.EmployeeRepository;
+import com.epms.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,8 @@ public class EmployeeCodeGeneratorService {
     private static final int CODE_WIDTH = 4;
 
     private final EmployeeCodeSequenceRepository sequenceRepository;
+    private final EmployeeRepository employeeRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public String generateFor(Position position, String roleName, String dashboard) {
@@ -29,10 +33,33 @@ public class EmployeeCodeGeneratorService {
                 ? 1
                 : sequence.getNextNumber();
 
+        /*
+         * Seed/import data can put employee_code values ahead of employee_code_sequence.next_number.
+         * When that happens, the next HR employee create fails with a database 409 even when the
+         * email is new. Generate inside the locked sequence row and skip every already-used code
+         * from both employee and users so creation is deterministic and safe for HR and HR Admin.
+         */
+        String code = null;
+        int guard = 0;
+        while (guard < 10000) {
+            String candidate = prefix + String.format(Locale.ROOT, "%0" + CODE_WIDTH + "d", nextNumber);
+            if (!employeeRepository.existsByEmployeeCodeIgnoreCase(candidate)
+                    && !userRepository.existsByEmployeeCodeIgnoreCase(candidate)) {
+                code = candidate;
+                break;
+            }
+            nextNumber++;
+            guard++;
+        }
+
+        if (code == null) {
+            throw new IllegalStateException("Unable to generate a unique employee code for prefix " + prefix + ".");
+        }
+
         sequence.setNextNumber(nextNumber + 1);
         sequenceRepository.save(sequence);
 
-        return prefix + String.format(Locale.ROOT, "%0" + CODE_WIDTH + "d", nextNumber);
+        return code;
     }
 
     @Transactional

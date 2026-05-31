@@ -77,6 +77,9 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
         dropLegacyTemplateUniqueIndexesIfPresent();
 
         AppraisalFormTemplate sourceTemplate = getTemplateEntity(templateId);
+        if (!Boolean.TRUE.equals(request.getCycleSpecificCopy())) {
+            ensureUniqueTemplateNameForUpdate(request.getTemplateName(), sourceTemplate.getId());
+        }
         ensureTemplateEditable(sourceTemplate);
         String auditBefore = templateAuditSummary(sourceTemplate);
         List<AuditChangeParts> auditChanges = buildTemplateRequestAuditChanges(sourceTemplate, request);
@@ -715,7 +718,17 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
 
     private void ensureUniqueTemplateNameForCreate(String templateName) {
         String normalizedName = templateName == null ? "" : templateName.trim();
-        if (templateRepository.existsByTemplateNameIgnoreCase(normalizedName)) {
+        if (templateRepository.existsByTemplateNameIgnoreCaseAndCycleSpecificCopyFalse(normalizedName)) {
+            throw new BadRequestException("Template name already exists. Please use a different template name.");
+        }
+    }
+
+    private void ensureUniqueTemplateNameForUpdate(String templateName, Integer currentTemplateId) {
+        String normalizedName = templateName == null ? "" : templateName.trim();
+        if (normalizedName.isBlank() || currentTemplateId == null) {
+            return;
+        }
+        if (templateRepository.existsByTemplateNameIgnoreCaseAndCycleSpecificCopyFalseAndIdNot(normalizedName, currentTemplateId)) {
             throw new BadRequestException("Template name already exists. Please use a different template name.");
         }
     }
@@ -1008,21 +1021,55 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
         return defaults;
     }
 
-    private void applyScoreBands(AppraisalFormTemplate template, List<AppraisalScoreBandRequest> scoreBandRequests) {
-        List<AppraisalScoreBandRequest> bands = normalizeScoreBandRequests((scoreBandRequests == null || scoreBandRequests.isEmpty())
-                ? defaultScoreBands()
-                : scoreBandRequests);
-        int index = 0;
-        for (AppraisalScoreBandRequest bandRequest : bands) {
-            if (bandRequest.getMinScore() == null || bandRequest.getMaxScore() == null) {
+    private void validateScoreBands(List<AppraisalScoreBandRequest> bands) {
+        if (bands == null || bands.isEmpty()) {
+            throw new BadRequestException("At least one score range is required.");
+        }
+
+        List<AppraisalScoreBandRequest> activeBands = new ArrayList<>();
+        for (int index = 0; index < bands.size(); index++) {
+            AppraisalScoreBandRequest band = bands.get(index);
+            if (band == null) {
+                throw new BadRequestException("Score range row " + (index + 1) + " is required.");
+            }
+            if (band.getMinScore() == null || band.getMaxScore() == null) {
                 throw new BadRequestException("Score range min and max are required.");
             }
-            if (bandRequest.getMinScore() < 0 || bandRequest.getMaxScore() > 100 || bandRequest.getMinScore() > bandRequest.getMaxScore()) {
+            if (band.getMinScore() < 0 || band.getMaxScore() > 100 || band.getMinScore() > band.getMaxScore()) {
                 throw new BadRequestException("Score ranges must be valid values between 0 and 100.");
             }
-            if (bandRequest.getLabel() == null || bandRequest.getLabel().isBlank()) {
+            if (band.getLabel() == null || band.getLabel().isBlank()) {
                 throw new BadRequestException("Score rating label is required.");
             }
+            if (band.getActive() == null || Boolean.TRUE.equals(band.getActive())) {
+                activeBands.add(band);
+            }
+        }
+
+        activeBands.sort(Comparator
+                .comparing(AppraisalScoreBandRequest::getMinScore)
+                .thenComparing(AppraisalScoreBandRequest::getMaxScore));
+        for (int index = 1; index < activeBands.size(); index++) {
+            AppraisalScoreBandRequest previous = activeBands.get(index - 1);
+            AppraisalScoreBandRequest current = activeBands.get(index);
+            if (current.getMinScore() <= previous.getMaxScore()) {
+                throw new BadRequestException(
+                        "Score ranges cannot overlap: "
+                                + previous.getMinScore() + "-" + previous.getMaxScore()
+                                + " overlaps with "
+                                + current.getMinScore() + "-" + current.getMaxScore()
+                );
+            }
+        }
+    }
+
+    private void applyScoreBands(AppraisalFormTemplate template, List<AppraisalScoreBandRequest> scoreBandRequests) {
+        List<AppraisalScoreBandRequest> bands = (scoreBandRequests == null || scoreBandRequests.isEmpty())
+                ? defaultScoreBands()
+                : new ArrayList<>(scoreBandRequests);
+        validateScoreBands(bands);
+        int index = 0;
+        for (AppraisalScoreBandRequest bandRequest : bands) {
             AppraisalTemplateScoreBand band = new AppraisalTemplateScoreBand();
             band.setTemplate(template);
             band.setMinScore(bandRequest.getMinScore());
@@ -1038,9 +1085,10 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
 
 
     private void replaceScoreBands(AppraisalFormTemplate template, List<AppraisalScoreBandRequest> scoreBandRequests) {
-        List<AppraisalScoreBandRequest> bands = normalizeScoreBandRequests((scoreBandRequests == null || scoreBandRequests.isEmpty())
+        List<AppraisalScoreBandRequest> bands = (scoreBandRequests == null || scoreBandRequests.isEmpty())
                 ? defaultScoreBands()
-                : scoreBandRequests);
+                : new ArrayList<>(scoreBandRequests);
+        validateScoreBands(bands);
 
         Map<Integer, AppraisalTemplateScoreBand> existingBandsById = new LinkedHashMap<>();
         template.getScoreBands().forEach(band -> {
@@ -1063,16 +1111,6 @@ public class AppraisalTemplateServiceImpl implements AppraisalTemplateService {
 
         int index = 0;
         for (AppraisalScoreBandRequest bandRequest : bands) {
-            if (bandRequest.getMinScore() == null || bandRequest.getMaxScore() == null) {
-                throw new BadRequestException("Score range min and max are required.");
-            }
-            if (bandRequest.getMinScore() < 0 || bandRequest.getMaxScore() > 100 || bandRequest.getMinScore() > bandRequest.getMaxScore()) {
-                throw new BadRequestException("Score ranges must be valid values between 0 and 100.");
-            }
-            if (bandRequest.getLabel() == null || bandRequest.getLabel().isBlank()) {
-                throw new BadRequestException("Score rating label is required.");
-            }
-
             AppraisalTemplateScoreBand band = bandRequest.getId() != null ? existingBandsById.get(bandRequest.getId()) : null;
             if (band == null) {
                 band = new AppraisalTemplateScoreBand();

@@ -8,6 +8,7 @@ import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.service.FeedbackRequestService;
+import com.epms.service.FeedbackWorkRelationshipResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -28,6 +29,7 @@ public class FeedbackRequestController {
 
     private final FeedbackRequestService feedbackRequestService;
     private final UserRepository userRepository;
+    private final FeedbackWorkRelationshipResolver workRelationshipResolver;
 
     @GetMapping("/{employeeId}")
     public ResponseEntity<GenericApiResponse<Page<FeedbackRequestListResponse>>> getRequestsForEmployee(
@@ -79,8 +81,9 @@ public class FeedbackRequestController {
             return;
         }
 
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
         boolean managesTarget = userRepository.findByEmployeeId(employeeId.intValue())
-                .map(targetUser -> Objects.equals(targetUser.getManagerId(), currentUserId))
+                .map(targetUser -> workRelationshipResolver.isWorkContextManager(targetUser, currentUser))
                 .orElse(false);
 
         if (!managesTarget) {

@@ -78,7 +78,7 @@ const ManagerEmployeeKpiScoreModal = ({
         <header className="border-b border-slate-100 px-5 py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">KPI Score Calculation</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">KPI Score Calculation</p>
               <h2 id="mgr-kpi-modal-title" className="mt-1 text-lg font-bold text-slate-950">
                 {assignment.employeeName}
               </h2>
@@ -172,7 +172,7 @@ const ManagerEmployeeKpiScoreModal = ({
                           className={`h-9 w-24 rounded-lg border px-2 text-right tabular-nums outline-none transition disabled:bg-slate-100 disabled:text-slate-500 ${
                             actualInvalid
                               ? 'border-red-500 bg-red-50 text-red-800 focus:ring-2 focus:ring-red-200'
-                              : 'border-slate-300 bg-white text-slate-950 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                              : 'border-slate-300 bg-white text-slate-950 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
                           }`}
                         />
                         {actualInvalid && actualDraft.trim() !== '' && (
@@ -198,8 +198,8 @@ const ManagerEmployeeKpiScoreModal = ({
           </div>
 
           <footer className="mt-5 flex flex-col items-stretch gap-3 border-t border-slate-100 pt-4 sm:items-end">
-            <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-right sm:w-auto sm:min-w-64">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Total Score</p>
+            <div className="w-full rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-right sm:w-auto sm:min-w-64">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-blue-700">Total Score</p>
               <p className="mt-1 text-sm font-semibold text-slate-900">
                 {formatScore(assignment.totalScore)}
                 <span className="ml-2 text-xs font-medium text-slate-500">
@@ -219,7 +219,7 @@ const ManagerEmployeeKpiScoreModal = ({
                 type="button"
                 disabled={isFinal || saving}
                 onClick={() => void onSave(assignment)}
-                className="inline-flex h-11 items-center justify-center rounded-xl bg-emerald-600 px-5 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-5 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {saving ? 'Saving...' : 'Save actuals'}
               </button>

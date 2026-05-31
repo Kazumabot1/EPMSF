@@ -86,7 +86,7 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         applyTemplateDepartments(template, request.getDepartmentIds());
 
         DepartmentKpiTemplate saved = templateRepository.saveAndFlush(template);
-        return getTemplate(saved.getId());
+        return toTemplateDto(saved);
     }
 
     @Override
@@ -496,25 +496,49 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one KPI row is required.");
         }
 
-        int totalWeight = 0;
-        for (KpiFormItemDTO item : request.getItems()) {
+        KpiFormStatus status = request.getStatus() == null ? KpiFormStatus.DRAFT : request.getStatus();
+        validateTemplateItems(request.getItems());
+        validateTemplateWeights(status, request.getItems());
+    }
+
+    private void validateTemplateItems(List<KpiFormItemDTO> items) {
+        for (int i = 0; i < items.size(); i++) {
+            KpiFormItemDTO item = items.get(i);
             if (item == null) {
                 continue;
             }
-            if ((item.getKpiItemId() == null) && isBlank(item.getKpiLabel())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each KPI row needs a KPI item or KPI label.");
+            if (item.getKpiItemId() == null && isBlank(item.getKpiLabel())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": enter a KPI name or select a KPI item.");
             }
-            if (item.getTarget() == null || item.getTarget() <= 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each KPI row target must be greater than zero.");
+            boolean hasMasterCategory = item.getKpiCategoryId() != null;
+            boolean hasCategoryLabel = !isBlank(firstNonBlank(item.getKpiCategoryName(), item.getKpiCategoryLabel()));
+            boolean hasMasterUnit = item.getKpiUnitId() != null;
+            boolean hasUnitLabel = !isBlank(firstNonBlank(item.getKpiUnitName(), item.getKpiUnitLabel()));
+            if ((!hasMasterCategory && !hasCategoryLabel) || (!hasMasterUnit && !hasUnitLabel)
+                    || item.getTarget() == null || item.getWeight() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": category, unit, target, and weight are required.");
             }
-            if (item.getWeight() == null || item.getWeight() <= 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each KPI row weight must be greater than zero.");
+            if (!Double.isFinite(item.getTarget()) || item.getTarget() < 1 || item.getTarget() > 100) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": target must be between 1 and 100.");
             }
-            totalWeight += item.getWeight();
+            if (item.getWeight() < 1 || item.getWeight() > 100) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Row " + (i + 1) + ": weight must be between 1 and 100.");
+            }
         }
+    }
 
-        if (totalWeight != 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Total KPI weight must equal 100%.");
+    private void validateTemplateWeights(KpiFormStatus status, List<KpiFormItemDTO> items) {
+        int totalWeight = items.stream()
+                .filter(Objects::nonNull)
+                .mapToInt(item -> item.getWeight() == null ? 0 : item.getWeight())
+                .sum();
+        if ((status == KpiFormStatus.ACTIVE || status == KpiFormStatus.FINALIZED) && totalWeight != 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Total KPI weight must equal 100% before status can be ACTIVE or FINALIZED.");
         }
     }
 
@@ -897,6 +921,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
                 ? new ArrayList<>()
                 : template.getDepartments().stream()
                 .filter(link -> link.getDepartment() != null)
+                .sorted(Comparator
+                        .comparing((DepartmentKpiTemplateDepartment link) -> firstNonBlank(link.getDepartment().getDepartmentName(), ""))
+                        .thenComparing(link -> link.getDepartment().getId() == null ? Integer.MAX_VALUE : link.getDepartment().getId()))
                 .map(link -> {
                     DepartmentKpiTemplateResponseDto.DepartmentSummary summary = new DepartmentKpiTemplateResponseDto.DepartmentSummary();
                     summary.setId(link.getDepartment().getId());
@@ -1018,7 +1045,9 @@ public class DepartmentKpiServiceImpl implements DepartmentKpiService {
         if (template == null || template.getRows() == null) {
             return List.of();
         }
+        Set<Integer> seenIds = new LinkedHashSet<>();
         return template.getRows().stream()
+                .filter(row -> row.getId() == null || seenIds.add(row.getId()))
                 .sorted(Comparator.comparing(row -> row.getSortOrder() == null ? Integer.MAX_VALUE : row.getSortOrder()))
                 .toList();
     }

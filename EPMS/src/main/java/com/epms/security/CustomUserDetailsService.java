@@ -143,7 +143,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         }
 
         return switch (dashboard) {
-            case "ADMIN_DASHBOARD" -> "ADMIN";
+            case "ADMIN_DASHBOARD", "HRADMIN_DASHBOARD", "HR_ADMIN_DASHBOARD" -> "ADMIN";
             case "HR_DASHBOARD" -> "HR";
             case "MANAGER_DASHBOARD" -> "MANAGER";
             case "DEPARTMENT_HEAD_DASHBOARD" -> "DEPARTMENT_HEAD";
@@ -165,6 +165,11 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .replaceAll("[^A-Za-z0-9]+", "_")
                 .replaceAll("^_+|_+$", "")
                 .toUpperCase();
+
+        if (normalized.equals("HRADMIN")
+                || normalized.equals("HR_ADMIN")) {
+            return "HRADMIN";
+        }
 
         if (normalized.equals("DEPARTMENTHEAD")
                 || normalized.equals("DEPT_HEAD")

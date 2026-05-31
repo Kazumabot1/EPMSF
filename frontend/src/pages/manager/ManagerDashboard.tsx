@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+/*Z*/import { useEffect, useMemo, useState } from "react";
 import type { ReactNode, SVGProps } from "react";
 import { Link } from "react-router-dom";
+import { DashboardShell, DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from "../../components/dashboard";
 import { appraisalWorkflowService } from "../../services/appraisalService";
 import { employeeAssessmentService } from "../../services/employeeAssessmentService";
 import { feedbackService } from "../../services/feedbackService";
@@ -197,10 +198,10 @@ const toneStyles: Record<
         bar: "bg-blue-600",
     },
     indigo: {
-        icon: "bg-indigo-50 text-indigo-600 ring-indigo-100",
-        chip: "bg-indigo-50 text-indigo-700 ring-indigo-100",
-        text: "text-indigo-600",
-        bar: "bg-indigo-600",
+        icon: "bg-blue-50 text-blue-600 ring-blue-100",
+        chip: "bg-blue-50 text-blue-700 ring-blue-100",
+        text: "text-blue-600",
+        bar: "bg-blue-600",
     },
     emerald: {
         icon: "bg-emerald-50 text-emerald-600 ring-emerald-100",
@@ -755,10 +756,44 @@ const ManagerDashboard = () => {
                 ? "KPI assignments need manager scoring."
                 : "No KPI work is currently open.",
             href: "/manager/kpi-scoring",
-            actionLabel: "Open Team KPIs",
+            actionLabel: "Open KPI Evaluation",
             icon: <ChartIcon className="h-5 w-5" />,
             tone: openKpiAssignments ? "emerald" : "slate",
             progress: openKpiAssignments ? Math.min(openKpiAssignments * 10, 100) : 0,
+        },
+    ];
+
+    const workloadMix = [
+        { label: "Pending reviews", value: reviewRows.length, color: "#d97706" },
+        { label: "Active appraisals", value: activeAppraisals.length, color: "#2563eb" },
+        { label: "Open KPI work", value: openKpiAssignments, color: "#16a34a" },
+        { label: "Feedback pending", value: pendingFeedbackCount, color: "#dc2626" },
+    ];
+
+    const comparisonBars = [
+        {
+            label: "Team scope",
+            value: directReportCount,
+            detail: "Linked employees in manager workflows",
+            color: "#2563eb",
+        },
+        {
+            label: "Pending reviews",
+            value: reviewRows.length,
+            detail: "Submitted records waiting for action",
+            color: "#d97706",
+        },
+        {
+            label: "Active appraisals",
+            value: activeAppraisals.length,
+            detail: "Open appraisal records",
+            color: "#0284c7",
+        },
+        {
+            label: "Open KPI assignments",
+            value: openKpiAssignments,
+            detail: "KPI scoring workload",
+            color: "#16a34a",
         },
     ];
 
@@ -790,7 +825,7 @@ const ManagerDashboard = () => {
         },
         {
             id: "focus-team-kpis",
-            label: "Team KPIs",
+            label: "KPI Evaluation",
             value: openKpiAssignments
                 ? `${openKpiAssignments} assignment${openKpiAssignments > 1 ? "s" : ""} open`
                 : "No open KPI work",
@@ -891,7 +926,7 @@ const ManagerDashboard = () => {
         const kpiItems = data.kpiTemplates.slice(0, 3).map(
             (template, index): UpcomingItem => ({
                 id: `kpi-${template.kpiFormId}-${template.cyclePeriodId ?? "cycle"}-${index}`,
-                title: template.title || "Team KPI assignment",
+                title: template.title || "KPI evaluation assignment",
                 subtitle: template.periodEndDate
                     ? `KPI period ends ${formatShortDate(template.periodEndDate)}`
                     : `${template.openAssignments ?? 0} open assignments`,
@@ -918,37 +953,20 @@ const ManagerDashboard = () => {
     return (
         <main className="min-w-0 bg-slate-50 px-4 py-5 sm:px-6 lg:px-8">
             <div className="mx-auto flex w-full max-w-[1280px] min-w-0 flex-col gap-5">
-                <section className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/70 sm:p-6">
-                    <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div className="min-w-0">
-              <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-blue-700 ring-1 ring-blue-100">
-                <DashboardIcon className="h-4 w-4" />
-                Manager Dashboard
-              </span>
-                            <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-                                Welcome back, {firstName} <span aria-hidden="true">👋</span>
-                            </h1>
-                            <p className="mt-2 max-w-3xl text-base font-medium leading-7 text-slate-600">
-                                Review team performance, approve employee work, follow KPI
-                                progress, and stay on top of feedback activity.
-                            </p>
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3">
-                            <IconBadge tone="blue" compact>
-                                <ShieldIcon className="h-4 w-4" />
-                            </IconBadge>
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-[0.12em] text-blue-700">
-                                    Manager access
-                                </p>
-                                <p className="mt-0.5 text-sm font-black text-slate-950">
-                                    Team review workspace
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
+                <DashboardShell
+                    eyebrow="Manager Dashboard"
+                    title={`Welcome back, ${firstName}`}
+                    description="Review team performance, approve employee work, follow KPI progress, and stay on top of feedback activity."
+                    metaLabel="Your department"
+                    metaValue={departmentName || 'N/A'}
+                    metaDetail={`Queue: ${queueStatus}`}
+                    actions={
+                        <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.05em] text-blue-700">
+                            <ShieldIcon className="h-4 w-4" /> Manager access
+                        </span>
+                    }
+                    className="dashboard-page-shell"
+                >
                     <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                         <ContextPill
                             label="Department"
@@ -971,12 +989,40 @@ const ManagerDashboard = () => {
                             icon={<ClipboardIcon className="h-4 w-4" />}
                         />
                     </div>
-                </section>
+                </DashboardShell>
 
                 <section className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {metrics.map((metric) => (
                         <MetricCard key={metric.title} metric={metric} />
                     ))}
+                </section>
+
+                <section className="dashboard-grid dashboard-grid--two">
+                    <DashboardChartCard
+                        title="Fluxen Workload Mix"
+                        subtitle="Manager workload split across review, KPI, appraisal, and feedback work."
+                    >
+                        <DonutSummaryChart
+                            data={workloadMix}
+                            totalLabel="Open items"
+                            emptyTitle="No open manager workload"
+                            emptyDescription="Review, KPI, appraisal, and feedback counts appear here when work is active."
+                            height={220}
+                        />
+                    </DashboardChartCard>
+
+                    <DashboardChartCard
+                        title="Team Data Comparison"
+                        subtitle="Quick comparison of team size and active work volume."
+                    >
+                        <HorizontalBarChart
+                            data={comparisonBars}
+                            emptyTitle="No team comparison data"
+                            emptyDescription="Team and workload comparison appears after manager records are linked."
+                            height={220}
+                            maxBars={5}
+                        />
+                    </DashboardChartCard>
                 </section>
 
                 <section className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">

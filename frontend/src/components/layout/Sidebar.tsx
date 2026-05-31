@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/*Z*/import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { authStorage } from '../../services/authStorage';
 import api from '../../services/api';
@@ -146,11 +146,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
   const roleLabel =
       variant === 'admin'
-          ? 'Admin'
+          ? 'HR Admin'
           : variant === 'hr'
               ? 'HR'
               : isAdmin
-                  ? 'Admin'
+                  ? 'HR Admin'
                   : isHr
                       ? 'HR'
                       : isDepartmentHead
@@ -220,9 +220,27 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
     const adminNavItems: NavItem[] = [
-      { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
+      { to: '/admin/dashboard', label: 'HR Admin Dashboard', icon: 'bi bi-shield-lock' },
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
       { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
+      {
+        to: '/admin/kpi-scoring',
+        label: 'KPI Scoring',
+        icon: 'bi bi-ui-checks-grid',
+        children: [
+          { to: '/admin/kpi-scoring', label: 'Score Senior KPIs', icon: 'bi bi-clipboard2-check', end: true },
+          { to: '/admin/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
+        ],
+      },
+      {
+        to: '/admin/approval/kpi',
+        label: 'KPI Approvals',
+        icon: 'bi bi-bullseye',
+        children: [
+          { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
+          { to: '/admin/approval/department-kpi', label: 'Department KPI Approval', icon: 'bi bi-building-check' },
+        ],
+      },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -371,19 +389,9 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             end: true,
           },
           {
-            to: '/hr/appraisal/template-create',
-            label: 'Template Form Create',
-            icon: 'bi bi-file-earmark-plus',
-          },
-          {
             to: '/hr/appraisal/template-forms',
             label: 'Template Form Records',
             icon: 'bi bi-folder2-open',
-          },
-          {
-            to: '/hr/appraisal/create',
-            label: 'Create Appraisal',
-            icon: 'bi bi-calendar-plus',
           },
           {
             to: '/hr/appraisal/cycles',
@@ -558,12 +566,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
       {
         to: '/manager/kpi-scoring',
-        label: 'Team KPIs',
+        label: 'KPI Evaluation',
         icon: 'bi bi-bullseye',
         children: [
           {
             to: '/manager/kpi-scoring',
-            label: 'KPI Scoring',
+            label: 'Evaluate KPIs',
             icon: 'bi bi-clipboard2-check',
             end: true,
           },
@@ -692,15 +700,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-      {
-        to: '/executive/kpi-scoring',
-        label: 'KPI Management',
-        icon: 'bi bi-bullseye',
-        children: [
-          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
-          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
-        ],
-      },
+      { to: '/executive/approval/changes', label: 'People Change Review', icon: 'bi bi-person-check' },
       {
         to: '/executive/reports',
         label: 'Reports',
@@ -727,10 +727,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'Profile',
         icon: 'bi bi-person',
       },
-      hasMyTeams && {
-        to: '/my-team',
-        label: 'My Team',
-        icon: 'bi bi-diagram-3',
+      {
+        to: '/department-head/employee-lists',
+        label: 'Department Employee Lists',
+        icon: 'bi bi-people',
       },
       {
         to: '/department-head/self-assessment-forms',

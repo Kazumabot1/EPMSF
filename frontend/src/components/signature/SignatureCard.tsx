@@ -38,7 +38,7 @@ const SignatureCard = ({ item, busy = false, onEdit, onDelete, onSetDefault }: S
           type="button"
           disabled={busy || item.isDefault}
           onClick={() => onSetDefault(item)}
-          className="rounded border border-indigo-300 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+          className="rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 hover:bg-blue-50 disabled:opacity-60"
         >
           <i className="bi bi-check2-circle mr-1" />
           Set Default

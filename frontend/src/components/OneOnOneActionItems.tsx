@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+/*Z*/import React, { useCallback, useEffect, useState } from 'react';
 import './one-on-one.css';
 import {
   deleteMeeting,
@@ -96,7 +96,11 @@ const buildIso = (
 
 type Tab = 'upcoming' | 'ongoing' | 'past';
 
-const OneOnOneActionItems: React.FC = () => {
+type OneOnOneActionItemsProps = {
+  readOnly?: boolean;
+};
+
+const OneOnOneActionItems: React.FC<OneOnOneActionItemsProps> = ({ readOnly = false }) => {
   const [tab, setTab] = useState<Tab>('upcoming');
 
   const [upcoming, setUpcoming] = useState<Meeting[]>([]);
@@ -378,7 +382,7 @@ const OneOnOneActionItems: React.FC = () => {
                 <p>🕐 {fmtDateTime(stageDate(m))}</p>
                 {stageLocation(m) && <p style={{ fontSize: 12 }}>📍 {stageLocation(m)}</p>}
                 {stageGoal(m) && <p style={{ fontStyle: 'italic', fontSize: 12 }}>"{stageGoal(m)}"</p>}
-                <p style={{ fontSize: 12 }}>Click to manage →</p>
+                <p style={{ fontSize: 12 }}>{readOnly ? 'Click to view details →' : 'Click to manage →'}</p>
               </div>
 
               <div className="oom-card-right">
@@ -439,8 +443,8 @@ const OneOnOneActionItems: React.FC = () => {
   return (
     <div className="oom-page">
       <div className="oom-header">
-        <h1>🗒️ Action Items</h1>
-        <p>Track all your 1:1 meetings: upcoming, ongoing, and past.</p>
+        <h1>{readOnly ? 'One-on-One Meetings' : '🗒️ Action Items'}</h1>
+        <p>{readOnly ? 'View your upcoming, ongoing, and past one-on-one meetings. Employees cannot create or manage meetings.' : 'Track all your 1:1 meetings: upcoming, ongoing, and past.'}</p>
       </div>
 
       <div className="oom-tabs">
@@ -486,9 +490,11 @@ const OneOnOneActionItems: React.FC = () => {
 
             <div className="oom-modal-footer">
               <button className="oom-btn-ghost" onClick={closeUpcomingModal}>Close</button>
-              <button className="oom-btn-danger" onClick={() => setShowCancelConfirm(true)}>
-                ⚠ Cancel Meeting
-              </button>
+              {!readOnly && (
+                <button className="oom-btn-danger" onClick={() => setShowCancelConfirm(true)}>
+                  ⚠ Cancel Meeting
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -675,21 +681,25 @@ const OneOnOneActionItems: React.FC = () => {
 
             <div className="oom-modal-footer">
               <button className="oom-btn-ghost" onClick={closeOngoingModal} disabled={modalSaving}>
-                Cancel
+                Close
               </button>
 
-              <button className="oom-btn-teal" onClick={handleEnd} disabled={modalSaving}>
-                {modalSaving
-                  ? 'Saving…'
-                  : isFollowUpStage(modalMeeting)
-                  ? '✓ END Follow-Up Meeting'
-                  : '✓ END Meeting'}
-              </button>
+              {!readOnly && (
+                <>
+                  <button className="oom-btn-teal" onClick={handleEnd} disabled={modalSaving}>
+                    {modalSaving
+                      ? 'Saving…'
+                      : isFollowUpStage(modalMeeting)
+                      ? '✓ END Follow-Up Meeting'
+                      : '✓ END Meeting'}
+                  </button>
 
-              {!isFollowUpStage(modalMeeting) && (
-                <button className="oom-btn-primary" onClick={handleFinishWithFollowUp} disabled={modalSaving}>
-                  {modalSaving ? 'Saving…' : 'Finish + Follow-Up'}
-                </button>
+                  {!isFollowUpStage(modalMeeting) && (
+                    <button className="oom-btn-primary" onClick={handleFinishWithFollowUp} disabled={modalSaving}>
+                      {modalSaving ? 'Saving…' : 'Finish + Follow-Up'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

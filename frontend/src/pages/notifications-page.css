@@ -109,8 +109,8 @@
 .notif-tab-count {
   font-size: 0.75rem;
   font-weight: 700;
-  background: #e0e7ff;
-  color: #4338ca;
+  background: #dbeafe;
+  color: #1d4ed8;
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -137,7 +137,7 @@
 
 .notif-card:hover {
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
-  border-color: #e0e7ff;
+  border-color: #dbeafe;
 }
 
 .notif-card-unread {
@@ -161,8 +161,8 @@
 }
 
 .notif-card-icon-meeting {
-  background: #eef2ff;
-  color: #4f46e5;
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .notif-card-icon-pip {
@@ -232,7 +232,7 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #6366f1;
+  background: #2563eb;
   align-self: center;
 }
 

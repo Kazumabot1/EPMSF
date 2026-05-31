@@ -4,12 +4,20 @@ import api from './api';
 export type DepartmentHeadEmployee = {
   id?: number;
   userId?: number;
+  employeeCode?: string;
   fullName?: string;
   firstName?: string;
   lastName?: string;
+  phoneNumber?: string;
   email?: string;
   positionTitle?: string;
   positionName?: string;
+  positionLevelCode?: string;
+  positionRoleName?: string;
+  dashboard?: string;
+  managerId?: number | null;
+  managerName?: string | null;
+  managerEmail?: string | null;
   active?: boolean;
   currentDepartmentId?: number | null;
   currentDepartment?: string | null;
@@ -17,6 +25,15 @@ export type DepartmentHeadEmployee = {
   parentDepartment?: string | null;
   workingDepartmentId?: number | null;
   workingDepartment?: string | null;
+  profileImageData?: string | null;
+  profileImageType?: string | null;
+  profile_image_data?: string | null;
+  profile_image_type?: string | null;
+  avatarData?: string | null;
+  avatarType?: string | null;
+  profilePictureData?: string | null;
+  profilePictureType?: string | null;
+  profilePicture?: string | null;
   [key: string]: unknown;
 };
 
@@ -188,6 +205,22 @@ export const fetchDepartmentHeadDashboard = async (
       );
     }
 
+    throw error;
+  }
+};
+
+
+export const fetchDepartmentHeadEmployees = async (
+  includeInactive = false,
+): Promise<DepartmentHeadEmployee[]> => {
+  try {
+    const response = await api.get('/department-head/employees', {
+      params: { includeInactive },
+    });
+    const data = unwrap<DepartmentHeadEmployee[]>(response, []);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (is422(error)) return [];
     throw error;
   }
 };

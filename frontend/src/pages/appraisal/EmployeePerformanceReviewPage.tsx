@@ -106,6 +106,9 @@ const EmployeePerformanceReviewPage = () => {
     selectedCycle?.status === "LOCKED" ||
     isCycleEndDateToday(selectedCycle?.endDate),
   );
+  const selectedCycleNotStarted = Boolean(
+    selectedCycle && isCycleStartDateInFuture(selectedCycle.startDate),
+  );
   const availableEmployees = useMemo(
     () =>
       employees.filter(
@@ -222,19 +225,23 @@ const EmployeePerformanceReviewPage = () => {
       return;
     }
     setSelectedCycleId(cycle.id);
-    void loadEmployeesForCycle(cycle.id);
     void loadTemplateForCycle(cycle.id);
+    if (isCycleStartDateInFuture(cycle.startDate)) {
+      setMessage("This cycle has not started yet. You can view the form only until the start date arrives.");
+      return;
+    }
+    void loadEmployeesForCycle(cycle.id);
   };
 
   const refreshEligibleEmployees = async () => {
-    if (!selectedCycleId || selectedCycleLocked) return;
+    if (!selectedCycleId || selectedCycleLocked || selectedCycleNotStarted) return;
     const employeeList =
       await appraisalWorkflowService.getPmEligibleEmployees(selectedCycleId);
     setEmployees(employeeList);
   };
 
   const openEmployeeForm = async (employeeId: number) => {
-    if (!selectedCycleId || !employeeId || selectedCycleLocked) return;
+    if (!selectedCycleId || !employeeId || selectedCycleLocked || selectedCycleNotStarted) return;
     setSelectedEmployeeId(employeeId);
     setForm(null);
     setLoading(true);
@@ -296,12 +303,14 @@ const EmployeePerformanceReviewPage = () => {
       <select
         value={selectedEmployeeId || ""}
         onChange={(event) => void openEmployeeForm(Number(event.target.value))}
-        disabled={loading || loadingEmployees || selectedCycleLocked}
+        disabled={loading || loadingEmployees || selectedCycleLocked || selectedCycleNotStarted}
       >
         <option value="">
-          {loadingEmployees
-            ? "Loading employee-level team members..."
-            : "Select employee name"}
+          {selectedCycleNotStarted
+            ? "Available on the cycle start date"
+            : loadingEmployees
+              ? "Loading employee-level team members..."
+              : "Select employee name"}
         </option>
         {availableEmployees.map((employee) => (
           <option key={employee.employeeId} value={employee.employeeId}>
@@ -309,7 +318,7 @@ const EmployeePerformanceReviewPage = () => {
           </option>
         ))}
       </select>
-      <small>Choose an employee-level member from your assigned team.</small>
+      <small>{selectedCycleNotStarted ? "View-only before the start date." : "Choose an employee-level member from your assigned team."}</small>
     </label>
   );
 
@@ -735,18 +744,30 @@ const isCycleEndDateToday = (value?: string | null) => {
   return endDate.getTime() === startOfLocalDay(new Date()).getTime();
 };
 
+const isCycleStartDateInFuture = (value?: string | null) => {
+  const startDate = toLocalDateOnly(value);
+  if (!startDate) return false;
+  return startDate.getTime() > startOfLocalDay(new Date()).getTime();
+};
+
 const shouldShowCycleToManager = (cycle: AppraisalCycleResponse) => {
   const endDate = toLocalDateOnly(cycle.endDate);
   if (!endDate) return true;
   return endDate.getTime() >= startOfLocalDay(new Date()).getTime();
 };
 
-const displayCycleStatus = (cycle: AppraisalCycleResponse) =>
-  cycle.locked ||
-  cycle.status === "LOCKED" ||
-  isCycleEndDateToday(cycle.endDate)
-    ? "LOCKED"
-    : cycle.status;
+const displayCycleStatus = (cycle: AppraisalCycleResponse) => {
+  if (cycle.locked || cycle.status === "LOCKED" || isCycleEndDateToday(cycle.endDate)) {
+    return "LOCKED";
+  }
+  if (cycle.status === "ACTIVE" && isCycleStartDateInFuture(cycle.startDate)) {
+    return "Not Started Yet";
+  }
+  if (cycle.status === "ACTIVE") {
+    return "Manager Pending";
+  }
+  return cycle.status;
+};
 
 const formatEmployeeNameOption = (
   employee: AppraisalEmployeeOptionResponse,
@@ -760,7 +781,7 @@ const formatDate = formatDisplayDate;
 
 const statusClass = (status?: string | null) => {
   const normalized = status ?? "";
-  if (normalized === "ACTIVE") return "appraisal-status green";
+  if (normalized === "ACTIVE" || normalized === "Manager Pending") return "appraisal-status green";
   if (normalized === "LOCKED") return "appraisal-status gray";
   if (normalized === "COMPLETED") return "appraisal-status green";
   return "appraisal-status amber";

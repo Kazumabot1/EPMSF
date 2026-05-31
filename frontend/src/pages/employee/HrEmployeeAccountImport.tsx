@@ -717,7 +717,7 @@ const StatusPill = ({
         blue: 'bg-blue-50 text-blue-700 ring-blue-200',
         slate: 'bg-slate-100 text-slate-700 ring-slate-200',
         amber: 'bg-amber-50 text-amber-700 ring-amber-200',
-        violet: 'bg-violet-50 text-violet-700 ring-violet-200',
+        violet: 'bg-blue-50 text-blue-700 ring-blue-200',
     }[tone];
 
     return (
@@ -806,7 +806,7 @@ const MetricCard = ({
         green: 'bg-emerald-50 text-emerald-600',
         amber: 'bg-amber-50 text-amber-600',
         red: 'bg-rose-50 text-rose-600',
-        violet: 'bg-violet-50 text-violet-600',
+        violet: 'bg-blue-50 text-blue-600',
     }[tone];
 
     return (

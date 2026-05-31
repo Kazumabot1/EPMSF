@@ -1,3 +1,4 @@
+/*Z*/
 .feedback-results-stack {
   display: grid;
   gap: 24px;
@@ -316,7 +317,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-.feedback-results-column-panel input { accent-color: #4f46e5; }
+.feedback-results-column-panel input { accent-color: #2563eb; }
 .feedback-results-table-caption {
   color: #64748b;
   font-size: 0.82rem;
@@ -328,7 +329,7 @@
   text-align: left;
   cursor: pointer;
 }
-.feedback-results-row-button:hover strong { color: #4f46e5; }
+.feedback-results-row-button:hover strong { color: #2563eb; }
 .feedback-results-muted {
   color: #64748b;
   font-size: 0.78rem;
@@ -340,9 +341,9 @@
   min-width: 200px;
 }
 .feedback-results-chip-row span {
-  border: 1px solid #e0e7ff;
-  background: #eef2ff;
-  color: #4338ca;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
   border-radius: 999px;
   padding: 4px 8px;
   font-size: 0.72rem;

@@ -1,0 +1,760 @@
+.manager360-page {
+    min-height: 100%;
+    padding: 26px 28px 34px;
+    background: linear-gradient(180deg, #f7faff 0%, #eef5ff 44%, #f8fbff 100%);
+    color: #0f172a;
+}
+
+.manager360-header-card,
+.manager360-panel,
+.manager360-privacy-note,
+.manager360-metric {
+    border: 1px solid #dbe7f5;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.manager360-header-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: flex-start;
+    border-radius: 28px;
+    padding: 30px;
+}
+
+.manager360-kicker {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #2563eb;
+}
+
+.manager360-header-copy h1 {
+    margin: 0;
+    max-width: 760px;
+    font-size: clamp(32px, 4vw, 50px);
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+    color: #111827;
+}
+
+.manager360-header-copy p {
+    max-width: 860px;
+    margin: 16px 0 0;
+    font-size: 18px;
+    line-height: 1.65;
+    color: #475569;
+}
+
+.manager360-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.manager360-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #1e40af;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.manager360-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 150px;
+}
+
+.manager360-button,
+.manager360-link-button {
+    border: 0;
+    cursor: pointer;
+    font-weight: 800;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.manager360-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.manager360-button.primary {
+    min-height: 46px;
+    padding: 0 20px;
+    border-radius: 16px;
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 14px 26px rgba(37, 99, 235, 0.18);
+}
+
+.manager360-button.primary:not(:disabled):hover {
+    transform: translateY(-1px);
+    background: #1d4ed8;
+}
+
+.manager360-privacy-note {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-top: 20px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    background: #f0f7ff;
+}
+
+.manager360-note-icon,
+.manager360-metric-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 16px;
+    background: #e7f0ff;
+    color: #2563eb;
+    font-size: 18px;
+}
+
+.manager360-privacy-note h2,
+.manager360-panel-header h2,
+.manager360-detail-section h3 {
+    margin: 0;
+    color: #172033;
+}
+
+.manager360-privacy-note h2 {
+    font-size: 18px;
+}
+
+.manager360-privacy-note p {
+    margin: 5px 0 0;
+    color: #475569;
+    line-height: 1.55;
+}
+
+.manager360-alert,
+.manager360-loading {
+    margin-top: 18px;
+    border-radius: 18px;
+    padding: 16px 18px;
+    font-weight: 700;
+}
+
+.manager360-alert.error {
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.manager360-loading {
+    border: 1px solid #dbe7f5;
+    background: #fff;
+    color: #475569;
+}
+
+.manager360-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 22px;
+}
+
+.manager360-metric {
+    display: flex;
+    gap: 14px;
+    min-height: 150px;
+    padding: 20px;
+    border-radius: 24px;
+}
+
+.manager360-metric.warning .manager360-metric-icon {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.manager360-metric p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: #52627a;
+}
+
+.manager360-metric strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: #0f172a;
+}
+
+.manager360-metric small {
+    display: block;
+    margin-top: 12px;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.manager360-panel {
+    border-radius: 24px;
+    overflow: hidden;
+}
+
+.manager360-followup-panel,
+.manager360-filters {
+    margin-top: 22px;
+    padding: 22px;
+}
+
+.manager360-panel-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.manager360-panel-header h2 {
+    font-size: 22px;
+}
+
+.manager360-panel-header p {
+    margin: 8px 0 0;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+.manager360-panel-header > span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.manager360-priority-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.manager360-priority-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    min-height: 94px;
+    padding: 16px;
+    border: 1px solid #dbe7f5;
+    border-radius: 18px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.manager360-priority-item strong,
+.manager360-priority-item small {
+    display: block;
+}
+
+.manager360-priority-item strong {
+    color: #0f172a;
+}
+
+.manager360-priority-item small {
+    margin-top: 6px;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.manager360-priority-item em {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #c2410c;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.manager360-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.manager360-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.manager360-filter.full {
+    grid-column: 1 / -1;
+}
+
+.manager360-filter span {
+    font-size: 13px;
+    font-weight: 800;
+    color: #334155;
+}
+
+.manager360-filter input,
+.manager360-filter select {
+    width: 100%;
+    min-height: 48px;
+    border: 1px solid #dbe7f5;
+    border-radius: 15px;
+    background: #fff;
+    padding: 0 14px;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 700;
+    outline: none;
+}
+
+.manager360-filter input:focus,
+.manager360-filter select:focus {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.manager360-content-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(360px, 0.8fr);
+    gap: 20px;
+    align-items: flex-start;
+    margin-top: 22px;
+}
+
+.manager360-results-panel .manager360-panel-header {
+    padding: 22px;
+    border-bottom: 1px solid #e5edf7;
+}
+
+.manager360-table-wrap {
+    overflow-x: auto;
+}
+
+.manager360-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.manager360-table th,
+.manager360-table td {
+    padding: 16px 18px;
+    border-bottom: 1px solid #eef3f9;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.manager360-table th {
+    background: #f8fbff;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.manager360-table tr.selected td {
+    background: #eff6ff;
+}
+
+.manager360-table td strong,
+.manager360-table td small {
+    display: block;
+}
+
+.manager360-table td strong {
+    color: #111827;
+}
+
+.manager360-table td small {
+    margin-top: 5px;
+    color: #64748b;
+}
+
+.manager360-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.manager360-status.high,
+.manager360-status.clear {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.manager360-status.medium {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.manager360-status.low,
+.manager360-status.insufficient,
+.manager360-status.protected {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.manager360-link-button {
+    padding: 9px 12px;
+    border-radius: 12px;
+    background: #eef4ff;
+    color: #1d4ed8;
+}
+
+.manager360-link-button:hover {
+    background: #dbeafe;
+}
+
+.manager360-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    padding: 34px 20px;
+    color: #64748b;
+    text-align: center;
+}
+
+.manager360-empty.compact {
+    min-height: 140px;
+    padding: 24px 18px;
+}
+
+.manager360-empty i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 16px;
+    border-radius: 20px;
+    background: #f1f5f9;
+    color: #2563eb;
+    font-size: 24px;
+}
+
+.manager360-empty strong {
+    color: #111827;
+    font-size: 18px;
+}
+
+.manager360-empty p {
+    max-width: 420px;
+    margin: 10px 0 0;
+    line-height: 1.5;
+}
+
+.manager360-detail-panel {
+    position: sticky;
+    top: 18px;
+    padding: 0;
+}
+
+.manager360-detail-header {
+    padding: 24px;
+    border-bottom: 1px solid #e5edf7;
+    background: #f8fbff;
+}
+
+.manager360-detail-header span {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #2563eb;
+}
+
+.manager360-detail-header h2 {
+    margin: 8px 0 0;
+    font-size: 28px;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+}
+
+.manager360-detail-header p {
+    margin: 8px 0 0;
+    color: #64748b;
+}
+
+.manager360-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.manager360-detail-meta span {
+    min-height: 28px;
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #1e40af;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.manager360-score-box {
+    margin: 20px 20px 0;
+    padding: 18px;
+    border: 1px solid #dbe7f5;
+    border-radius: 20px;
+    background: #fff;
+}
+
+.manager360-score-box span,
+.manager360-score-box small {
+    display: block;
+    color: #64748b;
+    font-weight: 700;
+}
+
+.manager360-score-box strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 34px;
+    letter-spacing: -0.04em;
+}
+
+.manager360-score-box small {
+    margin-top: 8px;
+}
+
+.manager360-detail-section {
+    padding: 22px 20px;
+    border-top: 1px solid #eef3f9;
+}
+
+.manager360-detail-section h3 {
+    margin-bottom: 14px;
+    font-size: 18px;
+}
+
+.manager360-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.manager360-two-col h4 {
+    margin: 0 0 12px;
+    color: #334155;
+    font-size: 14px;
+}
+
+.manager360-score-line {
+    margin-bottom: 12px;
+}
+
+.manager360-score-line > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.manager360-score-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5edf7;
+}
+
+.manager360-score-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #2563eb;
+}
+
+.manager360-muted {
+    margin: 0;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.manager360-self-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.manager360-self-grid div {
+    padding: 14px;
+    border-radius: 16px;
+    background: #f8fbff;
+    border: 1px solid #e5edf7;
+}
+
+.manager360-self-grid span,
+.manager360-self-grid strong {
+    display: block;
+}
+
+.manager360-self-grid span {
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.manager360-self-grid strong {
+    margin-top: 8px;
+    color: #111827;
+    font-size: 22px;
+}
+
+.manager360-self-grid p {
+    grid-column: 1 / -1;
+    margin: 2px 0 0;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.manager360-relationship-list,
+.manager360-comment-list,
+.manager360-side-list {
+    display: grid;
+    gap: 10px;
+}
+
+.manager360-relationship-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    padding: 13px 14px;
+    border: 1px solid #e5edf7;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.manager360-relationship-row span {
+    color: #334155;
+    font-weight: 900;
+}
+
+.manager360-relationship-row strong {
+    color: #0f172a;
+}
+
+.manager360-relationship-row small {
+    grid-column: 1 / -1;
+    color: #64748b;
+}
+
+.manager360-comment-list blockquote {
+    margin: 0;
+    padding: 14px;
+    border-left: 4px solid #bfdbfe;
+    border-radius: 14px;
+    background: #f8fbff;
+}
+
+.manager360-comment-list blockquote span {
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.manager360-comment-list blockquote p {
+    margin: 8px 0 0;
+    color: #334155;
+    line-height: 1.5;
+}
+
+.manager360-next-steps ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #475569;
+    line-height: 1.75;
+}
+
+.manager360-side-list {
+    padding: 20px;
+    border-top: 1px solid #eef3f9;
+}
+
+.manager360-side-list h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.manager360-side-list span {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fbff;
+    color: #475569;
+    font-weight: 800;
+}
+
+@media (max-width: 1440px) {
+    .manager360-metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .manager360-priority-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .manager360-content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .manager360-detail-panel {
+        position: static;
+    }
+}
+
+@media (max-width: 900px) {
+    .manager360-page {
+        padding: 18px;
+    }
+
+    .manager360-header-card,
+    .manager360-panel-header,
+    .manager360-privacy-note {
+        flex-direction: column;
+    }
+
+    .manager360-metrics-grid,
+    .manager360-filters,
+    .manager360-priority-list,
+    .manager360-two-col,
+    .manager360-self-grid {
+        grid-template-columns: 1fr;
+    }
+}

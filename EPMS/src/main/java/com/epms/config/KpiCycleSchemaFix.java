@@ -36,6 +36,7 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             }
             alignEarlyCloseColumns(conn);
             alignDepartmentKpiEarlyCloseColumns(conn);
+            alignDepartmentKpiTemplateLegacyColumns(conn);
             alignDepartmentKpiCycleStatusEnum(conn);
             alignCycleDurationColumns(conn);
             alignCyclePeriodTemplateColumn(conn);
@@ -184,6 +185,18 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
         }
     }
 
+    private void alignDepartmentKpiTemplateLegacyColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "department_kpi_template")
+                || !columnExists(conn, "department_kpi_template", "duration_months")
+                || columnNullable(conn, "department_kpi_template", "duration_months")) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE department_kpi_template MODIFY COLUMN duration_months INT NULL");
+            log.info("Relaxed legacy department_kpi_template.duration_months column.");
+        }
+    }
+
     private void alignDepartmentKpiCycleStatusEnum(Connection conn) throws SQLException {
         if (!tableExists(conn, "department_kpi_cycle") || !columnExists(conn, "department_kpi_cycle", "status")) {
             return;
@@ -249,6 +262,18 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
                              + "AND column_name = '" + columnName + "'"
              )) {
             return rs.next() && rs.getInt(1) > 0;
+        }
+    }
+
+    private boolean columnNullable(Connection conn, String tableName, String columnName) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                     "SELECT IS_NULLABLE FROM information_schema.columns "
+                             + "WHERE table_schema = DATABASE() "
+                             + "AND table_name = '" + tableName + "' "
+                             + "AND column_name = '" + columnName + "'"
+             )) {
+            return rs.next() && "YES".equalsIgnoreCase(rs.getString(1));
         }
     }
 

@@ -11,7 +11,7 @@ export function kpiCycleStatusBadgeClass(status: string): string {
       return `${base} bg-gray-100 text-gray-600 ring-gray-400/20`;
     case 'DRAFT':
     default:
-      return `${base} bg-violet-50/80 text-violet-900 ring-violet-500/20`;
+      return `${base} bg-blue-50/80 text-blue-900 ring-blue-500/20`;
   }
 }
 
@@ -23,12 +23,12 @@ export function kpiStatusBadgeClass(status: string): string {
     case 'FINALIZED':
       return `${base} bg-sky-50 text-sky-900 ring-sky-600/15`;
     case 'SENT':
-      return `${base} bg-violet-50 text-violet-900 ring-violet-600/15`;
+      return `${base} bg-blue-50 text-blue-900 ring-blue-600/15`;
     case 'ARCHIVED':
       return `${base} bg-gray-100 text-gray-600 ring-gray-400/20`;
     case 'DRAFT':
     default:
-      return `${base} bg-violet-50/80 text-violet-900 ring-violet-500/20`;
+      return `${base} bg-blue-50/80 text-blue-900 ring-blue-500/20`;
   }
 }
 

@@ -1,7 +1,7 @@
-import EmptyChartState from './EmptyChartState';
+import EmptyChartState from './EmptyChartState';/*Z*/
 import {
-    DASHBOARD_CHART_COLORS,
     formatDashboardNumber,
+    resolveDashboardChartColor,
     formatDashboardPercent,
     hasDashboardChartData,
     toDashboardNumber,
@@ -23,7 +23,13 @@ const StatusDistributionChart = ({
                                      emptyDescription,
                                      valueFormatter,
                                  }: StatusDistributionChartProps) => {
-    const chartData = withDashboardPercentages(data).filter((item) => toDashboardNumber(item.value) > 0);
+    const usedColors = new Set<string>();
+    const chartData = withDashboardPercentages(data)
+        .filter((item) => toDashboardNumber(item.value) > 0)
+        .map((item, index) => ({
+            ...item,
+            chartColor: resolveDashboardChartColor(index, item.color, usedColors),
+        }));
 
     if (!hasDashboardChartData(chartData)) {
         return <EmptyChartState compact title={emptyTitle} description={emptyDescription} />;
@@ -32,7 +38,6 @@ const StatusDistributionChart = ({
     return (
         <div className="dashboard-status-list">
             {chartData.map((item, index) => {
-                const color = item.color || DASHBOARD_CHART_COLORS[index % DASHBOARD_CHART_COLORS.length];
                 const value = toDashboardNumber(item.value);
                 const percentage = toDashboardNumber(item.percentage);
 
@@ -45,7 +50,7 @@ const StatusDistributionChart = ({
                         <div className="dashboard-status-list__track" aria-hidden="true">
                             <div
                                 className="dashboard-status-list__fill"
-                                style={{ width: `${Math.max(percentage, 2)}%`, background: color }}
+                                style={{ width: `${Math.max(percentage, 2)}%`, background: item.chartColor }}
                             />
                         </div>
                         <span className="dashboard-status-list__meta">{formatDashboardPercent(percentage)} of total</span>

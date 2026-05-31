@@ -13,6 +13,7 @@ import com.epms.repository.EmployeeRepository;
 import com.epms.repository.OneOnOneMeetingRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
+import com.epms.security.UserPrincipal;
 import com.epms.service.NotificationService;
 import com.epms.service.OneOnOneMeetingService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -187,9 +189,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
     @Override
     @Transactional(readOnly = true)
     public List<OneOnOneMeetingResponseDto> getUpcomingMeetings() {
-        Optional<Integer> currentEmployeeId = getCurrentUserEmployeeId();
-
-        if (currentEmployeeId.isEmpty()) {
+        if (currentUserCanReadOrganizationWideMeetings()) {
             return meetingRepo.findAll()
                     .stream()
                     .filter(meeting -> meeting.getParentMeetingId() == null)
@@ -198,6 +198,12 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
                     .sorted(Comparator.comparing(this::stageStartDate, Comparator.nullsLast(Comparator.naturalOrder())))
                     .map(this::toDto)
                     .toList();
+        }
+
+        Optional<Integer> currentEmployeeId = getCurrentUserEmployeeId();
+
+        if (currentEmployeeId.isEmpty()) {
+            return List.of();
         }
 
         return meetingRepo.findUpcomingForUser(currentEmployeeId.get(), LocalDateTime.now())
@@ -209,9 +215,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
     @Override
     @Transactional(readOnly = true)
     public List<OneOnOneMeetingResponseDto> getOngoingMeetings() {
-        Optional<Integer> currentEmployeeId = getCurrentUserEmployeeId();
-
-        if (currentEmployeeId.isEmpty()) {
+        if (currentUserCanReadOrganizationWideMeetings()) {
             return meetingRepo.findAll()
                     .stream()
                     .filter(meeting -> meeting.getParentMeetingId() == null)
@@ -220,6 +224,12 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
                     .sorted(Comparator.comparing(this::stageStartDate, Comparator.nullsLast(Comparator.naturalOrder())))
                     .map(this::toDto)
                     .toList();
+        }
+
+        Optional<Integer> currentEmployeeId = getCurrentUserEmployeeId();
+
+        if (currentEmployeeId.isEmpty()) {
+            return List.of();
         }
 
         return meetingRepo.findOngoingForUser(currentEmployeeId.get())
@@ -231,9 +241,7 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
     @Override
     @Transactional(readOnly = true)
     public List<OneOnOneMeetingResponseDto> getPastMeetings() {
-        Optional<Integer> currentEmployeeId = getCurrentUserEmployeeId();
-
-        if (currentEmployeeId.isEmpty()) {
+        if (currentUserCanReadOrganizationWideMeetings()) {
             return meetingRepo.findAll()
                     .stream()
                     .filter(meeting -> meeting.getParentMeetingId() == null)
@@ -244,6 +252,12 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
                     ))
                     .map(this::toDto)
                     .toList();
+        }
+
+        Optional<Integer> currentEmployeeId = getCurrentUserEmployeeId();
+
+        if (currentEmployeeId.isEmpty()) {
+            return List.of();
         }
 
         return meetingRepo.findPastForUser(currentEmployeeId.get())
@@ -621,6 +635,70 @@ public class OneOnOneMeetingServiceImpl implements OneOnOneMeetingService {
         }
 
         return Optional.empty();
+    }
+
+    private boolean currentUserCanReadOrganizationWideMeetings() {
+        UserPrincipal principal;
+
+        try {
+            principal = SecurityUtils.currentUser();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+
+        if (isOrganizationWideOneOnOneAuthority(principal.getDashboard())) {
+            return true;
+        }
+
+        if (isOrganizationWideOneOnOneAuthority(principal.getPosition())) {
+            return true;
+        }
+
+        if (principal.getRoles() == null) {
+            return false;
+        }
+
+        return principal.getRoles()
+                .stream()
+                .anyMatch(this::isOrganizationWideOneOnOneAuthority);
+    }
+
+    private boolean isOrganizationWideOneOnOneAuthority(String value) {
+        String normalized = normalizeAccessValue(value);
+
+        if (normalized.isBlank()) {
+            return false;
+        }
+
+        return normalized.equals("ADMIN")
+                || normalized.equals("HRADMIN")
+                || normalized.equals("HR_ADMIN")
+                || normalized.equals("ADMIN_DASHBOARD")
+                || normalized.equals("HRADMIN_DASHBOARD")
+                || normalized.equals("HR_ADMIN_DASHBOARD")
+                || normalized.equals("HR")
+                || normalized.equals("HUMAN_RESOURCE")
+                || normalized.equals("HUMAN_RESOURCES")
+                || normalized.equals("HR_MANAGER")
+                || normalized.equals("HR_DASHBOARD")
+                || normalized.contains("HUMAN_RESOURCE")
+                || normalized.contains("HUMAN_RESOURCES")
+                || normalized.contains("PEOPLE")
+                || normalized.contains("TALENT");
+    }
+
+    private String normalizeAccessValue(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase(Locale.ROOT);
     }
 
     private boolean isWithinNext24Hours(LocalDateTime scheduledDate) {

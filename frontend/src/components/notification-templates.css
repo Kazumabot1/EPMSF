@@ -1,4 +1,4 @@
-.nt-page {
+/*Z*/.nt-page {
   max-width: 1120px;
 }
 
@@ -176,9 +176,9 @@ button.nt-chip {
 }
 
 .nt-role-chip {
-  background: #eef2ff;
-  border-color: #e0e7ff;
-  color: #4f46e5;
+  background: #eff6ff;
+  border-color: #dbeafe;
+  color: #2563eb;
 }
 
 .nt-card-actions {

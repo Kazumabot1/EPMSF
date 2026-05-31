@@ -1,4 +1,4 @@
-
+/*Z*/
 import api from './api';
 import type {
   AssessmentRequest,
@@ -177,6 +177,10 @@ const normalizeAssessment = (payload: any): EmployeeAssessment | null => {
     hrComment: payload.hrComment ?? null,
     departmentHeadComment: payload.departmentHeadComment ?? null,
     declineReason: payload.declineReason ?? null,
+    rejectedByRole: payload.rejectedByRole ?? null,
+    rejectedByUserId: payload.rejectedByUserId ?? null,
+    rejectedByName: payload.rejectedByName ?? null,
+    rejectedAt: payload.rejectedAt ?? null,
 
     // Employee signature
     employeeSignatureId: payload.employeeSignatureId ?? null,
@@ -250,6 +254,11 @@ const normalizeScoreRow = (row: any): AssessmentScoreRow => ({
   submittedAt: row.submittedAt ?? row.updatedAt ?? null,
   approvedAt: row.approvedAt ?? null,
   declinedAt: row.declinedAt ?? null,
+  declineReason: row.declineReason ?? null,
+  rejectedByRole: row.rejectedByRole ?? null,
+  rejectedByUserId: row.rejectedByUserId ?? null,
+  rejectedByName: row.rejectedByName ?? null,
+  rejectedAt: row.rejectedAt ?? null,
   employeeSigned: Boolean(row.employeeSigned ?? row.employeeSignatureId ?? row.employeeSignedAt),
   managerSigned: Boolean(row.managerSigned ?? row.managerSignatureId ?? row.managerSignedAt),
   departmentHeadSigned: Boolean(

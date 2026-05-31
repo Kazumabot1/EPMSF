@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+/*Z*/import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -78,6 +78,22 @@ function notifIconClass(type?: string | null) {
   return 'bi bi-bell';
 }
 
+
+const cleanHeaderRole = (value?: string | null) => {
+  const normalized = String(value ?? 'User')
+      .replace(/^ROLE_/i, '')
+      .replace(/_/g, ' ')
+      .trim();
+
+  if (/^admin$/i.test(normalized)) return 'HR Admin';
+  if (/^hr$/i.test(normalized) || /human resource/i.test(normalized)) return 'HR';
+  if (/department head/i.test(normalized) || /departmenthead/i.test(normalized)) return 'Department Head';
+  if (/manager/i.test(normalized)) return 'Manager';
+  if (/ceo|executive/i.test(normalized)) return 'CEO';
+
+  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 function mergeByLatest(prev: NotifItem[], incoming: NotifItem) {
   const ix = prev.findIndex((item) => item.id === incoming.id);
 
@@ -105,7 +121,7 @@ const Header = ({ collapsed }: HeaderProps) => {
 
   const email = user?.email ?? 'user@company.com';
   const userName = user?.fullName ?? 'User';
-  const primaryRole = user?.roles?.[0] ?? 'User';
+  const primaryRole = cleanHeaderRole(user?.roles?.[0] ?? user?.dashboard ?? 'User');
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeNotif = useCallback(() => setNotifOpen(false), []);

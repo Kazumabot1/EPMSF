@@ -1,4 +1,4 @@
-
+/*Z*/
 import { useEffect, useMemo, useState } from 'react';
 import { positionService } from '../../services/positionService';
 import {
@@ -367,9 +367,9 @@ const PositionPermissions = () => {
       {message && <div className={`position-alert ${isError ? 'error' : 'success'}`}>{message}</div>}
 
       <div className="position-surface">
-        <div className="position-surface-inner" style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 24 }}>
+        <div className="position-surface-inner position-permission-layout">
           <section>
-            <div className="position-table-toolbar" style={{ marginBottom: 14 }}>
+            <div className="position-table-toolbar position-permission-toolbar">
               <input className="position-input position-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search position..." />
               <button type="button" onClick={() => void loadPositions()} disabled={loading} className="position-btn secondary">
                 <i className={`bi ${loading ? 'bi-arrow-repeat animate-spin' : 'bi-arrow-clockwise'}`} />
@@ -377,13 +377,13 @@ const PositionPermissions = () => {
               </button>
             </div>
 
-            <div style={{ border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 20, overflow: 'hidden', background: 'rgba(255,255,255,0.9)' }}>
+            <div className="position-list-panel">
               {loading ? (
                 <div className="position-state">Loading positions...</div>
               ) : filteredPositions.length === 0 ? (
                 <div className="position-state">No positions found.</div>
               ) : (
-                <div style={{ display: 'grid' }}>
+                <div className="position-list-stack">
                   {filteredPositions.map((position) => {
                     const active = position.id === selectedPositionId;
                     return (
@@ -391,14 +391,7 @@ const PositionPermissions = () => {
                         key={position.id}
                         type="button"
                         onClick={() => setSelectedPositionId(position.id)}
-                        style={{
-                          padding: '16px 18px',
-                          textAlign: 'left',
-                          border: 0,
-                          borderBottom: '1px solid rgba(148, 163, 184, 0.22)',
-                          background: active ? 'linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(14, 165, 233, 0.10))' : 'transparent',
-                          cursor: 'pointer',
-                        }}
+                        className={`position-list-item ${active ? 'active' : ''}`}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                           <strong>{position.positionTitle}</strong>
@@ -422,14 +415,14 @@ const PositionPermissions = () => {
               <div className="position-alert error">This position is not connected to a dashboard role yet. Edit the position and choose a Dashboard Role first.</div>
             ) : (
               <>
-                <div className="position-detail-summary" style={{ marginBottom: 20 }}>
+                <div className="position-detail-summary position-permission-summary">
                   <div className="position-metric-card"><span>Selected position</span><strong>{selectedPosition.positionTitle}</strong><small>{selectedPosition.description || 'No description'}</small></div>
                   <div className="position-metric-card"><span>Level</span><strong>{selectedPosition.levelCode || '-'}</strong><small>Hierarchy level</small></div>
                   <div className="position-metric-card"><span>System role</span><strong>{selectedPosition.roleName}</strong><small>Dashboard comes from this role</small></div>
                   <div className="position-metric-card"><span>Status</span><strong>{selectedPosition.status ? 'Active' : 'Inactive'}</strong><small>Inactive remains visible for audit</small></div>
                 </div>
 
-                <div className="position-form-actions" style={{ justifyContent: 'space-between', marginBottom: 18 }}>
+                <div className="position-form-actions position-permission-actions">
                   <div>
                     <h2 style={{ margin: 0 }}>Available Permissions</h2>
                     <p className="position-mini-text" style={{ marginTop: 6 }}>Only permissions valid for {selectedPosition.roleName} are shown.</p>
@@ -462,8 +455,8 @@ const PositionPermissions = () => {
                                 style={{
                                   padding: 18,
                                   borderRadius: 20,
-                                  border: active ? '1px solid rgba(79, 70, 229, 0.55)' : '1px solid rgba(148, 163, 184, 0.32)',
-                                  background: active ? 'linear-gradient(135deg, rgba(79, 70, 229, 0.14), rgba(14, 165, 233, 0.12))' : 'rgba(248, 250, 252, 0.9)',
+                                  border: active ? '1px solid rgba(37, 99, 235, 0.55)' : '1px solid rgba(148, 163, 184, 0.32)',
+                                  background: active ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(14, 165, 233, 0.12))' : 'rgba(248, 250, 252, 0.9)',
                                   textAlign: 'left',
                                 }}
                               >

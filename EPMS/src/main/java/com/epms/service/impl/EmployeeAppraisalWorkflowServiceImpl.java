@@ -44,7 +44,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
 
     @Override
     public List<AppraisalEmployeeOptionResponse> getPmEligibleEmployees(Integer cycleId, Integer pmUserId) {
-        AppraisalCycle cycle = getActiveCycle(cycleId);
+        AppraisalCycle cycle = getActiveCycle(cycleId, true);
 
         User managerUser = getUser(pmUserId);
 
@@ -65,7 +65,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
 
     @Override
     public EmployeeAppraisalFormResponse createPmDraft(Integer cycleId, Integer employeeId, Integer pmUserId) {
-        AppraisalCycle cycle = getActiveCycle(cycleId);
+        AppraisalCycle cycle = getActiveCycle(cycleId, true);
 
         Employee employee = employeeRepository.findWithDepartmentsById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + employeeId));
@@ -190,10 +190,6 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
             throw new BadRequestException("Only manager draft or returned forms can be submitted by Manager.");
         }
 
-        ensureSubmissionDeadlineNotPassed(
-                form.getCycle() != null ? resolveManagerDeadline(form.getCycle()) : null,
-                "Manager submission deadline has passed."
-        );
 
         User managerUser = getUser(pmUserId);
         SignaturePayload managerSignature = resolveWorkflowSignature(
@@ -300,10 +296,6 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
             throw new BadRequestException("Only Dept Head pending forms can be reviewed by Dept Head.");
         }
 
-        ensureSubmissionDeadlineNotPassed(
-                form.getCycle() != null ? resolveDeptHeadDeadline(form.getCycle()) : null,
-                "Dept Head submission deadline has passed."
-        );
 
         User deptHead = getUser(deptHeadUserId);
         SignaturePayload deptHeadSignature = resolveWorkflowSignature(
@@ -777,6 +769,9 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         }
         AppraisalCycle cycle = form.getCycle();
         autoLockCycleIfExpired(cycle);
+        if (cycle != null && cycle.getStartDate() != null && LocalDate.now().isBefore(cycle.getStartDate())) {
+            throw new BadRequestException("This appraisal cycle has not started yet. Manager review is view-only until the start date.");
+        }
         if (cycle != null && Boolean.TRUE.equals(cycle.getLocked())) {
             throw new BadRequestException("This appraisal cycle is locked because the end date has been reached.");
         }
@@ -881,7 +876,7 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
         );
     }
 
-    private AppraisalCycle getActiveCycle(Integer cycleId) {
+    private AppraisalCycle getActiveCycle(Integer cycleId, boolean requireStarted) {
         AppraisalCycle cycle = cycleRepository.findById(cycleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appraisal cycle not found with id: " + cycleId));
 
@@ -893,6 +888,10 @@ public class EmployeeAppraisalWorkflowServiceImpl implements EmployeeAppraisalWo
 
         if (Boolean.TRUE.equals(cycle.getLocked())) {
             throw new BadRequestException("Locked appraisal cycles cannot be used for Manager review.");
+        }
+
+        if (requireStarted && cycle.getStartDate() != null && LocalDate.now().isBefore(cycle.getStartDate())) {
+            throw new BadRequestException("This appraisal cycle has not started yet. Manager review is view-only until the start date.");
         }
 
         return cycle;

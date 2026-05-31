@@ -145,7 +145,7 @@ const UseKpiDepartmentModal = ({ open, templateId, templateTitle, onClose, onApp
               <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Departments</span>
               <button
                 type="button"
-                className="text-xs font-semibold text-violet-700 underline-offset-2 hover:underline"
+                className="text-xs font-semibold text-blue-700 underline-offset-2 hover:underline"
                 disabled={loadingDeps || submitting || departments.length === 0}
                 onClick={selectAllDepts}
               >
@@ -170,11 +170,11 @@ const UseKpiDepartmentModal = ({ open, templateId, templateTitle, onClose, onApp
                 departments.map((d) => (
                   <label
                     key={d.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-violet-50/60"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60"
                   >
                     <input
                       type="checkbox"
-                      className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       checked={selectedDeptIds.has(d.id)}
                       disabled={submitting}
                       onChange={() => toggleDept(d.id)}

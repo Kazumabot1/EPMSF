@@ -116,7 +116,7 @@ const DepartmentKpiCycleEditorPage = () => {
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-5xl px-4 py-8">
         <header className="mb-6 flex items-start justify-between gap-4">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">Department KPI</p><h1 className="mt-1 text-2xl font-bold text-gray-900">{isEdit ? 'Edit Department KPI Cycle' : 'New Department KPI Cycle'}</h1></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Department KPI</p><h1 className="mt-1 text-2xl font-bold text-gray-900">{isEdit ? 'Edit Department KPI Cycle' : 'New Department KPI Cycle'}</h1></div>
           <Link to="/hr/department-kpi-cycle" className="kpi-tpl-btn-secondary no-underline">Back</Link>
         </header>
         <form onSubmit={submit} className="kpi-tpl-card space-y-5 p-6">

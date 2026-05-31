@@ -128,7 +128,7 @@ const DepartmentKpiApprovalPage = () => {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-violet-700">Approval</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-700">Approval</p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">Department KPI Approval</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
             Review HR requests for Department KPI finalization and early cycle closure.
@@ -142,7 +142,7 @@ const DepartmentKpiApprovalPage = () => {
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500">Finalization Requests</p>
-          <strong className="mt-2 block text-2xl text-violet-700">{summary.finalizationTotal}</strong>
+          <strong className="mt-2 block text-2xl text-blue-700">{summary.finalizationTotal}</strong>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-500">Early Close Requests</p>
@@ -195,7 +195,7 @@ const DepartmentKpiApprovalPage = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {finalizationRequests.map((request) => (
-                  <tr key={request.departmentKpiResultId} className="hover:bg-violet-50/40">
+                  <tr key={request.departmentKpiResultId} className="hover:bg-blue-50/40">
                     <td className="px-4 py-4 font-semibold text-gray-900">{request.departmentName}</td>
                     <td className="px-4 py-4 text-gray-700">{request.templateTitle}</td>
                     <td className="px-4 py-4 text-gray-700">
@@ -211,7 +211,7 @@ const DepartmentKpiApprovalPage = () => {
                     <td className="px-4 py-4 text-right">
                       <button
                         type="button"
-                        className="inline-flex h-9 items-center rounded-lg border border-violet-200 px-3 text-xs font-bold text-violet-700 hover:bg-violet-50"
+                        className="inline-flex h-9 items-center rounded-lg border border-blue-200 px-3 text-xs font-bold text-blue-700 hover:bg-blue-50"
                         onClick={() => {
                           setSelectedFinalization(request);
                           setReviewReason('');
@@ -247,7 +247,7 @@ const DepartmentKpiApprovalPage = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {requests.map((request) => (
-                  <tr key={request.id} className="hover:bg-violet-50/40">
+                  <tr key={request.id} className="hover:bg-blue-50/40">
                     <td className="px-4 py-4">
                       <strong className="block text-gray-900">{request.cycleName}</strong>
                       <span className="text-xs text-gray-500">Requested {formatDateTime(request.earlyCloseRequestedAt)}</span>
@@ -263,7 +263,7 @@ const DepartmentKpiApprovalPage = () => {
                     <td className="px-4 py-4 text-right">
                       <button
                         type="button"
-                        className="inline-flex h-9 items-center rounded-lg border border-violet-200 px-3 text-xs font-bold text-violet-700 hover:bg-violet-50"
+                        className="inline-flex h-9 items-center rounded-lg border border-blue-200 px-3 text-xs font-bold text-blue-700 hover:bg-blue-50"
                         onClick={() => {
                           setSelected(request);
                           setReviewReason('');
@@ -285,7 +285,7 @@ const DepartmentKpiApprovalPage = () => {
           <div className="w-full max-w-2xl rounded-lg bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-violet-700">
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-700">
                   Department KPI finalization request
                 </p>
                 <h2 className="mt-2 text-xl font-bold text-gray-900">{selectedFinalization.departmentName}</h2>
@@ -322,7 +322,7 @@ const DepartmentKpiApprovalPage = () => {
                   onChange={(event) => setReviewReason(event.target.value)}
                   rows={4}
                   maxLength={1000}
-                  className="rounded-lg border border-gray-200 p-3 font-normal outline-none focus:border-violet-500"
+                  className="rounded-lg border border-gray-200 p-3 font-normal outline-none focus:border-blue-500"
                 />
               </label>
             </div>
@@ -353,7 +353,7 @@ const DepartmentKpiApprovalPage = () => {
           <div className="w-full max-w-2xl rounded-lg bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-violet-700">
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-700">
                   Department KPI early close request
                 </p>
                 <h2 className="mt-2 text-xl font-bold text-gray-900">{selected.cycleName}</h2>
@@ -390,7 +390,7 @@ const DepartmentKpiApprovalPage = () => {
                   onChange={(event) => setReviewReason(event.target.value)}
                   rows={4}
                   maxLength={1000}
-                  className="rounded-lg border border-gray-200 p-3 font-normal outline-none focus:border-violet-500"
+                  className="rounded-lg border border-gray-200 p-3 font-normal outline-none focus:border-blue-500"
                 />
               </label>
             </div>

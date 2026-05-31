@@ -1,11 +1,15 @@
 package com.epms.service.impl;
 
 import com.epms.dto.FeedbackCampaignActivationReadinessResponse;
+import com.epms.dto.FeedbackCampaignCloseRequest;
+import com.epms.dto.FeedbackCampaignMonitoringDtos.CloseReadinessChecklistItemDto;
+import com.epms.dto.FeedbackCampaignMonitoringDtos.CloseReadinessDto;
 import com.epms.dto.FeedbackCampaignCreateRequest;
 import com.epms.dto.FeedbackCampaignMonitoringResponse;
 import com.epms.dto.FeedbackCampaignScoringConfigRequest;
 import com.epms.dto.FeedbackCampaignScoringConfigResponse;
 import com.epms.dto.FeedbackCampaignTargetsResponse;
+import com.epms.dto.FeedbackReminderRequest;
 import com.epms.dto.FeedbackReminderResponse;
 import com.epms.dto.FeedbackTargetCandidateResponse;
 import com.epms.entity.FeedbackCampaign;
@@ -14,12 +18,14 @@ import com.epms.entity.FeedbackRequest;
 import com.epms.entity.enums.AssignmentStatus;
 import com.epms.entity.enums.FeedbackCampaignEarlyCloseStatus;
 import com.epms.entity.enums.FeedbackCampaignStatus;
+import com.epms.entity.enums.FeedbackRelationshipType;
 import com.epms.exception.BusinessValidationException;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.FeedbackCampaignRepository;
 import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackRequestRepository;
 import com.epms.service.FeedbackOperationalService;
+import com.epms.service.FeedbackCampaignMonitoringService;
 import com.epms.service.FeedbackCampaignLifecycleService;
 import com.epms.service.FeedbackCampaignQuestionReviewService;
 import com.epms.service.FeedbackCampaignReadinessService;
@@ -35,8 +41,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,11 +53,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
     private static final String DEFAULT_CAMPAIGN_TYPE = "360 Feedback";
 
-    private static final List<FeedbackCampaignStatus> OVERLAP_BLOCKING_STATUSES = List.of(
-            FeedbackCampaignStatus.DRAFT,
-            FeedbackCampaignStatus.READY_TO_ACTIVATE,
-            FeedbackCampaignStatus.ACTIVE
-    );
 
     private final FeedbackCampaignRepository feedbackCampaignRepository;
     private final FeedbackRequestRepository feedbackRequestRepository;
@@ -57,6 +60,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
     private final FeedbackOperationalService feedbackOperationalService;
     private final FeedbackCampaignQuestionReviewService questionReviewService;
     private final FeedbackCampaignReadinessService campaignReadinessService;
+    private final FeedbackCampaignMonitoringService feedbackCampaignMonitoringService;
     private final FeedbackCampaignLifecycleService campaignLifecycleService;
     private final FeedbackCampaignTargetService campaignTargetService;
     private final FeedbackCampaignScoringConfigService campaignScoringConfigService;
@@ -67,7 +71,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         CampaignWindow window = resolveWindow(request);
         applyCampaignDefaults(request, window);
         validateCampaignMetadata(request, window);
-        validateNoOverlappingOpenCampaign(window);
+        // Drafts may be saved for planning. Submission-window overlap is checked during launch readiness/activation.
         // New campaign setup is rule-based. formId is legacy-only and ignored here.
 
         FeedbackCampaign campaign = new FeedbackCampaign();
@@ -254,7 +258,55 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
     @Override
     @Transactional
     public FeedbackCampaign closeCampaign(Long campaignId, Long actorUserId) {
-        return campaignLifecycleService.closeCampaign(campaignId, actorUserId);
+        return closeCampaignWithReadiness(campaignId, null, actorUserId);
+    }
+
+    @Override
+    @Transactional
+    public FeedbackCampaign closeCampaignWithReadiness(Long campaignId, FeedbackCampaignCloseRequest request, Long actorUserId) {
+        FeedbackCampaign campaign = getCampaignById(campaignId);
+        if (campaign.getStatus() == FeedbackCampaignStatus.CLOSED) {
+            return campaign;
+        }
+        if (campaign.getStatus() != FeedbackCampaignStatus.ACTIVE) {
+            throw new BusinessValidationException("Only ACTIVE campaigns can be closed from monitoring.");
+        }
+
+        com.epms.dto.FeedbackCampaignMonitoringDtos.FeedbackCampaignMonitoringResponse monitoring = feedbackCampaignMonitoringService.getMonitoring(campaignId);
+        CloseReadinessDto readiness = monitoring.getCloseReadiness();
+        if (readiness == null || !Boolean.TRUE.equals(readiness.getCanClose())) {
+            String blockerMessage = readiness == null
+                    ? "Campaign close readiness could not be verified."
+                    : readiness.getChecklist().stream()
+                      .filter(item -> "BLOCKER".equals(item.getStatus()))
+                      .map(CloseReadinessChecklistItemDto::getMessage)
+                      .filter(message -> message != null && !message.isBlank())
+                      .collect(Collectors.joining(" "));
+            throw new BusinessValidationException(blockerMessage == null || blockerMessage.isBlank()
+                    ? "Campaign is not ready to close. Resolve blocking issues first."
+                    : blockerMessage);
+        }
+
+        boolean closeWithWarnings = Boolean.TRUE.equals(readiness.getCanCloseWithWarnings())
+                || "CLOSE_WITH_WARNINGS".equalsIgnoreCase(readiness.getStatus());
+        if (closeWithWarnings && (request == null || !Boolean.TRUE.equals(request.getAcknowledgedWarnings()))) {
+            throw new BusinessValidationException("Acknowledge the close warnings before closing this campaign.");
+        }
+
+        String requestMode = request == null ? null : normalizeText(request.getCloseMode(), 40);
+        if (requestMode != null && requestMode.equalsIgnoreCase("STANDARD") && closeWithWarnings) {
+            throw new BusinessValidationException("This campaign still has warnings. Use close with warnings and acknowledge them before closing.");
+        }
+
+        String reason = request == null ? null : normalizeText(request.getReason(), 1000);
+        String readinessNote = closeWithWarnings
+                ? "Readiness status=CLOSE_WITH_WARNINGS, warnings=" + readiness.getWarningCount()
+                  + ", pendingAssignments=" + readiness.getPendingAssignments()
+                  + ", overdueAssignments=" + readiness.getOverdueAssignments()
+                  + ", privacyRiskTargets=" + readiness.getPrivacyRiskTargets()
+                : "Readiness status=READY_TO_CLOSE";
+        String finalReason = reason == null ? readinessNote : readinessNote + "; HR note=" + reason;
+        return campaignLifecycleService.closeCampaignWithReadiness(campaignId, actorUserId, finalReason, closeWithWarnings);
     }
 
     @Override
@@ -466,8 +518,192 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
                 .pendingAssignmentCount(result.getCandidateCount())
                 .notifiedEvaluatorCount(result.getSentCount())
                 .skippedAssignmentCount(result.getSkippedCount())
+                .notifiedUserCount(result.getUniqueUserCount())
+                .reminderScope("CAMPAIGN")
+                .onlyOverdue(kind == FeedbackOperationalService.FeedbackReminderKind.OVERDUE)
                 .warnings(result.getWarnings())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public FeedbackReminderResponse sendScopedEvaluatorReminders(Long campaignId, FeedbackReminderRequest request, Long actorUserId) {
+        FeedbackCampaign campaign = getCampaignById(campaignId);
+        if (campaign.getStatus() != FeedbackCampaignStatus.ACTIVE) {
+            throw new BusinessValidationException("Reminders can only be sent for ACTIVE feedback campaigns.");
+        }
+
+        FeedbackReminderRequest safeRequest = request == null ? new FeedbackReminderRequest() : request;
+        String scope = normalizeReminderScope(safeRequest.getScope());
+        FeedbackRelationshipType relationship = parseReminderRelationship(safeRequest.getRelationshipType());
+        boolean onlyOverdue = Boolean.TRUE.equals(safeRequest.getOnlyOverdue());
+
+        validateReminderScope(scope, safeRequest, relationship);
+
+        List<FeedbackEvaluatorAssignment> candidates = assignmentRepository.findByCampaignIdWithRequest(campaignId).stream()
+                .filter(assignment -> isPendingReminderCandidate(assignment))
+                .filter(assignment -> matchesReminderScope(scope, safeRequest, relationship, assignment))
+                .filter(assignment -> !onlyOverdue || isAssignmentPastDue(campaign, assignment))
+                .toList();
+
+        FeedbackOperationalService.FeedbackReminderKind kind = resolveReminderKind(campaign, onlyOverdue);
+
+        FeedbackOperationalService.NotificationDeliveryResult result = feedbackOperationalService.notifyEvaluatorReminders(campaign, candidates, kind);
+        List<Long> assignmentIds = candidates.stream()
+                .map(FeedbackEvaluatorAssignment::getId)
+                .toList();
+
+        if (actorUserId != null) {
+            feedbackOperationalService.audit(
+                    actorUserId,
+                    kind == FeedbackOperationalService.FeedbackReminderKind.OVERDUE
+                            ? FeedbackOperationalService.OVERDUE_REMINDERS_SENT
+                            : FeedbackOperationalService.DEADLINE_REMINDERS_SENT,
+                    FeedbackOperationalService.ENTITY_CAMPAIGN,
+                    campaignId,
+                    null,
+                    buildScopedReminderAuditValue(scope, safeRequest, relationship, onlyOverdue, result, assignmentIds),
+                    kind == FeedbackOperationalService.FeedbackReminderKind.OVERDUE
+                            ? "Scoped overdue 360 feedback reminders sent"
+                            : "Scoped pending 360 feedback reminders sent"
+            );
+        }
+
+        return FeedbackReminderResponse.builder()
+                .campaignId(campaign.getId())
+                .campaignName(campaign.getName())
+                .pendingAssignmentCount(result.getCandidateCount())
+                .notifiedEvaluatorCount(result.getSentCount())
+                .skippedAssignmentCount(result.getSkippedCount())
+                .notifiedUserCount(result.getUniqueUserCount())
+                .reminderScope(scope)
+                .targetEmployeeId(safeRequest.getTargetEmployeeId())
+                .evaluatorEmployeeId(safeRequest.getEvaluatorEmployeeId())
+                .relationshipType(relationship == null ? null : relationship.name())
+                .assignmentIds(assignmentIds)
+                .onlyOverdue(onlyOverdue)
+                .warnings(result.getWarnings())
+                .build();
+    }
+
+    private String normalizeReminderScope(String rawScope) {
+        String normalized = rawScope == null ? "CAMPAIGN" : rawScope.trim().toUpperCase().replace('-', '_').replace(' ', '_');
+        return switch (normalized) {
+            case "TARGET", "RELATIONSHIP", "TARGET_RELATIONSHIP", "EVALUATOR", "ASSIGNMENTS", "CAMPAIGN" -> normalized;
+            default -> throw new BusinessValidationException("Unsupported reminder scope: " + rawScope + ".");
+        };
+    }
+
+    private FeedbackRelationshipType parseReminderRelationship(String rawRelationship) {
+        String normalized = normalizeText(rawRelationship, 80);
+        if (normalized == null || normalized.isBlank()) {
+            return null;
+        }
+        normalized = normalized.trim().toUpperCase().replace('-', '_').replace(' ', '_');
+        if ("DIRECT_REPORT".equals(normalized) || "DIRECT_REPORTS".equals(normalized)) {
+            normalized = "SUBORDINATE";
+        }
+        try {
+            return FeedbackRelationshipType.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessValidationException("Unsupported reminder relationship: " + rawRelationship + ".");
+        }
+    }
+
+    private void validateReminderScope(String scope, FeedbackReminderRequest request, FeedbackRelationshipType relationship) {
+        switch (scope) {
+            case "TARGET" -> requireReminderValue(request.getTargetEmployeeId(), "Target employee is required for a target reminder.");
+            case "RELATIONSHIP" -> {
+                if (relationship == null) {
+                    throw new BusinessValidationException("Relationship type is required for a relationship reminder.");
+                }
+            }
+            case "TARGET_RELATIONSHIP" -> {
+                requireReminderValue(request.getTargetEmployeeId(), "Target employee is required for a target relationship reminder.");
+                if (relationship == null) {
+                    throw new BusinessValidationException("Relationship type is required for a target relationship reminder.");
+                }
+            }
+            case "EVALUATOR" -> requireReminderValue(request.getEvaluatorEmployeeId(), "Evaluator employee is required for an evaluator reminder.");
+            case "ASSIGNMENTS" -> {
+                if (request.getAssignmentIds() == null || request.getAssignmentIds().isEmpty()) {
+                    throw new BusinessValidationException("At least one assignment ID is required for an assignment reminder.");
+                }
+            }
+            case "CAMPAIGN" -> {
+                // No additional scope fields needed.
+            }
+            default -> throw new BusinessValidationException("Unsupported reminder scope: " + scope + ".");
+        }
+    }
+
+    private void requireReminderValue(Long value, String message) {
+        if (value == null || value <= 0) {
+            throw new BusinessValidationException(message);
+        }
+    }
+
+    private boolean matchesReminderScope(
+            String scope,
+            FeedbackReminderRequest request,
+            FeedbackRelationshipType relationship,
+            FeedbackEvaluatorAssignment assignment
+    ) {
+        FeedbackRequest feedbackRequest = assignment.getFeedbackRequest();
+        return switch (scope) {
+            case "TARGET" -> sameLong(feedbackRequest.getTargetEmployeeId(), request.getTargetEmployeeId());
+            case "RELATIONSHIP" -> assignment.getRelationshipType() == relationship;
+            case "TARGET_RELATIONSHIP" -> sameLong(feedbackRequest.getTargetEmployeeId(), request.getTargetEmployeeId())
+                    && assignment.getRelationshipType() == relationship;
+            case "EVALUATOR" -> sameLong(assignment.getEvaluatorEmployeeId(), request.getEvaluatorEmployeeId());
+            case "ASSIGNMENTS" -> request.getAssignmentIds() != null && request.getAssignmentIds().contains(assignment.getId());
+            case "CAMPAIGN" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isPendingReminderCandidate(FeedbackEvaluatorAssignment assignment) {
+        return assignment != null
+                && (assignment.getStatus() == AssignmentStatus.PENDING || assignment.getStatus() == AssignmentStatus.IN_PROGRESS);
+    }
+
+    private FeedbackOperationalService.FeedbackReminderKind resolveReminderKind(FeedbackCampaign campaign, boolean onlyOverdue) {
+        LocalDateTime deadline = campaign.getEndAt();
+        return onlyOverdue || (deadline != null && LocalDateTime.now().isAfter(deadline))
+                ? FeedbackOperationalService.FeedbackReminderKind.OVERDUE
+                : FeedbackOperationalService.FeedbackReminderKind.DEADLINE;
+    }
+
+    private boolean isAssignmentPastDue(FeedbackCampaign campaign, FeedbackEvaluatorAssignment assignment) {
+        LocalDateTime dueAt = assignment.getFeedbackRequest() == null ? null : assignment.getFeedbackRequest().getDueAt();
+        LocalDateTime deadline = dueAt != null ? dueAt : campaign.getEndAt();
+        return deadline != null && deadline.isBefore(LocalDateTime.now());
+    }
+
+    private boolean sameLong(Long left, Long right) {
+        return left != null && right != null && left.equals(right);
+    }
+
+    private String buildScopedReminderAuditValue(
+            String scope,
+            FeedbackReminderRequest request,
+            FeedbackRelationshipType relationship,
+            boolean onlyOverdue,
+            FeedbackOperationalService.NotificationDeliveryResult result,
+            List<Long> assignmentIds
+    ) {
+        Set<String> values = new LinkedHashSet<>();
+        values.add("scope=" + scope);
+        if (request.getTargetEmployeeId() != null) values.add("targetEmployeeId=" + request.getTargetEmployeeId());
+        if (request.getEvaluatorEmployeeId() != null) values.add("evaluatorEmployeeId=" + request.getEvaluatorEmployeeId());
+        if (relationship != null) values.add("relationshipType=" + relationship.name());
+        values.add("onlyOverdue=" + onlyOverdue);
+        values.add("pendingAssignments=" + result.getCandidateCount());
+        values.add("notifiedAssignments=" + result.getSentCount());
+        values.add("notifiedUsers=" + result.getUniqueUserCount());
+        values.add("skippedAssignments=" + result.getSkippedCount());
+        values.add("assignmentIds=" + assignmentIds);
+        return String.join(", ", values);
     }
 
 
@@ -539,22 +775,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
     }
 
 
-    private void validateNoOverlappingOpenCampaign(CampaignWindow window) {
-        List<FeedbackCampaign> overlappingCampaigns = feedbackCampaignRepository.findOverlappingCampaigns(
-                window.startAt.toLocalDate(),
-                window.endAt.toLocalDate(),
-                OVERLAP_BLOCKING_STATUSES
-        );
-
-        if (!overlappingCampaigns.isEmpty()) {
-            FeedbackCampaign existing = overlappingCampaigns.get(0);
-            throw new BusinessValidationException(
-                    "Another open 360 campaign overlaps this submission window: " + existing.getName()
-                            + " (" + formatDeadline(existing.getStartAt()) + " - " + formatDeadline(existing.getEndAt()) + "). Close it or choose a non-overlapping window."
-            );
-        }
-    }
-
     private void ensureDraftCampaign(FeedbackCampaign campaign, String message) {
         if (campaign.getStatus() != FeedbackCampaignStatus.DRAFT) {
             throw new BusinessValidationException(message);
@@ -597,10 +817,6 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         return trimmed.length() > maxLength ? trimmed.substring(0, maxLength) : trimmed;
     }
 
-
-    private String formatDeadline(LocalDateTime value) {
-        return value == null ? "the campaign deadline" : value.toString().replace('T', ' ');
-    }
 
     private static class CampaignWindow {
         private final LocalDateTime startAt;

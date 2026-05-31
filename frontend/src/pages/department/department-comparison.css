@@ -1,10 +1,10 @@
-.dept-compare-page {
+/*Z*/.dept-compare-page {
   position: relative;
   min-height: 100%;
   padding: 28px;
   color: #0f172a;
   background:
-    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.16), transparent 28%),
+    radial-gradient(circle at 10% 0%, rgba(37, 99, 235, 0.16), transparent 28%),
     radial-gradient(circle at 88% 8%, rgba(14, 165, 233, 0.14), transparent 30%),
     linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
 }
@@ -48,7 +48,7 @@
 .dept-compare-hero-glow.one {
   top: -110px;
   right: 260px;
-  background: rgba(99, 102, 241, 0.45);
+  background: rgba(37, 99, 235, 0.45);
 }
 
 .dept-compare-hero-glow.two {
@@ -155,7 +155,7 @@
   width: 120px;
   height: 120px;
   border-radius: 999px;
-  background: rgba(99, 102, 241, 0.11);
+  background: rgba(37, 99, 235, 0.11);
 }
 
 .dept-compare-performance-icon {
@@ -165,8 +165,8 @@
   place-items: center;
   margin-bottom: 14px;
   border-radius: 15px;
-  color: #4f46e5;
-  background: #eef2ff;
+  color: #2563eb;
+  background: #eff6ff;
   font-size: 18px;
 }
 
@@ -227,7 +227,7 @@
 }
 
 .dept-compare-rank-head span {
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 950;
 }
@@ -259,8 +259,8 @@
 .dept-compare-rank-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #6366f1, #06b6d4);
-  box-shadow: 0 0 18px rgba(99, 102, 241, 0.36);
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.36);
 }
 
 .dept-compare-rank-meta {
@@ -276,7 +276,7 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.14), transparent 30%),
+    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.14), transparent 30%),
     rgba(255, 255, 255, 0.94);
 }
 
@@ -321,7 +321,7 @@
 }
 
 .dept-compare-insight-row em {
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 12px;
   font-style: normal;
   font-weight: 900;
@@ -363,8 +363,8 @@
 }
 
 .dept-compare-search-input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .dept-compare-btn {
@@ -388,13 +388,13 @@
 
 .dept-compare-btn-primary {
   color: #ffffff;
-  background: linear-gradient(135deg, #6366f1, #2563eb 55%, #06b6d4);
+  background: linear-gradient(135deg, #2563eb, #2563eb 55%, #06b6d4);
   box-shadow: 0 12px 22px rgba(37, 99, 235, 0.24);
 }
 
 .dept-compare-btn-soft {
-  color: #3730a3;
-  background: #e0e7ff;
+  color: #1e40af;
+  background: #dbeafe;
 }
 
 .dept-compare-btn-ghost {
@@ -458,7 +458,7 @@
 }
 
 .dept-compare-slot-foot strong {
-  color: #4f46e5;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 950;
 }
@@ -590,8 +590,8 @@
 .dept-compare-panel-head > span:first-child {
   padding: 5px 9px;
   border-radius: 999px;
-  color: #3730a3;
-  background: #e0e7ff;
+  color: #1e40af;
+  background: #dbeafe;
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
@@ -614,9 +614,9 @@
 
 .dept-compare-score-strip > div {
   padding: 14px;
-  border: 1px solid #e0e7ff;
+  border: 1px solid #dbeafe;
   border-radius: 15px;
-  background: linear-gradient(180deg, #eef2ff, #ffffff);
+  background: linear-gradient(180deg, #eff6ff, #ffffff);
 }
 
 .dept-compare-score-strip span {
@@ -631,7 +631,7 @@
 .dept-compare-score-strip strong {
   display: block;
   margin-top: 6px;
-  color: #3730a3;
+  color: #1e40af;
   font-size: 25px;
   font-weight: 950;
 }
@@ -930,3 +930,40 @@
     display: none;
   }
 }
+
+/* Blue consistency correction: keep the page design, remove the dark/purple hero mismatch. */
+.dept-compare-page {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(37, 99, 235, 0.10), transparent 28%),
+    radial-gradient(circle at 88% 8%, rgba(14, 165, 233, 0.10), transparent 30%),
+    linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%) !important;
+}
+.dept-compare-hero {
+  color: #0f172a !important;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.10), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #eff6ff 100%) !important;
+  border-color: #dbeafe !important;
+  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.10) !important;
+}
+.dept-compare-hero::after { border-color: rgba(191, 219, 254, 0.85) !important; }
+.dept-compare-hero-glow { display: none !important; }
+.dept-compare-eyebrow { color: #2563eb !important; }
+.dept-compare-hero h1 { color: #0f172a !important; }
+.dept-compare-hero p { color: #475569 !important; }
+.dept-compare-hero-score {
+  background: #ffffff !important;
+  border-color: #bfdbfe !important;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.10) !important;
+}
+.dept-compare-hero-score span,
+.dept-compare-hero-score small { color: #64748b !important; }
+.dept-compare-hero-score strong {
+  color: #1d4ed8 !important;
+  text-shadow: none !important;
+}
+.dept-compare-performance-icon {
+  color: #2563eb !important;
+  background: #eff6ff !important;
+}
+.dept-compare-performance-card::after { background: rgba(37, 99, 235, 0.08) !important; }

@@ -109,8 +109,8 @@ const EvaluatorConfigComponent = ({
                 <label className="feedback-setup-checkbox">
                     <input type="checkbox" {...register('includeManager')} />
                     <div>
-                        <strong>Include direct manager</strong>
-                        <span>Uses the employee reporting line. Missing manager data will produce a warning.</span>
+                        <strong>Include manager reviewer</strong>
+                        <span>Uses eligible manager reviewers. Missing reviewer data will produce a warning.</span>
                     </div>
                 </label>
 
@@ -135,7 +135,7 @@ const EvaluatorConfigComponent = ({
                         <input type="checkbox" {...register('includeDepartmentPeers')} />
                         <div>
                             <strong>Use department fallback</strong>
-                            <span>Uses same current department when team/reporting data is incomplete.</span>
+                            <span>Uses eligible same-department reviewers when team data is incomplete.</span>
                         </div>
                     </label>
 
@@ -159,8 +159,8 @@ const EvaluatorConfigComponent = ({
                 <label className="feedback-setup-checkbox">
                     <input type="checkbox" {...register('includeSubordinates')} />
                     <div>
-                        <strong>Include direct subordinates</strong>
-                        <span>Employees who report to the target employee provide upward feedback anonymously.</span>
+                        <strong>Include subordinate reviewers</strong>
+                        <span>Eligible subordinate reviewers provide upward feedback anonymously.</span>
                     </div>
                 </label>
 

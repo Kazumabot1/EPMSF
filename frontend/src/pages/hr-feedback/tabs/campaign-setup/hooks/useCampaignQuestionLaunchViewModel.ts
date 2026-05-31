@@ -98,11 +98,11 @@ export function useCampaignQuestionLaunchViewModel({
 
     const anonymousRoleLabels = selectedCampaign ? [
         selectedCampaign.peerFeedbackAnonymous ? 'Peer' : '',
-        selectedCampaign.subordinateFeedbackAnonymous ? 'Direct Report' : '',
+        selectedCampaign.subordinateFeedbackAnonymous ? 'Subordinate' : '',
     ].filter(Boolean) : [];
     const privacySummary = anonymousRoleLabels.length > 0
-        ? `Peer and direct report feedback are grouped without showing individual evaluator names to recipients.`
-        : 'Peer and direct report evaluator names are visible to recipients.';
+        ? `Peer and subordinate feedback are grouped without showing individual evaluator names to recipients.`
+        : 'Peer and subordinate evaluator names are visible to recipients.';
 
     const launchChecklist = useMemo(() => {
         const checks = activationReadiness.checks.map(check => ({ ...check }));

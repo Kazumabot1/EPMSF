@@ -20,10 +20,27 @@ public class DepartmentKpiTemplateDepartment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
     @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private DepartmentKpiTemplate template;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)
     @EqualsAndHashCode.Exclude
     private Department department;
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof DepartmentKpiTemplateDepartment that)) {
+            return false;
+        }
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

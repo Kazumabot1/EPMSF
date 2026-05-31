@@ -128,6 +128,7 @@ const ProfileAvatar = ({
           src={src}
           alt={name}
           className={`employee-avatar-image ${sizeClass[size]}`}
+          style={{ objectFit: 'cover', display: 'block', maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
       ) : (

@@ -220,7 +220,7 @@ const AssignmentPreviewComponent = ({
                             <p className="feedback-setup-eyebrow">Manual override</p>
                             <h3>Add evaluator manually</h3>
                             <p>
-                                Use this when reporting hierarchy, team, or department data is incomplete. Manual assignments require an audit reason and are preserved when auto assignments are regenerated.
+                                Use this when reviewer assignments need HR confirmation. Manual assignments require an audit reason and are preserved when auto assignments are regenerated.
                             </p>
                         </div>
 
@@ -276,7 +276,7 @@ const AssignmentPreviewComponent = ({
                                 <textarea
                                     value={manualForm.reason}
                                     onChange={(event) => setManualForm({ ...manualForm, reason: event.target.value })}
-                                    placeholder="Example: Reporting hierarchy is missing; HR confirms this evaluator is the real manager."
+                                    placeholder="Example: HR confirms this evaluator is the right reviewer for this recipient."
                                 />
                                 {!reasonReady ? <small className="feedback-setup-error">Reason must be at least 5 characters.</small> : null}
                             </label>

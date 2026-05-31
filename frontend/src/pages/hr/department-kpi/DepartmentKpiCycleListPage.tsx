@@ -114,7 +114,7 @@ const DepartmentKpiCycleListPage = () => {
       <div className="mx-auto max-w-6xl px-4 py-8">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">Department KPI</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Department KPI</p>
             <h1 className="mt-1 text-2xl font-bold text-gray-900">Department KPI Cycles</h1>
           </div>
           <Link to="/hr/department-kpi-cycle/new" className="kpi-tpl-btn-primary no-underline">New Cycle</Link>
@@ -241,7 +241,7 @@ const DepartmentKpiCycleListPage = () => {
                   onChange={(event) => setCloseReason(event.target.value)}
                   rows={5}
                   maxLength={1000}
-                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-violet-500"
+                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-blue-500"
                 />
               </label>
               <label className="grid gap-2 text-sm font-semibold text-gray-700">
@@ -249,7 +249,7 @@ const DepartmentKpiCycleListPage = () => {
                 <select
                   value={graceExtension}
                   onChange={(event) => setGraceExtension(event.target.value as KpiGraceExtension)}
-                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-violet-500"
+                  className="rounded-lg border border-gray-200 p-3 text-sm font-normal text-gray-800 outline-none focus:border-blue-500"
                 >
                   {graceOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>

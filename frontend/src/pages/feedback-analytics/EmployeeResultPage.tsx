@@ -55,11 +55,11 @@ const relationshipRows = (item: FeedbackResultItem) => [
     },
     {
         key: 'SUBORDINATE',
-        label: 'Direct reports',
+        label: 'Subordinate reviewers',
         count: countOf(item.subordinateResponses),
         score: item.subordinateAverageScore,
         threshold: MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES,
-        helper: `Direct-report feedback is shown only when at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} direct-report responses are submitted.`,
+        helper: `Subordinate reviewer feedback is shown only when at least ${MIN_CONFIDENTIAL_RELATIONSHIP_RESPONSES} subordinate reviewer responses are submitted.`,
     },
     {
         key: 'SELF',

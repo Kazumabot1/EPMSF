@@ -76,7 +76,7 @@ const KpiVersionHistoryPage = () => {
         <header className="kpi-tpl-card--hero p-6 sm:p-8">
           <div className="relative">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">KPI Management</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">KPI Management</p>
               <h1>KPI Version History</h1>
               <p>Review KPI template versions created when HR adds or removes KPI rows.</p>
             </div>
@@ -128,12 +128,12 @@ const KpiVersionHistoryPage = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {filtered.map((version) => (
-                        <tr key={`${version.templateId}-${version.versionNumber}`} className="hover:bg-violet-50/25">
+                        <tr key={`${version.templateId}-${version.versionNumber}`} className="hover:bg-blue-50/25">
                           <td className="px-5 py-4">
                             <button
                               type="button"
                               onClick={() => void openDetail(version)}
-                              className="text-left font-bold text-violet-700 hover:underline"
+                              className="text-left font-bold text-blue-700 hover:underline"
                             >
                               Version {version.versionNumber}
                             </button>
@@ -221,7 +221,7 @@ const VersionDetailModal = ({
                       return (
                         <tr
                           key={change.historyId}
-                          className={removed ? 'kpi-tpl-row-removed' : added ? 'kpi-tpl-row-added' : 'hover:bg-violet-50/25'}
+                          className={removed ? 'kpi-tpl-row-removed' : added ? 'kpi-tpl-row-added' : 'hover:bg-blue-50/25'}
                         >
                           <td className="px-4 py-3.5">
                             <span className={`kpi-tpl-change-pill ${rowStatusClass(status)}`}>

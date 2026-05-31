@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode, SVGProps } from 'react';
 import { Link } from 'react-router-dom';
+import { DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import { appraisalWorkflowService } from '../../services/appraisalService';
 import { feedbackService } from '../../services/feedbackService';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
@@ -143,14 +144,14 @@ const sortByMostRecent = <T,>(items: T[], keys: (keyof T)[]) => {
 const iconClassByTone: Record<MetricCard['tone'], string> = {
   blue: 'bg-blue-50 text-blue-600 ring-blue-100',
   emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
-  violet: 'bg-violet-50 text-violet-600 ring-violet-100',
+  violet: 'bg-blue-50 text-blue-600 ring-blue-100',
   rose: 'bg-rose-50 text-rose-600 ring-rose-100',
 };
 
 const progressClassByTone: Record<MetricCard['tone'], string> = {
   blue: 'bg-blue-600',
   emerald: 'bg-emerald-500',
-  violet: 'bg-violet-500',
+  violet: 'bg-blue-500',
   rose: 'bg-rose-500',
 };
 
@@ -409,6 +410,34 @@ const EmployeeMyDashboard = () => {
     },
   ];
 
+  const focusDistribution = [
+    { label: 'KPI progress', value: Math.round(kpiPercent), color: '#2563eb' },
+    { label: 'Appraisal progress', value: latestAppraisal ? clampPercent(latestAppraisal.scorePercent ?? 45) : 0, color: '#16a34a' },
+    { label: 'Feedback received', value: feedbackReceived, color: '#0284c7' },
+    { label: 'Feedback pending', value: feedbackPending, color: '#d97706' },
+  ];
+
+  const personalProgressBars = [
+    {
+      label: 'KPI completion',
+      value: kpiTotal ? (kpiCompleted / kpiTotal) * 100 : kpiPercent,
+      detail: kpiTotal ? `${kpiCompleted} of ${kpiTotal} KPI items recorded` : 'Latest KPI score progress',
+      color: '#2563eb',
+    },
+    {
+      label: 'Appraisal score',
+      value: latestAppraisal ? clampPercent(latestAppraisal.scorePercent ?? 0) : 0,
+      detail: latestAppraisal ? prettyStatus(latestAppraisal.status) : 'No active appraisal form',
+      color: '#16a34a',
+    },
+    {
+      label: 'Feedback activity',
+      value: feedbackReceived + feedbackPending,
+      detail: `${feedbackReceived} received, ${feedbackPending} pending`,
+      color: '#0284c7',
+    },
+  ];
+
   const recentActivities: ActivityItem[] = [
     ...data.notifications.slice(0, 4).map((notification, index) => ({
       id: `notification-${notification.id ?? index}-${notification.createdAt ?? index}`,
@@ -438,10 +467,10 @@ const EmployeeMyDashboard = () => {
   ].slice(0, 5);
 
   return (
-      <div className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-hidden bg-slate-50 pb-6 text-slate-950">
+      <div className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-hidden bg-slate-50 pb-6 text-slate-950 dashboard-page-shell">
         <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 overflow-hidden">
           <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-            <div className="absolute inset-y-0 right-0 hidden w-[31%] bg-gradient-to-l from-blue-50 via-indigo-50/80 to-transparent xl:block" />
+            <div className="absolute inset-y-0 right-0 hidden w-[31%] bg-gradient-to-l from-blue-50 via-blue-50/80 to-transparent xl:block" />
             <div className="relative grid gap-6 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-center">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-blue-700">
@@ -485,7 +514,7 @@ const EmployeeMyDashboard = () => {
 
               <div className="hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-5 shadow-inner xl:block">
                 <div className="rounded-2xl border border-blue-100 bg-white/90 p-4">
-                  <div className="h-24 rounded-2xl bg-gradient-to-br from-blue-100 via-indigo-50 to-white p-4">
+                  <div className="h-24 rounded-2xl bg-gradient-to-br from-blue-100 via-blue-50 to-white p-4">
                     <div className="flex h-full items-end gap-2">
                       {[42, 58, 50, 68, 62, 77, 88].map((height, index) => (
                           <span key={`${height}-${index}`} className="w-full rounded-t-lg bg-blue-500/80" style={{ height: `${height}%` }} />
@@ -494,7 +523,7 @@ const EmployeeMyDashboard = () => {
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
                     <span className="h-2 rounded-full bg-blue-100" />
-                    <span className="h-2 rounded-full bg-indigo-100" />
+                    <span className="h-2 rounded-full bg-blue-100" />
                     <span className="h-2 rounded-full bg-slate-100" />
                   </div>
                 </div>
@@ -506,6 +535,37 @@ const EmployeeMyDashboard = () => {
             {metricCards.map((card) => (
                 <MetricCardView key={card.title} card={card} />
             ))}
+          </section>
+
+          <section className="dashboard-grid dashboard-grid--two">
+            <DashboardChartCard
+                title="Fluxen Personal Mix"
+                subtitle="KPI, appraisal, and feedback signals in one compact view."
+            >
+              <DonutSummaryChart
+                  data={focusDistribution}
+                  totalLabel="Signals"
+                  emptyTitle="No personal signals yet"
+                  emptyDescription="KPI, appraisal, and feedback data will appear as records are assigned."
+                  height={220}
+              />
+            </DashboardChartCard>
+
+            <DashboardChartCard
+                title="Progress Comparison"
+                subtitle="Current personal progress across active workflows."
+            >
+              <HorizontalBarChart
+                  data={personalProgressBars}
+                  emptyTitle="No progress data"
+                  emptyDescription="Your workflow progress appears here after activity is recorded."
+                  height={220}
+                  maxBars={4}
+                  valueFormatter={(value, item) =>
+                      item?.label === 'Feedback activity' ? String(Math.round(value)) : `${Math.round(value)}%`
+                  }
+              />
+            </DashboardChartCard>
           </section>
 
           <section className="grid min-w-0 gap-4">

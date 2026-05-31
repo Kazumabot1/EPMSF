@@ -124,6 +124,11 @@ export const appraisalCycleService = {
     return unwrap<AppraisalCycleResponse>(response);
   },
 
+  deactivate: async (cycleId: number) => {
+    const response = await api.patch<ApiEnvelope<AppraisalCycleResponse>>(`/hr/appraisal/cycles/${cycleId}/deactivate`);
+    return unwrap<AppraisalCycleResponse>(response);
+  },
+
   lock: async (cycleId: number) => {
     const response = await api.patch<ApiEnvelope<AppraisalCycleResponse>>(`/hr/appraisal/cycles/${cycleId}/lock`);
     return unwrap<AppraisalCycleResponse>(response);

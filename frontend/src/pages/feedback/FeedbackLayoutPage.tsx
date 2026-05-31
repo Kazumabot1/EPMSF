@@ -6,7 +6,7 @@ import DynamicFormPreviewTab from '../hr-feedback/tabs/DynamicFormPreviewTab';
 import CampaignSetupTab from '../hr-feedback/tabs/CampaignSetupTab';
 import EmployeeTargetingTab from '../hr-feedback/tabs/EmployeeTargetingTab';
 import AssignmentPreviewTab from '../hr-feedback/tabs/AssignmentPreviewTab';
-import CampaignMonitoringTab from '../hr-feedback/tabs/CampaignActivationTab';
+import CampaignMonitoringTab from '../hr-feedback/tabs/MonitoringTab';
 import AnalyticsTab from '../hr-feedback/tabs/AnalyticsTab';
 import FeedbackAuditPage from './FeedbackAuditPage';
 import { feedbackCampaignApi } from '../../api/feedbackCampaignApi';
@@ -234,7 +234,7 @@ const FeedbackLayoutPage = () => {
 
   return (
       <div className="feedback-page feedback-page-subnav-mode">
-        {!selfContainedQuestionPage && (
+        {!selfContainedQuestionPage && activeModule !== 'monitoring' && (
             <section className="feedback-hero compact">
               <div>
                 <p className="feedback-eyebrow">{activeCopy.eyebrow}</p>

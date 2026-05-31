@@ -1,4 +1,4 @@
-import type { PositionPermission } from '../types/positionPermission';
+/*Z*/import type { PositionPermission } from '../types/positionPermission';
 
 export type UserRole =
     | 'Employee'
@@ -78,11 +78,29 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   ],
 
   Admin: [
-    { label: 'Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
+    { label: 'HR Admin Dashboard', path: '/admin/dashboard', icon: 'bi-shield-lock', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
     { label: 'User Accounts', path: '/admin/users', icon: 'bi-person-plus' },
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
+    {
+      label: 'KPI Scoring',
+      path: '/admin/kpi-scoring',
+      icon: 'bi-ui-checks-grid',
+      children: [
+        { label: 'Score Senior KPIs', path: '/admin/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
+        { label: 'KPI History', path: '/admin/kpi/history', icon: 'bi-clock-history' },
+      ],
+    },
+    {
+      label: 'KPI Approvals',
+      path: '/admin/approval/kpi',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+        { label: 'Department KPI Approval', path: '/admin/approval/department-kpi', icon: 'bi-building-check' },
+      ],
+    },
     {
       label: 'Access Control',
       path: '/position-permissions',
@@ -243,6 +261,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   DepartmentHead: [
     { label: 'Department Dashboard', path: '/department-head/dashboard', icon: 'bi-building-check', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'Department Employee Lists', path: '/department-head/employee-lists', icon: 'bi-people' },
     { label: 'My KPIs', path: '/department-head/kpis', icon: 'bi-bullseye' },
     {
       label: 'View Self-assessment Form',
@@ -347,12 +366,12 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       ],
     },
     {
-      label: 'Team KPIs',
+      label: 'KPI Evaluation',
       path: '/manager/kpi-scoring',
       icon: 'bi-bullseye',
       permissionField: 'kpiInput',
       children: [
-        { label: 'KPI Scoring', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
+        { label: 'Evaluate KPIs', path: '/manager/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
         { label: 'KPI History', path: '/manager/kpi/history', icon: 'bi-clock-history' },
       ],
     },
@@ -402,24 +421,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    {
-      label: 'KPI Management',
-      path: '/executive/kpi-scoring',
-      icon: 'bi-bullseye',
-      children: [
-        { label: 'KPI Scoring', path: '/executive/kpi-scoring', icon: 'bi-ui-checks-grid', end: true },
-        { label: 'KPI History', path: '/executive/kpi/history', icon: 'bi-clock-history' },
-      ],
-    },
-    {
-      label: 'Approval',
-      path: '/executive/approval/kpi',
-      icon: 'bi-shield-check',
-      children: [
-        { label: 'KPI Approval', path: '/executive/approval/kpi', icon: 'bi-bullseye', end: true },
-        { label: 'Department KPI Approval', path: '/executive/approval/department-kpi', icon: 'bi-building-check' },
-      ],
-    },
+    { label: 'People Change Review', path: '/executive/approval/changes', icon: 'bi-person-check' },
     {
       label: 'Reports',
       path: '/executive/reports',
@@ -450,7 +452,14 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
   const dashboard = normalizeRoleName(user.dashboard ?? '');
   const normalizedPosition = normalizeRoleName(user.position ?? '');
 
-  if (normalizedRoles.includes('ADMIN') || dashboard === 'ADMIN_DASHBOARD') {
+  if (
+      normalizedRoles.includes('ADMIN') ||
+      normalizedRoles.includes('HRADMIN') ||
+      normalizedRoles.includes('HR_ADMIN') ||
+      dashboard === 'ADMIN_DASHBOARD' ||
+      dashboard === 'HRADMIN_DASHBOARD' ||
+      dashboard === 'HR_ADMIN_DASHBOARD'
+  ) {
     return 'Admin';
   }
 
@@ -508,5 +517,6 @@ export const dashboardPathByRole: Record<UserRole, string> = {
 export const displayRoleName = (role: UserRole) => {
   if (role === 'DepartmentHead') return 'Department Head';
   if (role === 'Executive') return 'CEO';
+  if (role === 'Admin') return 'HR Admin';
   return role;
 };

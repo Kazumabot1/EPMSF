@@ -59,6 +59,8 @@ const defaultScoreBands = (): AppraisalScoreBandRequest[] => [
 
 const clampScore = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 
+const normalizeUniqueName = (value?: string | null) => (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 const uniqueScoreBands = <T extends ScoreBandLike>(bands: T[]) => {
   const unique = new Map<string, T>();
   for (const band of bands) {
@@ -68,6 +70,32 @@ const uniqueScoreBands = <T extends ScoreBandLike>(bands: T[]) => {
     }
   }
   return Array.from(unique.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+};
+
+const validateScoreBands = (bands?: ScoreBandLike[] | null) => {
+  const activeBands = (bands?.length ? bands : defaultScoreBands())
+    .filter((band) => band.active !== false);
+
+  if (!activeBands.length) return 'At least one active score range is required.';
+
+  for (const band of activeBands) {
+    if (Number.isNaN(Number(band.minScore)) || Number.isNaN(Number(band.maxScore))) return 'Score range values must be numbers.';
+    if (Number(band.minScore) < 0 || Number(band.maxScore) > 100 || Number(band.minScore) > Number(band.maxScore)) {
+      return 'Score ranges must be valid values between 0 and 100.';
+    }
+    if (!band.label?.trim()) return 'Score rating label is required.';
+  }
+
+  const sortedBands = [...activeBands].sort((left, right) => Number(left.minScore) - Number(right.minScore));
+  for (let index = 1; index < sortedBands.length; index += 1) {
+    const previous = sortedBands[index - 1];
+    const current = sortedBands[index];
+    if (Number(current.minScore) <= Number(previous.maxScore)) {
+      return `Score ranges cannot overlap: ${previous.minScore}-${previous.maxScore} overlaps with ${current.minScore}-${current.maxScore}.`;
+    }
+  }
+
+  return '';
 };
 
 const makeCriteria = (criteriaText: string, sortOrder: number): AppraisalCriterionRequest => ({
@@ -772,6 +800,11 @@ const AppraisalTemplateRecordsPage = () => {
 
   const validateTemplateForm = () => {
     if (!form.templateName.trim()) return 'Template name is required.';
+    const normalizedTemplateName = normalizeUniqueName(form.templateName);
+    const duplicateTemplate = templates.find((template) =>
+      template.id !== editingTemplate?.id && normalizeUniqueName(template.templateName) === normalizedTemplateName,
+    );
+    if (duplicateTemplate) return 'Template name already exists. Please use a different template name.';
     if (!form.description?.trim()) return 'Description is required.';
     if (!form.sections.length || formTotalCriteria === 0) return 'At least one section and one criteria are required.';
     for (const section of form.sections) {
@@ -781,14 +814,7 @@ const AppraisalTemplateRecordsPage = () => {
         if (!criteria.criteriaText.trim()) return 'Criteria text is required.';
       }
     }
-    const bands = uniqueScoreBands(form.scoreBands?.length ? form.scoreBands : defaultScoreBands());
-    for (const band of bands) {
-      if (Number.isNaN(Number(band.minScore)) || Number.isNaN(Number(band.maxScore))) return 'Score range values must be numbers.';
-      if (Number(band.minScore) < 0 || Number(band.maxScore) > 100 || Number(band.minScore) > Number(band.maxScore)) {
-        return 'Score ranges must be valid values between 0 and 100.';
-      }
-    }
-    return '';
+    return validateScoreBands(form.scoreBands);
   };
 
   const createTemplate = async () => {

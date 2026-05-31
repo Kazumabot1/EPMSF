@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import { DashboardChartCard, DonutSummaryChart, HorizontalBarChart } from '../../components/dashboard';
 import EmployeeAvatar from '../../components/EmployeeAvatar';
 import { exportToExcel, todayStr } from '../../utils/exportExcel';
 
@@ -52,6 +53,8 @@ interface AdminUserAccount {
   departmentName?: string | null;
   positionId?: number | null;
   positionName?: string | null;
+  managerId?: number | null;
+  managerName?: string | null;
   roleName?: string | null;
   dashboard?: string | null;
   active?: boolean;
@@ -97,6 +100,7 @@ type ExportUserRow = {
   employeeCode: string;
   departmentName: string;
   positionName: string;
+  managerName: string;
   roleName: string;
   dashboard: string;
   status: string;
@@ -421,7 +425,7 @@ const MetricCard = ({
     green: 'bg-emerald-50 text-emerald-600',
     amber: 'bg-amber-50 text-amber-600',
     rose: 'bg-rose-50 text-rose-600',
-    violet: 'bg-violet-50 text-violet-600',
+    violet: 'bg-blue-50 text-blue-600',
   }[tone];
 
   return (
@@ -514,7 +518,7 @@ const StatusPill = ({
     blue: 'bg-blue-50 text-blue-700 ring-blue-200',
     slate: 'bg-slate-100 text-slate-700 ring-slate-200',
     amber: 'bg-amber-50 text-amber-700 ring-amber-200',
-    violet: 'bg-violet-50 text-violet-700 ring-violet-200',
+    violet: 'bg-blue-50 text-blue-700 ring-blue-200',
   }[tone];
 
   return (
@@ -909,6 +913,26 @@ const AdminDashboard = () => {
         .sort((a, b) => b.count - a.count);
   }, [users]);
 
+  const accountStatusChart = useMemo(
+      () => [
+        { label: 'Active', value: activeUsers.length, color: '#16a34a' },
+        { label: 'Inactive', value: inactiveUsers.length, color: '#dc2626' },
+        { label: 'Needs attention', value: attentionUsers.length, color: '#d97706' },
+      ],
+      [activeUsers.length, attentionUsers.length, inactiveUsers.length],
+  );
+
+  const dashboardAssignmentBars = useMemo(
+      () =>
+          dashboardSummary.map((item, index) => ({
+            label: item.label,
+            value: item.count,
+            detail: item.helper,
+            color: ['#2563eb', '#0284c7', '#0891b2', '#16a34a', '#d97706', '#64748b'][index % 6],
+          })),
+      [dashboardSummary],
+  );
+
   const openCreate = () => {
     resetForm();
     setShowForm(true);
@@ -1050,6 +1074,7 @@ const AdminDashboard = () => {
       employeeCode: user.employeeCode ?? '',
       departmentName: user.departmentName ?? '',
       positionName: user.positionName ?? '',
+      managerName: user.managerName ?? '',
       roleName: roleDisplayName(user.roleName ?? ''),
       dashboard: dashboardDisplayName(user.dashboard, user.roleName),
       status: user.active === false ? 'Inactive' : 'Active',
@@ -1063,6 +1088,7 @@ const AdminDashboard = () => {
           { header: 'Employee Code', key: 'employeeCode' },
           { header: 'Department', key: 'departmentName' },
           { header: 'Position', key: 'positionName' },
+          { header: 'Manager', key: 'managerName' },
           { header: 'Role', key: 'roleName' },
           { header: 'Dashboard', key: 'dashboard' },
           { header: 'Status', key: 'status' },
@@ -1073,7 +1099,7 @@ const AdminDashboard = () => {
 
   const renderUserTable = (tableUsers: AdminUserAccount[]) => (
       <div className="overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[1120px] divide-y divide-slate-200 text-left text-sm">
+        <table className="w-full min-w-[1240px] divide-y divide-slate-200 text-left text-sm">
           <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
           <tr>
             <th className="w-14 px-4 py-3">#</th>
@@ -1082,6 +1108,7 @@ const AdminDashboard = () => {
             <th className="min-w-[150px] px-4 py-3">Employee Code</th>
             <th className="min-w-[170px] px-4 py-3">Department</th>
             <th className="min-w-[180px] px-4 py-3">Position</th>
+            <th className="min-w-[170px] px-4 py-3">Manager</th>
             <th className="min-w-[130px] px-4 py-3">Role</th>
             <th className="min-w-[190px] px-4 py-3">Dashboard</th>
             <th className="min-w-[120px] px-4 py-3">Status</th>
@@ -1092,7 +1119,7 @@ const AdminDashboard = () => {
           <tbody className="divide-y divide-slate-100 bg-white">
           {listLoading && (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
+                <td colSpan={11} className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
                   Loading user accounts...
                 </td>
               </tr>
@@ -1127,6 +1154,7 @@ const AdminDashboard = () => {
                       <td className="px-4 py-3 text-slate-600">{user.employeeCode ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{user.departmentName ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{user.positionName ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{user.managerName ?? '—'}</td>
 
                       <td className="px-4 py-3">
                         <StatusPill tone="violet">{roleDisplayName(user.roleName ?? '—')}</StatusPill>
@@ -1158,7 +1186,7 @@ const AdminDashboard = () => {
 
           {!listLoading && tableUsers.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-10">
+                <td colSpan={11} className="px-4 py-10">
                   <EmptyState
                       title="No user accounts found"
                       message={
@@ -1243,6 +1271,34 @@ const AdminDashboard = () => {
                     icon="alert"
                     tone={attentionUsers.length > 0 ? 'amber' : 'green'}
                 />
+              </div>
+
+              <div className="dashboard-grid dashboard-grid--two">
+                <DashboardChartCard
+                    title="Fluxen Account Health"
+                    subtitle="Active, inactive, and attention-needed login accounts."
+                >
+                  <DonutSummaryChart
+                      data={accountStatusChart}
+                      totalLabel="Accounts"
+                      emptyTitle="No account health data"
+                      emptyDescription="Account status data appears after users are loaded."
+                      height={220}
+                  />
+                </DashboardChartCard>
+
+                <DashboardChartCard
+                    title="Dashboard Assignment Comparison"
+                    subtitle="How accounts are distributed across assigned dashboards."
+                >
+                  <HorizontalBarChart
+                      data={dashboardAssignmentBars}
+                      emptyTitle="No dashboard assignments"
+                      emptyDescription="Dashboard assignment counts will appear after accounts are created."
+                      height={220}
+                      maxBars={8}
+                  />
+                </DashboardChartCard>
               </div>
 
               <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-2">
@@ -1390,6 +1446,36 @@ const AdminDashboard = () => {
                   icon="info"
                   tone={attentionUsers.length > 0 ? 'amber' : 'blue'}
               />
+            </div>
+        )}
+
+        {isUserAccountsPage && (
+            <div className="dashboard-grid dashboard-grid--two">
+              <DashboardChartCard
+                  title="Fluxen Account Health"
+                  subtitle="Account availability and setup quality for the filtered admin workspace."
+              >
+                <DonutSummaryChart
+                    data={accountStatusChart}
+                    totalLabel="Accounts"
+                    emptyTitle="No account health data"
+                    emptyDescription="Account status data appears after users are loaded."
+                    height={220}
+                />
+              </DashboardChartCard>
+
+              <DashboardChartCard
+                  title="Dashboard Assignment Comparison"
+                  subtitle="Assigned dashboards across all login accounts."
+              >
+                <HorizontalBarChart
+                    data={dashboardAssignmentBars}
+                    emptyTitle="No dashboard assignments"
+                    emptyDescription="Dashboard assignment counts will appear after accounts are created."
+                    height={220}
+                    maxBars={8}
+                />
+              </DashboardChartCard>
             </div>
         )}
 

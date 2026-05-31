@@ -120,7 +120,7 @@ const DepartmentKpiScoringPage = () => {
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-7xl px-4 py-8">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">Department KPI</p><h1 className="mt-1 text-2xl font-bold text-gray-900">HR Department KPI Scoring</h1></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">Department KPI</p><h1 className="mt-1 text-2xl font-bold text-gray-900">HR Department KPI Scoring</h1></div>
           <button className="kpi-tpl-btn-primary" disabled={!selected || selected.openAssignments === 0} onClick={() => void finalizeAll()}>Finalize All</button>
         </header>
         <div className="mb-5 max-w-xl">

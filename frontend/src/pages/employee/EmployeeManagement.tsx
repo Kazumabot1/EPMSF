@@ -207,7 +207,7 @@ const EmployeeManagement = () => {
               View and manage employee master data. Use{' '}
               <Link
                   to="/hr/employee/import"
-                  className="text-indigo-600 underline decoration-indigo-200 underline-offset-2"
+                  className="text-blue-600 underline decoration-blue-200 underline-offset-2"
               >
                 Import Employees
               </Link>{' '}
@@ -582,7 +582,7 @@ const EmployeeManagement = () => {
                                     : 'No position'}
                               </p>
 
-                              <p className="truncate text-sm font-medium text-indigo-600">
+                              <p className="truncate text-sm font-medium text-blue-600">
                                 {employeeSubtitle(emp)}
                               </p>
 

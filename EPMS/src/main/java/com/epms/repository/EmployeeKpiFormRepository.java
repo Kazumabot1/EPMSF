@@ -31,6 +31,8 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
             Integer cyclePeriodId
     );
 
+    boolean existsByCyclePeriod_Id(Integer cyclePeriodId);
+
     @EntityGraph(attributePaths = {"kpiForm", "kpiTemplateCycle", "cyclePeriod", "scores", "scores.kpiFormItem", "scores.kpiFormItem.kpiUnit"})
     @Query("SELECT ekf FROM EmployeeKpiForm ekf WHERE ekf.employee.id = :employeeId AND ekf.status = :status")
     List<EmployeeKpiForm> findDetailedByEmployeeAndStatus(
