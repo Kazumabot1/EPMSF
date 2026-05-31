@@ -6,6 +6,12 @@ import java.util.List;
 
 public interface EmployeeChangeRequestService {
 
+    List<EmployeeChangeRequestDtos.WorkforceEmployeeResponse> getWorkforceEmployees();
+
+    List<EmployeeChangeRequestDtos.WorkforcePositionResponse> getWorkforcePositions();
+
+    List<EmployeeChangeRequestDtos.WorkforceDepartmentResponse> getWorkforceDepartments();
+
     List<EmployeeChangeRequestDtos.SummaryResponse> getAllForHr();
 
     List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForHrAdmin();

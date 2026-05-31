@@ -92,10 +92,7 @@ const WORKFORCE_ALLOWED_ROLES = new Set([
   'MANAGER',
   'PROJECT_MANAGER',
   'TEAM_MANAGER',
-  'DEPARTMENT_HEAD',
-  'DEPARTMENTHEAD',
-  'DEPT_HEAD',
-  'HEAD_OF_DEPARTMENT',
+  'PM',
 ]);
 
 const normalizeRoleName = (value?: string | null) =>
@@ -265,8 +262,21 @@ setSelectedEmployeeId((previous) => {
   const openModal = (mode: ModalMode) => {
     setModalMode(mode);
     setNewPositionId('');
-    setNewCurrentDepartmentId('');
-    setNewParentDepartmentId('');
+
+    if (mode === 'DEPARTMENT_CHANGE' && selectedEmployee) {
+      setNewCurrentDepartmentId(
+        selectedEmployee.currentDepartmentId || selectedEmployee.departmentId
+          ? String(selectedEmployee.currentDepartmentId || selectedEmployee.departmentId)
+          : '',
+      );
+      setNewParentDepartmentId(
+        selectedEmployee.parentDepartmentId ? String(selectedEmployee.parentDepartmentId) : '',
+      );
+    } else {
+      setNewCurrentDepartmentId('');
+      setNewParentDepartmentId('');
+    }
+
     setReason('');
     setMessage('');
     setIsError(false);
@@ -304,13 +314,19 @@ setSelectedEmployeeId((previous) => {
 setMessage('Position change request submitted for HR Admin approval.');      }
 
       if (modalMode === 'DEPARTMENT_CHANGE') {
-        if (!newCurrentDepartmentId) {
+        const fallbackCurrentDepartmentId =
+          selectedEmployee.currentDepartmentId || selectedEmployee.departmentId || null;
+        const nextCurrentDepartmentId = newCurrentDepartmentId
+          ? Number(newCurrentDepartmentId)
+          : fallbackCurrentDepartmentId;
+
+        if (!nextCurrentDepartmentId) {
           throw new Error('Please choose the new current department.');
         }
 
         await employeeChangeRequestService.createDepartmentChange({
           employeeId: selectedEmployee.id,
-          newCurrentDepartmentId: Number(newCurrentDepartmentId),
+          newCurrentDepartmentId: nextCurrentDepartmentId,
           newParentDepartmentId: newParentDepartmentId
             ? Number(newParentDepartmentId)
             : null,
@@ -651,7 +667,7 @@ Review employee details and submit position or department change requests for HR
                       onChange={(event) => setNewCurrentDepartmentId(event.target.value)}
                       className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                     >
-                      <option value="">Choose current department</option>
+                      <option value="">Keep current department</option>
                       {departments.map((department) => (
                         <option key={department.id} value={department.id}>
                           {departmentLabel(department)}

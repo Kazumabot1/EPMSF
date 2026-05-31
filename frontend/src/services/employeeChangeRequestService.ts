@@ -44,7 +44,7 @@ const unwrapList = <T>(response: any): T[] => {
 
 export const employeeChangeRequestService = {
   async getEmployees(): Promise<WorkforceEmployee[]> {
-    const response = await api.get('/employees');
+    const response = await api.get('/employee-change-requests/workforce-employees');
     return unwrapList<WorkforceEmployee>(response);
   },
 
@@ -54,12 +54,12 @@ async getEmployeeProfile(employeeId: number): Promise<EmployeeChangeProfile> {
 },
 
   async getPositions(): Promise<WorkforcePosition[]> {
-    const response = await api.get('/positions');
+    const response = await api.get('/employee-change-requests/workforce-positions');
     return unwrapList<WorkforcePosition>(response);
   },
 
   async getDepartments(): Promise<WorkforceDepartment[]> {
-    const response = await api.get('/departments');
+    const response = await api.get('/employee-change-requests/workforce-departments');
     return unwrapList<WorkforceDepartment>(response);
   },
 

@@ -49,6 +49,10 @@ const isDepartmentHeadUser = (user: any) => {
   });
 };
 
+
+const isAvailableCandidate = (candidate: CandidateUser) =>
+  candidate.available !== false && candidate.isAvailable !== false;
+
 const getApiErrorMessage = (err: any) => {
   const data = err?.response?.data;
 
@@ -152,8 +156,8 @@ const TeamCreate: React.FC = () => {
         ]);
 
         if (!cancelled) {
-          setLeaders(Array.isArray(leaderData) ? leaderData : []);
-          setMembers(Array.isArray(memberData) ? memberData : []);
+          setLeaders(Array.isArray(leaderData) ? leaderData.filter(isAvailableCandidate) : []);
+          setMembers(Array.isArray(memberData) ? memberData.filter(isAvailableCandidate) : []);
           setProjectManagers(Array.isArray(pmData) ? pmData : []);
           setTeamLeaderId('');
           setProjectManagerId('');
@@ -187,8 +191,8 @@ const TeamCreate: React.FC = () => {
         ]);
 
         if (!cancelled) {
-          setLeaders(Array.isArray(leaderData) ? leaderData : []);
-          setMembers(Array.isArray(memberData) ? memberData : []);
+          setLeaders(Array.isArray(leaderData) ? leaderData.filter(isAvailableCandidate) : []);
+          setMembers(Array.isArray(memberData) ? memberData.filter(isAvailableCandidate) : []);
           setProjectManagers(Array.isArray(pmData) ? pmData : []);
           setTeamLeaderId('');
           setProjectManagerId('');
@@ -261,15 +265,11 @@ const TeamCreate: React.FC = () => {
       .filter((member) => !roleCandidateIds.has(member.id))
       .filter((member) => member.id !== selectedLeaderIdNumber)
       .filter((member) => member.id !== selectedProjectManagerIdNumber)
-      .map((member) => {
-        const alreadyInTeam = member.available === false || member.isAvailable === false;
-
-        return {
-          ...member,
-          disabled: alreadyInTeam,
-          disabledReason: alreadyInTeam ? getCandidateTeamWarning(member) : '',
-        };
-      });
+      .map((member) => ({
+        ...member,
+        disabled: false,
+        disabledReason: '',
+      }));
   }, [members, roleCandidateIds, selectedLeaderIdNumber, selectedProjectManagerIdNumber]);
 
   const toggleMember = (memberId: number) => {

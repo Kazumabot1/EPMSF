@@ -41,6 +41,44 @@ const bandColorClass = (sortOrder: number) => {
   return 'sat-band-red';
 };
 
+const clampScore = (value: number) => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, Math.round(value)));
+};
+
+const splitDescendingRange = (
+  low: number,
+  high: number,
+  count: number,
+): Array<{ minScore: number; maxScore: number }> | null => {
+  if (count <= 0) return [];
+
+  const totalPoints = high - low + 1;
+
+  if (totalPoints < count) {
+    return null;
+  }
+
+  const baseWidth = Math.floor(totalPoints / count);
+  const remainder = totalPoints % count;
+  const ranges: Array<{ minScore: number; maxScore: number }> = [];
+  let cursorMax = high;
+
+  for (let index = 0; index < count; index += 1) {
+    const width = baseWidth + (index < remainder ? 1 : 0);
+    const minScore = cursorMax - width + 1;
+
+    ranges.push({
+      minScore,
+      maxScore: cursorMax,
+    });
+
+    cursorMax = minScore - 1;
+  }
+
+  return ranges;
+};
+
 const applyEditedBand = (
   currentBands: SelfAssessmentScoreBand[],
   editedBand: SelfAssessmentScoreBand,
@@ -53,45 +91,64 @@ const applyEditedBand = (
 
   if (index < 0) return sorted;
 
-  sorted[index] = { ...editedBand };
+  const normalizedEditedBand: SelfAssessmentScoreBand = {
+    ...editedBand,
+    minScore: clampScore(editedBand.minScore),
+    maxScore: clampScore(editedBand.maxScore),
+  };
 
-  const aboveIndex = index - 1;
-  const belowIndex = index + 1;
-
-  if (aboveIndex >= 0) {
-    const above = sorted[aboveIndex];
-    const tooWideAbove = index >= 2 && editedBand.maxScore >= sorted[index - 2].minScore;
-    const nextAboveMin = editedBand.maxScore + 1;
-
-    if (tooWideAbove || nextAboveMin > above.maxScore) {
-      for (let i = 0; i < index; i += 1) {
-        sorted[i] = { ...sorted[i], minScore: 0, maxScore: 0 };
-      }
-    } else {
-      sorted[aboveIndex] = {
-        ...above,
-        minScore: nextAboveMin,
-      };
-    }
+  if (index === 0) {
+    normalizedEditedBand.maxScore = 100;
   }
 
-  if (belowIndex < sorted.length) {
-    const below = sorted[belowIndex];
-    const tooWideBelow =
-      belowIndex + 1 < sorted.length && editedBand.minScore <= sorted[belowIndex + 1].maxScore;
-    const nextBelowMax = editedBand.minScore - 1;
-
-    if (tooWideBelow || nextBelowMax < below.minScore) {
-      for (let i = belowIndex; i < sorted.length; i += 1) {
-        sorted[i] = { ...sorted[i], minScore: 0, maxScore: 0 };
-      }
-    } else {
-      sorted[belowIndex] = {
-        ...below,
-        maxScore: nextBelowMax,
-      };
-    }
+  if (index === sorted.length - 1) {
+    normalizedEditedBand.minScore = 0;
   }
+
+  sorted[index] = normalizedEditedBand;
+
+  if (normalizedEditedBand.minScore > normalizedEditedBand.maxScore) {
+    return sorted;
+  }
+
+  const aboveCount = index;
+  const belowCount = sorted.length - index - 1;
+
+  const aboveRanges = splitDescendingRange(
+    normalizedEditedBand.maxScore + 1,
+    100,
+    aboveCount,
+  );
+
+  if (aboveRanges === null) {
+    return sorted;
+  }
+
+  aboveRanges.forEach((range, rangeIndex) => {
+    sorted[rangeIndex] = {
+      ...sorted[rangeIndex],
+      ...range,
+    };
+  });
+
+  const belowRanges = splitDescendingRange(
+    0,
+    normalizedEditedBand.minScore - 1,
+    belowCount,
+  );
+
+  if (belowRanges === null) {
+    return sorted;
+  }
+
+  belowRanges.forEach((range, rangeIndex) => {
+    const bandIndex = index + 1 + rangeIndex;
+
+    sorted[bandIndex] = {
+      ...sorted[bandIndex],
+      ...range,
+    };
+  });
 
   return sorted;
 };
@@ -320,7 +377,7 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
                     <strong>Active form notice</strong>
                     <p>
                       There {activeFormCount === 1 ? 'is' : 'are'} currently {activeFormCount} active self-assessment form
-                      {activeFormCount === 1 ? '' : 's'}. Updates to this table will apply to active and past self-assessment records.
+                      {activeFormCount === 1 ? '' : 's'}. Updates to this table will apply to active self-assessment forms and refresh displayed assessment explanations.
                     </p>
                   </div>
                 </div>
@@ -374,7 +431,7 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
               <div>
                 <h3>Edit Score Row</h3>
                 <p>
-                  Editing one row may automatically adjust the adjacent row. If the new range covers too much, affected rows reset to 00-00 and must be fixed before saving.
+                  Editing one row automatically redistributes the remaining rows so the full 0-100 score table stays continuous.
                 </p>
               </div>
 
@@ -390,7 +447,7 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
                   <div>
                     <strong>This update will apply to active forms.</strong>
                     <p>
-                      Updating this score table will immediately affect active self-assessment forms and displayed past assessment explanations.
+                      Updating this score table will immediately affect active self-assessment forms and refresh displayed assessment explanations.
                     </p>
                   </div>
                 </div>
@@ -403,7 +460,8 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
                     type="number"
                     min={0}
                     max={100}
-                    value={editState.draft.minScore}
+                    value={editState.draft.sortOrder === 5 ? 0 : editState.draft.minScore}
+                    disabled={editState.draft.sortOrder === 5}
                     onChange={(event) => updateDraft({ minScore: Number(event.target.value) })}
                   />
                 </label>
@@ -414,7 +472,8 @@ const SelfAssessmentScoreTableEditor = ({ open, onClose, onUpdated }: Props) => 
                     type="number"
                     min={0}
                     max={100}
-                    value={editState.draft.maxScore}
+                    value={editState.draft.sortOrder === 1 ? 100 : editState.draft.maxScore}
+                    disabled={editState.draft.sortOrder === 1}
                     onChange={(event) => updateDraft({ maxScore: Number(event.target.value) })}
                   />
                 </label>

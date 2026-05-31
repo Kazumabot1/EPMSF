@@ -16,6 +16,36 @@ public class EmployeeChangeRequestController {
 
     private final EmployeeChangeRequestService employeeChangeRequestService;
 
+    @GetMapping("/workforce-employees")
+    public ResponseEntity<GenericApiResponse<List<EmployeeChangeRequestDtos.WorkforceEmployeeResponse>>> getWorkforceEmployees() {
+        return ResponseEntity.ok(
+                GenericApiResponse.success(
+                        "Workforce employees fetched",
+                        employeeChangeRequestService.getWorkforceEmployees()
+                )
+        );
+    }
+
+    @GetMapping("/workforce-positions")
+    public ResponseEntity<GenericApiResponse<List<EmployeeChangeRequestDtos.WorkforcePositionResponse>>> getWorkforcePositions() {
+        return ResponseEntity.ok(
+                GenericApiResponse.success(
+                        "Workforce positions fetched",
+                        employeeChangeRequestService.getWorkforcePositions()
+                )
+        );
+    }
+
+    @GetMapping("/workforce-departments")
+    public ResponseEntity<GenericApiResponse<List<EmployeeChangeRequestDtos.WorkforceDepartmentResponse>>> getWorkforceDepartments() {
+        return ResponseEntity.ok(
+                GenericApiResponse.success(
+                        "Workforce departments fetched",
+                        employeeChangeRequestService.getWorkforceDepartments()
+                )
+        );
+    }
+
     @GetMapping("/hr")
     public ResponseEntity<GenericApiResponse<List<EmployeeChangeRequestDtos.SummaryResponse>>> getAllForHr() {
         return ResponseEntity.ok(

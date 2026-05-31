@@ -398,7 +398,7 @@ Review HR-submitted position and department change requests. Approved requests a
                   </section>
 
                   <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h3 className="font-black text-slate-950">CEO Review</h3>
+                    <h3 className="font-black text-slate-950">HR Admin Review</h3>
                     <div className="mt-3 flex flex-wrap gap-3">
                       <button
                         type="button"
@@ -427,11 +427,11 @@ Review HR-submitted position and department change requests. Approved requests a
                     <textarea
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
-                      placeholder="Write CEO approval/rejection reason..."
+                      placeholder="Write HR Admin approval/rejection reason..."
                       className="mt-4 min-h-28 w-full resize-y rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                     />
                     <p className="mt-2 text-xs font-bold text-slate-500">
-                      CEO review reason is required and must be at least 10 characters.
+                      HR Admin review reason is required and must be at least 10 characters.
                     </p>
                   </section>
                 </div>

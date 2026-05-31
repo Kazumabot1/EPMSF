@@ -20,6 +20,7 @@ import com.epms.notification.NotificationEventKey;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeDepartmentRepository;
 import com.epms.repository.EmployeeRepository;
+import com.epms.repository.PositionPermissionRepository;
 import com.epms.repository.RoleRepository;
 import com.epms.repository.TeamHistoryRepository;
 import com.epms.repository.TeamMemberRepository;
@@ -65,6 +66,7 @@ public class TeamServiceImpl implements TeamService {
     private final UserRoleRepository userRoleRepository;
     private final RoleRepository roleRepository;
     private final PositionPermissionService positionPermissionService;
+    private final PositionPermissionRepository positionPermissionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -1088,15 +1090,18 @@ public class TeamServiceImpl implements TeamService {
     private PositionPermission getPositionPermissions(User user) {
         Position position = resolvePosition(user);
 
-        if (position == null) {
+        if (position == null || position.getId() == null) {
             return null;
         }
 
-        try {
-            return position.getPermissions();
-        } catch (Exception ignored) {
-            return null;
-        }
+        return positionPermissionRepository.findByPositionId(position.getId())
+                .orElseGet(() -> {
+                    try {
+                        return position.getPermissions();
+                    } catch (Exception ignored) {
+                        return null;
+                    }
+                });
     }
 
     private Position resolvePosition(User user) {
