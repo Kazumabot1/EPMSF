@@ -47,7 +47,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     private static final String RESPONSE_RATING_WITH_COMMENT = "RATING_WITH_COMMENT";
     private static final String SCORING_SCORED = "SCORED";
 
-    private static final Set<String> SUPPORTED_STATUSES = Set.of("ACTIVE", "DRAFT", "RETIRED", "ARCHIVED", "INACTIVE");
+    private static final Set<String> SUPPORTED_STATUSES = Set.of("ACTIVE", "DRAFT", "INACTIVE", "RETIRED", "ARCHIVED");
     private static final Set<String> SUPPORTED_RULE_RELATIONSHIPS = Set.of("MANAGER", "PEER", "SUBORDINATE", "SELF");
 
     private static final Map<String, String> COMPETENCY_CODE_PREFIXES = Map.ofEntries(
@@ -165,7 +165,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                 .orElseThrow(() -> new ResourceNotFoundException("Feedback question not found."));
         String normalizedStatus = normalizeStatus(status);
         if ("ARCHIVED".equals(normalizedStatus) && "ACTIVE".equals(bank.getStatus())) {
-            throw new BadRequestException("Retire the question before archiving it.");
+            throw new BadRequestException("Make the question inactive before archiving it.");
         }
         bank.setStatus(normalizedStatus);
         return toQuestionResponse(questionBankRepository.save(bank));
@@ -271,7 +271,22 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         ruleSet = ruleSetRepository.save(ruleSet);
 
         List<FeedbackQuestionApplicabilityRule> existingRows = ruleRepository.findDetailedByRuleSetId(ruleSetId);
-        ruleRepository.deleteAll(existingRows);
+        Set<String> requestedRelationshipTypes = new LinkedHashSet<>(relationshipTypes);
+        List<FeedbackQuestionApplicabilityRule> rowsForRequestedEvaluatorTypes = existingRows.stream()
+                .filter(row -> requestedRelationshipTypes.contains(row.getEvaluatorRelationshipType()))
+                .toList();
+        List<FeedbackQuestionApplicabilityRule> rowsForOtherEvaluatorTypes = existingRows.stream()
+                .filter(row -> !requestedRelationshipTypes.contains(row.getEvaluatorRelationshipType()))
+                .toList();
+        for (FeedbackQuestionApplicabilityRule preservedRow : rowsForOtherEvaluatorTypes) {
+            preservedRow.setTargetLevelMinRank(minRank);
+            preservedRow.setTargetLevelMaxRank(maxRank);
+            preservedRow.setTargetDepartmentId(request.getTargetDepartmentId());
+            preservedRow.setTargetPositionId(request.getTargetPositionId());
+            preservedRow.setActive("ACTIVE".equals(desiredStatus));
+            ruleRepository.save(preservedRow);
+        }
+        ruleRepository.deleteAll(rowsForRequestedEvaluatorTypes);
         ruleRepository.flush();
 
         List<FeedbackQuestionRuleResponse> responses = new ArrayList<>();
@@ -1174,13 +1189,10 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
 
     private String normalizeStatus(String status) {
         String value = firstNonBlank(status, "DRAFT").trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
-        if ("INACTIVE".equals(value)) {
-            return "RETIRED";
-        }
         if (!SUPPORTED_STATUSES.contains(value)) {
             throw new BadRequestException("Unsupported question status: " + status);
         }
-        return value;
+        return "RETIRED".equals(value) ? "INACTIVE" : value;
     }
 
     private String normalizeCode(String value, String message) {
