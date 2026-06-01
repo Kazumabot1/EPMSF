@@ -9,10 +9,23 @@ type Props = {
 };
 
 const formatDate = (value: string | null | undefined): string => {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
+
+const formatPeriod = (start?: string | null, end?: string | null): string => {
+  if (!start || !end) return '-';
+  return `${formatDate(start)} - ${formatDate(end)}`;
+};
+
+const formatPercent = (value: number | null | undefined): string =>
+  value != null && Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : '-';
+
+const employeeKpiHeroGradient =
+  'bg-[radial-gradient(circle_at_88%_18%,rgba(255,255,255,0.45),transparent_14rem),linear-gradient(135deg,#ffffff_0%,#dbeafe_42%,#1e3a8a_100%)]';
 
 const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
   useEffect(() => {
@@ -26,19 +39,18 @@ const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
 
   if (!open || row == null) return null;
 
+  const metadata = [
+    ['Employee Name', row.employeeName],
+    ['Department', row.departmentName],
+    ['Position', row.positionTitle],
+    ['KPI Title', row.kpiTitle],
+    ['Period', formatPeriod(row.periodStartDate, row.periodEndDate)],
+  ];
+
   return createPortal(
     <div
       role="presentation"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1200,
-        background: 'rgba(15, 23, 42, 0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem',
-      }}
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/45 p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -47,161 +59,115 @@ const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="hr-kpi-modal-title"
-        style={{
-          width: '100%',
-          maxWidth: '960px',
-          maxHeight: 'min(90vh, 920px)',
-          overflow: 'auto',
-          background: '#fff',
-          borderRadius: '14px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-          fontFamily: 'Inter, sans-serif',
-        }}
+        className="max-h-[min(90vh,920px)] w-full max-w-6xl overflow-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        style={{ fontFamily: '"Times New Roman", Times, serif' }}
       >
-        {/* Header */}
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            padding: '1.25rem 1.25rem 1rem',
-            borderBottom: '1px solid #f1f5f9',
-          }}
+          className={`flex items-start justify-between gap-4 border-b border-blue-200/60 px-6 py-5 ${employeeKpiHeroGradient}`}
         >
-          <div>
-            <h2 id="hr-kpi-modal-title" style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a' }}>
-              {row.employeeName}
-            </h2>
-            <p style={{ margin: '.4rem 0 0', fontSize: '.82rem', color: '#64748b' }}>
-              {row.departmentName && <span>{row.departmentName} · </span>}
-              {row.positionTitle && <span>{row.positionTitle} · </span>}
-              KPI: <strong>{row.kpiTitle}</strong>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-800">
+              Employee KPI details
             </p>
-            {row.periodStartDate && row.periodEndDate && (
-              <p style={{ margin: '.3rem 0 0', fontSize: '.8rem', color: '#475569' }}>
-                Period:{' '}
-                <strong>
-                  {formatDate(row.periodStartDate)} – {formatDate(row.periodEndDate)}
-                </strong>
-              </p>
-            )}
+            <h2 id="hr-kpi-modal-title" className="mt-1 text-2xl font-bold leading-tight text-blue-950">
+              {row.kpiTitle ?? 'KPI Result'}
+            </h2>
+            <p className="mt-2 text-sm text-slate-700">
+              <span className="font-semibold text-blue-950">{row.employeeName}</span>
+              <span className="px-2 text-slate-400">·</span>
+              Status: <strong className="text-blue-950">{row.status ?? '-'}</strong>
+              {row.finalizedAt ? (
+                <>
+                  <span className="px-2 text-slate-400">|</span>
+                  Finalized: <strong className="text-blue-950">{formatDate(row.finalizedAt)}</strong>
+                </>
+              ) : null}
+              {row.earlyFinalizedReason ? (
+                <>
+                  <span className="px-2 text-slate-400">|</span>
+                  Reason: <strong className="text-blue-950">{row.earlyFinalizedReason}</strong>
+                </>
+              ) : null}
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            style={{
-              flexShrink: 0,
-              border: 'none',
-              background: '#f1f5f9',
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              color: '#475569',
-              fontSize: '1.25rem',
-              lineHeight: 1,
-            }}
+            className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-white/50 bg-white/90 text-xl font-semibold leading-none text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-blue-950"
           >
             ×
           </button>
         </div>
 
-        {/* Summary strip */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            padding: '.75rem 1.25rem',
-            background: '#f8fafc',
-            borderBottom: '1px solid #f1f5f9',
-            fontSize: '.82rem',
-            color: '#475569',
-          }}
-        >
-          <span>
-            Status: <strong style={{ color: '#0f172a' }}>{row.status ?? '—'}</strong>
-          </span>
-          {row.totalScore != null && (
-            <span>
-              Avg achievement %: <strong style={{ color: '#0f172a' }}>{row.totalScore.toFixed(2)}</strong>
-            </span>
-          )}
-          {row.totalWeightedScore != null && (
-            <span>
-              Weighted score: <strong style={{ color: '#0f172a' }}>{row.totalWeightedScore.toFixed(2)}</strong>
-            </span>
-          )}
-          {row.finalizedAt && (
-            <span>
-              Finalized: <strong style={{ color: '#0f172a' }}>{formatDate(row.finalizedAt)}</strong>
-            </span>
-          )}
-          {row.earlyFinalizedReason && (
-            <span>
-              Reason: <strong style={{ color: '#0f172a' }}>{row.earlyFinalizedReason}</strong>
-            </span>
-          )}
-        </div>
+        <div className="px-6 py-5">
+          <section className="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
+            {metadata.map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}:</dt>
+                <dd className="mt-1 truncate text-sm font-semibold text-slate-950" title={value ?? '-'}>
+                  {value ?? '-'}
+                </dd>
+              </div>
+            ))}
+          </section>
 
-        {/* KPI lines table */}
-        <div style={{ padding: '1rem 1.25rem 1.25rem' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: '#64748b' }}>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0' }}>KPI</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Target</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weight %</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Actual</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Achievement %</th>
-                  <th style={{ padding: '.5rem', borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>Weighted score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {row.lines.map((line) => (
-                  <tr key={line.kpiFormItemId}>
-                    <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
-                      {line.kpiLabel ?? '—'}
-                      {line.unitName ? <span style={{ color: '#94a3b8' }}> ({line.unitName})</span> : null}
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1040px] border-collapse text-sm">
+                <thead className="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">KPI</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3 text-right">Target%</th>
+                    <th className="px-4 py-3">Unit</th>
+                    <th className="px-4 py-3 text-right">Actual%</th>
+                    <th className="px-4 py-3 text-right">Weight %</th>
+                    <th className="px-4 py-3 text-right">Score %</th>
+                    <th className="px-4 py-3 text-right">Weighted Score%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {row.lines.map((line) => (
+                    <tr key={line.kpiFormItemId} className="hover:bg-slate-50/80">
+                      <td className="px-4 py-3 font-medium text-slate-700">
+                        {line.kpiLabel ?? '-'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{line.kpiCategoryName ?? '-'}</td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-700">{formatPercent(line.target)}</td>
+                      <td className="px-4 py-3 text-slate-500">{line.unitName ?? '-'}</td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-700">
+                        {formatPercent(line.actualValue)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-700">{formatPercent(line.weight)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-blue-700">
+                        {formatPercent(line.score)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">
+                        {formatPercent(line.weightedScore)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-slate-200 bg-blue-50">
+                    <td colSpan={7} className="px-4 py-4 text-right text-sm font-bold text-slate-900">
+                      Total Weighted Score
                     </td>
-                    <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {line.target != null ? line.target : '—'}
-                    </td>
-                    <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {line.weight != null ? line.weight : '—'}
-                    </td>
-                    <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {line.actualValue != null ? line.actualValue : '—'}
-                    </td>
-                    <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {line.score != null ? line.score.toFixed(2) : '—'}
-                    </td>
-                    <td style={{ padding: '.55rem', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {line.weightedScore != null ? line.weightedScore.toFixed(4) : '—'}
+                    <td className="px-4 py-4 text-right font-mono text-base font-bold text-blue-700">
+                      {formatPercent(row.totalWeightedScore)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.1rem' }}>
+          <div className="mt-5 flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              style={{
-                padding: '.55rem 1.2rem',
-                borderRadius: '10px',
-                border: '1px solid #cbd5e1',
-                background: '#fff',
-                color: '#334155',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700"
             >
               Close
             </button>
@@ -214,4 +180,3 @@ const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
 };
 
 export default HrEmployeeKpiModal;
-
