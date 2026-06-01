@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { hrFeedbackApi } from '../../../api/hrFeedbackApi';
 import { feedbackAnalyticsApi } from '../../../api/feedbackAnalyticsApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
+import './feedback-analytics.css';
 import type {
   FeedbackCampaign,
   FeedbackCampaignScoringConfig,
@@ -393,7 +394,7 @@ function CampaignPickerCard({
   );
 }
 
-function ScoringCard({ scoringConfig, scoringLoading }: { summary: FeedbackCampaignSummary; scoringConfig: FeedbackCampaignScoringConfig | null; scoringLoading: boolean }) {
+function ScoringCard({ scoringConfig, scoringLoading, className }: { summary: FeedbackCampaignSummary; scoringConfig: FeedbackCampaignScoringConfig | null; scoringLoading: boolean; className?: string }) {
   const configuredRows = (scoringConfig?.relationshipWeights ?? []).map(row => ({
     label: relationshipDisplayName(row.relationshipType),
     value: Number(row.weightPercent ?? 0),
@@ -401,15 +402,17 @@ function ScoringCard({ scoringConfig, scoringLoading }: { summary: FeedbackCampa
   }));
 
   return (
-      <CompactCard>
-        <div className="mb-3 flex items-start justify-between gap-3">
+      <CompactCard className={cx('h-full', className)}>
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold text-slate-950">Reviewer weights</h4>
-            <p className="mt-0.5 text-xs text-slate-500">{scoringLoading ? 'Loading…' : scoringConfig?.relationshipWeightsReady ? 'Ready' : 'Needs review'}</p>
+            <p className="mt-0.5 text-xs text-slate-500">Campaign scoring mix</p>
           </div>
-          <span className={badgeClass(scoringConfig?.relationshipWeightsReady ? 'green' : 'amber')}>{scoringConfig?.relationshipWeightsReady ? 'Ready' : 'Review'}</span>
+          <span className={badgeClass(scoringConfig?.relationshipWeightsReady ? 'green' : 'amber')}>{scoringLoading ? 'Loading' : scoringConfig?.relationshipWeightsReady ? 'Ready' : 'Review'}</span>
         </div>
-        <BarList rows={configuredRows} maxValue={100} emptyText="No weights configured." />
+        <div className="space-y-3">
+          <BarList rows={configuredRows} maxValue={100} emptyText="No weights configured." />
+        </div>
       </CompactCard>
   );
 }
@@ -470,27 +473,60 @@ function AnalyticsGrid({ summary }: { summary: FeedbackCampaignSummary }) {
   );
 }
 
-function ConfidenceCompact({ rows }: { rows: FeedbackConfidenceBreakdown[] }) {
+function ConfidenceDonut({ rows }: { rows: FeedbackConfidenceBreakdown[] }) {
   const total = rows.reduce((sum, row) => sum + countValue(row.count), 0);
+  const palette = ['#2563eb', '#60a5fa', '#f59e0b', '#f43f5e'];
+  let cursor = 0;
+  const segments = rows.map((row, index) => {
+    const count = countValue(row.count);
+    const start = total > 0 ? (cursor / total) * 360 : 0;
+    cursor += count;
+    const end = total > 0 ? (cursor / total) * 360 : 0;
+    return `${palette[index % palette.length]} ${start}deg ${end}deg`;
+  });
+  const background = total > 0 ? `conic-gradient(${segments.join(', ')})` : '#eef2f7';
+
   return (
-      <CompactCard>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h4 className="text-sm font-semibold text-slate-950">Confidence</h4>
-            <p className="mt-0.5 text-xs text-slate-500">Result quality</p>
-          </div>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{formatCount(total)}</span>
+      <div className="f360-confidence-donut" style={{ background }} aria-label={`${formatCount(total)} total results`}>
+        <div className="f360-confidence-donut-center">
+          <strong>{formatCount(total)}</strong>
+          <span>results</span>
         </div>
-        <div className="space-y-2">
-          {rows.length === 0 ? <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-400">No confidence data yet.</p> : rows.map((row, index) => {
-            const tone: Tone = String(row.level).toUpperCase().includes('HIGH') ? 'green' : String(row.level).toUpperCase().includes('MEDIUM') ? 'amber' : String(row.level).toUpperCase().includes('LOW') ? 'amber' : 'red';
-            return (
-                <div key={`${row.level}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
-                  <span className="flex items-center gap-2 text-xs font-semibold text-slate-700"><i className={cx('h-1.5 w-1.5 rounded-full not-italic', tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-rose-500')} />{row.label || row.level}</span>
-                  <strong className="text-xs text-slate-950">{formatCount(row.count)}</strong>
-                </div>
-            );
-          })}
+      </div>
+  );
+}
+
+function ConfidenceCompact({ rows, className }: { rows: FeedbackConfidenceBreakdown[]; className?: string }) {
+  const safeRows = rows.length ? rows : [
+    { level: 'HIGH', label: 'High confidence', count: 0 },
+    { level: 'MEDIUM', label: 'Medium confidence', count: 0 },
+    { level: 'LOW', label: 'Low confidence', count: 0 },
+    { level: 'INSUFFICIENT', label: 'Insufficient feedback', count: 0 },
+  ] as FeedbackConfidenceBreakdown[];
+
+  return (
+      <CompactCard className={cx('h-full', className)}>
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-slate-950">Confidence</h4>
+          <p className="mt-0.5 text-xs text-slate-500">Result quality by employee</p>
+        </div>
+        <div className="grid h-full gap-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center">
+          <ConfidenceDonut rows={safeRows} />
+          <div className="space-y-2">
+            {safeRows.map((row, index) => {
+              const level = String(row.level ?? '').toUpperCase();
+              const tone: Tone = level.includes('HIGH') ? 'green' : level.includes('MEDIUM') ? 'amber' : level.includes('LOW') ? 'amber' : 'red';
+              return (
+                  <div key={`${row.level}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
+                <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <i className={cx('h-1.5 w-1.5 rounded-full not-italic', tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-rose-500')} />
+                  {row.label || row.level}
+                </span>
+                    <strong className="text-xs text-slate-950">{formatCount(row.count)}</strong>
+                  </div>
+              );
+            })}
+          </div>
         </div>
       </CompactCard>
   );
@@ -764,6 +800,8 @@ function PublishModal({ open, step, setStep, options, setOptions, readyItems, bl
 }) {
   if (!open) return null;
 
+  const canOpenConfirm = selectedReadyCount > 0;
+
   const toggleEmployee = (employeeId: number) => {
     setOptions(current => ({
       ...current,
@@ -778,7 +816,7 @@ function PublishModal({ open, step, setStep, options, setOptions, readyItems, bl
   };
 
   return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
+      <div className="f360-publish-modal fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
         <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
           <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
             <div>
@@ -790,8 +828,21 @@ function PublishModal({ open, step, setStep, options, setOptions, readyItems, bl
           </div>
 
           <div className="flex gap-2 border-b border-slate-100 px-6 py-3">
-            <span className={cx('rounded-full px-3 py-1 text-xs font-bold', step === 1 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500')}>Configure</span>
-            <span className={cx('rounded-full px-3 py-1 text-xs font-bold', step === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500')}>Confirm</span>
+            <button
+                type="button"
+                className={cx('f360-publish-step rounded-full px-3 py-1 text-xs font-bold transition', step === 1 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}
+                onClick={() => setStep(1)}
+            >
+              Configure
+            </button>
+            <button
+                type="button"
+                className={cx('f360-publish-step rounded-full px-3 py-1 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50', step === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}
+                onClick={() => canOpenConfirm && setStep(2)}
+                disabled={!canOpenConfirm}
+            >
+              Confirm
+            </button>
           </div>
 
           <div className="max-h-[62vh] overflow-y-auto p-6">
@@ -800,14 +851,14 @@ function PublishModal({ open, step, setStep, options, setOptions, readyItems, bl
                   <CompactCard>
                     <h4 className="text-base font-semibold text-slate-950">Publish scope</h4>
                     <div className="mt-4 space-y-3">
-                      <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 hover:border-blue-200 hover:bg-blue-50/40"><input type="radio" checked={options.scope === 'ALL_READY'} onChange={() => setOptions(current => ({ ...current, scope: 'ALL_READY' }))} /><span><strong className="block text-sm text-slate-950">All ready employees</strong><small className="text-slate-500">Publish every result that passed checks.</small></span></label>
-                      <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 hover:border-blue-200 hover:bg-blue-50/40"><input type="radio" checked={options.scope === 'SELECTED_EMPLOYEES'} onChange={() => setOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} /><span><strong className="block text-sm text-slate-950">Selected employees</strong><small className="text-slate-500">Choose specific ready results.</small></span></label>
+                      <label className={cx('f360-publish-option flex cursor-pointer gap-3 rounded-2xl border p-4 transition', options.scope === 'ALL_READY' ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40')}><input type="radio" checked={options.scope === 'ALL_READY'} onChange={() => setOptions(current => ({ ...current, scope: 'ALL_READY' }))} /><span><strong className="block text-sm text-slate-950">All ready employees</strong><small className="text-slate-500">Publish every result that passed checks.</small></span></label>
+                      <label className={cx('f360-publish-option flex cursor-pointer gap-3 rounded-2xl border p-4 transition', options.scope === 'SELECTED_EMPLOYEES' ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40')}><input type="radio" checked={options.scope === 'SELECTED_EMPLOYEES'} onChange={() => setOptions(current => ({ ...current, scope: 'SELECTED_EMPLOYEES' }))} /><span><strong className="block text-sm text-slate-950">Selected employees</strong><small className="text-slate-500">Choose specific ready results.</small></span></label>
                     </div>
                     {options.scope === 'SELECTED_EMPLOYEES' ? (
                         <div className="mt-4 rounded-2xl bg-slate-50 p-3">
                           <button className="mb-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700" type="button" onClick={selectAllReady}>Select all ready</button>
                           <div className="max-h-52 space-y-2 overflow-auto">
-                            {readyItems.map(item => <label key={item.targetEmployeeId} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"><span><input className="mr-2" type="checkbox" checked={options.selectedEmployeeIds.includes(item.targetEmployeeId)} onChange={() => toggleEmployee(item.targetEmployeeId)} />{item.targetEmployeeName}</span><strong>{formatScore(item.averageScore)}</strong></label>)}
+                            {readyItems.map(item => <label key={item.targetEmployeeId} className="f360-publish-option flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"><span><input className="mr-2" type="checkbox" checked={options.selectedEmployeeIds.includes(item.targetEmployeeId)} onChange={() => toggleEmployee(item.targetEmployeeId)} />{item.targetEmployeeName}</span><strong>{formatScore(item.averageScore)}</strong></label>)}
                           </div>
                         </div>
                     ) : null}
@@ -822,7 +873,7 @@ function PublishModal({ open, step, setStep, options, setOptions, readyItems, bl
                         ['includeSelfVsOthers', 'Self vs others', 'Reviewer group comparison.'],
                         ['includeComments', 'Anonymous comments', 'Only where confidentiality allows.'],
                       ].map(([key, title, helper]) => (
-                          <label key={key} className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 hover:border-blue-200 hover:bg-blue-50/40">
+                          <label key={key} className={cx('f360-publish-option flex cursor-pointer gap-3 rounded-2xl border p-4 transition', Boolean(options[key as keyof PublishOptions]) ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40')}>
                             <input type="checkbox" checked={Boolean(options[key as keyof PublishOptions])} onChange={event => setBooleanOption(key as keyof Pick<PublishOptions, 'includeOverallScore' | 'includeCompetencyBreakdown' | 'includeSelfVsOthers' | 'includeComments'>, event.target.checked)} />
                             <span><strong className="block text-sm text-slate-950">{title}</strong><small className="text-slate-500">{helper}</small></span>
                           </label>
@@ -841,7 +892,7 @@ function PublishModal({ open, step, setStep, options, setOptions, readyItems, bl
                       <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs font-semibold text-slate-500">Blocked</span><strong>{blockedItems.length}</strong></div>
                     </div>
                   </CompactCard>
-                  <label className="flex gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-medium text-blue-900"><input type="checkbox" checked={options.confirmVisibility} onChange={event => setBooleanOption('confirmVisibility', event.target.checked)} /><span>I reviewed the selected summaries and confirm these sections can be shown to employees.</span></label>
+                  <label className={cx('f360-publish-option flex gap-3 rounded-2xl border p-4 text-sm font-medium transition', options.confirmVisibility ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-700')}><input type="checkbox" checked={options.confirmVisibility} onChange={event => setBooleanOption('confirmVisibility', event.target.checked)} /><span>I reviewed the selected summaries and confirm these sections can be shown to employees.</span></label>
                 </div>
             )}
           </div>
@@ -1083,28 +1134,36 @@ export default function AnalyticsTab() {
             <>
               <CampaignSummaryStrip summary={summary} campaign={selectedCampaign} cards={metricCards} selectedId={selectedId} closedCampaigns={closedCampaigns} setSelectedId={setSelectedId} onRefresh={refreshSummary} loading={loading} />
 
-              <div className="grid w-full min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <main className="min-w-0 space-y-4">
-                  <EmployeeResultsList
-                      items={filteredItems}
-                      searchTerm={searchTerm}
-                      setSearchTerm={setSearchTerm}
-                      publishFilter={publishFilter}
-                      setPublishFilter={setPublishFilter}
-                      confidenceFilter={confidenceFilter}
-                      setConfidenceFilter={setConfidenceFilter}
-                      sortBy={sortBy}
-                      setSortBy={setSortBy}
-                      onOpen={setSelectedResult}
-                      onExport={exportCsv}
-                  />
-                  <AnalyticsGrid summary={summary} />
-                </main>
-                <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
-                  <PublishReadinessPanel summary={summary} readyItems={readyItems} blockedItems={blockedItems} publishedCount={publishedCount} actionLoading={actionLoading} onPublish={openPublishModal} onUnpublish={() => setUnpublishOpen(true)} />
-                  <ConfidenceCompact rows={summary.confidenceBreakdown ?? []} />
-                  <ScoringCard summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
-                </aside>
+              <EmployeeResultsList
+                  items={filteredItems}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  publishFilter={publishFilter}
+                  setPublishFilter={setPublishFilter}
+                  confidenceFilter={confidenceFilter}
+                  setConfidenceFilter={setConfidenceFilter}
+                  sortBy={sortBy}
+                  setSortBy={setSortBy}
+                  onOpen={setSelectedResult}
+                  onExport={exportCsv}
+              />
+
+              <div className="grid w-full min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <AnalyticsGrid summary={summary} />
+                <PublishReadinessPanel
+                    summary={summary}
+                    readyItems={readyItems}
+                    blockedItems={blockedItems}
+                    publishedCount={publishedCount}
+                    actionLoading={actionLoading}
+                    onPublish={openPublishModal}
+                    onUnpublish={() => setUnpublishOpen(true)}
+                />
+              </div>
+
+              <div className="grid w-full min-w-0 items-stretch gap-4 lg:grid-cols-2">
+                <ConfidenceCompact rows={summary.confidenceBreakdown ?? []} />
+                <ScoringCard summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
               </div>
 
               <ResultDrawer item={selectedResult} onClose={() => setSelectedResult(null)} />

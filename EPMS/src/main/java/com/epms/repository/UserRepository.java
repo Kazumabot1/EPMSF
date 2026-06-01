@@ -18,6 +18,11 @@ public interface UserRepository extends JpaRepository<User, Integer> {
         String getRoleName();
     }
 
+    interface UserRoleNameProjection {
+        Integer getUserId();
+        String getRoleName();
+    }
+
     Optional<User> findByEmail(String email);
 
     Optional<User> findByEmailIgnoreCase(String email);
@@ -83,6 +88,16 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             WHERE u.id = :userId
             """, nativeQuery = true)
     List<String> findNormalizedRoleNamesByUserId(@Param("userId") Integer userId);
+
+    @Query(value = """
+            SELECT DISTINCT
+                ur.user_id AS userId,
+                UPPER(REPLACE(REPLACE(REPLACE(REPLACE(r.name, 'ROLE_', ''), ' ', '_'), '-', '_'), '/', '_')) AS roleName
+            FROM user_roles ur
+            JOIN roles r ON r.id = ur.role_id
+            WHERE ur.user_id IN (:userIds)
+            """, nativeQuery = true)
+    List<UserRoleNameProjection> findNormalizedRoleNamesByUserIds(@Param("userIds") Collection<Integer> userIds);
 
     @Query(value = """
             SELECT DISTINCT u.*

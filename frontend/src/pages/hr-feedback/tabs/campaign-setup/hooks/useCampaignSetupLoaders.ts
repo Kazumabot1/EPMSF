@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useRef, type Dispatch, type SetStateAction } from 'react';
 import { hrFeedbackApi } from '../../../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../../../api/feedbackCampaignApi';
 import type {
@@ -85,6 +85,8 @@ export function useCampaignSetupLoaders({
                                             setError,
                                             onCampaignCreated,
                                         }: CampaignSetupLoaderParams) {
+    const candidateLoadSeq = useRef(0);
+
     const applyForm = (campaign: FeedbackCampaign) => {
         setForm(campaignToForm(campaign));
     };
@@ -123,6 +125,8 @@ export function useCampaignSetupLoaders({
     };
 
     const loadCandidates = async () => {
+        const requestSeq = candidateLoadSeq.current + 1;
+        candidateLoadSeq.current = requestSeq;
         try {
             setLoadingCandidates(true);
             const data = await feedbackCampaignApi.getTargetCandidates({
@@ -133,11 +137,15 @@ export function useCampaignSetupLoaders({
                 campaignId: selectedCampaign?.id ?? null,
                 readiness,
             });
+            if (requestSeq !== candidateLoadSeq.current) return;
             setCandidates(data);
         } catch (err) {
+            if (requestSeq !== candidateLoadSeq.current) return;
             setError(err instanceof Error ? err.message : 'Failed to load target candidates.');
         } finally {
-            setLoadingCandidates(false);
+            if (requestSeq === candidateLoadSeq.current) {
+                setLoadingCandidates(false);
+            }
         }
     };
 

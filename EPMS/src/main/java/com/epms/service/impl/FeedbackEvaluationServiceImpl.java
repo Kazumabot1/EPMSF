@@ -102,9 +102,9 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             questionReviewService.clearCampaignQuestionSelection(campaignId);
         }
 
-        List<FeedbackEvaluatorAssignment> existingAssignments = requests.stream()
-                .flatMap(request -> assignmentRepository.findByFeedbackRequestId(request.getId()).stream())
-                .toList();
+        List<FeedbackEvaluatorAssignment> existingAssignments = assignmentRepository.findByCampaignIdWithRequest(campaignId);
+        Map<Integer, User> usersByEmployeeId = loadUsersByEmployeeId();
+        Map<Integer, Set<Integer>> activeTeamIdsByEmployeeId = buildActiveTeamIdsByEmployeeId(usersByEmployeeId);
         List<FeedbackEvaluatorAssignment> existingManualAssignments = existingAssignments.stream()
                 .filter(assignment -> assignment.getSelectionMethod() == EvaluatorSelectionMethod.MANUAL)
                 .toList();
@@ -131,12 +131,12 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
         for (FeedbackRequest request : requests) {
             List<String> targetWarnings = new ArrayList<>();
-            User targetUser = userRepository.findByEmployeeId(request.getTargetEmployeeId().intValue())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "No user account is linked to target employee " + request.getTargetEmployeeId() + "."
-                    ));
+            User targetUser = usersByEmployeeId.get(request.getTargetEmployeeId().intValue());
+            if (targetUser == null) {
+                throw new ResourceNotFoundException("No user account is linked to target employee " + request.getTargetEmployeeId() + ".");
+            }
 
-            Set<Integer> targetTeamIds = workRelationshipResolver.resolveActiveTeamIds(targetUser);
+            Set<Integer> targetTeamIds = activeTeamIdsByEmployeeId.getOrDefault(request.getTargetEmployeeId().intValue(), Set.of());
             Set<Long> assignedEvaluatorEmployeeIds = new LinkedHashSet<>();
             Set<Long> managerEmployeeIds = workRelationshipResolver.resolveManagerEmployeeIds(targetUser);
             Set<Long> subordinateEmployeeIds = workRelationshipResolver.resolveSubordinateEmployeeIds(targetUser);
@@ -167,7 +167,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 for (Long managerEmployeeId : managerEmployeeIds) {
                     if (managerEmployeeId != null && !Objects.equals(managerEmployeeId, request.getTargetEmployeeId())) {
                         if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, managerEmployeeId,
-                                FeedbackRelationshipType.MANAGER, EvaluatorSelectionMethod.AUTO_RELATIONSHIP)) {
+                                FeedbackRelationshipType.MANAGER, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, usersByEmployeeId)) {
                             managerAssignments++;
                             autoAssignmentsForTarget++;
                             incrementEvaluatorLoad(evaluatorLoadByEmployeeId, managerEmployeeId);
@@ -178,7 +178,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
             if (Boolean.TRUE.equals(config.getIncludeSelf())) {
                 if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, request.getTargetEmployeeId(),
-                        FeedbackRelationshipType.SELF, EvaluatorSelectionMethod.AUTO_RELATIONSHIP)) {
+                        FeedbackRelationshipType.SELF, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, usersByEmployeeId)) {
                     selfAssignments++;
                     autoAssignmentsForTarget++;
                     incrementEvaluatorLoad(evaluatorLoadByEmployeeId, request.getTargetEmployeeId());
@@ -190,7 +190,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                         .filter(employeeId -> !Objects.equals(employeeId, request.getTargetEmployeeId()))
                         .filter(employeeId -> !managerEmployeeIds.contains(employeeId))
                         .filter(employeeId -> !assignedEvaluatorEmployeeIds.contains(employeeId))
-                        .filter(this::hasActiveUserForEmployeeId)
+                        .filter(employeeId -> hasActiveUserForEmployeeId(employeeId, usersByEmployeeId))
                         .sorted()
                         .limit(requestedSubordinateMaxCount(config))
                         .toList();
@@ -206,7 +206,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
 
                 for (Long subordinateEmployeeId : selectedSubordinates) {
                     if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, subordinateEmployeeId,
-                            FeedbackRelationshipType.SUBORDINATE, EvaluatorSelectionMethod.AUTO_RELATIONSHIP)) {
+                            FeedbackRelationshipType.SUBORDINATE, EvaluatorSelectionMethod.AUTO_RELATIONSHIP, usersByEmployeeId)) {
                         subordinateAssignments++;
                         autoAssignmentsForTarget++;
                         incrementEvaluatorLoad(evaluatorLoadByEmployeeId, subordinateEmployeeId);
@@ -231,7 +231,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             int requestedPeerMinCount = requestedPeerMinCount(config);
             int requestedPeerMaxCount = requestedPeerMaxCount(config);
             List<Long> selectedPeers = isPeerSelectionEnabled(config)
-                    ? selectPeers(peerPool, requestedPeerMaxCount, targetUser, targetTeamIds, evaluatorLoadByEmployeeId)
+                    ? selectPeers(peerPool, requestedPeerMaxCount, targetUser, targetTeamIds, evaluatorLoadByEmployeeId, usersByEmployeeId, activeTeamIdsByEmployeeId)
                     : List.of();
             if (isPeerSelectionEnabled(config) && selectedPeers.size() < requestedPeerMinCount) {
                 targetWarnings.add("Only " + selectedPeers.size()
@@ -240,7 +240,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             }
             for (Long peerEmployeeId : selectedPeers) {
                 if (addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, peerEmployeeId,
-                        FeedbackRelationshipType.PEER, EvaluatorSelectionMethod.AUTO_RANKED)) {
+                        FeedbackRelationshipType.PEER, EvaluatorSelectionMethod.AUTO_RANKED, usersByEmployeeId)) {
                     peerAssignments++;
                     autoAssignmentsForTarget++;
                     incrementEvaluatorLoad(evaluatorLoadByEmployeeId, peerEmployeeId);
@@ -253,7 +253,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             previewItems.add(FeedbackAssignmentPreviewItemResponse.builder()
                     .requestId(request.getId())
                     .targetEmployeeId(request.getTargetEmployeeId())
-                    .targetEmployeeName(resolveEmployeeNameForId(request.getTargetEmployeeId()))
+                    .targetEmployeeName(resolveEmployeeName(usersByEmployeeId, request.getTargetEmployeeId()))
                     .managerAssignments(managerAssignments)
                     .selfAssignments(selfAssignments)
                     .subordinateAssignments(subordinateAssignments)
@@ -628,10 +628,11 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         List<FeedbackEvaluatorAssignment> assignments = assignmentRepository.findByCampaignIdWithRequest(campaignId);
         Map<Long, List<FeedbackEvaluatorAssignment>> assignmentsByRequestId = assignments.stream()
                 .collect(Collectors.groupingBy(a -> a.getFeedbackRequest().getId()));
+        Map<Integer, User> usersByEmployeeId = loadUsersByEmployeeId(requests, assignments);
 
         List<String> warnings = new ArrayList<>(extraWarnings == null ? List.of() : extraWarnings);
         List<FeedbackAssignmentPreviewItemResponse> previewItems = requests.stream()
-                .map(request -> buildPreviewItem(request, assignmentsByRequestId.getOrDefault(request.getId(), List.of()), warnings))
+                .map(request -> buildPreviewItem(request, assignmentsByRequestId.getOrDefault(request.getId(), List.of()), warnings, usersByEmployeeId))
                 .toList();
 
         return FeedbackAssignmentGenerationResponse.builder()
@@ -648,7 +649,8 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
     private FeedbackAssignmentPreviewItemResponse buildPreviewItem(
             FeedbackRequest request,
             List<FeedbackEvaluatorAssignment> assignments,
-            List<String> campaignWarnings
+            List<String> campaignWarnings,
+            Map<Integer, User> usersByEmployeeId
     ) {
         Map<FeedbackRelationshipType, Long> countsByType = assignments.stream()
                 .collect(Collectors.groupingBy(
@@ -672,7 +674,7 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return FeedbackAssignmentPreviewItemResponse.builder()
                 .requestId(request.getId())
                 .targetEmployeeId(request.getTargetEmployeeId())
-                .targetEmployeeName(resolveEmployeeNameForId(request.getTargetEmployeeId()))
+                .targetEmployeeName(resolveEmployeeName(usersByEmployeeId, request.getTargetEmployeeId()))
                 .managerAssignments(countsByType.getOrDefault(FeedbackRelationshipType.MANAGER, 0L).intValue())
                 .selfAssignments(countsByType.getOrDefault(FeedbackRelationshipType.SELF, 0L).intValue())
                 .subordinateAssignments(countsByType.getOrDefault(FeedbackRelationshipType.SUBORDINATE, 0L).intValue())
@@ -698,10 +700,11 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
                 .map(Long::intValue)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Map<Integer, User> usersByEmployeeId = employeeIds.stream()
-                .map(userRepository::findByEmployeeId)
-                .flatMap(optional -> optional.stream())
-                .collect(Collectors.toMap(User::getEmployeeId, Function.identity(), (left, right) -> left));
+        Map<Integer, User> usersByEmployeeId = employeeIds.isEmpty()
+                ? Map.of()
+                : userRepository.findByEmployeeIdIn(employeeIds).stream()
+                  .filter(user -> user.getEmployeeId() != null)
+                  .collect(Collectors.toMap(User::getEmployeeId, Function.identity(), (left, right) -> left));
 
         return assignments.stream()
                 .map(assignment -> {
@@ -886,10 +889,22 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             FeedbackRelationshipType relationshipType,
             EvaluatorSelectionMethod selectionMethod
     ) {
+        return addAssignment(assignmentsToSave, assignedEvaluatorEmployeeIds, request, evaluatorEmployeeId, relationshipType, selectionMethod, null);
+    }
+
+    private boolean addAssignment(
+            List<FeedbackEvaluatorAssignment> assignmentsToSave,
+            Set<Long> assignedEvaluatorEmployeeIds,
+            FeedbackRequest request,
+            Long evaluatorEmployeeId,
+            FeedbackRelationshipType relationshipType,
+            EvaluatorSelectionMethod selectionMethod,
+            Map<Integer, User> usersByEmployeeId
+    ) {
         if (evaluatorEmployeeId == null || !assignedEvaluatorEmployeeIds.add(evaluatorEmployeeId)) {
             return false;
         }
-        assignmentsToSave.add(createAssignment(request, evaluatorEmployeeId, relationshipType, selectionMethod));
+        assignmentsToSave.add(createAssignment(request, evaluatorEmployeeId, relationshipType, selectionMethod, usersByEmployeeId));
         return true;
     }
 
@@ -899,6 +914,16 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             FeedbackRelationshipType relationshipType,
             EvaluatorSelectionMethod selectionMethod
     ) {
+        return createAssignment(request, evaluatorEmployeeId, relationshipType, selectionMethod, null);
+    }
+
+    private FeedbackEvaluatorAssignment createAssignment(
+            FeedbackRequest request,
+            Long evaluatorEmployeeId,
+            FeedbackRelationshipType relationshipType,
+            EvaluatorSelectionMethod selectionMethod,
+            Map<Integer, User> usersByEmployeeId
+    ) {
         FeedbackEvaluatorAssignment assignment = new FeedbackEvaluatorAssignment();
         assignment.setFeedbackRequest(request);
         assignment.setEvaluatorEmployeeId(evaluatorEmployeeId);
@@ -906,27 +931,36 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         assignment.setSelectionMethod(selectionMethod);
         assignment.setIsAnonymous(isAnonymous(request == null ? null : request.getCampaign(), relationshipType));
         assignment.setStatus(AssignmentStatus.PENDING);
-        snapshotEvaluator(assignment, evaluatorEmployeeId);
+        snapshotEvaluator(assignment, evaluatorEmployeeId, usersByEmployeeId);
         return assignment;
     }
 
     private void snapshotEvaluator(FeedbackEvaluatorAssignment assignment, Long evaluatorEmployeeId) {
+        snapshotEvaluator(assignment, evaluatorEmployeeId, null);
+    }
+
+    private void snapshotEvaluator(FeedbackEvaluatorAssignment assignment, Long evaluatorEmployeeId, Map<Integer, User> usersByEmployeeId) {
         if (assignment == null || evaluatorEmployeeId == null) {
             return;
         }
-        userRepository.findByEmployeeId(evaluatorEmployeeId.intValue()).ifPresent(user -> {
-            assignment.setEvaluatorUserId(user.getId());
-            assignment.setEvaluatorEmployeeCode(user.getEmployeeCode());
-            assignment.setEvaluatorEmployeeName(user.getFullName() == null || user.getFullName().isBlank()
-                    ? "Employee #" + evaluatorEmployeeId
-                    : user.getFullName().trim());
-            assignment.setEvaluatorEmployeeEmail(user.getEmail());
-            assignment.setEvaluatorDepartmentId(user.getDepartmentId());
-            if (user.getPosition() != null) {
-                assignment.setEvaluatorPositionId(user.getPosition().getId());
-                assignment.setEvaluatorPositionName(user.getPosition().getPositionTitle());
-            }
-        });
+        User user = usersByEmployeeId == null ? null : usersByEmployeeId.get(evaluatorEmployeeId.intValue());
+        if (user == null) {
+            user = userRepository.findByEmployeeId(evaluatorEmployeeId.intValue()).orElse(null);
+        }
+        if (user == null) {
+            return;
+        }
+        assignment.setEvaluatorUserId(user.getId());
+        assignment.setEvaluatorEmployeeCode(user.getEmployeeCode());
+        assignment.setEvaluatorEmployeeName(user.getFullName() == null || user.getFullName().isBlank()
+                ? "Employee #" + evaluatorEmployeeId
+                : user.getFullName().trim());
+        assignment.setEvaluatorEmployeeEmail(user.getEmail());
+        assignment.setEvaluatorDepartmentId(user.getDepartmentId());
+        if (user.getPosition() != null) {
+            assignment.setEvaluatorPositionId(user.getPosition().getId());
+            assignment.setEvaluatorPositionName(user.getPosition().getPositionTitle());
+        }
     }
 
     private boolean isAnonymous(FeedbackCampaign campaign, FeedbackRelationshipType relationshipType) {
@@ -957,13 +991,69 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
         return findActiveUserForEmployeeId(employeeId) != null;
     }
 
+    private boolean hasActiveUserForEmployeeId(Long employeeId, Map<Integer, User> usersByEmployeeId) {
+        return findActiveUserForEmployeeId(employeeId, usersByEmployeeId) != null;
+    }
+
     private User findActiveUserForEmployeeId(Long employeeId) {
+        return findActiveUserForEmployeeId(employeeId, null);
+    }
+
+    private User findActiveUserForEmployeeId(Long employeeId, Map<Integer, User> usersByEmployeeId) {
         if (employeeId == null) {
             return null;
+        }
+        User cached = usersByEmployeeId == null ? null : usersByEmployeeId.get(employeeId.intValue());
+        if (cached != null) {
+            return Boolean.FALSE.equals(cached.getActive()) ? null : cached;
         }
         return userRepository.findByEmployeeId(employeeId.intValue())
                 .filter(user -> !Boolean.FALSE.equals(user.getActive()))
                 .orElse(null);
+    }
+
+    private Map<Integer, User> loadUsersByEmployeeId() {
+        return userRepository.findAll().stream()
+                .filter(user -> user.getEmployeeId() != null)
+                .collect(Collectors.toMap(User::getEmployeeId, Function.identity(), (left, right) -> left));
+    }
+
+    private Map<Integer, User> loadUsersByEmployeeId(
+            List<FeedbackRequest> requests,
+            List<FeedbackEvaluatorAssignment> assignments
+    ) {
+        Set<Integer> employeeIds = new LinkedHashSet<>();
+        (requests == null ? List.<FeedbackRequest>of() : requests).stream()
+                .map(FeedbackRequest::getTargetEmployeeId)
+                .filter(Objects::nonNull)
+                .map(Long::intValue)
+                .forEach(employeeIds::add);
+        (assignments == null ? List.<FeedbackEvaluatorAssignment>of() : assignments).forEach(assignment -> {
+            if (assignment.getFeedbackRequest() != null && assignment.getFeedbackRequest().getTargetEmployeeId() != null) {
+                employeeIds.add(assignment.getFeedbackRequest().getTargetEmployeeId().intValue());
+            }
+            if (assignment.getEvaluatorEmployeeId() != null) {
+                employeeIds.add(assignment.getEvaluatorEmployeeId().intValue());
+            }
+        });
+        return employeeIds.isEmpty()
+                ? Map.of()
+                : userRepository.findByEmployeeIdIn(employeeIds).stream()
+                  .filter(user -> user.getEmployeeId() != null)
+                  .collect(Collectors.toMap(User::getEmployeeId, Function.identity(), (left, right) -> left));
+    }
+
+    private Map<Integer, Set<Integer>> buildActiveTeamIdsByEmployeeId(Map<Integer, User> usersByEmployeeId) {
+        if (usersByEmployeeId == null || usersByEmployeeId.isEmpty()) {
+            return Map.of();
+        }
+        return usersByEmployeeId.values().stream()
+                .filter(user -> user.getEmployeeId() != null)
+                .collect(Collectors.toMap(
+                        User::getEmployeeId,
+                        workRelationshipResolver::resolveActiveTeamIds,
+                        (left, right) -> left
+                ));
     }
 
     private enum PeerLayer {
@@ -1042,15 +1132,27 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
     }
 
     private boolean sharesActiveTeam(User target, User candidate, Set<Integer> targetTeamIds) {
+        return sharesActiveTeam(target, candidate, targetTeamIds, null);
+    }
+
+    private boolean sharesActiveTeam(
+            User target,
+            User candidate,
+            Set<Integer> targetTeamIds,
+            Map<Integer, Set<Integer>> activeTeamIdsByEmployeeId
+    ) {
         if (target == null || candidate == null || targetTeamIds == null || targetTeamIds.isEmpty()) {
             return false;
         }
-        return !Collections.disjoint(targetTeamIds, workRelationshipResolver.resolveActiveTeamIds(candidate));
+        Set<Integer> candidateTeamIds = activeTeamIdsByEmployeeId == null || candidate.getEmployeeId() == null
+                ? workRelationshipResolver.resolveActiveTeamIds(candidate)
+                : activeTeamIdsByEmployeeId.getOrDefault(candidate.getEmployeeId(), Set.of());
+        return !Collections.disjoint(targetTeamIds, candidateTeamIds);
     }
 
-    private int peerScore(User target, User candidate, Set<Integer> targetTeamIds, Map<Long, Integer> evaluatorLoadByEmployeeId) {
+    private int peerScore(User target, User candidate, Set<Integer> targetTeamIds, Map<Long, Integer> evaluatorLoadByEmployeeId, Map<Integer, Set<Integer>> activeTeamIdsByEmployeeId) {
         int score = 0;
-        if (sharesActiveTeam(target, candidate, targetTeamIds)) score += 45;
+        if (sharesActiveTeam(target, candidate, targetTeamIds, activeTeamIdsByEmployeeId)) score += 45;
         if (target.getDepartmentId() != null && Objects.equals(target.getDepartmentId(), candidate.getDepartmentId())) score += 35;
         int distance = levelDistance(target, candidate);
         if (distance == 0) score += 20;
@@ -1091,16 +1193,18 @@ public class FeedbackEvaluationServiceImpl implements FeedbackEvaluationService 
             int peerCount,
             User targetUser,
             Set<Integer> targetTeamIds,
-            Map<Long, Integer> evaluatorLoadByEmployeeId
+            Map<Long, Integer> evaluatorLoadByEmployeeId,
+            Map<Integer, User> usersByEmployeeId,
+            Map<Integer, Set<Integer>> activeTeamIdsByEmployeeId
     ) {
         if (peerPool.isEmpty() || peerCount <= 0) {
             return List.of();
         }
         return peerPool.stream()
-                .map(this::findActiveUserForEmployeeId)
+                .map(employeeId -> findActiveUserForEmployeeId(employeeId, usersByEmployeeId))
                 .filter(Objects::nonNull)
                 .sorted(Comparator
-                        .comparingInt((User candidate) -> peerScore(targetUser, candidate, targetTeamIds, evaluatorLoadByEmployeeId)).reversed()
+                        .comparingInt((User candidate) -> peerScore(targetUser, candidate, targetTeamIds, evaluatorLoadByEmployeeId, activeTeamIdsByEmployeeId)).reversed()
                         .thenComparingInt(candidate -> evaluatorLoadByEmployeeId.getOrDefault(candidate.getEmployeeId() == null ? null : candidate.getEmployeeId().longValue(), 0))
                         .thenComparing(candidate -> candidate.getFullName() == null ? "" : candidate.getFullName(), String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(User::getId))

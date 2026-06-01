@@ -210,12 +210,13 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
                 .collect(Collectors.toMap(Employee::getId, employee -> employee, (left, right) -> left));
 
         List<User> users = userRepository.findAll();
-        Map<Integer, User> usersById = users.stream()
-                .filter(user -> user.getId() != null)
-                .collect(Collectors.toMap(User::getId, user -> user, (left, right) -> left));
         Map<Integer, User> usersByEmployeeId = users.stream()
                 .filter(user -> user.getEmployeeId() != null)
                 .collect(Collectors.toMap(User::getEmployeeId, user -> user, (left, right) -> preferActiveUser(left, right)));
+        Map<Integer, Set<String>> roleNamesByUserId = loadRoleNamesByUserId(users.stream()
+                .map(User::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
 
         List<TeamMember> activeMemberships = teamMemberRepository.findActiveMemberships();
         Map<Integer, List<TeamMember>> membershipsByUserId = activeMemberships.stream()
@@ -225,7 +226,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
         Map<Long, TargetContext> contexts = new HashMap<>();
         for (Employee employee : employees) {
             User user = employee.getId() == null ? null : usersByEmployeeId.get(employee.getId());
-            TargetContext context = buildBaseTargetContext(employee, user, usersById, employeesById, membershipsByUserId, excludedTargetUserId);
+            TargetContext context = buildBaseTargetContext(employee, user, employeesById, membershipsByUserId, roleNamesByUserId, excludedTargetUserId);
             contexts.put(context.employeeId, context);
         }
 
@@ -236,9 +237,9 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
     private TargetContext buildBaseTargetContext(
             Employee employee,
             User user,
-            Map<Integer, User> usersById,
             Map<Integer, Employee> employeesById,
             Map<Integer, List<TeamMember>> membershipsByUserId,
+            Map<Integer, Set<String>> roleNamesByUserId,
             Long excludedTargetUserId
     ) {
         EmployeeDepartment assignment = latestActiveDepartmentAssignment(employee);
@@ -291,7 +292,7 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
         if (normalizedLevelCode == null || !TARGET_LEVEL_CODES.contains(normalizedLevelCode)) {
             blockReasons.add("This employee is outside the selected campaign audience.");
         }
-        if (user != null && hasTargetExcludedRole(user)) {
+        if (user != null && hasTargetExcludedRole(user, roleNamesByUserId)) {
             blockReasons.add("Department heads, HR, Admin, and CEO users can give feedback when assigned, but they are not included as feedback recipients.");
         }
         if (excludedTargetUserId != null && user != null && user.getId() != null
@@ -342,15 +343,18 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
             return;
         }
 
-        User targetUser = userRepository.findByEmployeeId(context.employeeId.intValue()).orElse(null);
-        Set<Long> subordinateEmployeeIds = targetUser == null
-                ? Set.of()
-                : workRelationshipResolver.resolveSubordinateEmployeeIds(targetUser);
+        Set<Long> subordinateEmployeeIds = contexts.stream()
+                .filter(other -> isEligibleEvaluatorContext(other))
+                .filter(other -> !Objects.equals(other.employeeId, context.employeeId))
+                .filter(other -> Objects.equals(other.managerUserId, context.userId))
+                .map(other -> other.employeeId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         context.subordinateCandidateCount = subordinateEmployeeIds.size();
 
-        context.peerCandidateCount = targetUser == null
-                ? 0
-                : workRelationshipResolver.resolvePeerEmployeeIds(targetUser).size();
+        context.peerCandidateCount = (int) contexts.stream()
+                .filter(other -> isPeerCandidate(context, other, subordinateEmployeeIds))
+                .count();
 
         if (context.peerCandidateCount < 2 && context.blockReasons.isEmpty()) {
             context.warnings.add("Limited peer options found.");
@@ -360,11 +364,23 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
         }
     }
 
-    private boolean hasTargetExcludedRole(User user) {
+    private Map<Integer, Set<String>> loadRoleNamesByUserId(Set<Integer> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findNormalizedRoleNamesByUserIds(userIds).stream()
+                .filter(row -> row.getUserId() != null && row.getRoleName() != null)
+                .collect(Collectors.groupingBy(
+                        UserRepository.UserRoleNameProjection::getUserId,
+                        Collectors.mapping(row -> normalizeRoleNameForPolicy(row.getRoleName()), Collectors.toSet())
+                ));
+    }
+
+    private boolean hasTargetExcludedRole(User user, Map<Integer, Set<String>> roleNamesByUserId) {
         if (user == null || user.getId() == null) {
             return false;
         }
-        return userRepository.findNormalizedRoleNamesByUserId(user.getId()).stream()
+        return roleNamesByUserId.getOrDefault(user.getId(), Set.of()).stream()
                 .map(this::normalizeRoleNameForPolicy)
                 .anyMatch(TARGET_EXCLUDED_ROLES::contains);
     }
