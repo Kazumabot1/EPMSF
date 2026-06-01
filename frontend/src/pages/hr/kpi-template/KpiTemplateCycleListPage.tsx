@@ -139,7 +139,7 @@ const KpiTemplateCycleListPage = () => {
         reason: closeReason.trim(),
         graceExtension,
       });
-      toast.success('KPI close request sent to CEO.');
+      toast.success('KPI close request sent to HR Admin.');
       setCloseCycle(null);
       await load();
     } catch (err) {
@@ -273,14 +273,14 @@ const KpiTemplateCycleListPage = () => {
                             {cycle.cycleName}
                             {cycle.status === 'PENDING_APPROVAL' && (
                               <p className="mt-1 text-xs font-semibold text-amber-700">
-                                CEO approval pending — {graceLabel(cycle.graceExtension)} grace requested
+                                HR Admin approval pending — {graceLabel(cycle.graceExtension)} grace requested
                               </p>
                             )}
                             {cycle.status === 'ACTIVE' &&
                               cycle.earlyCloseReviewDecision === 'REJECTED' &&
                               cycle.earlyCloseReviewReason && (
                                 <p className="mt-1 text-xs font-semibold text-red-700">
-                                  CEO rejected early close: {cycle.earlyCloseReviewReason}
+                                  HR Admin rejected early close: {cycle.earlyCloseReviewReason}
                                 </p>
                               )}
                           </td>
@@ -462,7 +462,7 @@ const KpiTemplateCycleListPage = () => {
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">CEO approval required</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">HR Admin approval required</p>
                 <h2 className="mt-1 text-xl font-semibold text-slate-950">Request early KPI cycle close</h2>
               </div>
               <button
@@ -478,7 +478,7 @@ const KpiTemplateCycleListPage = () => {
               <p className="text-sm leading-6 text-slate-600">
                 {closeCycle.cycleName} ends on{' '}
                 {formatDate(closeCycle.currentPeriodEndDate ?? closeCycle.endDate)}. Add a reason and grace period for
-                in-progress forms before sending this to CEO.
+                in-progress forms before sending this to HR Admin.
               </p>
               <label className="grid gap-2 text-sm font-semibold text-slate-700">
                 Reason
@@ -519,7 +519,7 @@ const KpiTemplateCycleListPage = () => {
                 onClick={() => void submitEarlyCloseRequest()}
                 className="inline-flex min-h-10 items-center rounded-lg border border-blue-600 bg-blue-600 px-4 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Send to CEO
+                Send to HR Admin
               </button>
             </div>
           </div>

@@ -36,7 +36,10 @@ const AppraisalCycleDashboardPage = () => {
   }, []);
 
   return (
-    <div className="appraisal-page appraisal-dashboard-page">
+    <div
+      className="appraisal-page appraisal-dashboard-page"
+      style={{ fontFamily: '"Times New Roman", Times, serif' }}
+    >
       <div className="appraisal-dashboard-hero">
         <div className="appraisal-dashboard-orb one" />
         <div className="appraisal-dashboard-orb two" />

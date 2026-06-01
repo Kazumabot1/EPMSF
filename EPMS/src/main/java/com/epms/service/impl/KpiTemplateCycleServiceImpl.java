@@ -115,7 +115,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     @Override
     @Transactional
     public List<KpiTemplateCycleResponseDTO> list() {
-        employeeKpiWorkflowService.runCycleMaintenance();
         return cycleRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toSummaryDto)
                 .toList();
@@ -124,7 +123,6 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     @Override
     @Transactional
     public KpiTemplateCycleResponseDTO getById(Integer id) {
-        employeeKpiWorkflowService.runCycleMaintenance();
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
         List<KpiTemplateCycleForm> links = cycleFormRepository.findWithFormsByCycleId(id);

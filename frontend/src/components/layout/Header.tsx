@@ -6,6 +6,7 @@ import KpiNotificationMessageBody from '../notifications/KpiNotificationMessageB
 import SignatureModal from '../signature/SignatureModal';
 import ProfileHeaderAvatar from '../ProfileHeaderAvatar';
 import { useNotificationsWebSocket } from '../../hooks/useNotificationsWebSocket';
+import HeaderDateTime from './HeaderDateTime';
 
 type HeaderProps = {
   collapsed: boolean;
@@ -275,12 +276,9 @@ const Header = ({ collapsed }: HeaderProps) => {
 
   return (
       <header className={`hr-header ${collapsed ? 'collapsed' : ''}`}>
-        <div className="hr-header-search">
-          <i className="bi bi-search" />
-          <input type="text" placeholder="Search employees, KPI, appraisals..." />
-        </div>
-
         <div className="hr-header-actions">
+          <HeaderDateTime />
+
           <div className="hr-notification-wrap" ref={notifRef}>
             <button
                 type="button"

@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import './one-on-one.css';
+import {
+  OOM_FONT,
+  formatOomDateTime,
+  oomBtnPrimary,
+  oomCard,
+  oomCompactHeader,
+  oomEyebrow,
+  oomHeaderDesc,
+  oomHeaderTitle,
+  oomInput,
+  oomLabel,
+  oomPageWrap,
+  oomTextarea,
+} from './one-on-one/oneOnOneUi';
 
 import { fetchDepartments } from '../services/departmentService';
 import type { Department } from '../services/departmentService';
@@ -58,21 +71,6 @@ const getMeetingDate = (meeting: Meeting) => {
   }
 
   return meeting.scheduledDate;
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '-';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString(undefined, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 };
 
 const OneOnOneMeetings: React.FC = () => {
@@ -135,7 +133,7 @@ const OneOnOneMeetings: React.FC = () => {
   }, [ongoingMeetings, selectedEmp, upcomingMeetings]);
 
   const selectedEmployeeWarning = selectedEmployeeMeeting
-    ? `This employee already has a meeting with ${getMeetingCreatorName(selectedEmployeeMeeting)} at ${formatDateTime(getMeetingDate(selectedEmployeeMeeting))}.`
+    ? `This employee already has a meeting with ${getMeetingCreatorName(selectedEmployeeMeeting)} at ${formatOomDateTime(getMeetingDate(selectedEmployeeMeeting))}.`
     : '';
 
   const loadActiveMeetingChecks = async () => {
@@ -479,65 +477,81 @@ const OneOnOneMeetings: React.FC = () => {
             ? 'No active employees found in this department'
             : '- Select Employee -';
 
+  const headerDescription =
+    context?.accessMode === 'DEPARTMENT_HEAD_SCOPE'
+      ? 'Your department is fixed. Choose any team in your department or pick an employee from the full department list.'
+      : canSelectDepartment
+        ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
+        : teamRequired
+          ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
+          : hasDefaultDepartment
+            ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
+            : 'Create one-on-one meetings with employees.';
+
+  const renderHeader = () => (
+    <header className={oomCompactHeader}>
+      <p className={oomEyebrow}>One-on-One Meetings</p>
+      <h1 className={oomHeaderTitle}>Create 1:1 Meeting</h1>
+      <p className={oomHeaderDesc}>{headerDescription}</p>
+    </header>
+  );
+
   if (!loadingContext && context && !canCreate) {
     return (
-      <div className="oom-page">
-        <div className="oom-header">
-          <p className="oom-eyebrow">One-on-One Meetings</p>
-          <h1>Create 1:1 Meeting</h1>
-          <p>Your current position does not have permission to create one-on-one meetings.</p>
-        </div>
-
-        <div className="oom-card">
-          <div className="oom-card-header">
-            <div>
-              <h2>Creation Locked</h2>
-              <p>Ask an administrator to enable the 1:1 Meetings → Creation permission for your position.</p>
-            </div>
-          </div>
+      <div className={oomPageWrap} style={{ fontFamily: OOM_FONT }}>
+        <header className={oomCompactHeader}>
+          <p className={oomEyebrow}>One-on-One Meetings</p>
+          <h1 className={oomHeaderTitle}>Create 1:1 Meeting</h1>
+          <p className={oomHeaderDesc}>
+            Your current position does not have permission to create one-on-one meetings.
+          </p>
+        </header>
+        <div className={oomCard}>
+          <h2 className="text-base font-bold text-[#0f172a]">Creation Locked</h2>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Ask an administrator to enable the 1:1 Meetings → Creation permission for your position.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="oom-page">
-      <div className="oom-header">
-        <p className="oom-eyebrow">One-on-One Meetings</p>
-        <h1>Create 1:1 Meeting</h1>
-        <p>
-          {context?.accessMode === 'DEPARTMENT_HEAD_SCOPE'
-            ? 'Your department is fixed. Choose any team in your department or pick an employee from the full department list.'
-            : canSelectDepartment
-              ? 'Choose a department, optionally narrow the list by team, then schedule a meeting.'
-              : teamRequired
-                ? 'Choose one of the active teams you lead or manage, then select an employee from that team.'
-                : hasDefaultDepartment
-                  ? 'Your default department is auto-selected. Team is optional; skip it to see all active employees in your department.'
-                  : 'Create one-on-one meetings with employees.'}
-        </p>
-      </div>
+    <div className={oomPageWrap} style={{ fontFamily: OOM_FONT }}>
+      {renderHeader()}
 
       {(error || success) && (
-        <div className="oom-message-stack">
-          {error && <div className="oom-alert oom-alert--error">{error}</div>}
-          {success && <div className="oom-alert oom-alert--success">{success}</div>}
+        <div className="mb-4 space-y-2">
+          {error && (
+            <div className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm font-semibold text-[#991b1b]">
+              <i className="bi bi-exclamation-triangle me-2" aria-hidden />
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="rounded-lg border border-[#bbf7d0] bg-[#ecfdf5] px-4 py-3 text-sm font-semibold text-[#065f46]">
+              <i className="bi bi-check-circle me-2" aria-hidden />
+              {success}
+            </div>
+          )}
         </div>
       )}
 
-      <div className="oom-card">
-        <div className="oom-card-header">
-          <div>
-            <h2>Schedule a New Meeting</h2>
-            <p>Action Items now owns Upcoming, Ongoing, and Past meeting views.</p>
-          </div>
+      <div className={oomCard}>
+        <div className="mb-5 border-b border-[#e5e7eb] pb-4">
+          <h2 className="text-base font-bold text-[#0f172a] sm:text-lg">Schedule a New Meeting</h2>
+          <p className="mt-1 text-xs text-[#64748b] sm:text-sm">
+            Action Items now owns Upcoming, Ongoing, and Past meeting views.
+          </p>
         </div>
 
-        <form className="oom-form" onSubmit={handleSubmit}>
-          <div className="oom-scope-card">
+        <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+          <div className="col-span-full rounded-xl border border-[#dbe7f6] bg-gradient-to-br from-[#eff6ff] to-white p-4 sm:p-5">
             <div>
-              <span className="oom-scope-pill">Scope</span>
-              <h3>
+              <span className="inline-flex rounded-full bg-[#2563eb] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                Scope
+              </span>
+              <h3 className="mt-2 text-sm font-bold text-[#0f172a] sm:text-base">
                 {context?.accessMode === 'DEPARTMENT_HEAD_SCOPE'
                   ? 'Department head scope'
                   : canSelectDepartment
@@ -558,13 +572,13 @@ const OneOnOneMeetings: React.FC = () => {
             </div>
           </div>
 
-          <div className="oom-two-col">
-            <div className="oom-field">
-              <label className="oom-label">Department</label>
+          <div className="col-span-full grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className={oomLabel}>Department</label>
 
               {canSelectDepartment ? (
                 <select
-                  className="oom-select"
+                  className={oomInput}
                   value={selectedDept}
                   onChange={(e) => {
                     setSelectedDept(e.target.value);
@@ -585,7 +599,7 @@ const OneOnOneMeetings: React.FC = () => {
                 </select>
               ) : (
                 <input
-                  className="oom-input"
+                  className={oomInput}
                   value={context?.departmentName || `Department #${context?.departmentId || ''}`}
                   disabled
                   placeholder="Default department"
@@ -594,12 +608,17 @@ const OneOnOneMeetings: React.FC = () => {
             </div>
 
             {canSelectTeam && (
-              <div className="oom-field">
-                <label className="oom-label">
-                  Team {!teamRequired && <span className="oom-optional">Optional</span>}
+              <div className="flex flex-col gap-1.5">
+                <label className={oomLabel}>
+                  Team{' '}
+                  {!teamRequired && (
+                    <span className="ml-1.5 rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-bold text-[#2563eb]">
+                      Optional
+                    </span>
+                  )}
                 </label>
                 <select
-                  className="oom-select"
+                  className={oomInput}
                   value={selectedTeam}
                   onChange={(e) => setSelectedTeam(e.target.value)}
                   required={teamRequired}
@@ -619,17 +638,17 @@ const OneOnOneMeetings: React.FC = () => {
                   ))}
                 </select>
                 {selectedTeamOption?.departmentName && (
-                  <small>Department: {selectedTeamOption.departmentName}</small>
+                  <small className="text-xs text-[#64748b]">Department: {selectedTeamOption.departmentName}</small>
                 )}
               </div>
             )}
           </div>
 
-          <div className="oom-field">
-            <label className="oom-label">Employee</label>
+          <div className="col-span-full flex flex-col gap-1.5">
+            <label className={oomLabel}>Employee</label>
 
             <select
-              className="oom-select"
+              className={oomInput}
               value={selectedEmp}
               onChange={(e) => setSelectedEmp(e.target.value)}
               required
@@ -649,20 +668,24 @@ const OneOnOneMeetings: React.FC = () => {
             </select>
 
             {selectedEmployeeWarning && (
-              <div className="oom-warning-card">
-                <strong>Warning</strong>
-                <span>{selectedEmployeeWarning}</span>
+              <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3.5 py-2.5 text-sm text-[#92400e]">
+                <strong className="flex items-center gap-1.5 font-bold">
+                  <i className="bi bi-exclamation-triangle" aria-hidden />
+                  Warning
+                </strong>
+                <span className="mt-1 block">{selectedEmployeeWarning}</span>
               </div>
             )}
           </div>
 
-          <div className="oom-field">
-            <label className="oom-label">Meeting Date</label>
+          <div className="col-span-full flex flex-col gap-1.5 sm:col-span-1">
+            <label className={oomLabel}>Meeting Date</label>
 
-            <div className="oom-date-row">
-              <div className="oom-date-part oom-date-part--dd">
-                <label>Day</label>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Day</label>
                 <input
+                  className={`${oomInput} w-[72px] text-center`}
                   type="number"
                   min={1}
                   max={31}
@@ -673,11 +696,12 @@ const OneOnOneMeetings: React.FC = () => {
                 />
               </div>
 
-              <span className="oom-date-sep">/</span>
+              <span className="pb-3 font-bold text-[#94a3b8]">/</span>
 
-              <div className="oom-date-part oom-date-part--mm">
-                <label>Month</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Month</label>
                 <input
+                  className={`${oomInput} w-[72px] text-center`}
                   type="number"
                   min={1}
                   max={12}
@@ -688,11 +712,12 @@ const OneOnOneMeetings: React.FC = () => {
                 />
               </div>
 
-              <span className="oom-date-sep">/</span>
+              <span className="pb-3 font-bold text-[#94a3b8]">/</span>
 
-              <div className="oom-date-part oom-date-part--yy">
-                <label>Year</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Year</label>
                 <input
+                  className={`${oomInput} w-[88px] text-center`}
                   type="number"
                   min={2024}
                   max={2099}
@@ -703,7 +728,8 @@ const OneOnOneMeetings: React.FC = () => {
                 />
               </div>
 
-              <button type="button" className="oom-calendar-btn" onClick={openCalendar}>
+              <button type="button" className={oomBtnPrimary} onClick={openCalendar}>
+                <i className="bi bi-calendar3" aria-hidden />
                 Calendar
               </button>
 
@@ -718,11 +744,12 @@ const OneOnOneMeetings: React.FC = () => {
             </div>
           </div>
 
-          <div className="oom-field">
-            <label className="oom-label">Meeting Time</label>
+          <div className="col-span-full flex flex-col gap-1.5 sm:col-span-1">
+            <label className={oomLabel}>Meeting Time</label>
 
-            <div className="oom-time-row">
+            <div className="flex flex-wrap items-center gap-2">
               <input
+                className={`${oomInput} w-[76px] text-center`}
                 type="number"
                 min={1}
                 max={12}
@@ -731,8 +758,9 @@ const OneOnOneMeetings: React.FC = () => {
                 onChange={(e) => setHour(e.target.value.slice(0, 2))}
                 required
               />
-              <span>:</span>
+              <span className="font-bold text-[#94a3b8]">:</span>
               <input
+                className={`${oomInput} w-[76px] text-center`}
                 type="number"
                 min={0}
                 max={59}
@@ -741,40 +769,45 @@ const OneOnOneMeetings: React.FC = () => {
                 onChange={(e) => setMinute(e.target.value.slice(0, 2))}
                 required
               />
-              <select value={ampm} onChange={(e) => setAmPm(e.target.value as 'AM' | 'PM')}>
+              <select
+                className={`${oomInput} w-[92px]`}
+                value={ampm}
+                onChange={(e) => setAmPm(e.target.value as 'AM' | 'PM')}
+              >
                 <option value="AM">AM</option>
                 <option value="PM">PM</option>
               </select>
             </div>
           </div>
 
-          <div className="oom-field">
-            <label className="oom-label">Location</label>
+          <div className="col-span-full flex flex-col gap-1.5 sm:col-span-1">
+            <label className={oomLabel}>Location</label>
             <input
-              className="oom-input"
+              className={oomInput}
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Meeting room, online link, or office location"
               maxLength={500}
             />
-            <small>Optional. Cannot exceed 500 letters.</small>
+            <small className="text-xs text-[#64748b]">Optional. Cannot exceed 500 letters.</small>
           </div>
 
-          <div className="oom-field oom-field-full">
-            <label className="oom-label">Notes</label>
+          <div className="col-span-full flex flex-col gap-1.5">
+            <label className={oomLabel}>Notes</label>
             <textarea
-              className="oom-textarea"
+              className={oomTextarea}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Agenda or meeting notes"
               rows={4}
               maxLength={1000}
             />
-            <small>Cannot exceed 1000 letters.</small>
+            <small className="text-xs text-[#64748b]">Cannot exceed 1000 letters.</small>
           </div>
 
-          <button type="submit" className="oom-submit" disabled={submitting || loadingContext}>
+          <button type="submit" className={`${oomBtnPrimary} col-span-full`} disabled={submitting || loadingContext}>
+            <i className="bi bi-calendar-plus" aria-hidden />
             {submitting ? 'Scheduling...' : 'Schedule Meeting'}
           </button>
         </form>

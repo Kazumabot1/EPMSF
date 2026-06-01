@@ -382,7 +382,7 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
       { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Manager reviews', to: '/manager/assessment-review', permissionField: 'selfAssessmentSign' },
       { icon: 'bi-list-check', title: 'Appraisals', description: 'Review history', to: '/manager/appraisals', permissionField: 'appraisalPermission' },
       { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Team feedback summary', to: '/manager/feedback/summary', permissionField: 'feedback360Permission' },
-      { icon: 'bi-bullseye', title: 'KPI Scoring', description: 'Score KPIs', to: '/manager/kpi-scoring', anyPermissions: ['kpiInput', 'kpiScore', 'kpiView'] },
+      { icon: 'bi-bullseye', title: 'Evaluate KPIs', description: 'Score KPI actuals', to: '/manager/kpi-scoring', anyPermissions: ['kpiInput', 'kpiScore', 'kpiView'] },
       { icon: 'bi-graph-up', title: 'Reports', description: 'Manager reports', to: '/manager/reports/performance' },
       { icon: 'bi-exclamation-triangle', title: 'Create PIP', description: 'Improvement plan', to: '/pip/create', permissionField: 'pipCreate' },
     ];

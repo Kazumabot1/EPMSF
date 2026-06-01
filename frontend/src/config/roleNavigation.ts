@@ -88,11 +88,11 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Import Accounts', path: '/admin/employee/import', icon: 'bi-upload' },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
-      label: 'KPI Scoring',
+      label: 'KPI Evaluation',
       path: '/admin/kpi-scoring',
       icon: 'bi-ui-checks-grid',
       children: [
-        { label: 'Score Senior KPIs', path: '/admin/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
+        { label: 'Evaluate KPIs', path: '/admin/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
         { label: 'KPI History', path: '/admin/kpi/history', icon: 'bi-clock-history' },
       ],
     },
@@ -316,11 +316,11 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     },
 
     {
-      label: 'Manager KPI Scoring',
+      label: 'KPI Evaluation',
       path: '/department-head/kpi-scoring',
       icon: 'bi-ui-checks-grid',
       children: [
-        { label: 'Score Managers', path: '/department-head/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
+        { label: 'Evaluate KPIs', path: '/department-head/kpi-scoring', icon: 'bi-clipboard2-check', end: true },
         { label: 'KPI History', path: '/department-head/kpi/history', icon: 'bi-clock-history' },
       ],
     },

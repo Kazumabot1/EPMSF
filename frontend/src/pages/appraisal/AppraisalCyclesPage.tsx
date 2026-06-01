@@ -20,8 +20,37 @@ import type {
 } from '../../types/appraisal';
 import type { Signature } from '../../types/signature';
 import AppraisalRatingDots from '../../components/appraisal/AppraisalRatingDots';
-import { formatDisplayDate, formatDisplayDateTime, parseDisplayDateToIso } from '../../utils/appraisalDateFormat';
+import { parseDisplayDateToIso } from '../../utils/appraisalDateFormat';
+import { formatDate, formatDateTimeParen } from '../../components/hr/kpi-template/kpiTemplateDateFormat';
 import { getAppraisalScoreBandToneClass } from '../../utils/appraisalScoreBandTone';
+import {
+  CYCLE_RECORDS_FONT,
+  btnGhost as tailBtnGhost,
+  btnPrimary as tailBtnPrimary,
+  btnSecondary as tailBtnSecondary,
+  card as tailCard,
+  cycleHeaderCard,
+  cycleHeaderDesc,
+  cycleHeaderKicker,
+  cycleHeaderTitle,
+  cycleModalBody,
+  cycleModalCloseBtn,
+  cycleModalHeader,
+  cycleModalHeaderTitle,
+  cycleModalOverlay,
+  cycleModalPanel,
+  cyclePageWrap,
+  cycleSummaryGrid,
+  cycleSummaryItem,
+  cycleSummaryLabel,
+  cycleSummaryValue,
+  input as tailInput,
+  row as tailRow,
+  tableHead as tailTableHead,
+  tableWrap as tailTableWrap,
+  td as tailTd,
+  th as tailTh,
+} from './appraisalCyclesUi';
 import './appraisal.css';
 
 const currentYear = new Date().getFullYear();
@@ -112,9 +141,17 @@ const validateScoreBands = (bands?: ScoreBandLike[] | null) => {
 
 const clampScore = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 
-const displayDate = (value?: string | null) => formatDisplayDate(value);
+const displayDate = (value?: string | null) => formatDate(value);
 
-const displayDateTime = (value?: string | null) => formatDisplayDateTime(value);
+const displayDateTime = (value?: string | null) => formatDateTimeParen(value);
+
+const displayDateWithTime = (value?: string | null) => {
+  if (!value) return '—';
+  const raw = String(value).trim();
+  if (/[T\s]\d{1,2}:\d{2}/.test(raw)) return formatDateTimeParen(value);
+  const dateOnly = formatDate(value);
+  return dateOnly === '—' ? dateOnly : `${dateOnly} (12:00 AM)`;
+};
 
 const normalizeAuditKey = (value: string) => value.trim().toLowerCase();
 
@@ -1659,22 +1696,62 @@ const AppraisalCyclesPage = () => {
     if (!selectedCycle) return null;
     let globalNo = 0;
     return (
-      <div className="appraisal-modal-backdrop">
-        <div className="appraisal-modal-box appraisal-modal-box-xl appraisal-cycle-view-modal">
-          <div className="appraisal-modal-header">
-            <div><h2>View Appraisal Cycle</h2><p>{selectedCycle.cycleName}</p></div>
-            <button className="appraisal-modal-close" type="button" onClick={closeCycleView}><i className="bi bi-x-lg" /></button>
+      <div
+        className={cycleModalOverlay}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="appraisal-cycle-view-title"
+        onClick={closeCycleView}
+      >
+        <div
+          className={cycleModalPanel}
+          onClick={(event) => event.stopPropagation()}
+          style={{ fontFamily: CYCLE_RECORDS_FONT }}
+        >
+          <div className={cycleModalHeader}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className={cycleHeaderKicker}>
+                  <i className="bi bi-arrow-repeat" aria-hidden />
+                  HR Appraisal Management
+                </p>
+                <h2 id="appraisal-cycle-view-title" className={cycleModalHeaderTitle}>
+                  View Cycle
+                </h2>
+                <p className="mt-1 truncate text-sm text-[#334155]">{selectedCycle.cycleName}</p>
+              </div>
+              <button
+                className={cycleModalCloseBtn}
+                type="button"
+                onClick={closeCycleView}
+                aria-label="Close"
+              >
+                <i className="bi bi-x-lg text-sm" aria-hidden />
+              </button>
+            </div>
           </div>
-          <div className="appraisal-modal-body template-form-modal-body">
+          <div className={cycleModalBody}>
             {cycleViewLoading && <div className="appraisal-empty">Loading appraisal cycle form...</div>}
             {!cycleViewLoading && !selectedCycleTemplate && <div className="appraisal-empty">Selected template form could not be loaded.</div>}
             {!cycleViewLoading && selectedCycleTemplate && (
               <>
-                <div className="appraisal-template-summary-card appraisal-cycle-summary-card compact-summary">
-                  <div><strong>Appraisal Name</strong><span>{selectedCycle.cycleName}</span></div>
-                  <div><strong>Template</strong><span>{selectedCycle.templateName || selectedCycleTemplate.templateName}</span></div>
-                  <div><strong>Cycle Type</strong><span>{formatCycleType(selectedCycle.cycleType)}</span></div>
-                  <div><strong>Cycle Year</strong><span>{selectedCycle.cycleYear}</span></div>
+                <div className={cycleSummaryGrid}>
+                  <div className={cycleSummaryItem}>
+                    <span className={cycleSummaryLabel}>Appraisal Name</span>
+                    <span className={cycleSummaryValue}>{selectedCycle.cycleName}</span>
+                  </div>
+                  <div className={cycleSummaryItem}>
+                    <span className={cycleSummaryLabel}>Template</span>
+                    <span className={cycleSummaryValue}>{selectedCycle.templateName || selectedCycleTemplate.templateName}</span>
+                  </div>
+                  <div className={cycleSummaryItem}>
+                    <span className={cycleSummaryLabel}>Cycle Type</span>
+                    <span className={cycleSummaryValue}>{formatCycleType(selectedCycle.cycleType)}</span>
+                  </div>
+                  <div className={cycleSummaryItem}>
+                    <span className={cycleSummaryLabel}>Cycle Year</span>
+                    <span className={cycleSummaryValue}>{selectedCycle.cycleYear}</span>
+                  </div>
                 </div>
                 <div className="appraisal-form-block">
                   <h3>Employee Information</h3>
@@ -1683,8 +1760,8 @@ const AppraisalCyclesPage = () => {
                     <label className="appraisal-field"><span>Employee ID</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Current Position</span><input value="" placeholder="Filled by Project Manager" readOnly disabled /></label>
                     <label className="appraisal-field"><span>Department</span><input value={selectedCycle.departmentNames?.join(', ') || 'All Departments'} readOnly disabled /></label>
-                    <label className="appraisal-field"><span>Start Date</span><input value={displayDate(selectedCycle.startDate)} readOnly disabled /></label>
-                    <label className="appraisal-field"><span>End Date</span><input value={displayDate(selectedCycle.endDate)} readOnly disabled /></label>
+                    <label className="appraisal-field"><span>Start Date</span><input value={displayDateWithTime(selectedCycle.startDate)} readOnly disabled /></label>
+                    <label className="appraisal-field"><span>End Date</span><input value={displayDateWithTime(selectedCycle.endDate)} readOnly disabled /></label>
                   </div>
                 </div>
                 <div className="appraisal-form-block">
@@ -1955,62 +2032,157 @@ const AppraisalCyclesPage = () => {
   };
 
   return (
-    <div className="appraisal-page">
-      <div className="appraisal-page-header">
-        <div><h1>Appraisal Cycles</h1><p>Manage appraisal cycles created from reusable template forms.</p></div>
-        <button className="appraisal-button primary" type="button" onClick={() => openCreateModal()}><i className="bi bi-plus-circle" />Create Appraisal Cycle</button>
-      </div>
-
-      <div className="appraisal-card">
-        <div className="appraisal-form-block-header">
-<div><h2>Appraisal Cycles</h2></div>
-          <button className="appraisal-button secondary" type="button" disabled={loading} onClick={() => void loadData()}>Refresh</button>
+    <div className={`appraisal-page ${cyclePageWrap}`} style={{ fontFamily: CYCLE_RECORDS_FONT }}>
+      <header className={cycleHeaderCard}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className={cycleHeaderKicker}>
+              <i className="bi bi-arrow-repeat" aria-hidden />
+              HR Appraisal Management
+            </p>
+            <h1 className={cycleHeaderTitle}>Appraisal Cycles</h1>
+            <p className={cycleHeaderDesc}>Manage appraisal cycles created from reusable template forms.</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            <button className={tailBtnSecondary} type="button" disabled={loading} onClick={() => void loadData()}>
+              <i className="bi bi-arrow-clockwise" aria-hidden />
+              Refresh
+            </button>
+            <button className={tailBtnPrimary} type="button" onClick={() => openCreateModal()}>
+              <i className="bi bi-plus-circle" aria-hidden />
+              Create Appraisal Cycle
+            </button>
+          </div>
         </div>
-        <div className="appraisal-filter-bar appraisal-cycle-filter-bar">
-          <label className="appraisal-filter-field">
-            <span>Search Appraisal Name</span>
-            <input value={cycleSearch} onChange={(event) => setCycleSearch(event.target.value)} placeholder="Search by appraisal name" />
+      </header>
+
+      <div className={tailCard}>
+        <div className="mb-4 grid gap-3 border-b border-[#e5e7eb] pb-4 sm:grid-cols-2 lg:grid-cols-[1fr_180px_160px_auto] lg:items-end">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-[#334155]">Search Appraisal Name</span>
+            <input
+              className={tailInput}
+              value={cycleSearch}
+              onChange={(event) => setCycleSearch(event.target.value)}
+              placeholder="Search by appraisal name"
+            />
           </label>
-          <label className="appraisal-filter-field">
-            <span>Cycle Type</span>
-            <select value={cycleTypeFilter} onChange={(event) => setCycleTypeFilter(event.target.value)}>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-[#334155]">Cycle Type</span>
+            <select className={tailInput} value={cycleTypeFilter} onChange={(event) => setCycleTypeFilter(event.target.value)}>
               <option value="">All Cycle Types</option>
               <option value="ANNUAL">Annual</option>
               <option value="SEMI_ANNUAL">Semi-Annual</option>
               <option value="CUSTOM">Custom</option>
             </select>
           </label>
-          <label className="appraisal-filter-field">
-            <span>Year</span>
-            <select value={cycleYearFilter} onChange={(event) => setCycleYearFilter(event.target.value)}>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-[#334155]">Year</span>
+            <select className={tailInput} value={cycleYearFilter} onChange={(event) => setCycleYearFilter(event.target.value)}>
               <option value="">All Years</option>
-              {cycleYearFilterOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+              {cycleYearFilterOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </label>
-          <div className="appraisal-filter-actions">
-            <button className="appraisal-button ghost" type="button" onClick={clearCycleFilters}>Clear Filters</button>
-            <span className="appraisal-filter-result">Showing {filteredCycles.length} of {cycles.length}</span>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-1 lg:justify-end">
+            <button className={tailBtnGhost} type="button" onClick={clearCycleFilters}>
+              Clear Filters
+            </button>
+            <span className="text-xs font-semibold text-[#64748b]">
+              Showing {filteredCycles.length} of {cycles.length}
+            </span>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="appraisal-table appraisal-cycle-record-table">
-            <thead><tr><th>Appraisal Name</th><th>Cycle Type</th><th>Cycle Year</th><th>Start Date</th><th>End Date</th><th>Created At</th><th>Status</th><th>Locked</th><th>Actions</th></tr></thead>
+
+        <div className={tailTableWrap}>
+          <table className="w-full min-w-[980px] border-collapse">
+            <thead className={tailTableHead}>
+              <tr>
+                <th className={tailTh}>Appraisal Name</th>
+                <th className={tailTh}>Cycle Type</th>
+                <th className={tailTh}>Cycle Year</th>
+                <th className={tailTh}>Start Date</th>
+                <th className={tailTh}>End Date</th>
+                <th className={tailTh}>Created At</th>
+                <th className={tailTh}>Status</th>
+                <th className={tailTh}>Locked</th>
+                <th className={`${tailTh} text-right`}>Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              {cycles.length === 0 && <tr><td colSpan={9}><div className="appraisal-empty">No appraisal cycles yet.</div></td></tr>}
-              {cycles.length > 0 && filteredCycles.length === 0 && <tr><td colSpan={9}><div className="appraisal-empty">No appraisal cycles match the selected search/filter.</div></td></tr>}
+              {cycles.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm font-semibold text-[#64748b]">
+                    No appraisal cycles yet.
+                  </td>
+                </tr>
+              )}
+              {cycles.length > 0 && filteredCycles.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm font-semibold text-[#64748b]">
+                    No appraisal cycles match the selected search/filter.
+                  </td>
+                </tr>
+              )}
               {filteredCycles.map((cycle) => (
-                <tr key={cycle.id}>
-                  <td><strong>{cycle.cycleName}</strong></td><td>{formatCycleType(cycle.cycleType)}</td><td>{cycle.cycleYear}</td><td>{displayDate(cycle.startDate)}</td><td>{displayDate(cycle.endDate)}</td><td>{displayDateTime(cycle.createdAt)}</td><td><span className={`appraisal-status ${statusClass(cycle.status)}`}>{cycle.status}</span></td><td>{cycle.locked ? 'Yes' : 'No'}</td>
-                  <td>
-                    <div className="appraisal-button-row record-actions">
-                      <button className="appraisal-button ghost" type="button" onClick={() => void openCycleView(cycle)}>View Cycle</button>
-                      {canEditCycleDraft(cycle) && <button className="appraisal-button secondary" type="button" onClick={() => void openEditCycle(cycle)}>Edit</button>}
-                      {canEditCycleDraft(cycle) && <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>Active</button>}
-                      {canDeactivateCycle(cycle) && <button className="appraisal-button warning" type="button" onClick={() => askDeactivateCycle(cycle)}>Inactive</button>}
-                      {canLockCycle(cycle) && <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>Lock</button>}
-                      {canCompleteCycle(cycle) && cycle.status !== 'COMPLETED' && <button className="appraisal-button secondary" type="button" onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>Complete</button>}
-                      {canEditCycleDraft(cycle) && <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(cycle)}>Edit Records</button>}
-                      {cycle.status === 'COMPLETED' && <button className="appraisal-button ghost" type="button" onClick={() => void openReuseModal(cycle)}>Re-use</button>}
+                <tr key={cycle.id} className={tailRow}>
+                  <td className={tailTd}>
+                    <strong className="text-[#0f172a]">{cycle.cycleName}</strong>
+                  </td>
+                  <td className={tailTd}>{formatCycleType(cycle.cycleType)}</td>
+                  <td className={tailTd}>{cycle.cycleYear}</td>
+                  <td className={tailTd}>{displayDate(cycle.startDate)}</td>
+                  <td className={tailTd}>{displayDate(cycle.endDate)}</td>
+                  <td className={tailTd}>{displayDateTime(cycle.createdAt)}</td>
+                  <td className={tailTd}>
+                    <span className={`appraisal-status ${statusClass(cycle.status)}`}>{cycle.status}</span>
+                  </td>
+                  <td className={tailTd}>{cycle.locked ? 'Yes' : 'No'}</td>
+                  <td className={`${tailTd} text-right`}>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <button className={tailBtnGhost} type="button" onClick={() => void openCycleView(cycle)}>
+                        <i className="bi bi-eye" aria-hidden />
+                        View Cycle
+                      </button>
+                      {canEditCycleDraft(cycle) && (
+                        <button className={tailBtnSecondary} type="button" onClick={() => void openEditCycle(cycle)}>
+                          <i className="bi bi-pencil" aria-hidden />
+                          Edit
+                        </button>
+                      )}
+                      {canEditCycleDraft(cycle) && (
+                        <button className="appraisal-button success" type="button" onClick={() => askActivateCycle(cycle)}>
+                          Active
+                        </button>
+                      )}
+                      {canDeactivateCycle(cycle) && (
+                        <button className="appraisal-button warning" type="button" onClick={() => askDeactivateCycle(cycle)}>
+                          Inactive
+                        </button>
+                      )}
+                      {canLockCycle(cycle) && (
+                        <button className="appraisal-button warning" type="button" onClick={() => runAction(() => appraisalCycleService.lock(cycle.id), 'Cycle locked.')}>
+                          Lock
+                        </button>
+                      )}
+                      {canCompleteCycle(cycle) && cycle.status !== 'COMPLETED' && (
+                        <button className={tailBtnSecondary} type="button" onClick={() => runAction(() => appraisalCycleService.complete(cycle.id), 'Cycle completed.')}>
+                          Complete
+                        </button>
+                      )}
+                      {canEditCycleDraft(cycle) && (
+                        <button className={tailBtnGhost} type="button" onClick={() => void openEditRecords(cycle)}>
+                          Edit Records
+                        </button>
+                      )}
+                      {cycle.status === 'COMPLETED' && (
+                        <button className={tailBtnGhost} type="button" onClick={() => void openReuseModal(cycle)}>
+                          Re-use
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

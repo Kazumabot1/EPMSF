@@ -8,6 +8,7 @@ import { useNotificationsWebSocket } from '../../hooks/useNotificationsWebSocket
 import KpiNotificationMessageBody from '../notifications/KpiNotificationMessageBody';
 import SignatureModal from '../signature/SignatureModal';
 import ProfileHeaderAvatar from '../ProfileHeaderAvatar';
+import HeaderDateTime from '../layout/HeaderDateTime';
 
 interface UserLike {
   fullName?: string;
@@ -309,12 +310,9 @@ const EmployeeHeader = ({
 
   return (
       <header className={`employee-header ${collapsed ? 'collapsed' : ''}`}>
-        <div className="employee-header-search">
-          <i className="bi bi-search" />
-          <input type="text" placeholder="Search employees, KPIs, appraisals..." />
-        </div>
-
         <div className="employee-header-actions">
+          <HeaderDateTime />
+
           <div className="hr-notification-wrap" ref={notifRef}>
             <button
                 type="button"

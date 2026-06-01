@@ -45,6 +45,17 @@ export const formatDateTime = (value?: string | null): string => {
   return `${datePart}, ${hours}:${minutes} ${ampm}`;
 };
 
+/** Formats a `Date` as `DD-MM-YYYY (hh:mm AM/PM)`. */
+export const formatDateTimeParenFromDate = (date: Date): string => {
+  const datePart = formatParts(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  let hours = date.getHours();
+  const minutes = pad2(date.getMinutes());
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours %= 12;
+  if (hours === 0) hours = 12;
+  return `${datePart} (${pad2(hours)}:${minutes} ${ampm})`;
+};
+
 /** Formats a date-time as `DD-MM-YYYY (hh:mm AM/PM)`. */
 export const formatDateTimeParen = (value?: string | null): string => {
   if (!value) return '—';

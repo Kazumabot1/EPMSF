@@ -230,10 +230,10 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
       {
         to: '/admin/kpi-scoring',
-        label: 'KPI Scoring',
+        label: 'KPI Evaluation',
         icon: 'bi bi-ui-checks-grid',
         children: [
-          { to: '/admin/kpi-scoring', label: 'Score Senior KPIs', icon: 'bi bi-clipboard2-check', end: true },
+          { to: '/admin/kpi-scoring', label: 'Evaluate KPIs', icon: 'bi bi-clipboard2-check', end: true },
           { to: '/admin/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
@@ -770,12 +770,12 @@ const organizationChildren = compactItems([
       },
       (allow(positionPermissions, 'kpiInput') || allow(positionPermissions, 'kpiScore') || allow(positionPermissions, 'kpiView')) && {
         to: '/department-head/kpi-scoring',
-        label: 'Manager KPI Scoring',
+        label: 'KPI Evaluation',
         icon: 'bi bi-ui-checks-grid',
         children: [
           {
             to: '/department-head/kpi-scoring',
-            label: 'Score Managers',
+            label: 'Evaluate KPIs',
             icon: 'bi bi-clipboard2-check',
             end: true,
           },

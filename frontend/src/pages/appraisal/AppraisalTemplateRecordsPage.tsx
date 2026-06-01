@@ -13,8 +13,31 @@ import type {
 } from '../../types/appraisal';
 import type { Signature } from '../../types/signature';
 import AppraisalRatingDots from '../../components/appraisal/AppraisalRatingDots';
-import { formatDisplayDateTime } from '../../utils/appraisalDateFormat';
+import { formatDateTimeParen } from '../../components/hr/kpi-template/kpiTemplateDateFormat';
 import { getAppraisalScoreBandToneClass } from '../../utils/appraisalScoreBandTone';
+import {
+  TEMPLATE_RECORDS_FONT,
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  modalBody,
+  modalFooter,
+  modalHeader,
+  modalOverlay,
+  modalPanelXl,
+  recordsCard,
+  recordsHeader,
+  recordsHeaderDesc,
+  recordsHeaderKicker,
+  recordsHeaderTitle,
+  recordsInput,
+  recordsPageWrap,
+  tableHead,
+  tableRow,
+  tableTd,
+  tableTh,
+  tableWrap,
+} from './appraisalTemplateRecordsUi';
 import './appraisal.css';
 
 type TemplateModalMode = 'create' | 'edit' | 'view' | null;
@@ -144,7 +167,7 @@ const getSignatureImageSrc = (signature?: Signature) => {
     : `data:${signature.imageType};base64,${signature.imageData}`;
 };
 
-const displayDateTime = (value?: string | null) => formatDisplayDateTime(value);
+const displayDateTime = (value?: string | null) => formatDateTimeParen(value);
 
 const normalizeAuditKey = (value: string) => value.trim().toLowerCase();
 
@@ -1447,30 +1470,77 @@ const AppraisalTemplateRecordsPage = () => {
   const renderEditRecordsModal = () => {
     if (!editRecordsTitle) return null;
     return (
-      <div className="appraisal-modal-backdrop" onMouseDown={closeEditRecords}>
-        <div className="appraisal-modal-box appraisal-modal-box-xl appraisal-edit-records-modal" onMouseDown={(event) => event.stopPropagation()}>
-          <div className="appraisal-modal-header">
-            <div>
-              <h2>{editRecordView ? 'Template Edit Record' : 'Template Edit Records'}</h2>
-              <p>{editRecordsTitle}</p>
+      <div className={modalOverlay} role="dialog" aria-modal="true" onClick={closeEditRecords}>
+        <div className={modalPanelXl} onClick={(event) => event.stopPropagation()}>
+          <div className={modalHeader}>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#2563eb]">
+                {editRecordView ? 'Edit Record Detail' : 'Audit Trail'}
+              </p>
+              <h2 className="text-base font-bold text-[#0f172a] sm:text-lg">
+                {editRecordView ? 'Template Edit Record' : 'Template Edit Records'}
+              </h2>
+              <p className="mt-0.5 truncate text-sm text-[#64748b]">{editRecordsTitle}</p>
             </div>
-            <button className="appraisal-modal-close" type="button" onClick={closeEditRecords}><i className="bi bi-x-lg" /></button>
+            <button
+              type="button"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe7f6] bg-white text-[#334155] transition hover:bg-[#eff6ff]"
+              onClick={closeEditRecords}
+              aria-label="Close"
+            >
+              <i className="bi bi-x-lg text-sm" aria-hidden />
+            </button>
           </div>
-          <div className="appraisal-modal-body template-form-modal-body">
+          <div className={`${modalBody} template-form-modal-body`}>
             {!editRecordView && (
               <>
-                {editRecordsLoading && <div className="appraisal-empty">Loading edit records...</div>}
-                {!editRecordsLoading && editRecords.length === 0 && <div className="appraisal-empty">No edit records yet.</div>}
+                {editRecordsLoading && (
+                  <div className="rounded-lg border border-dashed border-[#dbe7f6] bg-[#f8fafc] px-4 py-8 text-center text-sm font-semibold text-[#64748b]">
+                    Loading edit records...
+                  </div>
+                )}
+                {!editRecordsLoading && editRecords.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-[#dbe7f6] bg-[#f8fafc] px-4 py-8 text-center text-sm font-semibold text-[#64748b]">
+                    No edit records yet.
+                  </div>
+                )}
                 {!editRecordsLoading && editRecords.length > 0 && (
-                  <div className="appraisal-edit-record-history">
-                    <div className="appraisal-edit-record-history-note">Latest 3 edit records are shown first.</div>
-                    <div className="appraisal-edit-record-list">
+                  <div>
+                    <p className="mb-3 text-xs font-semibold text-[#64748b]">
+                      <i className="bi bi-info-circle me-1" aria-hidden />
+                      Latest 3 edit records are shown first.
+                    </p>
+                    <div className="flex flex-col gap-2">
                       {latestEditRecords.map((record) => (
-                        <button className="appraisal-edit-record-row" type="button" key={record.id} onClick={() => void openEditRecordView(record)}>
-                          <span><strong>{record.changedByName || `User #${record.userId ?? '-'}`}</strong><small>Edited By</small></span>
-                          <span><strong>{formatAppraisalAuditChangeCount(record)}</strong><small>Changed Fields</small></span>
-                          <span><strong>{displayDateTime(record.timestamp)}</strong><small>Edited At</small></span>
-                          <i className="bi bi-chevron-right" />
+                        <button
+                          type="button"
+                          key={record.id}
+                          className="grid w-full gap-2 rounded-xl border border-[#dbe7f6] bg-white p-4 text-left shadow-sm transition hover:border-[#93c5fd] hover:bg-[#f0f9ff] sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center"
+                          onClick={() => void openEditRecordView(record)}
+                        >
+                          <span className="flex flex-col gap-0.5">
+                            <strong className="text-sm text-[#0f172a]">
+                              {record.changedByName || `User #${record.userId ?? '-'}`}
+                            </strong>
+                            <small className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                              Edited By
+                            </small>
+                          </span>
+                          <span className="flex flex-col gap-0.5">
+                            <strong className="text-sm text-[#0f172a]">
+                              {formatAppraisalAuditChangeCount(record)}
+                            </strong>
+                            <small className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                              Changed Fields
+                            </small>
+                          </span>
+                          <span className="flex flex-col gap-0.5">
+                            <strong className="text-sm text-[#0f172a]">{displayDateTime(record.timestamp)}</strong>
+                            <small className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                              Edited At
+                            </small>
+                          </span>
+                          <i className="bi bi-chevron-right hidden text-[#2563eb] sm:block" aria-hidden />
                         </button>
                       ))}
                     </div>
@@ -1480,15 +1550,30 @@ const AppraisalTemplateRecordsPage = () => {
             )}
             {editRecordView && (
               <>
-                {editRecordViewLoading && <div className="appraisal-empty">Loading edited form...</div>}
-                {!editRecordViewLoading && !editRecordTemplate && <div className="appraisal-empty">Template form could not be loaded.</div>}
+                {editRecordViewLoading && (
+                  <div className="rounded-lg border border-dashed border-[#dbe7f6] bg-[#f8fafc] px-4 py-8 text-center text-sm font-semibold text-[#64748b]">
+                    Loading edited form...
+                  </div>
+                )}
+                {!editRecordViewLoading && !editRecordTemplate && (
+                  <div className="rounded-lg border border-dashed border-[#dbe7f6] bg-[#f8fafc] px-4 py-8 text-center text-sm font-semibold text-[#64748b]">
+                    Template form could not be loaded.
+                  </div>
+                )}
                 {!editRecordViewLoading && editRecordTemplate && renderTemplateAuditForm(editRecordTemplate, editRecordView)}
               </>
             )}
           </div>
-          <div className="appraisal-modal-footer">
-            {editRecordView && <button className="appraisal-button ghost" type="button" onClick={closeEditRecordView}>Back to List</button>}
-            <button className="appraisal-button secondary" type="button" onClick={closeEditRecords}>Close</button>
+          <div className={modalFooter}>
+            {editRecordView && (
+              <button type="button" className={btnGhost} onClick={closeEditRecordView}>
+                <i className="bi bi-arrow-left" aria-hidden />
+                Back to List
+              </button>
+            )}
+            <button type="button" className={btnSecondary} onClick={closeEditRecords}>
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -1496,72 +1581,141 @@ const AppraisalTemplateRecordsPage = () => {
   };
 
   return (
-    <div className="appraisal-page appraisal-template-records-page">
-      <div className="appraisal-page-header">
-        <div>
-          <h1>Template Forms</h1>
-          <p>Create, view, and edit reusable blank appraisal form templates. Any appraisal cycle can use any template form.</p>
-        </div>
-        <div className="appraisal-button-row" style={{ marginTop: 0 }}>
-          <button className="appraisal-button secondary" type="button" disabled={loading} onClick={() => void loadTemplates()}>Refresh</button>
-          <button className="appraisal-button primary" type="button" onClick={openCreate}>Create New Template</button>
-        </div>
-      </div>
-
-      <div className="appraisal-card">
-        <div className="appraisal-form-block-header">
-          <div>
-            <h2>Template Forms</h2>
+    <div
+      className={`appraisal-page appraisal-template-records-page ${recordsPageWrap}`}
+      style={{ fontFamily: TEMPLATE_RECORDS_FONT }}
+    >
+      <header className={recordsHeader}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className={recordsHeaderKicker}>
+              <i className="bi bi-folder2-open" aria-hidden />
+              HR Appraisal Management
+            </p>
+            <h1 className={recordsHeaderTitle}>Template Form Records</h1>
+            <p className={recordsHeaderDesc}>
+              Create, view, and edit reusable blank appraisal form templates. Any appraisal cycle can use any template form.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            <button className={btnSecondary} type="button" disabled={loading} onClick={() => void loadTemplates()}>
+              <i className="bi bi-arrow-clockwise" aria-hidden />
+              Refresh
+            </button>
+            <button className={btnPrimary} type="button" onClick={openCreate}>
+              <i className="bi bi-file-earmark-plus" aria-hidden />
+              Create New Template
+            </button>
           </div>
         </div>
-        <div className="appraisal-filter-bar">
-          <label className="appraisal-filter-field">
-            <span>Search Template Name</span>
+      </header>
+
+      <div className={recordsCard}>
+        <div className="mb-4 grid gap-3 border-b border-[#e5e7eb] pb-4 sm:grid-cols-2 lg:grid-cols-[1fr_160px_auto] lg:items-end">
+          <label className="flex flex-col gap-1.5 sm:col-span-1 lg:col-span-1">
+            <span className="text-xs font-bold text-[#334155]">Search Template Name</span>
             <input
+              className={recordsInput}
               value={templateSearch}
               onChange={(event) => setTemplateSearch(event.target.value)}
               placeholder="Search by template name"
             />
           </label>
-          <label className="appraisal-filter-field">
-            <span>Year</span>
-            <select value={templateYearFilter} onChange={(event) => setTemplateYearFilter(event.target.value)}>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-[#334155]">Year</span>
+            <select
+              className={recordsInput}
+              value={templateYearFilter}
+              onChange={(event) => setTemplateYearFilter(event.target.value)}
+            >
               <option value="">All Years</option>
-              {templateYearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+              {templateYearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </label>
-          <div className="appraisal-filter-actions">
-            <button className="appraisal-button ghost" type="button" onClick={clearTemplateFilters}>Clear Filters</button>
-            <span className="appraisal-filter-result">Showing {filteredTemplates.length} of {templates.length}</span>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-1 lg:justify-end">
+            <button type="button" className={btnGhost} onClick={clearTemplateFilters}>
+              Clear Filters
+            </button>
+            <span className="text-xs font-semibold text-[#64748b]">
+              Showing {filteredTemplates.length} of {templates.length}
+            </span>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="appraisal-table appraisal-cycle-record-table">
-            <thead>
+
+        <div className={tableWrap}>
+          <table className="w-full min-w-[640px] border-collapse">
+            <thead className={tableHead}>
               <tr>
-                <th>Template Name</th>
-                <th>Created By</th>
-                <th>Created At</th>
-                <th>Actions</th>
+                <th className={tableTh}>Template Name</th>
+                <th className={tableTh}>Created By</th>
+                <th className={tableTh}>Created At</th>
+                <th className={`${tableTh} text-right`}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {templates.length === 0 && (
-                <tr><td colSpan={4}><div className="appraisal-empty">No template forms yet.</div></td></tr>
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-sm font-semibold text-[#64748b]">
+                    No template forms yet.
+                  </td>
+                </tr>
               )}
               {templates.length > 0 && filteredTemplates.length === 0 && (
-                <tr><td colSpan={4}><div className="appraisal-empty">No template forms match the selected search/filter.</div></td></tr>
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-sm font-semibold text-[#64748b]">
+                    No template forms match the selected search/filter.
+                  </td>
+                </tr>
               )}
               {filteredTemplates.map((template) => (
-                <tr key={template.id}>
-                  <td><strong>{template.templateName}</strong></td>
-                  <td>{template.createdByEmployeeId || '-'}</td>
-                  <td>{displayDateTime(template.createdAt)}</td>
-                  <td>
-                    <div className="appraisal-button-row record-actions">
-                      <button className="appraisal-button ghost" type="button" onClick={() => void openView(template.id)}>View Form</button>
-                      <button className="appraisal-button secondary" type="button" onClick={() => void openEdit(template.id)}>Edit</button>
-                      <button className="appraisal-button ghost" type="button" onClick={() => void openEditRecords(template)}>Edit Records</button>
+                <tr
+                  key={template.id}
+                  className={tableRow}
+                  onClick={() => void openView(template.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      void openView(template.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <td className={tableTd}>
+                    <strong className="text-[#0f172a]">{template.templateName}</strong>
+                  </td>
+                  <td className={tableTd}>{template.createdByEmployeeId || '—'}</td>
+                  <td className={tableTd}>{displayDateTime(template.createdAt)}</td>
+                  <td className={`${tableTd} text-right`} onClick={(event) => event.stopPropagation()}>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <button
+                        className={btnGhost}
+                        type="button"
+                        onClick={() => void openView(template.id)}
+                      >
+                        <i className="bi bi-eye" aria-hidden />
+                        View
+                      </button>
+                      <button
+                        className={btnSecondary}
+                        type="button"
+                        onClick={() => void openEdit(template.id)}
+                      >
+                        <i className="bi bi-pencil" aria-hidden />
+                        Edit
+                      </button>
+                      <button
+                        className={btnGhost}
+                        type="button"
+                        onClick={() => void openEditRecords(template)}
+                      >
+                        <i className="bi bi-clock-history" aria-hidden />
+                        Edit Records
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1610,32 +1764,63 @@ const AppraisalTemplateRecordsPage = () => {
       )}
 
       {modalMode && (
-        <div className="appraisal-modal-backdrop">
-          <div className="appraisal-modal-box appraisal-modal-box-xl">
-            <div className="appraisal-modal-header">
-              <div>
-                <h2>{modalMode === 'create' ? 'Create New Template' : modalMode === 'edit' ? 'Edit Template Form' : 'View Template Form'}</h2>
-                <p>{modalMode === 'view' ? 'Read-only template form preview.' : 'Fill required fields and customize sections, criteria, and score ranges.'}</p>
+        <div className={modalOverlay} role="dialog" aria-modal="true" onClick={closeModal}>
+          <div className={modalPanelXl} onClick={(event) => event.stopPropagation()}>
+            <div className={modalHeader}>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#2563eb]">
+                  {modalMode === 'view' ? 'View Form' : modalMode === 'edit' ? 'Edit Form' : 'New Form'}
+                </p>
+                <h2 className="text-base font-bold text-[#0f172a] sm:text-lg">
+                  {modalMode === 'create'
+                    ? 'Create New Template'
+                    : modalMode === 'edit'
+                      ? 'Edit Template Form'
+                      : 'View Template Form'}
+                </h2>
+                <p className="mt-0.5 text-sm text-[#64748b]">
+                  {modalMode === 'view'
+                    ? 'Read-only template form preview.'
+                    : 'Fill required fields and customize sections, criteria, and score ranges.'}
+                </p>
               </div>
-              <button className="appraisal-modal-close" type="button" onClick={closeModal}><i className="bi bi-x-lg" /></button>
+              <button
+                type="button"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe7f6] bg-white text-[#334155] transition hover:bg-[#eff6ff]"
+                onClick={closeModal}
+                aria-label="Close"
+              >
+                <i className="bi bi-x-lg text-sm" aria-hidden />
+              </button>
             </div>
-            <div className="appraisal-modal-body template-form-modal-body">
+            <div className={`${modalBody} template-form-modal-body`}>
               <div className="appraisal-template-banner center">
                 <h2>Performance Evaluation Form</h2>
                 <p>ACE Data Systems Ltd.</p>
               </div>
               {modalMode === 'view' ? renderTemplatePreview() : renderTemplateEditor()}
             </div>
-            <div className="appraisal-modal-footer">
-              <button className="appraisal-button secondary" type="button" onClick={closeModal}>Close</button>
+            <div className={modalFooter}>
+              <button type="button" className={btnSecondary} onClick={closeModal}>
+                Close
+              </button>
               {modalMode === 'view' && selectedTemplate && (
-                <button className="appraisal-button primary" type="button" onClick={() => useThisTemplate(selectedTemplate.id)}>Use This Template</button>
+                <button type="button" className={btnPrimary} onClick={() => useThisTemplate(selectedTemplate.id)}>
+                  <i className="bi bi-box-arrow-in-right" aria-hidden />
+                  Use This Template
+                </button>
               )}
               {modalMode === 'create' && (
-                <button className="appraisal-button primary" type="button" disabled={loading} onClick={() => void createTemplate()}>Create Template</button>
+                <button type="button" className={btnPrimary} disabled={loading} onClick={() => void createTemplate()}>
+                  <i className="bi bi-check-lg" aria-hidden />
+                  Create Template
+                </button>
               )}
               {modalMode === 'edit' && (
-                <button className="appraisal-button primary" type="button" disabled={loading} onClick={() => void saveEdit()}>Save Changes</button>
+                <button type="button" className={btnPrimary} disabled={loading} onClick={() => void saveEdit()}>
+                  <i className="bi bi-save" aria-hidden />
+                  Save Changes
+                </button>
               )}
             </div>
           </div>
