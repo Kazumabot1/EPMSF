@@ -24,6 +24,9 @@ const formatPeriod = (start?: string | null, end?: string | null): string => {
 const formatPercent = (value: number | null | undefined): string =>
   value != null && Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : '-';
 
+const employeeKpiHeroGradient =
+  'bg-[radial-gradient(circle_at_88%_18%,rgba(255,255,255,0.45),transparent_14rem),linear-gradient(135deg,#ffffff_0%,#dbeafe_42%,#1e3a8a_100%)]';
+
 const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
   useEffect(() => {
     if (!open) return;
@@ -59,24 +62,30 @@ const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
         className="max-h-[min(90vh,920px)] w-full max-w-6xl overflow-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
         style={{ fontFamily: '"Times New Roman", Times, serif' }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+        <div
+          className={`flex items-start justify-between gap-4 border-b border-blue-200/60 px-6 py-5 ${employeeKpiHeroGradient}`}
+        >
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Employee KPI Details</p>
-            <h2 id="hr-kpi-modal-title" className="mt-1 text-xl font-semibold text-slate-950">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-800">
+              Employee KPI details
+            </p>
+            <h2 id="hr-kpi-modal-title" className="mt-1 text-2xl font-bold leading-tight text-blue-950">
               {row.kpiTitle ?? 'KPI Result'}
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Status: <strong className="text-slate-900">{row.status ?? '-'}</strong>
+            <p className="mt-2 text-sm text-slate-700">
+              <span className="font-semibold text-blue-950">{row.employeeName}</span>
+              <span className="px-2 text-slate-400">·</span>
+              Status: <strong className="text-blue-950">{row.status ?? '-'}</strong>
               {row.finalizedAt ? (
                 <>
-                  <span className="px-2 text-slate-300">|</span>
-                  Finalized: <strong className="text-slate-900">{formatDate(row.finalizedAt)}</strong>
+                  <span className="px-2 text-slate-400">|</span>
+                  Finalized: <strong className="text-blue-950">{formatDate(row.finalizedAt)}</strong>
                 </>
               ) : null}
               {row.earlyFinalizedReason ? (
                 <>
-                  <span className="px-2 text-slate-300">|</span>
-                  Reason: <strong className="text-slate-900">{row.earlyFinalizedReason}</strong>
+                  <span className="px-2 text-slate-400">|</span>
+                  Reason: <strong className="text-blue-950">{row.earlyFinalizedReason}</strong>
                 </>
               ) : null}
             </p>
@@ -85,9 +94,9 @@ const HrEmployeeKpiModal = ({ open, row, onClose }: Props) => {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-transparent bg-slate-100 text-xl font-semibold leading-none text-slate-500 transition hover:border-slate-200 hover:bg-white hover:text-slate-900"
+            className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl border border-white/50 bg-white/90 text-xl font-semibold leading-none text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-blue-950"
           >
-            x
+            ×
           </button>
         </div>
 
