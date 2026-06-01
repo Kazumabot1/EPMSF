@@ -64,6 +64,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Employee: [
     { label: 'My Dashboard', path: '/employee/dashboard', icon: 'bi-columns-gap', end: true },
     { label: 'My KPIs', path: '/employee/kpis', icon: 'bi-bullseye' },
+    { label: 'KPI History', path: '/employee/kpi/history', icon: 'bi-clock-history' },
     { label: 'My Appraisals', path: '/employee/appraisals', icon: 'bi-clipboard-check' },
     { label: 'Self-Assessment', path: '/employee/self-assessment', icon: 'bi-pencil-square' },
     { label: '360 Feedback', path: '/employee/feedback', icon: 'bi-chat-dots' },
@@ -258,6 +259,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Version History', path: '/hr/kpi-version-history', icon: 'bi-clock-history' },
         { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
         { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
+        { label: 'KPI History', path: '/hr/kpi/history', icon: 'bi-clock-history' },
       ],
     },
 

@@ -32,6 +32,13 @@ public interface EmployeeKpiWorkflowService {
 
     List<ManagerKpiAssignmentDto> listFinalizedHistoryForManagerDepartment();
 
+    /**
+     * Role-aware KPI history scope:
+     * HRADMIN/HR = company-wide, Department Head = own department,
+     * Manager = assigned/team employees, Employee = own records.
+     */
+    List<ManagerKpiAssignmentDto> listFinalizedHistoryForCurrentUserScope();
+
     ManagerKpiAssignmentDto updateScores(Integer employeeKpiFormId, UpdateEmployeeKpiScoresRequest request);
 
     default UseKpiTemplateResultDto finalizeDepartmentKpi(Integer kpiFormId) {

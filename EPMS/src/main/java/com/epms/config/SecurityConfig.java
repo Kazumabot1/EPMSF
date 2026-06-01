@@ -574,6 +574,11 @@ public class SecurityConfig {
                                 )
                         )
 
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/kpi-history",
+                                "/api/kpi-history/**"
+                        ).authenticated()
+
                         .requestMatchers(
                                 "/api/kpi-workflow",
                                 "/api/kpi-workflow/**",
@@ -1326,3 +1331,4 @@ public class SecurityConfig {
         return configuration.getAuthenticationManager();
     }
 }
+

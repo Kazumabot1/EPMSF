@@ -51,7 +51,7 @@ public class ManagerKpiWorkflowController {
 
     @GetMapping("/history")
     public ResponseEntity<List<ManagerKpiAssignmentDto>> history() {
-        return ResponseEntity.ok(employeeKpiWorkflowService.listFinalizedHistoryForManagerDepartment());
+        return ResponseEntity.ok(employeeKpiWorkflowService.listFinalizedHistoryForCurrentUserScope());
     }
 
     @PutMapping("/assignments/{employeeKpiFormId}/scores")

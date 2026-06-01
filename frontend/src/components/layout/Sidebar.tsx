@@ -495,6 +495,7 @@ const organizationChildren = compactItems([
           { to: '/hr/kpi-version-history', label: 'KPI Version History', icon: 'bi bi-clock-history' },
           { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
           { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
+          { to: '/hr/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
 
@@ -507,6 +508,7 @@ const organizationChildren = compactItems([
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       hasMyTeams && { to: '/my-team', label: 'My Team', icon: 'bi bi-diagram-3' },
       { to: '/employee/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
+      { to: '/employee/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
       { to: '/employee/feedback', label: '360 Feedback', icon: 'bi bi-chat-dots' },
