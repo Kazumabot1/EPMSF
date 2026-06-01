@@ -174,12 +174,10 @@ export function CampaignInfoStep({
                                      targetsResponse,
                                      savedAssignmentCount,
                                      handleSave,
-                                     currentUser,
                                      errors,
                                      form,
                                      canEditSelected,
                                      setForm,
-                                     DESCRIPTION_LIMIT,
                                      deleting,
                                      handleDeleteDraft,
                                      setErrors,
@@ -213,7 +211,7 @@ export function CampaignInfoStep({
                 <div>
                     <span className="hfdq-kicker">Step 1</span>
                     <h3>Campaign Details</h3>
-                    <p>Set the campaign name, review year, collection window, announcement, and feedback visibility before selecting recipients.</p>
+                    <p>Set the campaign name, review year, and collection window before selecting recipients.</p>
                 </div>
                 <div className="hfdc-info-head-actions">
                     {selectedCampaign ? <span className={statusClass(selectedCampaign.status)}>{statusLabels[selectedCampaign.status] ?? selectedCampaign.status}</span> : <span className="hfd-status-badge DRAFT">New Draft</span>}
@@ -248,7 +246,7 @@ export function CampaignInfoStep({
                                 <small>Only the required campaign information is shown here.</small>
                             </div>
 
-                            <label className="hfdc-field full">
+                            <label className="hfdc-field">
                                 <span>Campaign Name <em>*</em></span>
                                 <input
                                     id="feedback-campaign-name"
@@ -260,7 +258,7 @@ export function CampaignInfoStep({
                                     placeholder="Example: Q2 Leadership 360 Review"
                                     aria-invalid={Boolean(errors.name)}
                                 />
-                                {errors.name ? <small className="hfd-error-msg">{errors.name}</small> : <small>Use a clear name employees and HR can recognize later.</small>}
+                                {errors.name ? <small className="hfd-error-msg">{errors.name}</small> : null}
                             </label>
 
                             <label className="hfdc-field">
@@ -278,16 +276,8 @@ export function CampaignInfoStep({
                                     placeholder="Example: 2026"
                                     aria-invalid={Boolean(errors.reviewYear)}
                                 />
-                                {errors.reviewYear ? <small className="hfd-error-msg">{errors.reviewYear}</small> : <small>Used for filtering, reporting, and comparison.</small>}
+                                {errors.reviewYear ? <small className="hfd-error-msg">{errors.reviewYear}</small> : null}
                             </label>
-
-                            <div className="hfdc-field hfdc-owner-card">
-                                <span>Campaign Owner</span>
-                                <div>
-                                    <strong>{currentUser?.fullName ?? 'Current HR user'}</strong>
-                                    <small>{currentUser?.email ?? 'Owner is recorded from the signed-in HR account.'}</small>
-                                </div>
-                            </div>
 
                             <div className="hfdc-date-time-field full">
                                 <span>Start Date & Time <em>*</em></span>
@@ -367,41 +357,24 @@ export function CampaignInfoStep({
                                 {errors.endAt ? <small className="hfd-error-msg">{errors.endAt}</small> : <small>End date/time must be after the start date/time.</small>}
                             </div>
 
-                            <div className="hfdc-section-title hfdc-section-title-spaced">
-                                <span><i className="bi bi-megaphone" /> Participant Announcement</span>
-                            </div>
-
-                            <label className="hfdc-field full">
-                                <textarea
-                                    id="feedback-campaign-announcement"
-                                    name="participantAnnouncement"
-                                    className={`hfd-input hfdc-textarea ${errors.description ? 'error' : ''}`}
-                                    rows={3}
-                                    value={form.description}
-                                    disabled={!canEditSelected}
-                                    onChange={(e: any) => setForm((current: any) => ({ ...current, description: e.target.value }))}
-                                    placeholder="Example: This cycle focuses on practical feedback that helps employees understand strengths and growth opportunities."
-                                    aria-invalid={Boolean(errors.description)}
-                                />
-                                <small className={form.description.length > DESCRIPTION_LIMIT ? 'hfd-error-msg' : ''}>{form.description.length}/{DESCRIPTION_LIMIT.toLocaleString()} characters</small>
-                                {errors.description ? <small className="hfd-error-msg">{errors.description}</small> : null}
-                            </label>
-
-                            <div className="hfdc-visibility-card full">
+                            <div className="hfdc-visibility-card full hfdc-visibility-readonly">
                                 <div className="hfdc-visibility-head">
                                     <span><i className="bi bi-shield-lock" /> Feedback Visibility</span>
+                                    <small>This visibility policy is fixed for this campaign type.</small>
                                 </div>
                                 <div className="hfdc-visibility-grid">
-                                    <label className="hfdc-toggle-card compact">
-                                        <input id="feedback-campaign-peer-anonymous" name="peerFeedbackAnonymous" type="checkbox" checked={form.peerFeedbackAnonymous} disabled={!canEditSelected} onChange={(e: any) => setForm((current: any) => ({ ...current, peerFeedbackAnonymous: e.target.checked }))} />
+                                    <div className="hfdc-toggle-card compact readonly">
+                                        <i className={`bi ${form.peerFeedbackAnonymous ? 'bi-check-circle-fill' : 'bi-dash-circle'} hfdc-readonly-icon`} />
                                         <span><strong>Peer feedback anonymous</strong><small>Recipient will not see individual peer names.</small></span>
-                                    </label>
-                                    <label className="hfdc-toggle-card compact">
-                                        <input id="feedback-campaign-subordinate-anonymous" name="subordinateFeedbackAnonymous" type="checkbox" checked={form.subordinateFeedbackAnonymous} disabled={!canEditSelected} onChange={(e: any) => setForm((current: any) => ({ ...current, subordinateFeedbackAnonymous: e.target.checked }))} />
+                                        <em>{form.peerFeedbackAnonymous ? 'Enabled' : 'Disabled'}</em>
+                                    </div>
+                                    <div className="hfdc-toggle-card compact readonly">
+                                        <i className={`bi ${form.subordinateFeedbackAnonymous ? 'bi-check-circle-fill' : 'bi-dash-circle'} hfdc-readonly-icon`} />
                                         <span><strong>Subordinate reviewer feedback anonymous</strong><small>Recipient will not see individual subordinate reviewer names.</small></span>
-                                    </label>
+                                        <em>{form.subordinateFeedbackAnonymous ? 'Enabled' : 'Disabled'}</em>
+                                    </div>
                                 </div>
-                                <p className="hfdc-visibility-note">HR/Admin can still view evaluator identity for audit and assignment management.</p>
+                                <p className="hfdc-visibility-note">HR can still view evaluator identity for audit and assignment management.</p>
                             </div>
                         </div>
                     </div>

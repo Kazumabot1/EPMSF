@@ -131,10 +131,19 @@ public class FeedbackOperationalService {
 
     @Transactional
     public NotificationDeliveryResult notifyPendingEvaluatorReminders(FeedbackCampaign campaign, FeedbackReminderKind kind) {
+        return notifyPendingEvaluatorReminders(campaign, kind, false);
+    }
+
+    @Transactional
+    public NotificationDeliveryResult notifyPendingEvaluatorReminders(
+            FeedbackCampaign campaign,
+            FeedbackReminderKind kind,
+            boolean allowRepeat
+    ) {
         List<FeedbackEvaluatorAssignment> assignments = assignmentRepository.findByCampaignIdWithRequest(campaign.getId()).stream()
                 .filter(this::isPendingEvaluatorAssignment)
                 .toList();
-        return notifyEvaluatorReminders(campaign, assignments, kind);
+        return notifyEvaluatorReminders(campaign, assignments, kind, allowRepeat);
     }
 
     @Transactional
@@ -142,6 +151,16 @@ public class FeedbackOperationalService {
             FeedbackCampaign campaign,
             List<FeedbackEvaluatorAssignment> assignments,
             FeedbackReminderKind kind
+    ) {
+        return notifyEvaluatorReminders(campaign, assignments, kind, false);
+    }
+
+    @Transactional
+    public NotificationDeliveryResult notifyEvaluatorReminders(
+            FeedbackCampaign campaign,
+            List<FeedbackEvaluatorAssignment> assignments,
+            FeedbackReminderKind kind,
+            boolean allowRepeat
     ) {
         List<FeedbackEvaluatorAssignment> reminderCandidates = assignments == null ? List.of() : assignments.stream()
                                                                                                  .filter(this::isPendingEvaluatorAssignment)
@@ -165,16 +184,15 @@ public class FeedbackOperationalService {
                     ? "360 feedback is overdue"
                     : "360 feedback deadline reminder";
             String message = buildReminderMessage(campaign, assignment, kind);
+            String eventKey = kind == FeedbackReminderKind.OVERDUE
+                    ? NotificationEventKey.FEEDBACK_360_OVERDUE_REMINDER
+                    : NotificationEventKey.FEEDBACK_360_DEADLINE_REMINDER;
 
-            if (notificationService.sendEventOnce(
-                    user.getId(),
-                    kind == FeedbackReminderKind.OVERDUE
-                            ? NotificationEventKey.FEEDBACK_360_OVERDUE_REMINDER
-                            : NotificationEventKey.FEEDBACK_360_DEADLINE_REMINDER,
-                    title,
-                    message,
-                    NOTIFICATION_TYPE
-            )) {
+            boolean delivered = allowRepeat
+                    ? notificationService.sendEvent(user.getId(), eventKey, title, message, NOTIFICATION_TYPE)
+                    : notificationService.sendEventOnce(user.getId(), eventKey, title, message, NOTIFICATION_TYPE);
+
+            if (delivered) {
                 sent++;
                 notifiedUsers.add(user.getId());
             } else {

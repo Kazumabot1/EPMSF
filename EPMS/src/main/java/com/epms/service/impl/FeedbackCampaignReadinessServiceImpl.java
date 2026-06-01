@@ -326,7 +326,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
             FeedbackCampaignQuestionReviewResponse review = questionReviewService.getQuestionReview(campaign.getId());
             if (!Boolean.TRUE.equals(review.getSaved()) || review.getIncludedQuestionCount() == null || review.getIncludedQuestionCount() <= 0) {
                 blocking.add("Complete and save the Campaign Question Preview before activation.");
-                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", "Campaign question snapshot has not been saved."));
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Campaign questions", "BLOCKED", "Campaign questions have not been saved yet."));
                 return;
             }
             questionReviewService.validateCampaignQuestionSelectionReady(campaign.getId());
@@ -334,22 +334,22 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
                                                                 .filter(group -> group.getIncludedQuestionCount() == null || group.getIncludedQuestionCount() <= 0)
                                                                 .count();
             if (emptyGroups > 0) {
-                blocking.add("Every evaluator group must keep at least one included question.");
-                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", emptyGroups + " evaluator group(s) have no included questions."));
+                blocking.add("Every evaluator form must keep at least one included question.");
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Campaign questions", "BLOCKED", emptyGroups + " evaluator form(s) have no included questions."));
                 return;
             }
             long noScoredGroups = review.getGroups() == null ? 0 : review.getGroups().stream()
                                                                    .filter(group -> group.getIncludedScoredQuestionCount() == null || group.getIncludedScoredQuestionCount() <= 0)
                                                                    .count();
             if (noScoredGroups > 0) {
-                warnings.add(noScoredGroups + " question group(s) have no scored questions.");
-                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "WARNING", review.getIncludedQuestionCount() + " questions saved; " + noScoredGroups + " group(s) are non-scored only."));
+                warnings.add(noScoredGroups + " evaluator form(s) have no scored questions.");
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Campaign questions", "WARNING", review.getIncludedQuestionCount() + " questions are saved; " + noScoredGroups + " evaluator form(s) are non-scored only."));
             } else {
-                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "PASS", review.getIncludedQuestionCount() + " rating question(s) with required comments are saved in the snapshot."));
+                checks.add(readinessCheck("QUESTION_SNAPSHOT", "Campaign questions", "PASS", review.getIncludedQuestionCount() + " rating question(s) with required comments are saved for this campaign."));
             }
         } catch (BusinessValidationException ex) {
             blocking.add(ex.getMessage());
-            checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", ex.getMessage()));
+            checks.add(readinessCheck("QUESTION_SNAPSHOT", "Campaign questions", "BLOCKED", ex.getMessage()));
         }
     }
 

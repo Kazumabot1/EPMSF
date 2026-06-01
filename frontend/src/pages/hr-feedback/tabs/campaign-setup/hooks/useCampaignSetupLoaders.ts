@@ -169,7 +169,7 @@ export function useCampaignSetupLoaders({
             setQuestionReview(data);
             setSelectedQuestionGroupKey(current => current && data.groups.some(group => group.groupKey === current) ? current : data.groups[0]?.groupKey ?? '');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load question snapshot.');
+            setError(err instanceof Error ? err.message : 'Failed to load campaign question preview.');
         } finally {
             setLoadingQuestionReview(false);
         }
@@ -198,9 +198,10 @@ export function useCampaignSetupLoaders({
 
     const loadCampaignSnapshot = async (campaignId: number, fallback?: FeedbackCampaign | null): Promise<FeedbackCampaign | null> => {
         try {
-            const [latestCampaign, latestTargets] = await Promise.all([
+            const [latestCampaign, latestTargets, latestAssignmentPreview] = await Promise.all([
                 feedbackCampaignApi.getCampaign(campaignId).catch(() => fallback ?? null),
                 feedbackCampaignApi.getCampaignTargets(campaignId).catch(() => null),
+                feedbackCampaignApi.getAssignmentPreview(campaignId).catch(() => null),
             ]);
             const nextCampaign = latestCampaign ?? fallback ?? null;
             if (nextCampaign) {
@@ -219,6 +220,7 @@ export function useCampaignSetupLoaders({
             } else if (nextCampaign) {
                 setSelectedTargetIds(normalizeList(nextCampaign.targetEmployeeIds ?? []));
             }
+            setAssignmentPreview(latestAssignmentPreview ?? emptyAssignmentPreview(nextCampaign));
             return nextCampaign;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to refresh campaign workspace.');

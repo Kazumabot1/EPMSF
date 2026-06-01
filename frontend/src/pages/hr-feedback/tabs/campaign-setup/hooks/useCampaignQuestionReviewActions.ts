@@ -69,7 +69,7 @@ export function useCampaignQuestionReviewActions({
         if (!selectedCampaign) return;
         if (savedAssignmentCount === 0) {
             setError(
-                "Save evaluator assignments before preparing the question snapshot.",
+                "Save evaluator assignments before refreshing the campaign question preview.",
             );
             return;
         }
@@ -89,7 +89,7 @@ export function useCampaignQuestionReviewActions({
             setError(
                 err instanceof Error
                     ? err.message
-                    : "Question snapshot could not be prepared.",
+                    : "Campaign question preview could not be refreshed.",
             );
         } finally {
             setResolvingQuestionReview(false);
@@ -214,7 +214,7 @@ export function useCampaignQuestionReviewActions({
         if (!selectedCampaign) return;
         if (selectedCampaign.status !== "DRAFT") {
             setError(
-                "Question snapshot can be saved only while the campaign is DRAFT.",
+                "Campaign questions can be saved only while the campaign is DRAFT.",
             );
             return;
         }
@@ -233,7 +233,7 @@ export function useCampaignQuestionReviewActions({
             })),
         );
         if (selections.length === 0) {
-            setError("Refresh the question snapshot before saving.");
+            setError("Refresh the campaign question preview before saving.");
             return;
         }
         const emptyGroups = questionReview.groups.filter(
@@ -241,7 +241,7 @@ export function useCampaignQuestionReviewActions({
         );
         if (emptyGroups.length > 0) {
             setError(
-                "Each form variant needs at least one rating question with a required comment.",
+                "Each evaluator form needs at least one rating question with a required comment.",
             );
             return;
         }
@@ -261,7 +261,7 @@ export function useCampaignQuestionReviewActions({
             return;
         }
         if (competencyWeights.length === 0) {
-            setError("Competency weights are required before saving the snapshot.");
+            setError("Competency weights are required before saving campaign questions.");
             return;
         }
         if (!competencyWeightsReady) {
@@ -286,15 +286,16 @@ export function useCampaignQuestionReviewActions({
             );
             setQuestionReview(data);
             setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? "");
-            setSuccess("Question snapshot saved.");
+            setSuccess("Campaign questions saved successfully.");
             setActiveStepKey("launch");
             await loadScoringConfig(selectedCampaign.id);
             await loadActivationState(selectedCampaign.id);
         } catch (err) {
+            const message = err instanceof Error ? err.message : "";
             setError(
-                err instanceof Error
-                    ? err.message
-                    : "Question snapshot could not be saved.",
+                /duplicate|invalid database record|constraint/i.test(message)
+                    ? "Campaign questions could not be saved. Refresh the preview and try again."
+                    : message || "Campaign questions could not be saved.",
             );
         } finally {
             setSavingQuestionReview(false);

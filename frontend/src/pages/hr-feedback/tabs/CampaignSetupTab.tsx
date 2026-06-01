@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { authStorage } from '../../../services/authStorage';
+import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { LaunchReadinessSection } from './campaign-setup/components/LaunchReadinessSection';
 import { CampaignInfoStep } from './campaign-setup/components/CampaignInfoStep';
 import { TargetEmployeesStep } from './campaign-setup/components/TargetEmployeesStep';
 import { EvaluatorAssignmentsStep } from './campaign-setup/components/EvaluatorAssignmentsStep';
 import { QuestionReviewStep } from './campaign-setup/components/QuestionReviewStep';
-import { CampaignSetupHeader } from './campaign-setup/components/CampaignSetupHeader';
 import { CampaignSetupStepper } from './campaign-setup/components/CampaignSetupStepper';
 import { CampaignRecordsTable } from './campaign-setup/components/CampaignRecordsTable';
 import { useCampaignSetupLoaders } from './campaign-setup/hooks/useCampaignSetupLoaders';
@@ -138,6 +138,15 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
   );
 
   const currentUser = useMemo(() => authStorage.getUser() as { fullName?: string; email?: string; employeeCode?: string; position?: string } | null, []);
+
+  useEffect(() => {
+    if (!error && !success) return undefined;
+    const timer = window.setTimeout(() => {
+      setError('');
+      setSuccess('');
+    }, 3500);
+    return () => window.clearTimeout(timer);
+  }, [error, success]);
 
   const {
     savedTargetIds,
@@ -295,7 +304,10 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
       void loadQuestionReview(selectedCampaign.id);
       void loadScoringConfig(selectedCampaign.id);
       void loadActivationState(selectedCampaign.id);
-      setAssignmentPreview(emptyAssignmentPreview(selectedCampaign));
+      void feedbackCampaignApi
+          .getAssignmentPreview(selectedCampaign.id)
+          .then(setAssignmentPreview)
+          .catch(() => setAssignmentPreview(emptyAssignmentPreview(selectedCampaign)));
     } else {
       setTargetsResponse(emptyTargetsResponse(null));
       setSelectedTargetIds([]);
@@ -475,13 +487,12 @@ export default function CampaignSetupTab({ onCampaignCreated }: Props) {
 
   return (
       <div className="hfdq-page hfdc-page">
-        <CampaignSetupHeader
-            loadingCampaigns={loadingCampaigns}
-            error={error}
-            success={success}
-            onRefresh={() => void refreshCampaigns()}
-            onNewDraft={() => handleSelectCampaign('')}
-        />
+        {(error || success) && (
+            <div className="hfdc-floating-alerts" aria-live="polite">
+              {error && <div className="hfd-alert hfd-alert-error"><i className="bi bi-exclamation-triangle" />{error}</div>}
+              {success && <div className="hfd-alert hfd-alert-success"><i className="bi bi-check-circle" />{success}</div>}
+            </div>
+        )}
 
         <CampaignSetupStepper
             selectedCampaign={selectedCampaign}
