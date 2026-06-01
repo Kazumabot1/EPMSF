@@ -14,6 +14,7 @@ import KpiRowReasonModal from './KpiRowReasonModal';
 import KpiTemplateRowsTable from './KpiTemplateRowsTable';
 import { handleKpiTemplateSaveError } from './kpiTemplateConflict';
 import {
+  DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
   buildKpiPositionDropdownOptions,
   countAvailableKpiPositions,
 } from './kpiTemplateUi';
@@ -175,6 +176,7 @@ const KpiTemplateCreateModal = ({ open, mode, templateId, onClose, onSaved }: Pr
   const buildPayload = (submitStatus: KpiFormStatus): KpiTemplateRequest => ({
     title: title.trim(),
     status: submitStatus,
+    positionDurationMonths: DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
     positionIds: positionId != null ? [positionId] : [],
     items: rows.map((row, index) => ({
       kpiLabel: row.kpiItemId !== null ? null : row.kpiLabel.trim() || null,

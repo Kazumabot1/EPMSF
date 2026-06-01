@@ -189,7 +189,8 @@ export function CampaignInfoStep({
     const todayInputDate = getTodayInputDate(now);
     const currentMinuteOfDay = (now.getHours() * 60) + now.getMinutes();
     const endDateMin = form.startDate && form.startDate > todayInputDate ? form.startDate : todayInputDate;
-    const formErrorMessages = Object.values(errors ?? {}).filter(Boolean);
+    const formErrorMessages = Object.values(errors ?? {})
+        .filter((message): message is string => typeof message === 'string' && message.trim().length > 0);
 
     const isStartTimeDisabled = (date: string, time: string) => {
         if (!date || !time) return false;

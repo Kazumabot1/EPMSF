@@ -119,6 +119,29 @@ export const getDashboardStatusColor = (value?: string | null, fallbackIndex = 0
     return STATUS_COLOR_MAP[key] || STATUS_COLOR_MAP[key.replace(/_/g, '')] || DASHBOARD_CHART_COLORS[fallbackIndex % DASHBOARD_CHART_COLORS.length];
 };
 
+
+export type DashboardComparisonDatum = {
+    label: string;
+    values: Record<string, number | string | null | undefined>;
+    detail?: string;
+    raw?: unknown;
+};
+
+export type DashboardComparisonSeries = {
+    key: string;
+    label: string;
+    color?: string;
+};
+
+export const hasDashboardComparisonData = (
+    data: DashboardComparisonDatum[],
+    series: DashboardComparisonSeries[],
+) => {
+    return data.some((item) =>
+        series.some((entry) => toDashboardNumber(item.values[entry.key]) > 0),
+    );
+};
+
 export const hasDashboardChartData = (data: DashboardChartDatum[]) => {
     return data.some((item) => toDashboardNumber(item.value) > 0);
 };
@@ -225,4 +248,3 @@ export const buildCompletionBars = <T,>(
         .sort((left, right) => right.value - left.value)
         .slice(0, limit);
 };
-

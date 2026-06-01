@@ -19,7 +19,6 @@ import AppLayout from './layouts/AppLayout';
 
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 import EmployeeManagement from './pages/employee/EmployeeManagement';
-import EmployeeRoutePlaceholder from './pages/employee/EmployeeRoutePlaceholder';
 import EmployeeKpiResultsPage from './pages/employee/EmployeeKpiResultsPage';
 import EmployeeSelfAssessmentPage from './pages/employee/EmployeeSelfAssessmentPage';
 import EmployeeAssessmentScoresPage from './pages/employee/EmployeeAssessmentScoresPage';
@@ -322,7 +321,7 @@ function App() {
                 </Route>
                 <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
                 <Route path="/department-head/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
-                <Route path="/department-head/reports/department-performance" element={<DepartmentKpiResultsPage departmentHead />} />
+                <Route path="/department-head/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
                 <Route path="/department-head/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
                 <Route path="/department-head/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
                 <Route path="/department-head/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
@@ -346,7 +345,7 @@ function App() {
                   <Route path="/department-head/kpi-scoring" element={<ManagerKpiScoringPage />} />
                 </Route>
 
-                <Route path="/department-head/department-kpis" element={<DepartmentKpiResultsPage departmentHead />} />
+                <Route path="/department-head/department-kpis" element={<ReportingDashboardPage reportType="departments" />} />
 
                 <Route element={<PositionPermissionRoute permission="teamView" fallbackPath="/department-head/dashboard" />}>
                   <Route path="/department-head/teams" element={<TeamManagement />} />

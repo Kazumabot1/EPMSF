@@ -25,6 +25,7 @@ public class PositionPermissionDto {
     private Boolean oneOnOnePermission;
     private Boolean positionPermission;
     private Boolean kpiPermission;
+    private Boolean departmentKpiPermission;
 
     private Boolean assessmentScoresView;
     private Boolean assessmentFormCreate;
