@@ -113,16 +113,18 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<KpiTemplateCycleResponseDTO> list() {
+        employeeKpiWorkflowService.runCycleMaintenance();
         return cycleRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toSummaryDto)
                 .toList();
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public KpiTemplateCycleResponseDTO getById(Integer id) {
+        employeeKpiWorkflowService.runCycleMaintenance();
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
         List<KpiTemplateCycleForm> links = cycleFormRepository.findWithFormsByCycleId(id);
@@ -141,7 +143,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 return getById(id);
             }
             if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
-                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL
+                    || cycle.getStatus() == KpiTemplateCycleStatus.CLOSED) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
             }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
@@ -150,7 +153,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
             cycle.setClosedAt(null);
         } else {
             if (cycle.getStatus() != KpiTemplateCycleStatus.ACTIVE) {
-                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
+                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED
+                        || cycle.getStatus() == KpiTemplateCycleStatus.CLOSED) {
                     return getById(id);
                 }
                 throw new ResponseStatusException(
@@ -393,15 +397,10 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         .title(link.getKpiForm().getTitle())
                         .build())
                 .toList();
-        KpiTemplateCyclePeriod currentPeriod = cyclePeriodRepository
-                .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
-                        cycle.getId(),
-                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
-                )
-                .orElse(null);
         Integer durationYears = responseDurationYears(cycle);
 
         List<KpiTemplateCyclePeriod> allPeriods = cyclePeriodRepository.findAllWithFormByCycleIdOrderByFormIdAndPeriodNumber(cycle.getId());
+        KpiTemplateCyclePeriod currentPeriod = displayCurrentPeriod(allPeriods);
         Map<Integer, KpiTemplateCycleResponseDTO.KpiFormPeriodScheduleDTO> schedulesByFormId = new LinkedHashMap<>();
         // Ensure linked forms exist in response even if no periods yet.
         for (KpiTemplateCycleForm link : links) {
@@ -469,6 +468,22 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .kpiForms(forms)
                 .periodSchedules(schedulesByFormId.values().stream().toList())
                 .build();
+    }
+
+    private KpiTemplateCyclePeriod displayCurrentPeriod(List<KpiTemplateCyclePeriod> periods) {
+        if (periods == null || periods.isEmpty()) {
+            return null;
+        }
+        LocalDate today = today();
+        return periods.stream()
+                .filter(p -> p.getStartDate() != null && p.getEndDate() != null)
+                .filter(p -> !today.isBefore(p.getStartDate()) && !today.isAfter(p.getEndDate()))
+                .findFirst()
+                .orElseGet(() -> periods.stream()
+                        .filter(p -> p.getStatus() == KpiTemplateCyclePeriodStatus.OPEN
+                                || p.getStatus() == KpiTemplateCyclePeriodStatus.CLOSING)
+                        .findFirst()
+                        .orElse(null));
     }
 
     private Integer responseDurationYears(KpiTemplateCycle cycle) {

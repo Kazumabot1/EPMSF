@@ -36,6 +36,8 @@ public interface KpiTemplateCyclePeriodRepository extends JpaRepository<KpiTempl
             Collection<KpiTemplateCyclePeriodStatus> statuses
     );
 
+    List<KpiTemplateCyclePeriod> findByCycle_IdOrderByPeriodNumberAsc(Integer cycleId);
+
     List<KpiTemplateCyclePeriod> findByCycle_IdAndStatusIn(
             Integer cycleId,
             Collection<KpiTemplateCyclePeriodStatus> statuses

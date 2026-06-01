@@ -5,6 +5,7 @@ import com.epms.entity.enums.KpiTemplateCycleStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -13,6 +14,8 @@ public interface KpiTemplateCycleRepository extends JpaRepository<KpiTemplateCyc
     List<KpiTemplateCycle> findAllByOrderByCreatedAtDesc();
 
     List<KpiTemplateCycle> findByStatus(KpiTemplateCycleStatus status);
+
+    List<KpiTemplateCycle> findByStatusAndEndDateBefore(KpiTemplateCycleStatus status, LocalDate endDate);
 
     List<KpiTemplateCycle> findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus status);
 }

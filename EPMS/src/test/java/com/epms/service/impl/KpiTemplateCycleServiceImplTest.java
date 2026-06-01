@@ -257,6 +257,37 @@ class KpiTemplateCycleServiceImplTest {
                 .hasMessageContaining("already used by the running cycle");
     }
 
+    @Test
+    void detailUsesDateMatchedCurrentPeriodEvenWhenEarlierPeriodRemainsOpen() {
+        KpiTemplateCycle cycle = activeCycle();
+        KpiForm form = new KpiForm();
+        form.setId(200);
+        form.setTitle("Engineering KPI");
+        KpiTemplateCycleForm link = KpiTemplateCycleForm.builder()
+                .cycle(cycle)
+                .kpiForm(form)
+                .build();
+        KpiTemplateCyclePeriod staleOpen = period(cycle, form, 1,
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 5, 31),
+                KpiTemplateCyclePeriodStatus.OPEN);
+        KpiTemplateCyclePeriod dateMatched = period(cycle, form, 2,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 30),
+                KpiTemplateCyclePeriodStatus.SCHEDULED);
+
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+        when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of(link));
+        when(cyclePeriodRepository.findAllWithFormByCycleIdOrderByFormIdAndPeriodNumber(100))
+                .thenReturn(List.of(staleOpen, dateMatched));
+
+        var response = service.getById(100);
+
+        assertThat(response.getCurrentPeriodNumber()).isEqualTo(2);
+        assertThat(response.getCurrentPeriodStartDate()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(response.getCurrentPeriodEndDate()).isEqualTo(LocalDate.of(2026, 6, 30));
+    }
+
     private KpiTemplateCycle draftCycle() {
         KpiTemplateCycle cycle = activeCycle();
         cycle.setStatus(KpiTemplateCycleStatus.DRAFT);
@@ -306,6 +337,25 @@ class KpiTemplateCycleServiceImplTest {
         period.setStartDate(LocalDate.now().minusDays(10));
         period.setEndDate(endDate);
         period.setStatus(KpiTemplateCyclePeriodStatus.OPEN);
+        return period;
+    }
+
+    private KpiTemplateCyclePeriod period(
+            KpiTemplateCycle cycle,
+            KpiForm form,
+            int number,
+            LocalDate startDate,
+            LocalDate endDate,
+            KpiTemplateCyclePeriodStatus status
+    ) {
+        KpiTemplateCyclePeriod period = new KpiTemplateCyclePeriod();
+        period.setId(500 + number);
+        period.setCycle(cycle);
+        period.setKpiForm(form);
+        period.setPeriodNumber(number);
+        period.setStartDate(startDate);
+        period.setEndDate(endDate);
+        period.setStatus(status);
         return period;
     }
 

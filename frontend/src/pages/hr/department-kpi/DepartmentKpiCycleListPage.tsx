@@ -23,6 +23,7 @@ const formatDate = (value: string | null | undefined) => {
 const statusLabel = (cycle: DepartmentKpiCycle) => {
   if (cycle.status === 'PENDING_APPROVAL') return 'Pending approval';
   if (cycle.status === 'CLOSING') return 'Closing';
+  if (cycle.status === 'CLOSED') return 'Closed';
   if (cycle.status === 'ACTIVE') return 'Active';
   if (cycle.status === 'DEACTIVATED') return 'Inactive';
   return 'Draft';
@@ -199,6 +200,7 @@ const DepartmentKpiCycleListPage = () => {
                                   togglingId === cycle.id
                                   || cycle.status === 'CLOSING'
                                   || cycle.status === 'PENDING_APPROVAL'
+                                  || cycle.status === 'CLOSED'
                                 }
                                 onChange={() => void handleToggleActive(cycle)}
                               />
