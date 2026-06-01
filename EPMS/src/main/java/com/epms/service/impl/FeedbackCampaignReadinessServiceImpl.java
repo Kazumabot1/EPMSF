@@ -325,7 +325,7 @@ public class FeedbackCampaignReadinessServiceImpl implements FeedbackCampaignRea
         try {
             FeedbackCampaignQuestionReviewResponse review = questionReviewService.getQuestionReview(campaign.getId());
             if (!Boolean.TRUE.equals(review.getSaved()) || review.getIncludedQuestionCount() == null || review.getIncludedQuestionCount() <= 0) {
-                blocking.add("Complete and save the Question Snapshot before activation.");
+                blocking.add("Complete and save the Campaign Question Preview before activation.");
                 checks.add(readinessCheck("QUESTION_SNAPSHOT", "Question snapshot", "BLOCKED", "Campaign question snapshot has not been saved."));
                 return;
             }

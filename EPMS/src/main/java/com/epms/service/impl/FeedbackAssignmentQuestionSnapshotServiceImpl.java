@@ -110,7 +110,7 @@ public class FeedbackAssignmentQuestionSnapshotServiceImpl implements FeedbackAs
             }
         }
 
-        List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findApplicableRules(
+        List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findBestMatchingFormRules(
                 levelRank,
                 positionId,
                 departmentId,
@@ -133,9 +133,9 @@ public class FeedbackAssignmentQuestionSnapshotServiceImpl implements FeedbackAs
         String relationship = assignment == null || assignment.getRelationshipType() == null
                 ? "this evaluator role"
                 : assignment.getRelationshipType().name();
-        return "No campaign question snapshot or active Question Rule matched " + relationship
+        return "No campaign question preview or active Form Setup matched " + relationship
                 + " for target level " + firstNonBlank(targetLevelCode, "UNSPECIFIED")
-                + ". Resolve and save Campaign Question Review before activation.";
+                + ". Refresh and save Campaign Question Preview before activation.";
     }
 
 

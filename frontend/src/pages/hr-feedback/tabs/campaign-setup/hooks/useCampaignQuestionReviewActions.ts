@@ -82,7 +82,7 @@ export function useCampaignQuestionReviewActions({
             );
             setQuestionReview(data);
             setSelectedQuestionGroupKey(data.groups[0]?.groupKey ?? "");
-            setSuccess("Question snapshot refreshed from active Rule Sets.");
+            setSuccess("Campaign question preview refreshed from Form Setup.");
             await loadScoringConfig(selectedCampaign.id);
             await loadActivationState(selectedCampaign.id);
         } catch (err) {

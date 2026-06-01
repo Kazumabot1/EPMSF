@@ -229,7 +229,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     @Transactional
     public FeedbackQuestionRuleResponse updateRule(Long ruleId, FeedbackQuestionRuleUpsertRequest request) {
         FeedbackQuestionApplicabilityRule rule = ruleRepository.findById(ruleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question applicability rule not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Form question row not found."));
         List<String> relationshipTypes = resolveRelationshipTypes(request);
         if (relationshipTypes.size() > 1) {
             throw new BadRequestException("Update one evaluator role at a time. Create new rules for additional roles.");
@@ -245,7 +245,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     @Transactional
     public List<FeedbackQuestionRuleResponse> updateRuleSet(Long ruleSetId, FeedbackQuestionRuleUpsertRequest request) {
         FeedbackQuestionRuleSet ruleSet = ruleSetRepository.findById(ruleSetId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question rule set not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Form not found."));
 
         List<String> relationshipTypes = resolveRelationshipTypes(request);
         List<Long> questionBankIds = resolveQuestionBankIds(request);
@@ -294,10 +294,10 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     @Transactional
     public void deactivateRule(Long ruleId) {
         FeedbackQuestionApplicabilityRule rule = ruleRepository.findById(ruleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question applicability rule not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Form question row not found."));
         if (rule.getRuleSet() != null && rule.getRuleSet().getId() != null) {
             FeedbackQuestionRuleSet ruleSet = ruleSetRepository.findById(rule.getRuleSet().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Question rule set not found."));
+                    .orElseThrow(() -> new ResourceNotFoundException("Form not found."));
             ruleSet.setStatus("DISABLED");
             ruleSet.setActive(false);
             ruleSetRepository.save(ruleSet);
@@ -315,14 +315,14 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     @Transactional
     public FeedbackQuestionRuleResponse activateRule(Long ruleId) {
         FeedbackQuestionApplicabilityRule rule = ruleRepository.findById(ruleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question applicability rule not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Form question row not found."));
         if (rule.getRuleSet() != null && rule.getRuleSet().getId() != null) {
             Long ruleSetId = rule.getRuleSet().getId();
             FeedbackQuestionRuleSet ruleSet = ruleSetRepository.findById(ruleSetId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Question rule set not found."));
+                    .orElseThrow(() -> new ResourceNotFoundException("Form not found."));
             List<FeedbackQuestionApplicabilityRule> rows = ruleRepository.findDetailedByRuleSetId(ruleSetId);
             if (rows.isEmpty()) {
-                throw new BadRequestException("This Rule Set has no generated question rows. Edit it and select at least one question and evaluator role.");
+                throw new BadRequestException("This form has no questions. Edit it and select at least one question and evaluator type.");
             }
             List<Long> questionBankIds = rows.stream()
                     .map(FeedbackQuestionApplicabilityRule::getQuestionBank)
@@ -375,7 +375,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     ) {
         int levelRank = parseLevelRank(levelCode);
         String normalizedRelationship = normalizeRelationship(relationshipType);
-        List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findApplicableRules(
+        List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findBestMatchingFormRules(
                 levelRank,
                 targetPositionId,
                 targetDepartmentId,
@@ -508,7 +508,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
             throw new BadRequestException("Question bank item is required.");
         }
         if (!"ACTIVE".equals(bank.getStatus())) {
-            throw new BadRequestException("Only active questions can be used in Question Rules.");
+            throw new BadRequestException("Only active rating questions with required comments can be used in Form Setup.");
         }
         FeedbackQuestionVersion activeVersion = findActiveVersion(bank);
         if (activeVersion == null) {
@@ -682,7 +682,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
             return creatingNew ? "DRAFT" : "DISABLED";
         }
         if (!Set.of("DRAFT", "ACTIVE", "DISABLED", "ARCHIVED").contains(value)) {
-            throw new BadRequestException("Unsupported Rule Set status: " + status);
+            throw new BadRequestException("Unsupported form status: " + status);
         }
         return value;
     }
@@ -774,7 +774,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
             return;
         }
         validateSameScopeActiveOverlap(relationshipTypes, minRank, maxRank, targetDepartmentId, targetPositionId, excludeRuleSetId);
-        validateInheritedQuestionDuplicates(questionBankIds, relationshipTypes, minRank, maxRank, targetDepartmentId, targetPositionId, excludeRuleSetId);
+        // Form Setup uses full replacement forms, so department and position forms may reuse questions from the default form.
     }
 
     private void validateSameScopeActiveOverlap(
@@ -808,7 +808,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
             boolean rolesOverlap = existingRoles.stream().anyMatch(requestedRoles::contains);
             if (rolesOverlap) {
-                throw new BadRequestException("Active Rule Set overlap blocked. \"" + existingSet.getName() + "\" already covers the same level range, same department/position scope, and one or more selected evaluator roles. Edit that Rule Set instead of creating another one for the same scope.");
+                throw new BadRequestException("A form already exists for the same scope, level range, and evaluator type. Edit the existing form instead.");
             }
         }
     }
@@ -853,7 +853,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
             }
             if (isBroaderScope(rule.getTargetDepartmentId(), rule.getTargetPositionId(), targetDepartmentId, targetPositionId)) {
                 String questionLabel = firstNonBlank(existingBank.getQuestionCode(), "Question #" + existingBank.getId());
-                throw new BadRequestException("Redundant add-on question blocked. " + questionLabel + " is already inherited from broader active Rule Set \"" + existingSet.getName() + "\" for the selected level and evaluator role. Specific Rule Sets should only add extra questions that are not already covered by broader rules.");
+                throw new BadRequestException("This question is already used by another active form for this scope and evaluator type.");
             }
         }
     }
@@ -938,7 +938,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
     private String resolveRuleSetDescription(FeedbackQuestionRuleUpsertRequest request) {
         String description = blankToNull(request.getRuleSetDescription());
         if (description != null && description.length() > 500) {
-            throw new BadRequestException("Rule Set purpose/notes must be 500 characters or fewer.");
+            throw new BadRequestException("Form notes must be 500 characters or fewer.");
         }
         return description;
     }
@@ -947,7 +947,7 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
         String providedName = blankToNull(request.getRuleSetName());
         if (providedName != null) {
             if (providedName.length() > 180) {
-                throw new BadRequestException("Rule Set name must be 180 characters or fewer.");
+                throw new BadRequestException("Form name must be 180 characters or fewer.");
             }
             return providedName;
         }
@@ -1007,8 +1007,8 @@ public class FeedbackQuestionBankServiceImpl implements FeedbackQuestionBankServ
                     .filter(Objects::nonNull)
                     .collect(java.util.stream.Collectors.toSet());
             if (existingQuestions.equals(requestedQuestions) && existingRoles.equals(requestedRoles)) {
-                String existingName = first.getRuleSet() == null ? "an existing Rule Set" : first.getRuleSet().getName();
-                throw new BadRequestException("This Rule Set is identical to \"" + existingName + "\". Change the level, scope, evaluator roles, or selected questions before saving.");
+                String existingName = first.getRuleSet() == null ? "an existing form" : first.getRuleSet().getName();
+                throw new BadRequestException("This form is identical to \"" + existingName + "\". Change the level, scope, evaluator roles, or selected questions before saving.");
             }
         }
     }

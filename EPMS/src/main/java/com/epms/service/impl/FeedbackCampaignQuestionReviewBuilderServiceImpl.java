@@ -94,7 +94,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                     .sorted(groupComparator())
                     .toList();
             List<String> warnings = new ArrayList<>(resolved.warnings());
-            warnings.add("Current active Question Rules could not be resolved. Showing the last saved review only.");
+            warnings.add("Current Form Setup could not be resolved. Showing the last saved preview only.");
             return buildResponse(campaign, true, savedGroups, warnings, lastSavedAt);
         }
 
@@ -141,7 +141,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
         boolean savedMatchesCurrentRules = savedKeys.equals(activeKeys) && savedGroupSignatures.equals(activeGroupSignatures);
         List<String> warnings = new ArrayList<>(resolved.warnings());
         if (!savedMatchesCurrentRules) {
-            warnings.add("Question snapshot is out of date. Refresh and save it again before launch.");
+            warnings.add("Campaign question preview is out of date. Refresh and save it again before launch.");
         }
 
         return buildResponse(campaign, savedMatchesCurrentRules, mergedGroups, warnings, lastSavedAt);
@@ -180,7 +180,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
             group.targetIds.add(assignment.getFeedbackRequest().getTargetEmployeeId());
             group.assignmentCount++;
 
-            List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findApplicableRules(
+            List<FeedbackQuestionApplicabilityRule> rules = ruleRepository.findBestMatchingFormRules(
                     context.targetLevelRank(),
                     context.targetPositionId(),
                     context.targetDepartmentId(),
@@ -188,7 +188,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                     LocalDate.now()
             );
             if (rules.isEmpty()) {
-                group.warnings.add("No active question rules matched " + buildFormVariantLabel(assignment.getRelationshipType(), context) + ".");
+                group.warnings.add("No active 360 form questions matched " + buildFormVariantLabel(assignment.getRelationshipType(), context) + ".");
             }
             for (FeedbackQuestionApplicabilityRule rule : rules) {
                 QuestionCandidate candidate = fromRule(rule);
@@ -469,7 +469,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     private QuestionCandidate fromSelection(FeedbackCampaignQuestionSelection selection) {
         return new QuestionCandidate(
                 selection.getSourceRuleId(),
-                selection.getSourceRuleId() == null ? "Saved snapshot" : "Rule #" + selection.getSourceRuleId(),
+                selection.getSourceRuleId() == null ? "Saved snapshot" : "Form #" + selection.getSourceRuleId(),
                 "Saved campaign snapshot",
                 selection.getQuestionVersion(),
                 selection.getQuestionBankId(),
@@ -565,7 +565,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 .count();
         List<String> warnings = new ArrayList<>(group.warnings());
         if (questionCount == 0) {
-            warnings.add("No matched questions. Add or adjust Question Rules before activation.");
+            warnings.add("No matched questions. Add or adjust Form Setup before activation.");
         } else {
             if (includedCount == 0) {
                 warnings.add("All questions are excluded. Keep at least one question for this evaluator group.");
@@ -886,12 +886,12 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
 
     private String resolveRuleSetName(FeedbackQuestionApplicabilityRule rule) {
         if (rule == null) {
-            return "Active Question Rules";
+            return "Active Form Setup";
         }
         if (rule.getRuleSet() != null && rule.getRuleSet().getName() != null && !rule.getRuleSet().getName().isBlank()) {
             return rule.getRuleSet().getName().trim();
         }
-        return rule.getId() == null ? "Active Question Rules" : "Rule #" + rule.getId();
+        return rule.getId() == null ? "Active Form Setup" : "Form #" + rule.getId();
     }
 
     private String resolveRuleScope(FeedbackQuestionApplicabilityRule rule) {

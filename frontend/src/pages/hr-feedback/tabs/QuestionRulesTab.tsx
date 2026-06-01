@@ -1,1536 +1,1268 @@
 import { useEffect, useMemo, useState } from 'react';
-import '../hr-feedback-dashboard.css';
-import './question-rules.css';
+import toast from 'react-hot-toast';
 import {
     hrFeedbackApi,
+    type DynamicFormPreview,
+    type DynamicPreviewQuestion,
     type QuestionBankItem,
     type QuestionRuleItem,
     type QuestionRulePayload,
 } from '../../../api/hrFeedbackApi';
 import { feedbackCampaignApi } from '../../../api/feedbackCampaignApi';
 import { positionService } from '../../../services/positionService';
-import type { FeedbackDepartmentOption, FeedbackTargetCandidate } from '../../../types/feedbackCampaign';
+import type { FeedbackDepartmentOption, FeedbackTargetEmployee } from '../../../types/feedbackCampaign';
 import type { PositionLevelResponse, PositionResponse } from '../../../types/position';
 import {
     EVALUATOR_ROLE_OPTIONS,
     getCompetencyLabel,
     getRoleLabel,
-    normalizeText,
     type QuestionRuleRole,
 } from './feedbackQuestionConfig.ts';
 
 type RuleRole = QuestionRuleRole;
-type RuleSetStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'ARCHIVED';
-type StatusFilter = 'ALL' | RuleSetStatus;
-
-interface RuleSetFormState {
-    ruleSetName: string;
-    ruleSetDescription: string;
-    questionBankIds: number[];
-    targetLevelMinRank: number;
-    targetLevelMaxRank: number;
-    evaluatorRoles: RuleRole[];
-    targetDepartmentId: number | '';
-    targetPositionId: number | '';
-    ruleSetStatus: RuleSetStatus;
-    active: boolean;
-}
-
-interface RuleSetGroup {
-    key: string;
-    ruleSetId?: number | null;
-    ruleSetName?: string | null;
-    ruleSetDescription?: string | null;
-    rules: QuestionRuleItem[];
-    ruleSetStatus: RuleSetStatus;
-    ruleSetType?: string | null;
-    active: boolean;
-    targetLevelMinRank: number;
-    targetLevelMaxRank: number;
-    targetDepartmentId?: number | null;
-    targetPositionId?: number | null;
-    roles: RuleRole[];
-    questionIds: number[];
-    questions: QuestionRuleItem[];
-    conflictCount: number;
-}
-
-interface MatrixSelection {
-    levelRank: number;
-    levelCode: string;
-    role: RuleRole;
-}
-
-interface RuleHealthItem {
-    tone: 'danger' | 'warning' | 'info' | 'success';
-    icon: string;
-    title: string;
-    message: string;
-    value?: number;
-}
+type FormScopeType = 'DEFAULT' | 'DEPARTMENT' | 'POSITION' | 'SPECIFIC';
+type EditableFormScopeType = Exclude<FormScopeType, 'SPECIFIC'>;
+type FormStatus = 'ACTIVE' | 'DRAFT' | 'DISABLED' | 'ARCHIVED';
 
 interface LevelOption {
-    id?: number;
     code: string;
     rank: number;
     label: string;
 }
+
+interface FormSegment {
+    key: string;
+    ruleSetId?: number | null;
+    firstRuleId?: number | null;
+    name: string;
+    description?: string | null;
+    status: FormStatus;
+    active: boolean;
+    scopeType: FormScopeType;
+    departmentId?: number | null;
+    positionId?: number | null;
+    minRank: number;
+    maxRank: number;
+    roles: RuleRole[];
+    questionIds: number[];
+    questions: QuestionRuleItem[];
+}
+
+interface FormCollection {
+    key: string;
+    scopeType: EditableFormScopeType;
+    scopeId: number | 'default' | string;
+    title: string;
+    subtitle: string;
+    departmentId?: number | null;
+    positionId?: number | null;
+    segments: FormSegment[];
+    roleCounts: Record<RuleRole, number>;
+    active: boolean;
+}
+
+interface EditorState {
+    mode: 'create' | 'edit';
+    scopeType: EditableFormScopeType;
+    departmentId: number | '';
+    positionId: number | '';
+    evaluatorRoles: RuleRole[];
+    minRank: number;
+    maxRank: number;
+    status: FormStatus;
+    questionIds: number[];
+    ruleSetId?: number | null;
+    firstRuleId?: number | null;
+}
+
+const ROLE_VALUES = EVALUATOR_ROLE_OPTIONS.map(option => option.value);
+const EMPTY_ROLE_COUNTS: Record<RuleRole, number> = {
+    SELF: 0,
+    MANAGER: 0,
+    PEER: 0,
+    SUBORDINATE: 0,
+};
 
 const parseLevelRank = (levelCode?: string | null) => {
     const match = String(levelCode ?? '').match(/(\d+)/);
     return match ? Number(match[1]) : null;
 };
 
-const toLevelCode = (rank: number, levels: LevelOption[] = []) =>
-    levels.find(level => level.rank === rank)?.code ?? `L${String(rank).padStart(2, '0')}`;
+const fallbackLevels = (): LevelOption[] => [];
 
+const toLevelOptions = (levels: PositionLevelResponse[]): LevelOption[] => levels
+    .filter(level => level.active !== false)
+    .map(level => {
+        const rank = parseLevelRank(level.levelCode) ?? 0;
+        return {
+            code: level.levelCode,
+            rank,
+            label: level.levelCode,
+        };
+    })
+    .filter(level => level.rank > 0)
+    .sort((left, right) => left.rank - right.rank);
 
-const getLevelRangeLabel = (minRank: number, maxRank: number, levels: LevelOption[] = []) =>
-    `${toLevelCode(minRank, levels)}–${toLevelCode(maxRank, levels)}`;
-
-const emptyForm = (minRank = 1, maxRank = 9): RuleSetFormState => ({
-    ruleSetName: '',
-    ruleSetDescription: '',
-    questionBankIds: [],
-    targetLevelMinRank: minRank,
-    targetLevelMaxRank: maxRank,
-    evaluatorRoles: [],
-    targetDepartmentId: '',
-    targetPositionId: '',
-    ruleSetStatus: 'ACTIVE',
-    active: true,
-});
-
-const normalizeRuleSetStatus = (status?: string | null, active?: boolean | null): RuleSetStatus => {
-    const value = (status || '').toUpperCase().replace(/[-\s]+/g, '_');
-    if (['DRAFT', 'ACTIVE', 'DISABLED', 'ARCHIVED'].includes(value)) return value as RuleSetStatus;
-    if (value === 'INACTIVE') return 'DISABLED';
+const normalizeStatus = (status?: string | null, active?: boolean | null): FormStatus => {
+    const clean = String(status ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (clean === 'ACTIVE' || clean === 'DRAFT' || clean === 'DISABLED' || clean === 'ARCHIVED') {
+        return clean;
+    }
     return active === false ? 'DISABLED' : 'ACTIVE';
 };
 
-const isActiveRuleSetStatus = (status?: string | null, active?: boolean | null) => normalizeRuleSetStatus(status, active) === 'ACTIVE';
+const isRole = (value?: string | null): value is RuleRole =>
+    value === 'SELF' || value === 'MANAGER' || value === 'PEER' || value === 'SUBORDINATE';
 
-const ruleSetStatusLabel = (status: RuleSetStatus) => ({
-    DRAFT: 'Draft',
-    ACTIVE: 'Active',
-    DISABLED: 'Disabled',
-    ARCHIVED: 'Archived',
-}[status]);
-
-const ruleSetTypeLabel = (type?: string | null) => ({
-    BASE: 'Base Rule Set',
-    DEPARTMENT_ADD_ON: 'Department Add-on',
-    POSITION_ADD_ON: 'Position Add-on',
-    DEPARTMENT_POSITION_ADD_ON: 'Department + Position Add-on',
-}[type || ''] || 'Rule Set');
-
-const inferRuleSetType = (departmentId?: number | null, positionId?: number | null) => {
-    if (departmentId == null && positionId == null) return 'BASE';
-    if (departmentId != null && positionId == null) return 'DEPARTMENT_ADD_ON';
-    if (departmentId == null && positionId != null) return 'POSITION_ADD_ON';
-    return 'DEPARTMENT_POSITION_ADD_ON';
+const inferScopeType = (departmentId?: number | null, positionId?: number | null): FormScopeType => {
+    if (departmentId == null && positionId == null) return 'DEFAULT';
+    if (departmentId != null && positionId == null) return 'DEPARTMENT';
+    if (departmentId == null && positionId != null) return 'POSITION';
+    return 'SPECIFIC';
 };
 
 const toNumberOrNull = (value: number | '') => (value === '' ? null : Number(value));
-const scopeKeyValue = (value?: number | null) => value == null ? 'all' : String(value);
 
-const scopeLabel = (
-    group: Pick<RuleSetGroup, 'targetDepartmentId' | 'targetPositionId'>,
-    getDepartmentName: (id?: number | null) => string,
-    getPositionName: (id?: number | null) => string,
-) => {
-    const department = group.targetDepartmentId ? getDepartmentName(group.targetDepartmentId) : 'All departments';
-    const position = group.targetPositionId ? getPositionName(group.targetPositionId) : 'All positions';
-    return `${department} / ${position}`;
+const uniqueNumbers = (values: Array<number | null | undefined>) =>
+    [...new Set(values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)))];
+
+const uniqueRoles = (values: Array<string | null | undefined>) =>
+    [...new Set(values.filter(isRole))];
+
+const levelCodeForRank = (rank: number, levels: LevelOption[]) =>
+    levels.find(level => level.rank === rank)?.code ?? `L${String(rank).padStart(2, '0')}`;
+
+const levelLabel = (minRank: number, maxRank: number, levels: LevelOption[]) => {
+    const minCode = levelCodeForRank(minRank, levels);
+    const maxCode = levelCodeForRank(maxRank, levels);
+    return minCode === maxCode ? minCode : `${minCode}–${maxCode}`;
 };
 
-const formatGroupLevelRange = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank'>, levels: LevelOption[] = []) =>
-    getLevelRangeLabel(group.targetLevelMinRank, group.targetLevelMaxRank, levels);
+const isUsableQuestion = (question: QuestionBankItem) =>
+    question.status === 'ACTIVE'
+    && question.responseType === 'RATING_WITH_COMMENT'
+    && question.required !== false;
 
-const formatRuleSetTitle = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'targetDepartmentId' | 'targetPositionId'>, getDepartmentName: (id?: number | null) => string, getPositionName: (id?: number | null) => string, levels: LevelOption[] = []) =>
-    `${formatGroupLevelRange(group, levels)} · ${scopeLabel(group, getDepartmentName, getPositionName)}`;
+const formScopeLabel = (scopeType: FormScopeType) => ({
+    DEFAULT: 'Default Form',
+    DEPARTMENT: 'Department Form',
+    POSITION: 'Position Form',
+    SPECIFIC: 'Legacy Form',
+}[scopeType]);
 
-const buildSuggestedRuleSetName = (form: Pick<RuleSetFormState, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'evaluatorRoles' | 'targetDepartmentId' | 'targetPositionId'>, levels: LevelOption[] = []) => {
-    const level = getLevelRangeLabel(form.targetLevelMinRank, form.targetLevelMaxRank, levels);
-    const roles = form.evaluatorRoles.length === EVALUATOR_ROLE_OPTIONS.length
-        ? 'All Roles'
-        : form.evaluatorRoles.length > 0
-            ? form.evaluatorRoles.map(getRoleLabel).join(' + ')
-            : 'Roles';
-    const scope = form.targetPositionId ? 'Position Scope' : form.targetDepartmentId ? 'Department Scope' : 'General Scope';
-    return `${level} · ${roles} · ${scope}`;
+const statusChipClass = (status: FormStatus, active = status === 'ACTIVE') => {
+    if (status === 'ACTIVE' && active) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    if (status === 'DRAFT') return 'border-amber-200 bg-amber-50 text-amber-700';
+    if (status === 'ARCHIVED') return 'border-slate-200 bg-slate-100 text-slate-500';
+    return 'border-slate-200 bg-slate-50 text-slate-600';
 };
 
-const buildRuleSetSignature = (group: Pick<RuleSetGroup, 'targetLevelMinRank' | 'targetLevelMaxRank' | 'targetDepartmentId' | 'targetPositionId' | 'roles' | 'questionIds'>) => [
-    group.targetLevelMinRank,
-    group.targetLevelMaxRank,
-    scopeKeyValue(group.targetDepartmentId),
-    scopeKeyValue(group.targetPositionId),
-    [...group.roles].sort().join(','),
-    [...group.questionIds].sort((a, b) => a - b).join(','),
-].join('|');
-
-const buildFormSignature = (form: RuleSetFormState) => buildRuleSetSignature({
-    targetLevelMinRank: form.targetLevelMinRank,
-    targetLevelMaxRank: form.targetLevelMaxRank,
-    targetDepartmentId: toNumberOrNull(form.targetDepartmentId),
-    targetPositionId: toNumberOrNull(form.targetPositionId),
-    roles: form.evaluatorRoles,
-    questionIds: form.questionBankIds,
-});
-
-const ruleScopeSpecificityLabel = (rule: Pick<QuestionRuleItem, 'targetPositionId' | 'targetDepartmentId'>) => {
-    if (rule.targetPositionId != null) return 'Position-specific';
-    if (rule.targetDepartmentId != null) return 'Department-specific';
-    return 'General';
+const formatFormSetupError = (error: unknown, fallback: string): string => {
+    const raw = error instanceof Error ? error.message : fallback;
+    const message = raw || fallback;
+    if (/A form already exists/i.test(message)) {
+        return 'A form already exists for this evaluator type and scope. Edit the existing form instead.';
+    }
+    if (/Question rule set not found|Question applicability rule not found/i.test(message)) {
+        return 'This form is no longer available. Refresh the page and try again.';
+    }
+    if (/Only active questions can be used in Form Setup/i.test(message)) {
+        return 'Only active rating questions with required comments can be used.';
+    }
+    if (/generated question rows/i.test(message)) {
+        return 'Select at least one question before activating this form.';
+    }
+    return message;
 };
 
+const flattenPreviewQuestions = (preview: DynamicFormPreview | null): DynamicPreviewQuestion[] =>
+    preview?.sections?.flatMap(section => section.questions ?? []) ?? [];
 
-const rangesOverlap = (aMin: number, aMax: number, bMin: number, bMax: number) =>
-    aMin <= bMax && bMin <= aMax;
-
-const nullableScopeEquals = (a?: number | null, b?: number | null) =>
-    (a == null && b == null) || a === b;
-
-const isRuleEffectivelyActive = (rule: QuestionRuleItem) =>
-    Boolean(rule.active)
-    && rule.questionBankId != null
-    && rule.questionStatus === 'ACTIVE'
-    && rule.effectiveActive !== false;
-
-const specificityScore = (rule: Pick<QuestionRuleItem, 'targetPositionId' | 'targetDepartmentId'>) => {
-    if (rule.targetPositionId != null) return 3;
-    if (rule.targetDepartmentId != null) return 2;
-    return 1;
+const makeSegmentKey = (rule: QuestionRuleItem) => {
+    if (rule.ruleSetId != null) return `set-${rule.ruleSetId}`;
+    return [
+        'legacy',
+        rule.targetLevelMinRank,
+        rule.targetLevelMaxRank,
+        rule.targetDepartmentId ?? 'all-dept',
+        rule.targetPositionId ?? 'all-pos',
+        rule.evaluatorRelationshipType,
+    ].join('|');
 };
 
-const compareRulesByResolverOrder = (a: QuestionRuleItem, b: QuestionRuleItem) => {
-    const specificityDiff = specificityScore(b) - specificityScore(a);
-    if (specificityDiff !== 0) return specificityDiff;
-    const displayDiff = (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999);
-    if (displayDiff !== 0) return displayDiff;
-    const priorityDiff = (a.rulePriority ?? 9999) - (b.rulePriority ?? 9999);
-    if (priorityDiff !== 0) return priorityDiff;
-    return (a.id ?? 0) - (b.id ?? 0);
-};
+const buildSegments = (rules: QuestionRuleItem[]): FormSegment[] => {
+    const byKey = new Map<string, QuestionRuleItem[]>();
+    for (const rule of rules) {
+        const key = makeSegmentKey(rule);
+        byKey.set(key, [...(byKey.get(key) ?? []), rule]);
+    }
 
-const ruleMatchesCriteria = (
-    rule: QuestionRuleItem,
-    levelRank: number,
-    role: RuleRole,
-    targetDepartmentId?: number | null,
-    targetPositionId?: number | null,
-) => {
-    if (!isRuleEffectivelyActive(rule)) return false;
-    if (rule.evaluatorRelationshipType !== role) return false;
-    if (rule.targetLevelMinRank > levelRank || rule.targetLevelMaxRank < levelRank) return false;
-    if (rule.targetPositionId != null && rule.targetPositionId !== targetPositionId) return false;
-    if (rule.targetDepartmentId != null && rule.targetDepartmentId !== targetDepartmentId) return false;
-    return true;
-};
-
-const isBroaderRuleScope = (
-    rule: Pick<QuestionRuleItem, 'targetDepartmentId' | 'targetPositionId'>,
-    targetDepartmentId?: number | null,
-    targetPositionId?: number | null,
-) => {
-    const departmentMatches = rule.targetDepartmentId == null || rule.targetDepartmentId === targetDepartmentId;
-    const positionMatches = rule.targetPositionId == null || rule.targetPositionId === targetPositionId;
-    const broader = (rule.targetDepartmentId == null && targetDepartmentId != null)
-        || (rule.targetPositionId == null && targetPositionId != null);
-    return departmentMatches && positionMatches && broader;
-};
-
-const ruleSetExactScopeOverlaps = (
-    group: RuleSetGroup,
-    levelMin: number,
-    levelMax: number,
-    roles: RuleRole[],
-    targetDepartmentId?: number | null,
-    targetPositionId?: number | null,
-) => group.active
-    && nullableScopeEquals(group.targetDepartmentId, targetDepartmentId)
-    && nullableScopeEquals(group.targetPositionId, targetPositionId)
-    && rangesOverlap(group.targetLevelMinRank, group.targetLevelMaxRank, levelMin, levelMax)
-    && group.roles.some(role => roles.includes(role));
-
-const resolveEffectiveQuestionIds = (
-    rules: QuestionRuleItem[],
-    levelRank: number,
-    role: RuleRole,
-    targetDepartmentId?: number | null,
-    targetPositionId?: number | null,
-) => {
-    const byQuestion = new Map<number, QuestionRuleItem>();
-    rules
-        .filter(rule => ruleMatchesCriteria(rule, levelRank, role, targetDepartmentId, targetPositionId))
-        .sort(compareRulesByResolverOrder)
-        .forEach(rule => {
-            if (rule.questionBankId != null && !byQuestion.has(rule.questionBankId)) {
-                byQuestion.set(rule.questionBankId, rule);
-            }
-        });
-    return byQuestion;
-};
-
-const findConflictIds = (rules: QuestionRuleItem[]) => {
-    const conflicts = new Set<number>();
-    const activeRules = rules.filter(isRuleEffectivelyActive);
-
-    activeRules.forEach((rule, index) => {
-        activeRules.slice(index + 1).forEach(other => {
-            const sameRole = rule.evaluatorRelationshipType === other.evaluatorRelationshipType;
-            const levelsOverlap = rangesOverlap(
-                rule.targetLevelMinRank,
-                rule.targetLevelMaxRank,
-                other.targetLevelMinRank,
-                other.targetLevelMaxRank,
-            );
-            const sameDepartmentScope = nullableScopeEquals(rule.targetDepartmentId, other.targetDepartmentId);
-            const samePositionScope = nullableScopeEquals(rule.targetPositionId, other.targetPositionId);
-
-            if (sameRole && levelsOverlap && sameDepartmentScope && samePositionScope) {
-                conflicts.add(rule.id);
-                conflicts.add(other.id);
-            }
-        });
-    });
-
-    return conflicts;
-};
-
-const buildRuleGroups = (rules: QuestionRuleItem[], conflictIds: Set<number>): RuleSetGroup[] => {
-    const groups = new Map<string, RuleSetGroup>();
-
-    rules.forEach(rule => {
-        const key = rule.ruleSetId != null
-            ? `rule-set-${rule.ruleSetId}`
-            : [
-                'legacy',
-                normalizeRuleSetStatus(rule.ruleSetStatus, rule.active),
-                rule.targetLevelMinRank,
-                rule.targetLevelMaxRank,
-                scopeKeyValue(rule.targetDepartmentId),
-                scopeKeyValue(rule.targetPositionId),
-            ].join('|');
-
-        const group = groups.get(key) ?? {
+    return [...byKey.entries()].map(([key, groupedRules]) => {
+        const first = groupedRules[0];
+        const roles = uniqueRoles(groupedRules.map(rule => rule.evaluatorRelationshipType));
+        const questionIds = uniqueNumbers(groupedRules.map(rule => rule.questionBankId));
+        const status = normalizeStatus(first.ruleSetStatus, first.active);
+        const scopeType = inferScopeType(first.targetDepartmentId, first.targetPositionId);
+        return {
             key,
-            ruleSetId: rule.ruleSetId,
-            ruleSetName: rule.ruleSetName,
-            ruleSetDescription: rule.ruleSetDescription,
-            rules: [],
-            ruleSetStatus: normalizeRuleSetStatus(rule.ruleSetStatus, rule.active),
-            ruleSetType: rule.ruleSetType || inferRuleSetType(rule.targetDepartmentId, rule.targetPositionId),
-            active: isActiveRuleSetStatus(rule.ruleSetStatus, rule.active),
-            targetLevelMinRank: rule.targetLevelMinRank,
-            targetLevelMaxRank: rule.targetLevelMaxRank,
-            targetDepartmentId: rule.targetDepartmentId,
-            targetPositionId: rule.targetPositionId,
-            roles: [],
-            questionIds: [],
-            questions: [],
-            conflictCount: 0,
-        };
-
-        group.rules.push(rule);
-        group.ruleSetStatus = normalizeRuleSetStatus(rule.ruleSetStatus, rule.active);
-        group.ruleSetType = rule.ruleSetType || inferRuleSetType(rule.targetDepartmentId, rule.targetPositionId);
-        group.active = group.ruleSetStatus === 'ACTIVE';
-        if (!group.roles.includes(rule.evaluatorRelationshipType as RuleRole)) {
-            group.roles.push(rule.evaluatorRelationshipType as RuleRole);
-        }
-        if (rule.questionBankId && !group.questionIds.includes(rule.questionBankId)) {
-            group.questionIds.push(rule.questionBankId);
-            group.questions.push(rule);
-        }
-        if (conflictIds.has(rule.id)) {
-            group.conflictCount += 1;
-        }
-        groups.set(key, group);
-    });
-
-    return [...groups.values()].sort((a, b) => {
-        if (a.active !== b.active) return a.active ? -1 : 1;
-        if (a.ruleSetStatus !== b.ruleSetStatus) return a.ruleSetStatus.localeCompare(b.ruleSetStatus);
-        if (a.targetLevelMinRank !== b.targetLevelMinRank) return a.targetLevelMinRank - b.targetLevelMinRank;
-        if (a.targetLevelMaxRank !== b.targetLevelMaxRank) return a.targetLevelMaxRank - b.targetLevelMaxRank;
-        return a.key.localeCompare(b.key);
+            ruleSetId: first.ruleSetId,
+            firstRuleId: first.id,
+            name: first.ruleSetName?.trim() || formScopeLabel(scopeType),
+            description: first.ruleSetDescription ?? null,
+            status,
+            active: status === 'ACTIVE' && groupedRules.some(rule => rule.active),
+            scopeType,
+            departmentId: first.targetDepartmentId ?? null,
+            positionId: first.targetPositionId ?? null,
+            minRank: first.targetLevelMinRank,
+            maxRank: first.targetLevelMaxRank,
+            roles,
+            questionIds,
+            questions: groupedRules,
+        } satisfies FormSegment;
+    }).sort((left, right) => {
+        const scopeDiff = ['DEFAULT', 'DEPARTMENT', 'POSITION', 'SPECIFIC'].indexOf(left.scopeType)
+            - ['DEFAULT', 'DEPARTMENT', 'POSITION', 'SPECIFIC'].indexOf(right.scopeType);
+        if (scopeDiff !== 0) return scopeDiff;
+        if (left.status !== right.status) return left.status === 'ACTIVE' ? -1 : 1;
+        return left.name.localeCompare(right.name);
     });
 };
 
+const buildCollections = (
+    segments: FormSegment[],
+    departments: FeedbackDepartmentOption[],
+    positions: PositionResponse[],
+): FormCollection[] => {
+    const getDepartmentName = (id?: number | null) => departments.find(department => department.id === id)?.name ?? `Department #${id}`;
+    const getPositionName = (id?: number | null) => positions.find(position => position.id === id)?.positionTitle ?? `Position #${id}`;
+    const byKey = new Map<string, FormCollection>();
 
-type RuleMessageTone = 'error' | 'success' | 'warning' | 'info';
+    const ensureCollection = (segment: FormSegment) => {
+        if (segment.scopeType === 'SPECIFIC') return null;
+        const scopeId = segment.scopeType === 'DEFAULT'
+            ? 'default'
+            : segment.scopeType === 'DEPARTMENT'
+                ? segment.departmentId ?? 'unknown-department'
+                : segment.positionId ?? 'unknown-position';
+        const key = `${segment.scopeType}-${scopeId}`;
+        const existing = byKey.get(key);
+        if (existing) return existing;
 
-const buildRuleMessage = (tone: RuleMessageTone, message: string) => {
-    const normalized = message.toLowerCase();
-    if (tone === 'success') {
-        return {
-            title: 'Rule Set saved',
-            detail: message,
-            icon: 'bi bi-check-circle-fill',
+        const title = segment.scopeType === 'DEFAULT'
+            ? 'Default Form'
+            : segment.scopeType === 'DEPARTMENT'
+                ? `${getDepartmentName(segment.departmentId)} Form`
+                : `${getPositionName(segment.positionId)} Form`;
+        const subtitle = segment.scopeType === 'DEFAULT'
+            ? 'Used when no department or position form is available for this evaluator type.'
+            : segment.scopeType === 'DEPARTMENT'
+                ? 'Used for employees in this department unless a position form is available.'
+                : 'Used first for employees in this position.';
+
+        const next: FormCollection = {
+            key,
+            scopeType: segment.scopeType,
+            scopeId,
+            title,
+            subtitle,
+            departmentId: segment.departmentId ?? null,
+            positionId: segment.positionId ?? null,
+            segments: [],
+            roleCounts: { ...EMPTY_ROLE_COUNTS },
+            active: false,
         };
-    }
-    if (normalized.includes('redundant add-on') || normalized.includes('inherited from')) {
-        return {
-            title: 'Question already inherited',
-            detail: message,
-            icon: 'bi bi-intersect',
-        };
-    }
-    if (normalized.includes('active overlap')) {
-        return {
-            title: 'Active scope overlap blocked',
-            detail: message,
-            icon: 'bi bi-shield-exclamation',
-        };
-    }
-    if (normalized.includes('identical to')) {
-        return {
-            title: 'Duplicate Rule Set blocked',
-            detail: message,
-            icon: 'bi bi-files',
-        };
-    }
-    if (normalized.includes('another active rule') || normalized.includes('overlap') || normalized.includes('conflict')) {
-        return {
-            title: 'Rule Set overlap found',
-            detail: `${message} This usually means an active Rule Set already uses the same question, evaluator role, overlapping level range, and exact department/position scope. Edit or disable the overlapping active Rule Set first.`,
-            icon: 'bi bi-shield-exclamation',
-        };
-    }
-    if (normalized.includes('select at least') || normalized.includes('from level')) {
-        return {
-            title: 'Complete the required setup',
-            detail: message,
-            icon: 'bi bi-exclamation-circle-fill',
-        };
-    }
-    return {
-        title: tone === 'warning' ? 'Review required' : 'Action could not be completed',
-        detail: message,
-        icon: tone === 'warning' ? 'bi bi-exclamation-triangle-fill' : 'bi bi-x-octagon-fill',
+        byKey.set(key, next);
+        return next;
     };
+
+    for (const segment of segments) {
+        if (segment.scopeType === 'SPECIFIC' || segment.questionIds.length === 0) {
+            continue;
+        }
+        const collection = ensureCollection(segment);
+        if (!collection) continue;
+        collection.segments.push(segment);
+        if (segment.active) collection.active = true;
+        for (const role of segment.roles) {
+            const roleQuestionIds = uniqueNumbers(
+                segment.questions
+                    .filter(rule => rule.evaluatorRelationshipType === role)
+                    .map(rule => rule.questionBankId),
+            );
+            collection.roleCounts[role] = Math.max(collection.roleCounts[role], roleQuestionIds.length);
+        }
+    }
+
+    return [...byKey.values()].sort((left, right) => {
+        const scopeOrder = ['DEFAULT', 'DEPARTMENT', 'POSITION'];
+        const scopeDiff = scopeOrder.indexOf(left.scopeType) - scopeOrder.indexOf(right.scopeType);
+        if (scopeDiff !== 0) return scopeDiff;
+        return left.title.localeCompare(right.title);
+    });
 };
 
-const RuleToast = ({ tone, message, onClose }: { tone: RuleMessageTone; message: string; onClose: () => void }) => {
-    const content = buildRuleMessage(tone, message);
-    return (
-        <div className={`f360-rules-toast ${tone}`} role="status" aria-live="polite">
-            <span className="f360-rules-toast-icon"><i className={content.icon} /></span>
-            <div>
-                <strong>{content.title}</strong>
-                <p>{content.detail}</p>
-            </div>
-            <button type="button" onClick={onClose} aria-label="Dismiss message"><i className="bi bi-x-lg" /></button>
-        </div>
-    );
+const findSegmentForRole = (collection: FormCollection, role: RuleRole) =>
+    collection.segments
+        .filter(segment => segment.roles.includes(role) && segment.questionIds.length > 0)
+        .sort((left, right) => {
+            if (left.active !== right.active) return left.active ? -1 : 1;
+            return right.questionIds.length - left.questionIds.length;
+        })[0] ?? null;
+
+const firstMissingRole = (collection: FormCollection): RuleRole =>
+    ROLE_VALUES.find(role => collection.roleCounts[role] === 0) ?? 'MANAGER';
+
+const collectionDisplayRoles = (collection: FormCollection): RuleRole[] => {
+    if (collection.scopeType === 'DEFAULT') return ROLE_VALUES;
+    return ROLE_VALUES.filter(role => collection.roleCounts[role] > 0 || findSegmentForRole(collection, role));
 };
+
+const buildFormName = (editor: EditorState, departments: FeedbackDepartmentOption[], positions: PositionResponse[]) => {
+    const roleLabel = editor.evaluatorRoles.length === 1
+        ? getRoleLabel(editor.evaluatorRoles[0])
+        : 'Evaluator';
+    if (editor.scopeType === 'DEPARTMENT') {
+        const departmentName = departments.find(department => department.id === editor.departmentId)?.name ?? 'Department';
+        return `${departmentName} ${roleLabel} Form`;
+    }
+    if (editor.scopeType === 'POSITION') {
+        const positionName = positions.find(position => position.id === editor.positionId)?.positionTitle ?? 'Position';
+        return `${positionName} ${roleLabel} Form`;
+    }
+    return `Default ${roleLabel} Form`;
+};
+
+const createPayload = (
+    editor: EditorState,
+    departments: FeedbackDepartmentOption[],
+    positions: PositionResponse[],
+): QuestionRulePayload => ({
+    ruleSetName: buildFormName(editor, departments, positions),
+    ruleSetDescription: null,
+    ruleSetStatus: editor.status,
+    questionBankIds: editor.questionIds,
+    targetLevelMinRank: Math.min(editor.minRank, editor.maxRank),
+    targetLevelMaxRank: Math.max(editor.minRank, editor.maxRank),
+    targetDepartmentId: editor.scopeType === 'DEPARTMENT' ? toNumberOrNull(editor.departmentId) : null,
+    targetPositionId: editor.scopeType === 'POSITION' ? toNumberOrNull(editor.positionId) : null,
+    evaluatorRelationshipTypes: editor.evaluatorRoles,
+    displayOrder: 1,
+    rulePriority: 100,
+    active: editor.status === 'ACTIVE',
+});
 
 export default function QuestionRulesTab() {
     const [questions, setQuestions] = useState<QuestionBankItem[]>([]);
     const [rules, setRules] = useState<QuestionRuleItem[]>([]);
     const [departments, setDepartments] = useState<FeedbackDepartmentOption[]>([]);
     const [positions, setPositions] = useState<PositionResponse[]>([]);
-    const [positionLevels, setPositionLevels] = useState<PositionLevelResponse[]>([]);
-    const [targetCandidates, setTargetCandidates] = useState<FeedbackTargetCandidate[]>([]);
+    const [employees, setEmployees] = useState<FeedbackTargetEmployee[]>([]);
+    const [levels, setLevels] = useState<LevelOption[]>(fallbackLevels());
     const [loading, setLoading] = useState(true);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [builderOpen, setBuilderOpen] = useState(false);
-    const [editingGroup, setEditingGroup] = useState<RuleSetGroup | null>(null);
-    const [form, setForm] = useState<RuleSetFormState>(emptyForm());
-    const [search, setSearch] = useState('');
-    const [roleFilter, setRoleFilter] = useState<'ALL' | RuleRole>('ALL');
-    const [levelFilter, setLevelFilter] = useState('ALL');
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-    const [matrixDepartmentId, setMatrixDepartmentId] = useState<number | ''>('');
-    const [matrixPositionId, setMatrixPositionId] = useState<number | ''>('');
-    const [builderQuestionSearch, setBuilderQuestionSearch] = useState('');
-    const [builderCompetencyFilter, setBuilderCompetencyFilter] = useState('ALL');
-    const [matrixSelection, setMatrixSelection] = useState<MatrixSelection | null>(null);
-    const [coverageOpen, setCoverageOpen] = useState(false);
-    const [expandedRuleSetKeys, setExpandedRuleSetKeys] = useState<Set<string>>(new Set());
+    const [saving, setSaving] = useState(false);
+    const [editor, setEditor] = useState<EditorState | null>(null);
+    const [questionSearch, setQuestionSearch] = useState('');
+    const [competencyFilter, setCompetencyFilter] = useState('ALL');
+    const [previewRole, setPreviewRole] = useState<RuleRole>('MANAGER');
+    const [previewDepartmentId, setPreviewDepartmentId] = useState<number | ''>('');
+    const [previewPositionId, setPreviewPositionId] = useState<number | ''>('');
+    const [previewLevelRank, setPreviewLevelRank] = useState(1);
+    const [preview, setPreview] = useState<DynamicFormPreview | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
 
-    const activeQuestions = useMemo(
-        () => questions.filter(question => question.status === 'ACTIVE'),
-        [questions],
-    );
+    const minRank = levels[0]?.rank ?? 1;
+    const maxRank = levels[levels.length - 1]?.rank ?? 1;
 
-    const conflictIds = useMemo(() => findConflictIds(rules), [rules]);
-    const ruleGroups = useMemo(() => buildRuleGroups(rules, conflictIds), [conflictIds, rules]);
-
-    const formDepartmentId = toNumberOrNull(form.targetDepartmentId);
-    const formPositionId = toNumberOrNull(form.targetPositionId);
-
-    const activeScopeOverlapGroup = useMemo(() => {
-        if (form.ruleSetStatus !== 'ACTIVE' || form.evaluatorRoles.length === 0) return null;
-        return ruleGroups.find(group => group.ruleSetId !== editingGroup?.ruleSetId
-            && ruleSetExactScopeOverlaps(
-                group,
-                form.targetLevelMinRank,
-                form.targetLevelMaxRank,
-                form.evaluatorRoles,
-                formDepartmentId,
-                formPositionId,
-            )) ?? null;
-    }, [editingGroup?.ruleSetId, form.evaluatorRoles, form.ruleSetStatus, form.targetLevelMaxRank, form.targetLevelMinRank, formDepartmentId, formPositionId, ruleGroups]);
-
-    const inheritedQuestionInfo = useMemo(() => {
-        const map = new Map<number, string>();
-        if (formDepartmentId == null && formPositionId == null) return map;
-        if (form.evaluatorRoles.length === 0) return map;
-        rules
-            .filter(isRuleEffectivelyActive)
-            .filter(rule => rule.ruleSetId !== editingGroup?.ruleSetId)
-            .forEach(rule => {
-                if (rule.questionBankId == null) return;
-                if (!form.evaluatorRoles.includes(rule.evaluatorRelationshipType as RuleRole)) return;
-                if (!rangesOverlap(rule.targetLevelMinRank, rule.targetLevelMaxRank, form.targetLevelMinRank, form.targetLevelMaxRank)) return;
-                if (!isBroaderRuleScope(rule, formDepartmentId, formPositionId)) return;
-                const source = rule.ruleSetName || `${ruleScopeSpecificityLabel(rule)} Rule Set`;
-                if (!map.has(rule.questionBankId)) {
-                    map.set(rule.questionBankId, `Already inherited from ${source}`);
-                }
-            });
-        return map;
-    }, [editingGroup?.ruleSetId, form.evaluatorRoles, form.targetLevelMaxRank, form.targetLevelMinRank, formDepartmentId, formPositionId, rules]);
-
-    const selectedInheritedQuestions = useMemo(
-        () => form.questionBankIds.filter(id => inheritedQuestionInfo.has(id)),
-        [form.questionBankIds, inheritedQuestionInfo],
-    );
-
-    const loadAll = async () => {
+    const loadData = async () => {
         setLoading(true);
-        setError('');
         try {
-            const [loadedQuestions, loadedRules, loadedDepartments, loadedPositions, loadedPositionLevels, loadedTargetCandidates] = await Promise.all([
+            const [questionItems, ruleItems, departmentItems, positionItems, employeeItems, levelItems] = await Promise.all([
                 hrFeedbackApi.getQuestionBank(),
                 hrFeedbackApi.getQuestionRules(),
-                feedbackCampaignApi.getDepartments().catch(() => []),
-                positionService.getPositions().catch(() => []),
-                positionService.getPositionLevels().catch(() => []),
-                feedbackCampaignApi.getTargetCandidates().catch(() => []),
+                feedbackCampaignApi.getDepartments(),
+                positionService.getPositions(),
+                feedbackCampaignApi.getEmployees(),
+                positionService.getPositionLevels(),
             ]);
-            setQuestions(loadedQuestions);
-            setRules(loadedRules);
-            setDepartments(loadedDepartments);
-            setPositions(loadedPositions);
-            setPositionLevels(loadedPositionLevels);
-            setTargetCandidates(loadedTargetCandidates);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to load question rules.');
+            const nextLevels = toLevelOptions(levelItems);
+            const activePositions = positionItems.filter(position => position.status !== false);
+            setQuestions(questionItems);
+            setRules(ruleItems);
+            setDepartments(departmentItems);
+            setPositions(activePositions);
+            setEmployees(employeeItems);
+            setLevels(nextLevels);
+            setPreviewLevelRank(nextLevels[0]?.rank ?? 1);
+        } catch (error) {
+            toast.error(formatFormSetupError(error, 'Could not load Form Setup.'));
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        void loadAll();
+        void loadData();
     }, []);
 
-    useEffect(() => {
-        if (!success) return;
-        const timer = window.setTimeout(() => setSuccess(''), 3200);
-        return () => window.clearTimeout(timer);
-    }, [success]);
+    const activeQuestions = useMemo(
+        () => questions.filter(isUsableQuestion).sort((left, right) => {
+            const competencyDiff = getCompetencyLabel(left.competencyCode).localeCompare(getCompetencyLabel(right.competencyCode));
+            if (competencyDiff !== 0) return competencyDiff;
+            return left.questionText.localeCompare(right.questionText);
+        }),
+        [questions],
+    );
 
-    const getDepartmentName = (id?: number | null) => {
-        if (!id) return 'All departments';
-        return departments.find(department => department.id === id)?.name ?? `Department #${id}`;
-    };
+    const positionByTitle = useMemo(() => {
+        const map = new Map<string, PositionResponse>();
+        for (const position of positions) {
+            map.set(position.positionTitle.trim().toLowerCase(), position);
+        }
+        return map;
+    }, [positions]);
 
-    const getPositionName = (id?: number | null) => {
-        if (!id) return 'All positions';
-        return positions.find(position => position.id === id)?.positionTitle ?? `Position #${id}`;
-    };
+    const positionById = useMemo(() => new Map(positions.map(position => [position.id, position])), [positions]);
+    const levelByRank = useMemo(() => new Map(levels.map(level => [level.rank, level])), [levels]);
 
-    const positionIdsByDepartment = useMemo(() => {
+    const departmentPositionIds = useMemo(() => {
         const map = new Map<number, Set<number>>();
-        targetCandidates.forEach(candidate => {
-            if (candidate.currentDepartmentId != null && candidate.positionId != null) {
-                const set = map.get(candidate.currentDepartmentId) ?? new Set<number>();
-                set.add(candidate.positionId);
-                map.set(candidate.currentDepartmentId, set);
-            }
-        });
+        for (const employee of employees) {
+            if (employee.currentDepartmentId == null || !employee.positionTitle) continue;
+            const position = positionByTitle.get(employee.positionTitle.trim().toLowerCase());
+            if (!position) continue;
+            if (!map.has(employee.currentDepartmentId)) map.set(employee.currentDepartmentId, new Set<number>());
+            map.get(employee.currentDepartmentId)?.add(position.id);
+        }
         return map;
-    }, [targetCandidates]);
+    }, [employees, positionByTitle]);
 
-    const levelOptions = useMemo<LevelOption[]>(() => {
-        const byRank = new Map<number, LevelOption>();
-
-        positionLevels
-            .filter(level => level.active !== false)
-            .forEach(level => {
-                const rank = parseLevelRank(level.levelCode);
-                if (!rank) return;
-                byRank.set(rank, {
-                    id: level.id,
-                    code: level.levelCode,
-                    rank,
-                    label: level.levelCode,
-                });
-            });
-
-        positions
-            .filter(position => position.status !== false)
-            .forEach(position => {
-                const rank = parseLevelRank(position.levelCode);
-                if (!rank || byRank.has(rank)) return;
-                byRank.set(rank, {
-                    id: position.levelId,
-                    code: position.levelCode || `L${String(rank).padStart(2, '0')}`,
-                    rank,
-                    label: position.levelCode || `L${String(rank).padStart(2, '0')}`,
-                });
-            });
-
-        rules.forEach(rule => {
-            [rule.targetLevelMinRank, rule.targetLevelMaxRank].forEach(rank => {
-                if (!rank || byRank.has(rank)) return;
-                byRank.set(rank, {
-                    code: `L${String(rank).padStart(2, '0')}`,
-                    rank,
-                    label: `L${String(rank).padStart(2, '0')}`,
-                });
-            });
-        });
-
-        return [...byRank.values()].sort((a, b) => a.rank - b.rank);
-    }, [positionLevels, positions, rules]);
-
-    const levelRankSet = useMemo(() => new Set(levelOptions.map(level => level.rank)), [levelOptions]);
-    const minAvailableLevelRank = levelOptions[0]?.rank ?? 1;
-    const maxAvailableLevelRank = levelOptions[levelOptions.length - 1]?.rank ?? 9;
-
-    const getPositionRank = (position: PositionResponse) => {
-        const parsed = parseLevelRank(position.levelCode);
-        if (parsed) return parsed;
-        const matchedLevel = levelOptions.find(level => level.id === position.levelId);
-        return matchedLevel?.rank ?? null;
+    const getDepartmentPositions = (departmentId: number | ''): PositionResponse[] => {
+        if (departmentId === '') return [];
+        const ids = departmentPositionIds.get(Number(departmentId));
+        if (!ids) return [];
+        return [...ids]
+            .map(id => positionById.get(id))
+            .filter((position): position is PositionResponse => Boolean(position))
+            .sort((left, right) => left.positionTitle.localeCompare(right.positionTitle));
     };
 
-    const activeScopeOverlapMessage = useMemo(() => {
-        if (!activeScopeOverlapGroup) return '';
-        const sharedMin = Math.max(activeScopeOverlapGroup.targetLevelMinRank, form.targetLevelMinRank);
-        const sharedMax = Math.min(activeScopeOverlapGroup.targetLevelMaxRank, form.targetLevelMaxRank);
-        const sharedRoles = activeScopeOverlapGroup.roles.filter(role => form.evaluatorRoles.includes(role)).map(getRoleLabel).join(', ');
-        const name = activeScopeOverlapGroup.ruleSetName || formatGroupLevelRange(activeScopeOverlapGroup, levelOptions);
-        const scope = scopeLabel(activeScopeOverlapGroup, getDepartmentName, getPositionName);
-        return `This overlaps with "${name}". Shared scope: ${getLevelRangeLabel(sharedMin, sharedMax, levelOptions)}, ${sharedRoles || 'selected relationship'}, ${scope}. Edit the existing Rule Set or change this Rule Set's level range, scope, or relationship.`;
-    }, [activeScopeOverlapGroup, form.evaluatorRoles, form.targetLevelMaxRank, form.targetLevelMinRank, getDepartmentName, getPositionName, levelOptions]);
-
-    const getPositionsForDepartment = (departmentId: number | '', minRank = minAvailableLevelRank, maxRank = maxAvailableLevelRank) => {
-        const byDepartment = departmentId === ''
-            ? positions
-            : targetCandidates.length === 0
-                ? positions
-                : (() => {
-                    const mapped = positionIdsByDepartment.get(Number(departmentId));
-                    return mapped && mapped.size > 0 ? positions.filter(position => mapped.has(position.id)) : [];
-                })();
-
-        return byDepartment
-            .filter(position => position.status !== false)
-            .filter(position => {
-                const rank = getPositionRank(position);
-                return rank != null && rank >= minRank && rank <= maxRank;
-            });
+    const getDepartmentLevels = (departmentId: number | ''): LevelOption[] => {
+        const ranks = new Set<number>();
+        for (const position of getDepartmentPositions(departmentId)) {
+            const rank = parseLevelRank(position.levelCode);
+            if (rank != null) ranks.add(rank);
+        }
+        return [...ranks]
+            .map(rank => levelByRank.get(rank) ?? { code: `L${String(rank).padStart(2, '0')}`, rank, label: `L${String(rank).padStart(2, '0')}` })
+            .sort((left, right) => left.rank - right.rank);
     };
 
-    const builderPositions = useMemo(
-        () => getPositionsForDepartment(form.targetDepartmentId, form.targetLevelMinRank, form.targetLevelMaxRank),
-        [form.targetDepartmentId, form.targetLevelMaxRank, form.targetLevelMinRank, levelOptions, positionIdsByDepartment, positions, targetCandidates.length],
+    const getPositionLevel = (positionId: number | ''): LevelOption | null => {
+        if (positionId === '') return null;
+        const position = positionById.get(Number(positionId));
+        const rank = parseLevelRank(position?.levelCode);
+        if (rank == null) return null;
+        return levelByRank.get(rank) ?? { code: position?.levelCode ?? `L${String(rank).padStart(2, '0')}`, rank, label: position?.levelCode ?? `L${String(rank).padStart(2, '0')}` };
+    };
+
+    const segments = useMemo(() => buildSegments(rules), [rules]);
+    const collections = useMemo(() => buildCollections(segments, departments, positions), [segments, departments, positions]);
+
+    const defaultCollection = collections.find(collection => collection.scopeType === 'DEFAULT');
+    const departmentCollections = collections.filter(collection => collection.scopeType === 'DEPARTMENT');
+    const positionCollections = collections.filter(collection => collection.scopeType === 'POSITION');
+
+    const competencyOptions = useMemo(
+        () => [...new Set(activeQuestions.map(question => question.competencyCode).filter(Boolean))]
+            .sort((left, right) => getCompetencyLabel(left).localeCompare(getCompetencyLabel(right))),
+        [activeQuestions],
     );
 
-    const matrixPositions = useMemo(
-        () => getPositionsForDepartment(matrixDepartmentId),
-        [levelOptions, matrixDepartmentId, positionIdsByDepartment, positions, targetCandidates.length],
+    const filteredQuestions = useMemo(() => {
+        const search = questionSearch.trim().toLowerCase();
+        return activeQuestions.filter(question => {
+            const competencyMatch = competencyFilter === 'ALL' || question.competencyCode === competencyFilter;
+            const text = `${question.questionCode ?? ''} ${question.questionText} ${getCompetencyLabel(question.competencyCode)}`.toLowerCase();
+            const searchMatch = !search || text.includes(search);
+            return competencyMatch && searchMatch;
+        });
+    }, [activeQuestions, competencyFilter, questionSearch]);
+
+    const selectedQuestionMap = useMemo(
+        () => new Map(questions.map(question => [question.id, question])),
+        [questions],
     );
 
-    useEffect(() => {
-        if (form.targetPositionId !== '' && !builderPositions.some(position => position.id === Number(form.targetPositionId))) {
-            setForm(current => ({ ...current, targetPositionId: '' }));
-            setSuccess('Selected position was cleared because it is outside the selected level range.');
-        }
-    }, [builderPositions, form.targetPositionId]);
+    const previewQuestions = useMemo(() => flattenPreviewQuestions(preview), [preview]);
 
-    useEffect(() => {
-        if (matrixPositionId !== '' && !matrixPositions.some(position => position.id === Number(matrixPositionId))) {
-            setMatrixPositionId('');
-        }
-    }, [matrixPositions, matrixPositionId]);
+    const previewPositionOptions = useMemo(() => {
+        if (previewDepartmentId === '') return positions;
+        return getDepartmentPositions(previewDepartmentId);
+    }, [positions, previewDepartmentId, departmentPositionIds]);
 
-    useEffect(() => {
-        if (levelOptions.length === 0) return;
-        setForm(current => {
-            const minRank = levelRankSet.has(current.targetLevelMinRank) ? current.targetLevelMinRank : minAvailableLevelRank;
-            const maxRank = levelRankSet.has(current.targetLevelMaxRank) ? current.targetLevelMaxRank : maxAvailableLevelRank;
-            if (minRank === current.targetLevelMinRank && maxRank === current.targetLevelMaxRank) return current;
-            return { ...current, targetLevelMinRank: minRank, targetLevelMaxRank: Math.max(minRank, maxRank) };
-        });
-    }, [levelOptions.length, levelRankSet, maxAvailableLevelRank, minAvailableLevelRank]);
+    const workspacePreviewSource = useMemo(() => {
+        const matchingPosition = previewPositionId !== ''
+            ? positionCollections.find(collection => collection.positionId === previewPositionId && collection.roleCounts[previewRole] > 0)
+            : undefined;
+        if (matchingPosition) return { title: matchingPosition.title, reason: 'A position form will be used for this evaluator type.' };
 
-    const filteredGroups = useMemo(() => {
-        const query = normalizeText(search);
-        return ruleGroups.filter(group => {
-            const groupText = [
-                group.ruleSetName,
-                group.ruleSetDescription,
-                ruleSetStatusLabel(group.ruleSetStatus),
-                ruleSetTypeLabel(group.ruleSetType),
-                formatGroupLevelRange(group, levelOptions),
-                scopeLabel(group, getDepartmentName, getPositionName),
-                ...group.roles.map(getRoleLabel),
-                ...group.questions.flatMap(question => [question.questionCode, question.questionText, question.competencyCode]),
-            ].join(' ');
-            const matchesSearch = !query || normalizeText(groupText).includes(query);
-            const matchesRole = roleFilter === 'ALL' || group.roles.includes(roleFilter);
-            const matchesLevel = levelFilter === 'ALL' || (group.targetLevelMinRank <= Number(levelFilter) && group.targetLevelMaxRank >= Number(levelFilter));
-            const matchesStatus = statusFilter === 'ALL' || group.ruleSetStatus === statusFilter;
-            return matchesSearch && matchesRole && matchesLevel && matchesStatus;
-        });
-    }, [getDepartmentName, getPositionName, levelFilter, levelOptions, roleFilter, ruleGroups, search, statusFilter]);
+        const matchingDepartment = previewDepartmentId !== ''
+            ? departmentCollections.find(collection => collection.departmentId === previewDepartmentId && collection.roleCounts[previewRole] > 0)
+            : undefined;
+        if (matchingDepartment) return { title: matchingDepartment.title, reason: 'No position form was found, so the department form will be used.' };
 
-    const coverageLevels = useMemo(() => {
-        if (matrixPositionId === '') return levelOptions;
-        const selectedPosition = positions.find(position => position.id === Number(matrixPositionId));
-        const rank = selectedPosition ? getPositionRank(selectedPosition) : null;
-        return rank == null ? levelOptions : levelOptions.filter(level => level.rank === rank);
-    }, [levelOptions, matrixPositionId, positions]);
-
-    const coverageMatrix = useMemo(() => coverageLevels.map(level => {
-        const departmentId = toNumberOrNull(matrixDepartmentId);
-        const positionId = toNumberOrNull(matrixPositionId);
-        const cells = EVALUATOR_ROLE_OPTIONS.map(role => {
-            const rawMatches = rules.filter(rule => ruleMatchesCriteria(rule, level.rank, role.value, departmentId, positionId));
-            const matchedRules = Array.from(resolveEffectiveQuestionIds(rules, level.rank, role.value, departmentId, positionId).values());
-            return { role: role.value, count: matchedRules.length, matchedRules, rawCount: rawMatches.length, duplicatesIgnored: Math.max(0, rawMatches.length - matchedRules.length) };
-        });
-        return { level, cells };
-    }), [coverageLevels, matrixDepartmentId, matrixPositionId, rules]);
-
-    const stats = useMemo(() => {
-        const effectiveRows = rules.filter(isRuleEffectivelyActive);
-        const coveredCombos = coverageMatrix.reduce((total, row) => total + row.cells.filter(cell => cell.count > 0).length, 0);
         return {
-            ruleSets: ruleGroups.length,
-            activeRules: effectiveRows.length,
-            conflicts: conflictIds.size,
-            coveredCombos,
+            title: defaultCollection?.title ?? 'Default Form',
+            reason: 'No position or department form was found, so the default form will be used.',
         };
-    }, [conflictIds.size, coverageMatrix, ruleGroups.length, rules]);
+    }, [defaultCollection?.title, departmentCollections, positionCollections, previewDepartmentId, previewPositionId, previewRole]);
 
-    const ruleSetById = useMemo(() => {
-        const map = new Map<number, RuleSetGroup>();
-        ruleGroups.forEach(group => {
-            if (group.ruleSetId != null) map.set(group.ruleSetId, group);
-        });
-        return map;
-    }, [ruleGroups]);
-
-    const selectedMatrixCell = useMemo(() => {
-        if (!matrixSelection) return null;
-        const row = coverageMatrix.find(item => item.level.rank === matrixSelection.levelRank);
-        const cell = row?.cells.find(item => item.role === matrixSelection.role);
-        return row && cell ? { level: row.level, cell } : null;
-    }, [coverageMatrix, matrixSelection]);
-
-    const healthItems = useMemo<RuleHealthItem[]>(() => {
-        const missingCells = coverageMatrix.reduce((total, row) => total + row.cells.filter(cell => cell.count === 0).length, 0);
-        const lowCells = coverageMatrix.reduce((total, row) => total + row.cells.filter(cell => cell.count > 0 && cell.count < 5).length, 0);
-        const inactiveRuleSets = ruleGroups.filter(group => group.ruleSetStatus !== 'ACTIVE').length;
-        const draftRuleSets = ruleGroups.filter(group => group.ruleSetStatus === 'DRAFT').length;
-        const disabledRuleSets = ruleGroups.filter(group => group.ruleSetStatus === 'DISABLED').length;
-        const inactiveQuestionRows = rules.filter(rule => rule.active && rule.questionStatus && rule.questionStatus !== 'ACTIVE').length;
-        const activeRows = rules.filter(isRuleEffectivelyActive);
-        const redundantInheritedRows = activeRows.filter(rule => rule.targetDepartmentId != null || rule.targetPositionId != null).filter(rule =>
-            activeRows.some(other => other.id !== rule.id
-                && other.questionBankId === rule.questionBankId
-                && other.evaluatorRelationshipType === rule.evaluatorRelationshipType
-                && rangesOverlap(other.targetLevelMinRank, other.targetLevelMaxRank, rule.targetLevelMinRank, rule.targetLevelMaxRank)
-                && isBroaderRuleScope(other, rule.targetDepartmentId, rule.targetPositionId))
-        ).length;
-        const signatureCounts = new Map<string, number>();
-        ruleGroups.forEach(group => {
-            const signature = buildRuleSetSignature(group);
-            signatureCounts.set(signature, (signatureCounts.get(signature) ?? 0) + 1);
-        });
-        const duplicateRuleSets = Array.from(signatureCounts.values()).reduce((total, count) => total + Math.max(0, count - 1), 0);
-        const items: RuleHealthItem[] = [];
-        items.push(missingCells > 0
-            ? { tone: 'danger', icon: 'bi bi-exclamation-octagon', title: 'Missing coverage', value: missingCells, message: 'Level/role combinations have no active questions for the selected matrix scope.' }
-            : { tone: 'success', icon: 'bi bi-check-circle', title: 'Coverage present', value: 0, message: 'Every level/role combination has at least one active question for the selected matrix scope.' });
-        if (lowCells > 0) {
-            items.push({ tone: 'warning', icon: 'bi bi-speedometer', title: 'Low coverage', value: lowCells, message: 'Some combinations have only 1–4 questions. Review whether that is enough before campaign setup.' });
-        }
-        if (inactiveRuleSets > 0) {
-            items.push({ tone: 'info', icon: 'bi bi-pause-circle', title: 'Non-active sets', value: inactiveRuleSets, message: `${draftRuleSets} draft and ${disabledRuleSets} disabled Rule Set(s) are ignored by Coverage Matrix, Dynamic Preview, and Campaign setup.` });
-        }
-        if (redundantInheritedRows > 0) {
-            items.push({ tone: 'warning', icon: 'bi bi-intersect', title: 'Redundant add-ons', value: redundantInheritedRows, message: 'Some specific active rules repeat questions already inherited from broader active Rule Sets. Edit those add-ons so they only add extra questions.' });
-        }
-        if (duplicateRuleSets > 0) {
-            items.push({ tone: 'warning', icon: 'bi bi-files', title: 'Duplicate saved sets', value: duplicateRuleSets, message: 'Some saved Rule Sets have the same level, scope, roles, and selected questions. Edit or archive duplicates to reduce clutter.' });
-        }
-        if (inactiveQuestionRows > 0) {
-            items.push({ tone: 'warning', icon: 'bi bi-archive', title: 'Inactive questions referenced', value: inactiveQuestionRows, message: 'Some active rules point to questions that are not active. They are ignored by preview and coverage.' });
-        }
-        if (conflictIds.size > 0) {
-            items.push({ tone: 'danger', icon: 'bi bi-shield-exclamation', title: 'Conflicts detected', value: conflictIds.size, message: 'Exact-scope active Rule Sets overlap and should be resolved.' });
-        }
-        return items;
-    }, [conflictIds.size, coverageMatrix, ruleGroups, rules]);
-
-    const visibleMatrixHealthItems = useMemo(
-        () => healthItems.filter(item => item.tone !== 'success').slice(0, 3),
-        [healthItems],
-    );
-
-    const patchForm = (patch: Partial<RuleSetFormState>) => setForm(current => {
-        const next = { ...current, ...patch };
-        if (patch.ruleSetStatus) {
-            next.active = patch.ruleSetStatus === 'ACTIVE';
-        }
-        return next;
-    });
-
-    const openBuilder = () => {
-        setError('');
-        setSuccess('');
-        setEditingGroup(null);
-        setForm(emptyForm(minAvailableLevelRank, maxAvailableLevelRank));
-        setBuilderQuestionSearch('');
-        setBuilderCompetencyFilter('ALL');
-        setBuilderOpen(true);
-    };
-
-    const closeBuilder = () => {
-        if (busy) return;
-        setBuilderOpen(false);
-        setEditingGroup(null);
-        setForm(emptyForm(minAvailableLevelRank, maxAvailableLevelRank));
-        setBuilderQuestionSearch('');
-        setBuilderCompetencyFilter('ALL');
-    };
-
-    const toggleQuestion = (questionBankId: number) => {
-        patchForm({
-            questionBankIds: form.questionBankIds.includes(questionBankId)
-                ? form.questionBankIds.filter(id => id !== questionBankId)
-                : [...form.questionBankIds, questionBankId],
+    const openCreateEditor = (scopeType: EditableFormScopeType) => {
+        setQuestionSearch('');
+        setCompetencyFilter('ALL');
+        const firstDepartmentId = scopeType === 'DEPARTMENT' && departments.length === 1 ? departments[0].id : '';
+        const firstPositionId = scopeType === 'POSITION' && positions.length === 1 ? positions[0].id : '';
+        const positionLevel = getPositionLevel(firstPositionId);
+        const departmentLevels = getDepartmentLevels(firstDepartmentId);
+        const startRank = scopeType === 'POSITION' && positionLevel
+            ? positionLevel.rank
+            : scopeType === 'DEPARTMENT' && departmentLevels.length > 0
+                ? departmentLevels[0].rank
+                : minRank;
+        const endRank = scopeType === 'POSITION' && positionLevel
+            ? positionLevel.rank
+            : scopeType === 'DEPARTMENT' && departmentLevels.length > 0
+                ? departmentLevels[departmentLevels.length - 1].rank
+                : maxRank;
+        setEditor({
+            mode: 'create',
+            scopeType,
+            departmentId: firstDepartmentId,
+            positionId: firstPositionId,
+            evaluatorRoles: ['MANAGER'],
+            minRank: startRank,
+            maxRank: endRank,
+            status: 'ACTIVE',
+            questionIds: [],
         });
     };
 
-    const toggleRole = (role: RuleRole) => {
-        patchForm({
-            evaluatorRoles: form.evaluatorRoles.includes(role)
-                ? form.evaluatorRoles.filter(item => item !== role)
-                : [...form.evaluatorRoles, role],
+    const openAddEvaluatorEditor = (collection: FormCollection) => {
+        const role = firstMissingRole(collection);
+        setQuestionSearch('');
+        setCompetencyFilter('ALL');
+        const departmentLevels = getDepartmentLevels(collection.departmentId ?? '');
+        const positionLevel = getPositionLevel(collection.positionId ?? '');
+        setEditor({
+            mode: 'create',
+            scopeType: collection.scopeType,
+            departmentId: collection.departmentId ?? '',
+            positionId: collection.positionId ?? '',
+            evaluatorRoles: [role],
+            minRank: collection.scopeType === 'POSITION' && positionLevel
+                ? positionLevel.rank
+                : collection.scopeType === 'DEPARTMENT' && departmentLevels.length > 0
+                    ? departmentLevels[0].rank
+                    : minRank,
+            maxRank: collection.scopeType === 'POSITION' && positionLevel
+                ? positionLevel.rank
+                : collection.scopeType === 'DEPARTMENT' && departmentLevels.length > 0
+                    ? departmentLevels[departmentLevels.length - 1].rank
+                    : maxRank,
+            status: 'ACTIVE',
+            questionIds: [],
         });
     };
 
-    const selectAllRoles = () => {
-        patchForm({
-            evaluatorRoles: form.evaluatorRoles.length === EVALUATOR_ROLE_OPTIONS.length
-                ? []
-                : EVALUATOR_ROLE_OPTIONS.map(option => option.value),
+    const openEditEditor = (collection: FormCollection, role: RuleRole) => {
+        const segment = findSegmentForRole(collection, role);
+        setQuestionSearch('');
+        setCompetencyFilter('ALL');
+        setEditor({
+            mode: segment ? 'edit' : 'create',
+            scopeType: collection.scopeType,
+            departmentId: collection.departmentId ?? '',
+            positionId: collection.positionId ?? '',
+            evaluatorRoles: segment?.roles.length ? segment.roles : [role],
+            minRank: segment?.minRank ?? minRank,
+            maxRank: segment?.maxRank ?? maxRank,
+            status: segment?.status ?? 'ACTIVE',
+            questionIds: segment?.questionIds ?? [],
+            ruleSetId: segment?.ruleSetId ?? null,
+            firstRuleId: segment?.firstRuleId ?? null,
         });
     };
 
-    const selectQuestionsByCompetency = (competencyCode: string) => {
-        const ids = activeQuestions
-            .filter(question => question.competencyCode === competencyCode)
-            .filter(question => !inheritedQuestionInfo.has(question.id))
-            .map(question => question.id);
-        const merged = Array.from(new Set([...form.questionBankIds, ...ids]));
-        patchForm({ questionBankIds: merged });
+    const toggleEditorRole = (role: RuleRole) => {
+        setEditor(current => current ? { ...current, evaluatorRoles: [role] } : current);
     };
 
-    const submitRuleSet = async () => {
-        setError('');
-        setSuccess('');
-        if (form.questionBankIds.length === 0) {
-            setError('Select at least one question.');
-            return;
-        }
-        if (form.evaluatorRoles.length === 0) {
-            setError('Select at least one evaluator role.');
-            return;
-        }
-        if (form.targetLevelMinRank > form.targetLevelMaxRank) {
-            setError('From level cannot be greater than To level.');
-            return;
-        }
+    const toggleQuestion = (questionId: number) => {
+        setEditor(current => {
+            if (!current) return current;
+            const exists = current.questionIds.includes(questionId);
+            return {
+                ...current,
+                questionIds: exists
+                    ? current.questionIds.filter(id => id !== questionId)
+                    : [...current.questionIds, questionId],
+            };
+        });
+    };
 
-        const duplicate = ruleGroups.find(group => group.ruleSetId !== editingGroup?.ruleSetId && buildRuleSetSignature(group) === buildFormSignature(form));
-        if (duplicate) {
-            setError(`This Rule Set is identical to "${duplicate.ruleSetName || formatGroupLevelRange(duplicate, levelOptions)}". Change the scope, roles, or selected questions before saving.`);
-            return;
-        }
-        if (form.ruleSetStatus === 'ACTIVE' && activeScopeOverlapGroup) {
-            setError(activeScopeOverlapMessage || 'Active Rule Set overlap blocked. Edit the existing Rule Set or change this Rule Set before saving.');
-            return;
-        }
-        if (selectedInheritedQuestions.length > 0) {
-            const firstQuestion = activeQuestions.find(question => question.id === selectedInheritedQuestions[0]);
-            setError(`${firstQuestion?.questionCode || 'A selected question'} is already inherited from a broader active Rule Set for this scope. Specific add-on Rule Sets should only add extra questions.`);
-            return;
-        }
+    const updateEditorDepartment = (value: number | '') => {
+        const departmentLevels = getDepartmentLevels(value);
+        setEditor(current => current ? {
+            ...current,
+            departmentId: value,
+            minRank: departmentLevels[0]?.rank ?? current.minRank,
+            maxRank: departmentLevels[departmentLevels.length - 1]?.rank ?? current.maxRank,
+        } : current);
+    };
 
-        const payload: QuestionRulePayload = {
-            ruleSetName: (form.ruleSetName.trim() || buildSuggestedRuleSetName(form, levelOptions)),
-            ruleSetDescription: form.ruleSetDescription.trim() || null,
-            ruleSetStatus: form.ruleSetStatus,
-            questionBankIds: form.questionBankIds,
-            targetLevelMinRank: form.targetLevelMinRank,
-            targetLevelMaxRank: form.targetLevelMaxRank,
-            evaluatorRelationshipTypes: form.evaluatorRoles,
-            targetDepartmentId: formDepartmentId,
-            targetPositionId: formPositionId,
-            displayOrder: 10,
-            rulePriority: 100,
-            active: form.ruleSetStatus === 'ACTIVE',
-        };
+    const updateEditorPosition = (value: number | '') => {
+        const positionLevel = getPositionLevel(value);
+        setEditor(current => current ? {
+            ...current,
+            positionId: value,
+            minRank: positionLevel?.rank ?? current.minRank,
+            maxRank: positionLevel?.rank ?? current.maxRank,
+        } : current);
+    };
 
-        setBusy(true);
-        try {
-            if (editingGroup?.ruleSetId) {
-                await hrFeedbackApi.updateQuestionRuleSet(editingGroup.ruleSetId, payload);
-                setSuccess('Rule Set updated. Coverage and preview now use the revised generated rows.');
-            } else {
-                await hrFeedbackApi.createQuestionRule(payload);
-                setSuccess(form.ruleSetStatus === 'ACTIVE'
-                    ? 'Rule Set created and activated. Coverage and preview now include it.'
-                    : `${ruleSetStatusLabel(form.ruleSetStatus)} Rule Set created. It will not affect coverage until activated.`);
+    const validateEditor = (current: EditorState): boolean => {
+        if (current.evaluatorRoles.length === 0) {
+            toast.error('Choose an evaluator type.');
+            return false;
+        }
+        if (current.questionIds.length === 0) {
+            toast.error('Select at least one active rating question.');
+            return false;
+        }
+        if (current.scopeType === 'DEPARTMENT') {
+            if (current.departmentId === '') {
+                toast.error('Choose a department.');
+                return false;
             }
-            closeBuilder();
-            await loadAll();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : editingGroup ? 'Failed to update rule set.' : 'Failed to create rule set.');
-        } finally {
-            setBusy(false);
+            const departmentLevels = getDepartmentLevels(current.departmentId);
+            if (departmentLevels.length === 0) {
+                toast.error('No active positions were found for this department.');
+                return false;
+            }
+            if (!departmentLevels.some(level => level.rank === current.minRank) || !departmentLevels.some(level => level.rank === current.maxRank)) {
+                toast.error('Choose a valid level range from this department.');
+                return false;
+            }
         }
+        if (current.scopeType === 'POSITION') {
+            if (current.positionId === '') {
+                toast.error('Choose a position.');
+                return false;
+            }
+            const positionLevel = getPositionLevel(current.positionId);
+            if (!positionLevel) {
+                toast.error('This position does not have a valid active level.');
+                return false;
+            }
+        }
+        return true;
     };
 
-    const setRuleSetActive = async (group: RuleSetGroup, active: boolean) => {
-        setBusy(true);
-        setError('');
-        setSuccess('');
+    const saveEditor = async () => {
+        if (!editor || !validateEditor(editor)) return;
+        setSaving(true);
         try {
-            for (const rule of group.rules) {
-                if (active && !rule.active) {
-                    await hrFeedbackApi.activateQuestionRule(rule.id);
-                } else if (!active && rule.active) {
-                    await hrFeedbackApi.deactivateQuestionRule(rule.id);
+            const normalizedEditor = { ...editor };
+            if (normalizedEditor.scopeType === 'POSITION') {
+                const positionLevel = getPositionLevel(normalizedEditor.positionId);
+                if (positionLevel) {
+                    normalizedEditor.minRank = positionLevel.rank;
+                    normalizedEditor.maxRank = positionLevel.rank;
                 }
             }
-            setSuccess(active ? 'Rule set activated.' : 'Rule set disabled.');
-            await loadAll();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to update rule set.');
+            const payload = createPayload(normalizedEditor, departments, positions);
+            if (editor.ruleSetId != null) {
+                await hrFeedbackApi.updateQuestionRuleSet(editor.ruleSetId, payload);
+            } else {
+                await hrFeedbackApi.createQuestionRule(payload);
+            }
+            setEditor(null);
+            toast.success('Form saved.');
+            await loadData();
+        } catch (error) {
+            toast.error(formatFormSetupError(error, 'Could not save this form.'));
         } finally {
-            setBusy(false);
+            setSaving(false);
         }
     };
 
-    const changeRuleSetStatus = async (group: RuleSetGroup, status: RuleSetStatus) => {
-        if (!group.ruleSetId) return;
-        setBusy(true);
-        setError('');
-        setSuccess('');
+    const updateSegmentStatus = async (segment: FormSegment, active: boolean) => {
+        if (!segment.firstRuleId || segment.questionIds.length === 0) return;
         try {
-            await hrFeedbackApi.updateQuestionRuleSet(group.ruleSetId, {
-                ruleSetName: group.ruleSetName || buildSuggestedRuleSetName({
-                    targetLevelMinRank: group.targetLevelMinRank,
-                    targetLevelMaxRank: group.targetLevelMaxRank,
-                    evaluatorRoles: group.roles,
-                    targetDepartmentId: group.targetDepartmentId ?? '',
-                    targetPositionId: group.targetPositionId ?? '',
-                }, levelOptions),
-                ruleSetDescription: group.ruleSetDescription || null,
-                ruleSetStatus: status,
-                questionBankIds: group.questionIds,
-                targetLevelMinRank: group.targetLevelMinRank,
-                targetLevelMaxRank: group.targetLevelMaxRank,
-                evaluatorRelationshipTypes: group.roles,
-                targetDepartmentId: group.targetDepartmentId ?? null,
-                targetPositionId: group.targetPositionId ?? null,
-                displayOrder: 10,
-                rulePriority: 100,
-                active: status === 'ACTIVE',
-            });
-            setSuccess(`Rule Set moved to ${ruleSetStatusLabel(status)}.`);
-            await loadAll();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to update Rule Set status.');
-        } finally {
-            setBusy(false);
+            if (active) {
+                await hrFeedbackApi.activateQuestionRule(segment.firstRuleId);
+                toast.success('Form activated.');
+            } else {
+                await hrFeedbackApi.deactivateQuestionRule(segment.firstRuleId);
+                toast.success('Form disabled.');
+            }
+            await loadData();
+        } catch (error) {
+            toast.error(formatFormSetupError(error, 'Could not update form status.'));
         }
     };
 
-    const editRuleSet = (group: RuleSetGroup) => {
-        setError('');
-        setSuccess('');
-        setEditingGroup(group);
-        setForm({
-            ruleSetName: group.ruleSetName || formatGroupLevelRange(group, levelOptions),
-            ruleSetDescription: group.ruleSetDescription || '',
-            questionBankIds: group.questionIds,
-            evaluatorRoles: group.roles,
-            targetLevelMinRank: group.targetLevelMinRank,
-            targetLevelMaxRank: group.targetLevelMaxRank,
-            targetDepartmentId: group.targetDepartmentId ?? '',
-            targetPositionId: group.targetPositionId ?? '',
-            ruleSetStatus: group.ruleSetStatus,
-            active: group.ruleSetStatus === 'ACTIVE',
-        });
-        setBuilderQuestionSearch('');
-        setBuilderCompetencyFilter('ALL');
-        setBuilderOpen(true);
+    const runLivePreview = async () => {
+        setPreviewLoading(true);
+        try {
+            const positionLevel = getPositionLevel(previewPositionId);
+            const departmentLevels = getDepartmentLevels(previewDepartmentId);
+            const levelRank = positionLevel?.rank ?? departmentLevels[0]?.rank ?? levels[0]?.rank ?? previewLevelRank;
+            const result = await hrFeedbackApi.previewDynamicForm({
+                levelCode: levelCodeForRank(levelRank, levels),
+                relationshipType: previewRole,
+                targetDepartmentId: toNumberOrNull(previewDepartmentId),
+                targetPositionId: toNumberOrNull(previewPositionId),
+            });
+            setPreview(result);
+        } catch (error) {
+            toast.error(formatFormSetupError(error, 'Could not generate live preview.'));
+        } finally {
+            setPreviewLoading(false);
+        }
     };
 
-    const duplicateRuleSet = (group: RuleSetGroup) => {
-        setError('');
-        setSuccess('');
-        setEditingGroup(null);
-        setForm({
-            ruleSetName: `Copy of ${group.ruleSetName || formatGroupLevelRange(group, levelOptions)}`,
-            ruleSetDescription: group.ruleSetDescription || '',
-            questionBankIds: group.questionIds,
-            evaluatorRoles: group.roles,
-            targetLevelMinRank: group.targetLevelMinRank,
-            targetLevelMaxRank: group.targetLevelMaxRank,
-            targetDepartmentId: group.targetDepartmentId ?? '',
-            targetPositionId: group.targetPositionId ?? '',
-            ruleSetStatus: 'DRAFT',
-            active: false,
-        });
-        setBuilderQuestionSearch('');
-        setBuilderCompetencyFilter('ALL');
-        setBuilderOpen(true);
+    const clearLivePreview = () => {
+        setPreview(null);
+        setPreviewDepartmentId('');
+        setPreviewPositionId('');
+        setPreviewRole('MANAGER');
+        setPreviewLevelRank(levels[0]?.rank ?? 1);
     };
 
-    const clearFilters = () => {
-        setSearch('');
-        setRoleFilter('ALL');
-        setLevelFilter('ALL');
-        setStatusFilter('ALL');
+    const renderCollectionCard = (collection: FormCollection) => {
+        const rolesToShow = collectionDisplayRoles(collection);
+        const missingRoleCount = ROLE_VALUES.filter(role => collection.roleCounts[role] === 0).length;
+        return (
+            <article key={collection.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold text-slate-900">{collection.title}</h3>
+                            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${collection.active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                                {collection.active ? 'Active' : 'Not active'}
+                            </span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">{collection.subtitle}</p>
+                    </div>
+                    {missingRoleCount > 0 && (
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                            onClick={() => openAddEvaluatorEditor(collection)}
+                        >
+                            <i className="bi bi-plus-circle" /> Add evaluator form
+                        </button>
+                    )}
+                </div>
+
+                {rolesToShow.length === 0 ? (
+                    <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                        No evaluator form has been created for this scope yet.
+                    </div>
+                ) : (
+                    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {rolesToShow.map(role => {
+                            const count = collection.roleCounts[role];
+                            const segment = findSegmentForRole(collection, role);
+                            return (
+                                <div key={role} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-sm font-semibold text-slate-700">{getRoleLabel(role)} Form</span>
+                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${count > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {count > 0 ? 'Ready' : 'Not set'}
+                                        </span>
+                                    </div>
+                                    <p className="mt-2 text-2xl font-bold text-slate-900">{count}</p>
+                                    <p className="text-xs text-slate-500">rating questions</p>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50"
+                                            onClick={() => openEditEditor(collection, role)}
+                                        >
+                                            {count > 0 ? 'Edit' : 'Create'}
+                                        </button>
+                                        {segment && segment.questionIds.length > 0 && (
+                                            <button
+                                                type="button"
+                                                className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                                                onClick={() => void updateSegmentStatus(segment, !segment.active)}
+                                            >
+                                                {segment.active ? 'Disable' : 'Activate'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {collection.segments.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+                        {collection.segments.slice(0, 4).map(segment => (
+                            <span key={segment.key} className={`rounded-full border px-2.5 py-1 ${statusChipClass(segment.status, segment.active)}`}>
+                                {segment.roles.map(getRoleLabel).join(', ')} · {levelLabel(segment.minRank, segment.maxRank, levels)}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </article>
+        );
     };
 
-    const competencyBuckets = useMemo(() => {
-        const buckets = new Map<string, QuestionBankItem[]>();
-        activeQuestions.forEach(question => {
-            const code = question.competencyCode || 'UNCATEGORIZED';
-            buckets.set(code, [...(buckets.get(code) ?? []), question]);
-        });
-        return [...buckets.entries()].sort((a, b) => getCompetencyLabel(a[0]).localeCompare(getCompetencyLabel(b[0])));
-    }, [activeQuestions]);
+    const renderSection = (title: string, eyebrow: string, description: string, items: FormCollection[], createType: EditableFormScopeType, icon: string) => (
+        <section className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">{eyebrow}</p>
+                    <h2 className="mt-1 text-xl font-bold text-slate-950">{title}</h2>
+                    <p className="mt-1 max-w-3xl text-sm text-slate-500">{description}</p>
+                </div>
+                <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                    onClick={() => openCreateEditor(createType)}
+                >
+                    <i className={`bi ${icon}`} /> Create {formScopeLabel(createType)}
+                </button>
+            </div>
+            {items.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                    <i className={`bi ${icon} text-3xl text-blue-500`} />
+                    <h3 className="mt-3 text-base font-semibold text-slate-900">No {title.toLowerCase()} yet</h3>
+                    <p className="mt-1 text-sm text-slate-500">Create one only when this scope needs its own form.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">{items.map(renderCollectionCard)}</div>
+            )}
+        </section>
+    );
 
-    const filteredCompetencyBuckets = useMemo(() => {
-        const query = normalizeText(builderQuestionSearch);
-        const visibleQuestions = activeQuestions.filter(question => {
-            const matchesCompetency = builderCompetencyFilter === 'ALL' || question.competencyCode === builderCompetencyFilter;
-            const matchesSearch = !query
-                || normalizeText(question.questionText).includes(query)
-                || normalizeText(question.questionCode).includes(query)
-                || normalizeText(getCompetencyLabel(question.competencyCode)).includes(query);
-            return matchesCompetency && matchesSearch;
-        });
-
-        const buckets = new Map<string, QuestionBankItem[]>();
-        visibleQuestions.forEach(question => {
-            const code = question.competencyCode || 'UNCATEGORIZED';
-            buckets.set(code, [...(buckets.get(code) ?? []), question]);
-        });
-
-        return [...buckets.entries()].sort((a, b) => getCompetencyLabel(a[0]).localeCompare(getCompetencyLabel(b[0])));
-    }, [activeQuestions, builderCompetencyFilter, builderQuestionSearch]);
-
-    const selectedQuestions = useMemo(() => activeQuestions.filter(question => form.questionBankIds.includes(question.id)), [activeQuestions, form.questionBankIds]);
-
-    const clearSelectedQuestions = () => patchForm({ questionBankIds: [] });
-
-    const toggleRuleSetExpanded = (groupKey: string) => {
-        setExpandedRuleSetKeys(current => {
-            const next = new Set(current);
-            if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
-            return next;
-        });
+    const renderEditorScopeFields = () => {
+        if (!editor) return null;
+        const departmentLevels = getDepartmentLevels(editor.departmentId);
+        const positionLevel = getPositionLevel(editor.positionId);
+        return (
+            <>
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                    <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Form type</span>
+                    <strong className="mt-1 block text-slate-900">{formScopeLabel(editor.scopeType)}</strong>
+                </div>
+                {editor.scopeType === 'DEPARTMENT' && (
+                    <>
+                        <label className="block text-sm font-semibold text-slate-700">
+                            Department
+                            <select
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                value={editor.departmentId}
+                                onChange={(event) => updateEditorDepartment(event.target.value === '' ? '' : Number(event.target.value))}
+                            >
+                                <option value="">Choose department</option>
+                                {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                            </select>
+                        </label>
+                        {editor.departmentId !== '' && (
+                            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-slate-600">
+                                <strong className="block text-slate-800">Available levels in this department</strong>
+                                {departmentLevels.length > 0 ? (
+                                    <span>{departmentLevels.map(level => level.code).join(', ')}</span>
+                                ) : (
+                                    <span>No active positions found for this department.</span>
+                                )}
+                            </div>
+                        )}
+                        {departmentLevels.length > 0 && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <label className="block text-sm font-semibold text-slate-700">
+                                    From level
+                                    <select
+                                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                        value={editor.minRank}
+                                        onChange={(event) => setEditor(current => current ? { ...current, minRank: Number(event.target.value) } : current)}
+                                    >
+                                        {departmentLevels.map(level => <option key={level.code} value={level.rank}>{level.code}</option>)}
+                                    </select>
+                                </label>
+                                <label className="block text-sm font-semibold text-slate-700">
+                                    To level
+                                    <select
+                                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                        value={editor.maxRank}
+                                        onChange={(event) => setEditor(current => current ? { ...current, maxRank: Number(event.target.value) } : current)}
+                                    >
+                                        {departmentLevels.map(level => <option key={level.code} value={level.rank}>{level.code}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+                        )}
+                    </>
+                )}
+                {editor.scopeType === 'POSITION' && (
+                    <>
+                        <label className="block text-sm font-semibold text-slate-700">
+                            Position
+                            <select
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                value={editor.positionId}
+                                onChange={(event) => updateEditorPosition(event.target.value === '' ? '' : Number(event.target.value))}
+                            >
+                                <option value="">Choose position</option>
+                                {positions.map(position => <option key={position.id} value={position.id}>{position.positionTitle}</option>)}
+                            </select>
+                        </label>
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-sm text-slate-600">
+                            <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Position level</span>
+                            <strong className="mt-1 block text-slate-900">{positionLevel?.code ?? 'Choose a position'}</strong>
+                        </div>
+                    </>
+                )}
+                {editor.scopeType === 'DEFAULT' && (
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-sm text-slate-600">
+                        <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Form applies to</span>
+                        <strong className="mt-1 block text-slate-900">
+                            {levels.length > 0 ? `All active levels (${levelLabel(minRank, maxRank, levels)})` : 'No active levels found'}
+                        </strong>
+                    </div>
+                )}
+            </>
+        );
     };
 
-    const matrixScopeLabel = `${matrixDepartmentId ? getDepartmentName(Number(matrixDepartmentId)) : 'All departments'} / ${matrixPositionId ? getPositionName(Number(matrixPositionId)) : 'All positions'}`;
+    if (loading) {
+        return (
+            <div className="flex min-h-[420px] items-center justify-center rounded-3xl border border-slate-200 bg-white text-slate-600">
+                <i className="bi bi-arrow-repeat mr-2 animate-spin" /> Loading Form Setup...
+            </div>
+        );
+    }
 
     return (
-        <div className="f360-rules-page f360-rules-rule-clean-page">
-            <header className="f360-rules-clean-header">
-                <div>
-                    <h2>Rule Sets</h2>
-                    <p>Control which active feedback questions appear for each employee scope and evaluator relationship.</p>
-                    <div className="f360-rules-clean-meta">
-                        <span>{stats.ruleSets} rule sets</span>
-                        <span>{stats.activeRules} active rows</span>
-                        <span>{stats.coveredCombos} covered cells</span>
-                        <span>{stats.conflicts} conflicts</span>
+        <div className="space-y-6 bg-slate-50/60 p-4 sm:p-6">
+            <section className="rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50 to-indigo-50 p-6 shadow-sm">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.26em] text-blue-600">360 Feedback</p>
+                        <h1 className="mt-2 text-3xl font-bold text-slate-950">Form Setup</h1>
+                        <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                            Prepare the evaluator forms used by campaigns. Position forms are used first, then department forms, then the default form.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-2xl bg-white/80 p-4 text-center shadow-sm ring-1 ring-blue-100">
+                            <strong className="block text-2xl text-slate-950">{defaultCollection ? 1 : 0}</strong>
+                            <span className="text-xs font-semibold text-slate-500">Default</span>
+                        </div>
+                        <div className="rounded-2xl bg-white/80 p-4 text-center shadow-sm ring-1 ring-blue-100">
+                            <strong className="block text-2xl text-slate-950">{departmentCollections.length}</strong>
+                            <span className="text-xs font-semibold text-slate-500">Departments</span>
+                        </div>
+                        <div className="rounded-2xl bg-white/80 p-4 text-center shadow-sm ring-1 ring-blue-100">
+                            <strong className="block text-2xl text-slate-950">{positionCollections.length}</strong>
+                            <span className="text-xs font-semibold text-slate-500">Positions</span>
+                        </div>
+                        <div className="rounded-2xl bg-white/80 p-4 text-center shadow-sm ring-1 ring-blue-100">
+                            <strong className="block text-2xl text-slate-950">{activeQuestions.length}</strong>
+                            <span className="text-xs font-semibold text-slate-500">Questions</span>
+                        </div>
                     </div>
                 </div>
-                <div className="f360-rules-clean-actions">
-                    <button className="f360-rules-secondary-btn" onClick={loadAll} disabled={loading || busy}><i className="bi bi-arrow-clockwise" /> Refresh</button>
-                    <button className="f360-rules-primary-btn" onClick={openBuilder} disabled={busy}><i className="bi bi-plus-lg" /> Create rule set</button>
-                </div>
-            </header>
-
-            {(error || success) && (
-                <div className="f360-rules-message-stack f360-rules-clean-toast-stack">
-                    {error && <RuleToast tone="error" message={error} onClose={() => setError('')} />}
-                    {success && <RuleToast tone="success" message={success} onClose={() => setSuccess('')} />}
-                </div>
-            )}
-
-            {conflictIds.size > 0 && (
-                <div className="hfd-alert hfd-alert-warning f360-rules-clean-alert">
-                    <i className="bi bi-exclamation-triangle" />
-                    Some active rule sets overlap the same relationship, level range, and exact department/position scope.
-                </div>
-            )}
-
-            <section className="f360-rules-clean-toolbar" aria-label="Rule set filters">
-                <label className="f360-rules-clean-search">
-                    <i className="bi bi-search" />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search rule sets, questions, competency, relationship, or scope" />
-                </label>
-                <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as 'ALL' | RuleRole)} aria-label="Filter by evaluator relationship">
-                    <option value="ALL">All relationships</option>
-                    {EVALUATOR_ROLE_OPTIONS.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
-                </select>
-                <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} aria-label="Filter by employee level">
-                    <option value="ALL">All levels</option>
-                    {levelOptions.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
-                </select>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusFilter)} aria-label="Filter by status">
-                    <option value="ALL">All statuses</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="DRAFT">Draft</option>
-                    <option value="DISABLED">Disabled</option>
-                    <option value="ARCHIVED">Archived</option>
-                </select>
-                <button className="f360-rules-text-btn" onClick={clearFilters}>Clear</button>
             </section>
 
-            <div className="f360-rules-specificity-note">
-                <i className="bi bi-info-circle" /> More specific rules take priority when an employee matches multiple scopes: position rules override department rules, and department rules override general rules.
+            <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_420px]">
+                <div className="space-y-8">
+                    {renderSection(
+                        'Default Form',
+                        'Default Form',
+                        'This form is used when no department or position form is available for the evaluator type.',
+                        defaultCollection ? [defaultCollection] : [],
+                        'DEFAULT',
+                        'bi-ui-checks',
+                    )}
+                    {renderSection(
+                        'Department Forms',
+                        'Department Forms',
+                        'Create one only when a department needs its own full evaluator form.',
+                        departmentCollections,
+                        'DEPARTMENT',
+                        'bi-building',
+                    )}
+                    {renderSection(
+                        'Position Forms',
+                        'Position Forms',
+                        'Create one only when a position needs its own full evaluator form.',
+                        positionCollections,
+                        'POSITION',
+                        'bi-person-badge',
+                    )}
+                </div>
+
+                <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-5 shadow-sm 2xl:sticky 2xl:top-6">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">Live Preview</p>
+                            <h2 className="mt-1 text-xl font-bold text-slate-950">Check final questions</h2>
+                            <p className="mt-1 text-sm text-slate-500">Preview the form chosen for a target employee profile.</p>
+                        </div>
+                        <i className="bi bi-eye rounded-2xl bg-blue-50 p-3 text-blue-600" />
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-1">
+                        <label className="block text-sm font-semibold text-slate-700">
+                            Department
+                            <select
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                value={previewDepartmentId}
+                                onChange={(event) => {
+                                    const nextDepartmentId = event.target.value === '' ? '' : Number(event.target.value);
+                                    setPreviewDepartmentId(nextDepartmentId);
+                                    setPreview(null);
+                                    if (nextDepartmentId !== '' && previewPositionId !== '') {
+                                        const allowed = getDepartmentPositions(nextDepartmentId).some(position => position.id === previewPositionId);
+                                        if (!allowed) setPreviewPositionId('');
+                                    }
+                                }}
+                            >
+                                <option value="">No department selected</option>
+                                {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                            </select>
+                        </label>
+                        <label className="block text-sm font-semibold text-slate-700">
+                            Position
+                            <select
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                value={previewPositionId}
+                                onChange={(event) => {
+                                    const value = event.target.value === '' ? '' : Number(event.target.value);
+                                    setPreviewPositionId(value);
+                                    setPreview(null);
+                                    const positionLevel = getPositionLevel(value);
+                                    if (positionLevel) setPreviewLevelRank(positionLevel.rank);
+                                }}
+                            >
+                                <option value="">No position selected</option>
+                                {previewPositionOptions.map(position => <option key={position.id} value={position.id}>{position.positionTitle}</option>)}
+                            </select>
+                        </label>
+                        <label className="block text-sm font-semibold text-slate-700">
+                            Evaluator form
+                            <select
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                value={previewRole}
+                                onChange={(event) => {
+                                    setPreviewRole(event.target.value as RuleRole);
+                                    setPreview(null);
+                                }}
+                            >
+                                {ROLE_VALUES.map(role => <option key={role} value={role}>{getRoleLabel(role)}</option>)}
+                            </select>
+                        </label>
+                        <div className="flex items-end gap-2">
+                            <button
+                                type="button"
+                                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                                disabled={previewLoading}
+                                onClick={() => void runLivePreview()}
+                            >
+                                {previewLoading ? 'Generating...' : 'Preview'}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                                onClick={clearLivePreview}
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                        <strong className="text-sm text-slate-900">{workspacePreviewSource.title}</strong>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">{workspacePreviewSource.reason}</p>
+                    </div>
+
+                    <div className="mt-5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-700">Final questions</span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{preview?.totalQuestions ?? previewQuestions.length}</span>
+                        </div>
+                        {previewQuestions.length === 0 ? (
+                            <div className="mt-3 rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
+                                Run preview to see the final evaluator form.
+                            </div>
+                        ) : (
+                            <div className="mt-3 max-h-[460px] space-y-2 overflow-y-auto pr-1">
+                                {previewQuestions.map((question, index) => (
+                                    <article key={`${question.questionCode}-${index}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                                        <span className="text-xs font-bold text-blue-600">{index + 1}. {getCompetencyLabel(question.competencyCode)}</span>
+                                        <p className="mt-1 text-sm font-medium text-slate-800">{question.questionText}</p>
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </aside>
             </div>
 
-            <section className="f360-rules-clean-workspace">
-                <div className="f360-rules-rule-list-panel">
-                    <div className="f360-rules-clean-section-head">
-                        <div>
-                            <h3>Rule sets</h3>
-                            <p>{filteredGroups.length} result{filteredGroups.length === 1 ? '' : 's'}</p>
-                        </div>
-                        <button className="f360-rules-primary-btn compact" onClick={openBuilder} disabled={busy}><i className="bi bi-plus-lg" /> Create rule set</button>
-                    </div>
-
-                    {loading ? (
-                        <div className="hfd-spinner f360-rules-clean-loading"><i className="bi bi-arrow-repeat" /> Loading rule sets...</div>
-                    ) : filteredGroups.length === 0 ? (
-                        <div className="f360-rules-empty-state f360-rules-clean-empty">No rule sets found. Create a rule set to begin coverage.</div>
-                    ) : (
-                        <div className="f360-rules-rule-list-clean">
-                            {filteredGroups.map(group => {
-                                const primaryQuestions = group.questions.slice(0, 3);
-                                const isExpanded = expandedRuleSetKeys.has(group.key);
-                                return (
-                                    <article key={group.key} className={`f360-rules-rule-card-clean ${group.ruleSetStatus.toLowerCase()} ${group.active ? 'active' : 'inactive'}`}>
-                                        <div className="f360-rules-rule-card-head">
-                                            <div>
-                                                <h4>{group.ruleSetName || formatRuleSetTitle(group, getDepartmentName, getPositionName, levelOptions)}</h4>
-                                                <p>{group.ruleSetDescription || scopeLabel(group, getDepartmentName, getPositionName)}</p>
-                                            </div>
-                                            <span className={`f360-rules-status-pill ${group.ruleSetStatus.toLowerCase()}`}>{ruleSetStatusLabel(group.ruleSetStatus)}</span>
-                                        </div>
-
-                                        <div className="f360-rules-rule-card-meta">
-                                            <span>{ruleSetTypeLabel(group.ruleSetType)}</span>
-                                            <span>{formatGroupLevelRange(group, levelOptions)}</span>
-                                            <span>{scopeLabel(group, getDepartmentName, getPositionName)}</span>
-                                            <span>{group.questionIds.length} question{group.questionIds.length === 1 ? '' : 's'}</span>
-                                        </div>
-
-                                        <div className="f360-rules-role-chip-row">
-                                            {group.roles.map(role => <span key={role}>{getRoleLabel(role)}</span>)}
-                                        </div>
-
-                                        <div className="f360-rules-question-preview-list">
-                                            {primaryQuestions.length === 0 ? <em>No active questions in this set.</em> : primaryQuestions.map(question => (
-                                                <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>
-                                            ))}
-                                            {group.questions.length > primaryQuestions.length && <em>+{group.questions.length - primaryQuestions.length} more</em>}
-                                        </div>
-
-                                        {isExpanded && (
-                                            <div className="f360-rules-rule-detail-clean">
-                                                <div>
-                                                    <strong>Questions</strong>
-                                                    {group.questions.map(question => <span key={question.questionBankId}>{question.questionCode || `Q-${question.questionBankId}`} · {question.questionText}</span>)}
-                                                </div>
-                                                <div>
-                                                    <strong>Rule match trace</strong>
-                                                    <span>{group.rules.length} generated row{group.rules.length === 1 ? '' : 's'} · {group.active ? 'used in preview' : `ignored while ${ruleSetStatusLabel(group.ruleSetStatus).toLowerCase()}`}</span>
-                                                    <span>{ruleScopeSpecificityLabel(group.rules[0])} scope</span>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <footer className="f360-rules-rule-card-actions">
-                                            {group.conflictCount > 0 ? <span className="f360-rules-warning-chip"><i className="bi bi-exclamation-triangle" /> {group.conflictCount} overlaps</span> : <span className="f360-rules-muted-chip">No conflicts</span>}
-                                            <div>
-                                                <button className="f360-rules-row-action" onClick={() => toggleRuleSetExpanded(group.key)} disabled={busy}>{isExpanded ? 'Hide' : 'Details'}</button>
-                                                <button className="f360-rules-row-action primary" onClick={() => editRuleSet(group)} disabled={busy}>Edit</button>
-                                                <button className="f360-rules-row-action" onClick={() => duplicateRuleSet(group)} disabled={busy}>Duplicate</button>
-                                                {group.ruleSetStatus === 'ARCHIVED' ? (
-                                                    <button className="f360-rules-row-action" onClick={() => changeRuleSetStatus(group, 'DRAFT')} disabled={busy}>Restore</button>
-                                                ) : group.active ? (
-                                                    <button className="f360-rules-row-action danger" onClick={() => setRuleSetActive(group, false)} disabled={busy}>Disable</button>
-                                                ) : (
-                                                    <button className="f360-rules-row-action primary" onClick={() => setRuleSetActive(group, true)} disabled={busy}>Activate</button>
-                                                )}
-                                                {group.ruleSetStatus !== 'ARCHIVED' && (
-                                                    <button className="f360-rules-row-action" onClick={() => changeRuleSetStatus(group, 'ARCHIVED')} disabled={busy}>Archive</button>
-                                                )}
-                                            </div>
-                                        </footer>
-                                    </article>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                <aside className="f360-rules-coverage-summary-card">
-                    <div className="f360-rules-clean-section-head compact">
-                        <div>
-                            <h3>Coverage check</h3>
-                            <p>{matrixScopeLabel}</p>
-                        </div>
-                    </div>
-                    <div className="f360-rules-coverage-summary-grid">
-                        <span><strong>{stats.coveredCombos}</strong><em>covered</em></span>
-                        <span><strong>{healthItems.find(item => item.title === 'Missing coverage')?.value ?? 0}</strong><em>missing</em></span>
-                        <span><strong>{healthItems.find(item => item.title === 'Low coverage')?.value ?? 0}</strong><em>low</em></span>
-                    </div>
-                    {visibleMatrixHealthItems.length > 0 ? (
-                        <div className="f360-rules-health-clean compact" aria-label="Rule health summary">
-                            {visibleMatrixHealthItems.map(item => (
-                                <span key={item.title} className={item.tone} title={item.message}>
-                                    <i className={item.icon} />
-                                    <b>{item.value}</b>
-                                    {item.title}
-                                </span>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="f360-rules-coverage-summary-note">All dynamic level and relationship combinations have active questions for the selected scope.</p>
-                    )}
-                    <button type="button" className="f360-rules-primary-btn compact" onClick={() => setCoverageOpen(true)}>
-                        Open coverage check
-                    </button>
-                </aside>
-            </section>
-
-            {coverageOpen && (
-                <div className="f360-rules-coverage-drawer-shell" role="dialog" aria-modal="true" aria-label="Coverage check">
-                    <button type="button" className="f360-rules-modal-backdrop" aria-label="Close coverage check" onClick={() => setCoverageOpen(false)} />
-                    <section className="f360-rules-coverage-drawer">
-                        <header className="f360-rules-coverage-drawer-head">
+            {editor && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 p-4">
+                    <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+                        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 p-5">
                             <div>
-                                <h3>Coverage check</h3>
-                                <p>Review active questions by dynamic position level and evaluator relationship.</p>
+                                <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">{formScopeLabel(editor.scopeType)}</p>
+                                <h2 className="mt-1 text-2xl font-bold text-slate-950">{editor.mode === 'edit' ? 'Edit Form' : 'Create Form'}</h2>
+                                <p className="mt-1 text-sm text-slate-500">Choose active rating questions with required comments.</p>
                             </div>
-                            <button type="button" className="f360-rules-icon-button" onClick={() => setCoverageOpen(false)} aria-label="Close coverage check">
+                            <button type="button" className="rounded-full p-2 text-slate-500 hover:bg-slate-100" onClick={() => setEditor(null)}>
                                 <i className="bi bi-x-lg" />
                             </button>
-                        </header>
+                        </div>
 
-                        <div className="f360-rules-coverage-drawer-body">
-                            <div className="f360-rules-coverage-main">
-                                <div className="f360-rules-matrix-scope-clean drawer">
-                                    <select className="hfd-input" value={matrixDepartmentId} onChange={e => { setMatrixDepartmentId(e.target.value ? Number(e.target.value) : ''); setMatrixPositionId(''); setMatrixSelection(null); }}>
-                                        <option value="">All departments</option>
-                                        {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+                            <aside className="space-y-4 overflow-y-auto border-b border-slate-200 bg-slate-50 p-5 lg:border-b-0 lg:border-r">
+                                {renderEditorScopeFields()}
+                                <label className="block text-sm font-semibold text-slate-700">
+                                    Status
+                                    <select
+                                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                        value={editor.status}
+                                        onChange={(event) => setEditor(current => current ? { ...current, status: event.target.value as FormStatus } : current)}
+                                    >
+                                        <option value="ACTIVE">Active</option>
+                                        <option value="DRAFT">Draft</option>
+                                        <option value="DISABLED">Disabled</option>
                                     </select>
-                                    <select className="hfd-input" value={matrixPositionId} onChange={e => { setMatrixPositionId(e.target.value ? Number(e.target.value) : ''); setMatrixSelection(null); }}>
-                                        <option value="">All positions</option>
-                                        {matrixPositions.map(position => <option key={position.id} value={position.id}>{position.positionTitle} · {position.levelCode}</option>)}
+                                </label>
+                                <div>
+                                    <span className="text-sm font-semibold text-slate-700">Evaluator type</span>
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                        {ROLE_VALUES.map(role => (
+                                            <button
+                                                key={role}
+                                                type="button"
+                                                className={`rounded-xl border px-3 py-2 text-sm font-semibold ${editor.evaluatorRoles.includes(role) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                                onClick={() => toggleEditorRole(role)}
+                                            >
+                                                {getRoleLabel(role)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </aside>
+
+                            <main className="min-h-0 space-y-5 overflow-y-auto p-5">
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                                    <input
+                                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                        value={questionSearch}
+                                        onChange={(event) => setQuestionSearch(event.target.value)}
+                                        placeholder="Search active rating questions..."
+                                    />
+                                    <select
+                                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+                                        value={competencyFilter}
+                                        onChange={(event) => setCompetencyFilter(event.target.value)}
+                                    >
+                                        <option value="ALL">All competencies</option>
+                                        {competencyOptions.map(competency => <option key={competency} value={competency}>{getCompetencyLabel(competency)}</option>)}
                                     </select>
                                 </div>
 
-                                <div className="f360-rules-coverage-table-clean drawer">
-                                    <div className="f360-rules-coverage-head-clean">
-                                        <span>Level</span>
-                                        {EVALUATOR_ROLE_OPTIONS.map(role => <span key={role.value}>{role.label}</span>)}
-                                    </div>
-                                    {coverageMatrix.map(row => (
-                                        <div key={row.level.code} className="f360-rules-coverage-row-clean">
-                                            <span title={row.level.label}>{row.level.code}</span>
-                                            {row.cells.map(cell => {
-                                                const selected = matrixSelection?.levelRank === row.level.rank && matrixSelection?.role === cell.role;
+                                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                                    <section>
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">Question Bank</h3>
+                                            <span className="text-xs font-semibold text-slate-400">{filteredQuestions.length} available</span>
+                                        </div>
+                                        <div className="max-h-[430px] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-3">
+                                            {filteredQuestions.map(question => {
+                                                const selected = editor.questionIds.includes(question.id);
                                                 return (
                                                     <button
+                                                        key={question.id}
                                                         type="button"
-                                                        key={cell.role}
-                                                        className={`${cell.count === 0 ? 'empty' : cell.count < 5 ? 'low' : 'covered'} ${selected ? 'selected' : ''}`}
-                                                        onClick={() => setMatrixSelection({ levelRank: row.level.rank, levelCode: row.level.code, role: cell.role })}
-                                                        title={`View ${row.level.code} ${getRoleLabel(cell.role)} coverage`}
+                                                        className={`relative w-full rounded-2xl border p-3 pr-12 text-left transition ${selected ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-100 bg-white hover:border-blue-200 hover:bg-blue-50/50'}`}
+                                                        onClick={() => toggleQuestion(question.id)}
                                                     >
-                                                        {cell.count}
+                                                        {selected && (
+                                                            <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white">
+                                                                <i className="bi bi-check-lg" />
+                                                            </span>
+                                                        )}
+                                                        <span className="text-xs font-bold text-blue-600">{getCompetencyLabel(question.competencyCode)}</span>
+                                                        <p className="mt-1 text-sm font-semibold text-slate-800">{question.questionText}</p>
+                                                        <small className="mt-2 block text-xs text-slate-500">{question.questionCode ?? `Question #${question.id}`} · Rating 1–5 + required comment</small>
                                                     </button>
                                                 );
                                             })}
+                                            {filteredQuestions.length === 0 && (
+                                                <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                                                    No active rating questions found.
+                                                </div>
+                                            )}
                                         </div>
-                                    ))}
-                                </div>
+                                    </section>
 
-                                <div className="f360-rules-coverage-legend-clean">
-                                    <span><b className="missing">0</b> Missing</span>
-                                    <span><b className="low">1–4</b> Low</span>
-                                    <span><b className="covered">5+</b> Covered</span>
-                                </div>
-                            </div>
-
-                            <aside className="f360-rules-coverage-detail-panel">
-                                {selectedMatrixCell ? (
-                                    <>
-                                        <span className="f360-rules-detail-kicker">Selected cell</span>
-                                        <h4>{selectedMatrixCell.level.code} · {getRoleLabel(selectedMatrixCell.cell.role)}</h4>
-                                        <strong>{selectedMatrixCell.cell.count} effective question{selectedMatrixCell.cell.count === 1 ? '' : 's'}</strong>
-                                        <p>{matrixScopeLabel}</p>
-                                        {selectedMatrixCell.cell.count === 0 ? (
-                                            <div className="f360-rules-detail-empty">No active questions cover this level, evaluator relationship, and selected scope.</div>
-                                        ) : (
-                                            <ul>
-                                                {selectedMatrixCell.cell.matchedRules.map(rule => {
-                                                    const group = rule.ruleSetId != null ? ruleSetById.get(rule.ruleSetId) : undefined;
-                                                    return (
-                                                        <li key={rule.id}>
-                                                            <b>{rule.questionCode || `Q-${rule.questionBankId}`}</b>
-                                                            <span>{rule.questionText || 'Untitled question'}</span>
-                                                            <em>{group?.ruleSetName || (group ? formatRuleSetTitle(group, getDepartmentName, getPositionName, levelOptions) : `${formatGroupLevelRange(rule, levelOptions)} · ${ruleScopeSpecificityLabel(rule)}`)}</em>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="f360-rules-detail-empty">
-                                        <i className="bi bi-cursor" />
-                                        <strong>Select a coverage cell</strong>
-                                        <span>Click any level and relationship cell to see the effective questions and applied Rule Sets.</span>
-                                    </div>
-                                )}
-                            </aside>
-                        </div>
-                    </section>
-                </div>
-            )}
-
-            {builderOpen && (
-                <div className="f360-rules-modal-shell f360-rules-clean-modal-shell" role="dialog" aria-modal="true">
-                    <button className="f360-rules-modal-backdrop" aria-label="Close rule set builder" onClick={closeBuilder} />
-                    <div className="f360-rules-modal f360-rules-rule-builder-modal f360-rules-clean-rule-builder-modal">
-                        <div className="f360-rules-modal-head f360-rules-clean-modal-head">
-                            <div>
-                                <h3>{editingGroup ? 'Edit rule set' : 'Create rule set'}</h3>
-                                <p>Choose scope, evaluator relationships, and active questions.</p>
-                            </div>
-                            <button className="f360-rules-icon-button" onClick={closeBuilder} disabled={busy} aria-label="Close"><i className="bi bi-x-lg" /></button>
-                        </div>
-                        {error && (
-                            <div className="f360-rules-modal-message error">
-                                <i className={buildRuleMessage('error', error).icon} />
-                                <div>
-                                    <strong>{buildRuleMessage('error', error).title}</strong>
-                                    <p>{buildRuleMessage('error', error).detail}</p>
-                                </div>
-                            </div>
-                        )}
-                        <div className="f360-rules-rule-builder-body f360-rules-clean-builder-body">
-                            <div className="f360-rules-builder-setup-column f360-rules-clean-builder-column">
-                                <section className="f360-rules-builder-panel">
-                                    <h4>Details</h4>
-                                    <label className="hfd-field">
-                                        <span className="hfd-label">Rule Set name</span>
-                                        <input
-                                            className="hfd-input"
-                                            value={form.ruleSetName}
-                                            onChange={e => patchForm({ ruleSetName: e.target.value })}
-                                            placeholder={buildSuggestedRuleSetName(form, levelOptions)}
-                                            maxLength={180}
-                                        />
-                                    </label>
-                                    <label className="hfd-field">
-                                        <span className="hfd-label">Notes <em>optional</em></span>
-                                        <textarea
-                                            className="hfd-input"
-                                            value={form.ruleSetDescription}
-                                            onChange={e => patchForm({ ruleSetDescription: e.target.value })}
-                                            placeholder="Internal note for HR"
-                                            maxLength={500}
-                                            rows={2}
-                                        />
-                                    </label>
-                                </section>
-
-                                <section className="f360-rules-builder-panel">
-                                    <h4>Scope</h4>
-                                    <div className="hfd-grid-2">
-                                        <label className="hfd-field">
-                                            <span className="hfd-label">From level</span>
-                                            <select className="hfd-input" value={form.targetLevelMinRank} onChange={e => { const nextMin = Number(e.target.value); patchForm({ targetLevelMinRank: nextMin, targetLevelMaxRank: Math.max(nextMin, form.targetLevelMaxRank) }); }}>
-                                                {levelOptions.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
-                                            </select>
-                                        </label>
-                                        <label className="hfd-field">
-                                            <span className="hfd-label">To level</span>
-                                            <select className="hfd-input" value={form.targetLevelMaxRank} onChange={e => { const nextMax = Number(e.target.value); patchForm({ targetLevelMaxRank: nextMax, targetLevelMinRank: Math.min(form.targetLevelMinRank, nextMax) }); }}>
-                                                {levelOptions.map(level => <option key={level.code} value={level.rank}>{level.label}</option>)}
-                                            </select>
-                                        </label>
-                                    </div>
-                                    <div className="hfd-grid-2">
-                                        <label className="hfd-field">
-                                            <span className="hfd-label">Department</span>
-                                            <select className="hfd-input" value={form.targetDepartmentId} onChange={e => patchForm({ targetDepartmentId: e.target.value ? Number(e.target.value) : '', targetPositionId: '' })}>
-                                                <option value="">All departments</option>
-                                                {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
-                                            </select>
-                                        </label>
-                                        <label className="hfd-field">
-                                            <span className="hfd-label">Position</span>
-                                            <select className="hfd-input" value={form.targetPositionId} onChange={e => patchForm({ targetPositionId: e.target.value ? Number(e.target.value) : '' })}>
-                                                <option value="">All positions</option>
-                                                {builderPositions.map(position => <option key={position.id} value={position.id}>{position.positionTitle} · {position.levelCode}</option>)}
-                                            </select>
-                                        </label>
-                                    </div>
-                                    <small className="f360-rules-inline-help">Leave department and position empty for a general rule set.</small>
-                                </section>
-
-                                <section className="f360-rules-builder-panel f360-rules-builder-relationship-panel">
-                                    <div className="f360-rules-builder-panel-headline">
-                                        <h4>Evaluator relationships</h4>
-                                        <button type="button" className="f360-rules-text-btn" onClick={selectAllRoles}>{form.evaluatorRoles.length === EVALUATOR_ROLE_OPTIONS.length ? 'Clear all' : 'Select all'}</button>
-                                    </div>
-                                    <div className="f360-rules-role-panel prominent">
-                                        {EVALUATOR_ROLE_OPTIONS.map(option => (
-                                            <label key={option.value} className="f360-rules-role-check" title={option.help}>
-                                                <input type="checkbox" checked={form.evaluatorRoles.includes(option.value)} onChange={() => toggleRole(option.value)} />
-                                                <span>{option.label}</span>
-                                                <small>{option.help}</small>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </section>
-
-                                <section className="f360-rules-builder-panel f360-rules-builder-review-panel">
-                                    <h4>Review</h4>
-                                    <div className="f360-rules-builder-review-grid">
-                                        <span>Levels</span><strong>{getLevelRangeLabel(form.targetLevelMinRank, form.targetLevelMaxRank, levelOptions)}</strong>
-                                        <span>Scope</span><strong>{form.targetPositionId ? getPositionName(Number(form.targetPositionId)) : form.targetDepartmentId ? getDepartmentName(Number(form.targetDepartmentId)) : 'All departments / positions'}</strong>
-                                        <span>Relationships</span><strong>{form.evaluatorRoles.length || 0}</strong>
-                                        <span>Questions</span><strong>{form.questionBankIds.length}</strong>
-                                    </div>
-                                    <label className="hfd-field f360-rules-status-field">
-                                        <span className="hfd-label">Status</span>
-                                        <select className="hfd-input" value={form.ruleSetStatus} onChange={e => patchForm({ ruleSetStatus: e.target.value as RuleSetStatus })}>
-                                            <option value="DRAFT">Draft</option>
-                                            <option value="ACTIVE">Active</option>
-                                            <option value="DISABLED">Disabled</option>
-                                            <option value="ARCHIVED">Archived</option>
-                                        </select>
-                                    </label>
-                                    <span className="f360-rules-rule-type-preview">{ruleSetTypeLabel(inferRuleSetType(formDepartmentId, formPositionId))}</span>
-                                    {activeScopeOverlapGroup && form.ruleSetStatus === 'ACTIVE' && (
-                                        <small className="f360-rules-builder-warning">{activeScopeOverlapMessage}</small>
-                                    )}
-                                    {selectedInheritedQuestions.length > 0 && (
-                                        <small className="f360-rules-builder-warning">{selectedInheritedQuestions.length} selected question(s) are already inherited from broader active rule sets.</small>
-                                    )}
-                                </section>
-                            </div>
-
-                            <section className="f360-rules-builder-panel f360-rules-question-picker f360-rules-clean-question-picker">
-                                <div className="f360-rules-picker-title-row">
-                                    <div>
-                                        <h4>Questions</h4>
-                                        <p>Only active Question Bank items are selectable.</p>
-                                    </div>
-                                    <span>{form.questionBankIds.length} selected</span>
-                                </div>
-                                <div className="f360-rules-question-picker-tools">
-                                    <input
-                                        className="hfd-input"
-                                        value={builderQuestionSearch}
-                                        onChange={e => setBuilderQuestionSearch(e.target.value)}
-                                        placeholder="Search questions, code, or competency"
-                                    />
-                                    <select className="hfd-input" value={builderCompetencyFilter} onChange={e => setBuilderCompetencyFilter(e.target.value)}>
-                                        <option value="ALL">All competencies</option>
-                                        {competencyBuckets.map(([competencyCode]) => <option key={competencyCode} value={competencyCode}>{getCompetencyLabel(competencyCode)}</option>)}
-                                    </select>
-                                    <button type="button" className="f360-rules-row-action" onClick={clearSelectedQuestions} disabled={form.questionBankIds.length === 0}>Clear</button>
-                                </div>
-                                {selectedQuestions.length > 0 && (
-                                    <div className="f360-rules-selected-strip">
-                                        {selectedQuestions.slice(0, 4).map(question => <span key={question.id}>{question.questionCode || `Q-${question.id}`}</span>)}
-                                        {selectedQuestions.length > 4 && <em>+{selectedQuestions.length - 4} more</em>}
-                                    </div>
-                                )}
-                                <div className="f360-rules-question-picker-scroll">
-                                    {filteredCompetencyBuckets.length === 0 ? (
-                                        <div className="f360-rules-question-picker-empty">No active questions match the current search/filter.</div>
-                                    ) : filteredCompetencyBuckets.map(([competencyCode, bucket]) => (
-                                        <div key={competencyCode} className="f360-rules-question-bucket">
-                                            <div>
-                                                <strong>{getCompetencyLabel(competencyCode)} <em>{bucket.length}</em></strong>
-                                                <button type="button" onClick={() => selectQuestionsByCompetency(competencyCode)}>Select all</button>
-                                            </div>
-                                            {bucket.map(question => {
-                                                const inheritedReason = inheritedQuestionInfo.get(question.id);
-                                                const selected = form.questionBankIds.includes(question.id);
-                                                const disabled = Boolean(inheritedReason) && !selected;
+                                    <section>
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">Selected Questions</h3>
+                                            <span className="text-xs font-semibold text-slate-400">{editor.questionIds.length} selected</span>
+                                        </div>
+                                        <div className="max-h-[430px] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-3">
+                                            {editor.questionIds.map((questionId, index) => {
+                                                const question = selectedQuestionMap.get(questionId);
                                                 return (
-                                                    <label key={question.id} className={inheritedReason ? 'inherited' : ''} title={inheritedReason || undefined}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selected}
-                                                            disabled={disabled}
-                                                            onChange={() => toggleQuestion(question.id)}
-                                                        />
-                                                        <span className="f360-rules-question-option-text"><b>{question.questionCode}</b><em>{question.questionText}</em>{inheritedReason && <small>{inheritedReason}</small>}</span>
-                                                    </label>
+                                                    <article key={questionId} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{index + 1}</span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <strong className="block text-sm text-slate-900">{question?.questionText ?? `Question #${questionId}`}</strong>
+                                                            <small className="mt-1 block text-xs text-slate-500">{getCompetencyLabel(question?.competencyCode)}</small>
+                                                        </div>
+                                                        <button type="button" className="text-slate-400 hover:text-red-600" onClick={() => toggleQuestion(questionId)}>
+                                                            <i className="bi bi-trash" />
+                                                        </button>
+                                                    </article>
                                                 );
                                             })}
+                                            {editor.questionIds.length === 0 && (
+                                                <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                                                    Select questions from the question bank.
+                                                </div>
+                                            )}
                                         </div>
-                                    ))}
+                                    </section>
                                 </div>
-                            </section>
+                            </main>
                         </div>
-                        <div className="f360-rules-modal-actions f360-rules-clean-modal-actions">
-                            <div className="f360-rules-builder-summary">
-                                {editingGroup ? 'Editing existing rule set · ' : ''}{form.questionBankIds.length} question{form.questionBankIds.length === 1 ? '' : 's'} · {form.evaluatorRoles.length} relationship{form.evaluatorRoles.length === 1 ? '' : 's'} · {ruleSetStatusLabel(form.ruleSetStatus)}
-                            </div>
-                            <button className="hfd-btn hfd-btn-secondary" onClick={closeBuilder} disabled={busy}>Cancel</button>
-                            <button className="hfd-btn hfd-btn-primary" onClick={submitRuleSet} disabled={busy}>{editingGroup ? 'Update rule set' : form.ruleSetStatus === 'ACTIVE' ? 'Save and activate' : `Save as ${ruleSetStatusLabel(form.ruleSetStatus)}`}</button>
+
+                        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-end">
+                            <button type="button" className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50" onClick={() => setEditor(null)}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                                disabled={saving}
+                                onClick={() => void saveEditor()}
+                            >
+                                {saving ? 'Saving...' : 'Save Form'}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
     );
-
 }
