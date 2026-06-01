@@ -489,7 +489,11 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             }
 
             item.setAssignmentQuestion(assignmentQuestion);
-            item.setQuestion(assignmentQuestion.getSourceQuestion());
+            // Do not persist the legacy question_id for dynamic 360 feedback responses.
+            // A single source question can be reused in multiple assignment snapshots, and the
+            // legacy unique key (response_id, question_id) can then reject an otherwise valid
+            // submission. assignment_question_id is the correct unique response key.
+            item.setQuestion(null);
 
             Double ratingValue = item.getRatingValue();
             String label = questionLabel(assignmentQuestion);
@@ -617,7 +621,9 @@ public class FeedbackResponseServiceImpl implements FeedbackResponseService {
             }
 
             targetItem.setAssignmentQuestion(assignmentQuestion);
-            targetItem.setQuestion(assignmentQuestion.getSourceQuestion());
+            // Store responses by frozen assignment question only. Keeping question_id null avoids
+            // legacy duplicate-key conflicts when dynamic forms reuse the same bank question.
+            targetItem.setQuestion(null);
             targetItem.setRatingValue(incomingItem.getRatingValue());
             targetItem.setComment(incomingItem.getComment());
         }
