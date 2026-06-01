@@ -94,7 +94,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                     .sorted(groupComparator())
                     .toList();
             List<String> warnings = new ArrayList<>(resolved.warnings());
-            warnings.add("Current Form Setup could not be resolved. Showing the last saved preview only.");
+            warnings.add("Current Form Setup could not be resolved. Showing the last saved campaign questions only.");
             return buildResponse(campaign, true, savedGroups, warnings, lastSavedAt);
         }
 
@@ -249,7 +249,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
             throw new BusinessValidationException("Only rating questions with required comments can be used in 360 feedback campaigns. Invalid question(s): " + invalidQuestions);
         }
         if (!blocking.isEmpty()) {
-            throw new BusinessValidationException("Each form variant must have at least one rating question with a required comment before launch. Empty form variant(s): " + blocking);
+            throw new BusinessValidationException("Each evaluator form must have at least one rating question with a required comment before launch. Empty form(s): " + blocking);
         }
     }
 
@@ -469,8 +469,8 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
     private QuestionCandidate fromSelection(FeedbackCampaignQuestionSelection selection) {
         return new QuestionCandidate(
                 selection.getSourceRuleId(),
-                selection.getSourceRuleId() == null ? "Saved snapshot" : "Form #" + selection.getSourceRuleId(),
-                "Saved campaign snapshot",
+                selection.getSourceRuleId() == null ? "Saved campaign questions" : "Form #" + selection.getSourceRuleId(),
+                "Saved campaign questions",
                 selection.getQuestionVersion(),
                 selection.getQuestionBankId(),
                 selection.getQuestionCode(),
@@ -565,10 +565,10 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 .count();
         List<String> warnings = new ArrayList<>(group.warnings());
         if (questionCount == 0) {
-            warnings.add("No matched questions. Add or adjust Form Setup before activation.");
+            warnings.add("No matched questions. Update Form Setup before launch.");
         } else {
             if (includedCount == 0) {
-                warnings.add("All questions are excluded. Keep at least one question for this evaluator group.");
+                warnings.add("Keep at least one question for this evaluator form.");
             }
             List<String> invalidQuestions = group.questions().stream()
                     .filter(QuestionCandidate::included)
@@ -579,7 +579,7 @@ public class FeedbackCampaignQuestionReviewBuilderServiceImpl implements Feedbac
                 warnings.add("Only rating questions with required comments are allowed. Invalid question(s): " + invalidQuestions);
             }
             if (includedScoredCount == 0) {
-                warnings.add("No included rating-with-required-comment questions for this form variant.");
+                warnings.add("No included rating questions with required comments for this evaluator form.");
             }
             if (includedCount > 30) {
                 warnings.add("More than 30 included questions may make this review too long.");

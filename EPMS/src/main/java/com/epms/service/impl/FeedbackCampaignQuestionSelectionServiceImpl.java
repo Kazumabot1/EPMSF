@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -72,12 +73,11 @@ public class FeedbackCampaignQuestionSelectionServiceImpl implements FeedbackCam
         competencyWeightRepository.deleteByCampaignId(campaign.getId());
         competencyWeightRepository.flush();
 
-        List<FeedbackCampaignQuestionSelection> selections = (questionDrafts == null ? List.<QuestionSelectionDraft>of() : questionDrafts).stream()
-                .filter(Objects::nonNull)
+        List<FeedbackCampaignQuestionSelection> selections = uniqueQuestionDrafts(questionDrafts).stream()
                 .map(draft -> toSelection(campaign, draft))
                 .toList();
         selectionRepository.saveAll(selections);
-        saveCompetencyWeights(campaign, competencyWeightDrafts);
+        saveCompetencyWeights(campaign, uniqueCompetencyWeightDrafts(competencyWeightDrafts));
     }
 
     @Override
@@ -121,6 +121,46 @@ public class FeedbackCampaignQuestionSelectionServiceImpl implements FeedbackCam
     public void clearSelectionsAndWeights(Long campaignId) {
         selectionRepository.deleteByCampaignId(campaignId);
         competencyWeightRepository.deleteByCampaignId(campaignId);
+    }
+
+
+    private List<QuestionSelectionDraft> uniqueQuestionDrafts(List<QuestionSelectionDraft> drafts) {
+        Map<String, QuestionSelectionDraft> unique = new java.util.LinkedHashMap<>();
+        for (QuestionSelectionDraft draft : drafts == null ? List.<QuestionSelectionDraft>of() : drafts) {
+            if (draft == null) {
+                continue;
+            }
+            String key = String.join("|",
+                    normalizeKey(draft.relationshipType() == null ? null : draft.relationshipType().name()),
+                    normalizeKey(draft.targetLevelCode()),
+                    normalizeKey(draft.targetDepartmentId()),
+                    normalizeKey(draft.targetPositionId()),
+                    normalizeKey(draft.questionCode()));
+            unique.putIfAbsent(key, draft);
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private List<CompetencyWeightDraft> uniqueCompetencyWeightDrafts(List<CompetencyWeightDraft> drafts) {
+        Map<String, CompetencyWeightDraft> unique = new java.util.LinkedHashMap<>();
+        for (CompetencyWeightDraft draft : drafts == null ? List.<CompetencyWeightDraft>of() : drafts) {
+            if (draft == null) {
+                continue;
+            }
+            String key = draft.competency() != null && draft.competency().getId() != null
+                    ? "ID:" + draft.competency().getId()
+                    : "CODE:" + normalizeCode(draft.competencyCode(), "UNMAPPED");
+            unique.putIfAbsent(key, draft);
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private String normalizeKey(Object value) {
+        if (value == null) {
+            return "NULL";
+        }
+        String normalized = String.valueOf(value).trim();
+        return normalized.isBlank() ? "NULL" : normalized.toUpperCase();
     }
 
     private FeedbackCampaignQuestionSelection toSelection(FeedbackCampaign campaign, QuestionSelectionDraft draft) {

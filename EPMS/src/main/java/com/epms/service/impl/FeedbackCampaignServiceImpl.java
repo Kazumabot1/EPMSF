@@ -278,10 +278,10 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             String blockerMessage = readiness == null
                     ? "Campaign close readiness could not be verified."
                     : readiness.getChecklist().stream()
-                    .filter(item -> "BLOCKER".equals(item.getStatus()))
-                    .map(CloseReadinessChecklistItemDto::getMessage)
-                    .filter(message -> message != null && !message.isBlank())
-                    .collect(Collectors.joining(" "));
+                      .filter(item -> "BLOCKER".equals(item.getStatus()))
+                      .map(CloseReadinessChecklistItemDto::getMessage)
+                      .filter(message -> message != null && !message.isBlank())
+                      .collect(Collectors.joining(" "));
             throw new BusinessValidationException(blockerMessage == null || blockerMessage.isBlank()
                     ? "Campaign is not ready to close. Resolve blocking issues first."
                     : blockerMessage);
@@ -312,9 +312,9 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
         String reason = request == null ? "Closed from campaign action with warning acknowledgement." : normalizeText(request.getReason(), 1000);
         String readinessNote = closeWithWarnings
                 ? "Readiness status=CLOSE_WITH_WARNINGS, warnings=" + readiness.getWarningCount()
-                + ", pendingAssignments=" + readiness.getPendingAssignments()
-                + ", overdueAssignments=" + readiness.getOverdueAssignments()
-                + ", privacyRiskTargets=" + readiness.getPrivacyRiskTargets()
+                  + ", pendingAssignments=" + readiness.getPendingAssignments()
+                  + ", overdueAssignments=" + readiness.getOverdueAssignments()
+                  + ", privacyRiskTargets=" + readiness.getPrivacyRiskTargets()
                 : "Readiness status=READY_TO_CLOSE";
         String finalReason = reason == null ? readinessNote : readinessNote + "; HR note=" + reason;
         return campaignLifecycleService.closeCampaignWithReadiness(campaignId, actorUserId, finalReason, closeWithWarnings);
@@ -504,7 +504,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
                 ? FeedbackOperationalService.FeedbackReminderKind.OVERDUE
                 : FeedbackOperationalService.FeedbackReminderKind.DEADLINE;
 
-        FeedbackOperationalService.NotificationDeliveryResult result = feedbackOperationalService.notifyPendingEvaluatorReminders(campaign, kind);
+        FeedbackOperationalService.NotificationDeliveryResult result = feedbackOperationalService.notifyPendingEvaluatorReminders(campaign, kind, true);
 
         if (actorUserId != null) {
             feedbackOperationalService.audit(
@@ -559,7 +559,7 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
         FeedbackOperationalService.FeedbackReminderKind kind = resolveReminderKind(campaign, onlyOverdue);
 
-        FeedbackOperationalService.NotificationDeliveryResult result = feedbackOperationalService.notifyEvaluatorReminders(campaign, candidates, kind);
+        FeedbackOperationalService.NotificationDeliveryResult result = feedbackOperationalService.notifyEvaluatorReminders(campaign, candidates, kind, true);
         List<Long> assignmentIds = candidates.stream()
                 .map(FeedbackEvaluatorAssignment::getId)
                 .toList();
