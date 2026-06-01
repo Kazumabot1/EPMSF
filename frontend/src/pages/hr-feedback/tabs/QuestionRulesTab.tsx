@@ -138,6 +138,11 @@ const levelLabel = (minRank: number, maxRank: number, levels: LevelOption[]) => 
     return minCode === maxCode ? minCode : `${minCode}–${maxCode}`;
 };
 
+const activeLevelSummary = (levels: LevelOption[]) => {
+    if (levels.length === 0) return 'No active levels found';
+    return levelLabel(levels[0].rank, levels[levels.length - 1].rank, levels);
+};
+
 const isUsableQuestion = (question: QuestionBankItem) =>
     question.status === 'ACTIVE'
     && question.responseType === 'RATING_WITH_COMMENT'
@@ -149,13 +154,6 @@ const formScopeLabel = (scopeType: FormScopeType) => ({
     POSITION: 'Position Form',
     SPECIFIC: 'Legacy Form',
 }[scopeType]);
-
-const statusChipClass = (status: FormStatus, active = status === 'ACTIVE') => {
-    if (status === 'ACTIVE' && active) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    if (status === 'DRAFT') return 'border-amber-200 bg-amber-50 text-amber-700';
-    if (status === 'ARCHIVED') return 'border-slate-200 bg-slate-100 text-slate-500';
-    return 'border-slate-200 bg-slate-50 text-slate-600';
-};
 
 const formatFormSetupError = (error: unknown, fallback: string): string => {
     const raw = error instanceof Error ? error.message : fallback;
@@ -255,7 +253,7 @@ const buildCollections = (
                 ? `${getDepartmentName(segment.departmentId)} Form`
                 : `${getPositionName(segment.positionId)} Form`;
         const subtitle = segment.scopeType === 'DEFAULT'
-            ? 'Used when no department or position form is available for this evaluator type.'
+            ? 'Applies to all active departments, positions, and levels.'
             : segment.scopeType === 'DEPARTMENT'
                 ? 'Used for employees in this department unless a position form is available.'
                 : 'Used first for employees in this position.';
@@ -307,15 +305,37 @@ const findSegmentForRole = (collection: FormCollection, role: RuleRole) =>
         .filter(segment => segment.roles.includes(role) && segment.questionIds.length > 0)
         .sort((left, right) => {
             if (left.active !== right.active) return left.active ? -1 : 1;
-            return right.questionIds.length - left.questionIds.length;
+            const leftRoleCount = uniqueNumbers(
+                left.questions
+                    .filter(rule => rule.evaluatorRelationshipType === role)
+                    .map(rule => rule.questionBankId),
+            ).length;
+            const rightRoleCount = uniqueNumbers(
+                right.questions
+                    .filter(rule => rule.evaluatorRelationshipType === role)
+                    .map(rule => rule.questionBankId),
+            ).length;
+            return rightRoleCount - leftRoleCount;
         })[0] ?? null;
 
+const getSegmentRoleQuestionIds = (segment: FormSegment | null, role: RuleRole) =>
+    segment
+        ? uniqueNumbers(
+            segment.questions
+                .filter(rule => rule.evaluatorRelationshipType === role)
+                .map(rule => rule.questionBankId),
+        )
+        : [];
+
+const getCollectionRoleCount = (collection: FormCollection, role: RuleRole) =>
+    getSegmentRoleQuestionIds(findSegmentForRole(collection, role), role).length;
+
 const firstMissingRole = (collection: FormCollection): RuleRole =>
-    ROLE_VALUES.find(role => collection.roleCounts[role] === 0) ?? 'MANAGER';
+    ROLE_VALUES.find(role => getCollectionRoleCount(collection, role) === 0) ?? 'MANAGER';
 
 const collectionDisplayRoles = (collection: FormCollection): RuleRole[] => {
     if (collection.scopeType === 'DEFAULT') return ROLE_VALUES;
-    return ROLE_VALUES.filter(role => collection.roleCounts[role] > 0 || findSegmentForRole(collection, role));
+    return ROLE_VALUES.filter(role => getCollectionRoleCount(collection, role) > 0 || findSegmentForRole(collection, role));
 };
 
 const buildFormName = (editor: EditorState, departments: FeedbackDepartmentOption[], positions: PositionResponse[]) => {
@@ -503,12 +523,12 @@ export default function QuestionRulesTab() {
 
     const workspacePreviewSource = useMemo(() => {
         const matchingPosition = previewPositionId !== ''
-            ? positionCollections.find(collection => collection.positionId === previewPositionId && collection.roleCounts[previewRole] > 0)
+            ? positionCollections.find(collection => collection.positionId === previewPositionId && getCollectionRoleCount(collection, previewRole) > 0)
             : undefined;
         if (matchingPosition) return { title: matchingPosition.title, reason: 'A position form will be used for this evaluator type.' };
 
         const matchingDepartment = previewDepartmentId !== ''
-            ? departmentCollections.find(collection => collection.departmentId === previewDepartmentId && collection.roleCounts[previewRole] > 0)
+            ? departmentCollections.find(collection => collection.departmentId === previewDepartmentId && getCollectionRoleCount(collection, previewRole) > 0)
             : undefined;
         if (matchingDepartment) return { title: matchingDepartment.title, reason: 'No position form was found, so the department form will be used.' };
 
@@ -577,6 +597,9 @@ export default function QuestionRulesTab() {
 
     const openEditEditor = (collection: FormCollection, role: RuleRole) => {
         const segment = findSegmentForRole(collection, role);
+        const roleQuestionIds = getSegmentRoleQuestionIds(segment, role);
+        const departmentLevels = getDepartmentLevels(collection.departmentId ?? '');
+        const positionLevel = getPositionLevel(collection.positionId ?? '');
         setQuestionSearch('');
         setCompetencyFilter('ALL');
         setEditor({
@@ -584,11 +607,19 @@ export default function QuestionRulesTab() {
             scopeType: collection.scopeType,
             departmentId: collection.departmentId ?? '',
             positionId: collection.positionId ?? '',
-            evaluatorRoles: segment?.roles.length ? segment.roles : [role],
-            minRank: segment?.minRank ?? minRank,
-            maxRank: segment?.maxRank ?? maxRank,
+            evaluatorRoles: [role],
+            minRank: collection.scopeType === 'POSITION' && positionLevel
+                ? positionLevel.rank
+                : collection.scopeType === 'DEPARTMENT' && departmentLevels.length > 0
+                    ? departmentLevels[0].rank
+                    : minRank,
+            maxRank: collection.scopeType === 'POSITION' && positionLevel
+                ? positionLevel.rank
+                : collection.scopeType === 'DEPARTMENT' && departmentLevels.length > 0
+                    ? departmentLevels[departmentLevels.length - 1].rank
+                    : maxRank,
             status: segment?.status ?? 'ACTIVE',
-            questionIds: segment?.questionIds ?? [],
+            questionIds: roleQuestionIds,
             ruleSetId: segment?.ruleSetId ?? null,
             firstRuleId: segment?.firstRuleId ?? null,
         });
@@ -650,10 +681,6 @@ export default function QuestionRulesTab() {
                 toast.error('No active positions were found for this department.');
                 return false;
             }
-            if (!departmentLevels.some(level => level.rank === current.minRank) || !departmentLevels.some(level => level.rank === current.maxRank)) {
-                toast.error('Choose a valid level range from this department.');
-                return false;
-            }
         }
         if (current.scopeType === 'POSITION') {
             if (current.positionId === '') {
@@ -674,6 +701,17 @@ export default function QuestionRulesTab() {
         setSaving(true);
         try {
             const normalizedEditor = { ...editor };
+            if (normalizedEditor.scopeType === 'DEFAULT') {
+                normalizedEditor.minRank = minRank;
+                normalizedEditor.maxRank = maxRank;
+            }
+            if (normalizedEditor.scopeType === 'DEPARTMENT') {
+                const departmentLevels = getDepartmentLevels(normalizedEditor.departmentId);
+                if (departmentLevels.length > 0) {
+                    normalizedEditor.minRank = departmentLevels[0].rank;
+                    normalizedEditor.maxRank = departmentLevels[departmentLevels.length - 1].rank;
+                }
+            }
             if (normalizedEditor.scopeType === 'POSITION') {
                 const positionLevel = getPositionLevel(normalizedEditor.positionId);
                 if (positionLevel) {
@@ -743,7 +781,7 @@ export default function QuestionRulesTab() {
 
     const renderCollectionCard = (collection: FormCollection) => {
         const rolesToShow = collectionDisplayRoles(collection);
-        const missingRoleCount = ROLE_VALUES.filter(role => collection.roleCounts[role] === 0).length;
+        const missingRoleCount = ROLE_VALUES.filter(role => getCollectionRoleCount(collection, role) === 0).length;
         return (
             <article key={collection.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -774,8 +812,8 @@ export default function QuestionRulesTab() {
                 ) : (
                     <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         {rolesToShow.map(role => {
-                            const count = collection.roleCounts[role];
                             const segment = findSegmentForRole(collection, role);
+                            const count = getCollectionRoleCount(collection, role);
                             return (
                                 <div key={role} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                                     <div className="flex items-center justify-between gap-2">
@@ -810,46 +848,42 @@ export default function QuestionRulesTab() {
                     </div>
                 )}
 
-                {collection.segments.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
-                        {collection.segments.slice(0, 4).map(segment => (
-                            <span key={segment.key} className={`rounded-full border px-2.5 py-1 ${statusChipClass(segment.status, segment.active)}`}>
-                                {segment.roles.map(getRoleLabel).join(', ')} · {levelLabel(segment.minRank, segment.maxRank, levels)}
-                            </span>
-                        ))}
-                    </div>
-                )}
             </article>
         );
     };
 
-    const renderSection = (title: string, eyebrow: string, description: string, items: FormCollection[], createType: EditableFormScopeType, icon: string) => (
-        <section className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">{eyebrow}</p>
-                    <h2 className="mt-1 text-xl font-bold text-slate-950">{title}</h2>
-                    <p className="mt-1 max-w-3xl text-sm text-slate-500">{description}</p>
+    const renderSection = (title: string, eyebrow: string, description: string, items: FormCollection[], createType: EditableFormScopeType, icon: string) => {
+        const canCreate = createType !== 'DEFAULT' || items.length === 0;
+        return (
+            <section className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600">{eyebrow}</p>
+                        <h2 className="mt-1 text-xl font-bold text-slate-950">{title}</h2>
+                        <p className="mt-1 max-w-3xl text-sm text-slate-500">{description}</p>
+                    </div>
+                    {canCreate && (
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                            onClick={() => openCreateEditor(createType)}
+                        >
+                            <i className={`bi ${icon}`} /> Create {formScopeLabel(createType)}
+                        </button>
+                    )}
                 </div>
-                <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-                    onClick={() => openCreateEditor(createType)}
-                >
-                    <i className={`bi ${icon}`} /> Create {formScopeLabel(createType)}
-                </button>
-            </div>
-            {items.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-                    <i className={`bi ${icon} text-3xl text-blue-500`} />
-                    <h3 className="mt-3 text-base font-semibold text-slate-900">No {title.toLowerCase()} yet</h3>
-                    <p className="mt-1 text-sm text-slate-500">Create one only when this scope needs its own form.</p>
-                </div>
-            ) : (
-                <div className="space-y-4">{items.map(renderCollectionCard)}</div>
-            )}
-        </section>
-    );
+                {items.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                        <i className={`bi ${icon} text-3xl text-blue-500`} />
+                        <h3 className="mt-3 text-base font-semibold text-slate-900">No {title.toLowerCase()} yet</h3>
+                        <p className="mt-1 text-sm text-slate-500">Create one only when this scope needs its own form.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">{items.map(renderCollectionCard)}</div>
+                )}
+            </section>
+        );
+    };
 
     const renderEditorScopeFields = () => {
         if (!editor) return null;
@@ -885,27 +919,9 @@ export default function QuestionRulesTab() {
                             </div>
                         )}
                         {departmentLevels.length > 0 && (
-                            <div className="grid grid-cols-2 gap-3">
-                                <label className="block text-sm font-semibold text-slate-700">
-                                    From level
-                                    <select
-                                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                                        value={editor.minRank}
-                                        onChange={(event) => setEditor(current => current ? { ...current, minRank: Number(event.target.value) } : current)}
-                                    >
-                                        {departmentLevels.map(level => <option key={level.code} value={level.rank}>{level.code}</option>)}
-                                    </select>
-                                </label>
-                                <label className="block text-sm font-semibold text-slate-700">
-                                    To level
-                                    <select
-                                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
-                                        value={editor.maxRank}
-                                        onChange={(event) => setEditor(current => current ? { ...current, maxRank: Number(event.target.value) } : current)}
-                                    >
-                                        {departmentLevels.map(level => <option key={level.code} value={level.rank}>{level.code}</option>)}
-                                    </select>
-                                </label>
+                            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-sm text-slate-600">
+                                <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Form applies to</span>
+                                <strong className="mt-1 block text-slate-900">All active positions and levels in this department.</strong>
                             </div>
                         )}
                     </>
@@ -932,9 +948,10 @@ export default function QuestionRulesTab() {
                 {editor.scopeType === 'DEFAULT' && (
                     <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-sm text-slate-600">
                         <span className="block text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Form applies to</span>
-                        <strong className="mt-1 block text-slate-900">
-                            {levels.length > 0 ? `All active levels (${levelLabel(minRank, maxRank, levels)})` : 'No active levels found'}
-                        </strong>
+                        <strong className="mt-1 block text-slate-900">Applies to all active departments, positions, and levels.</strong>
+                        {levels.length > 0 && (
+                            <span className="mt-1 block text-xs text-slate-500">Current active level coverage: {activeLevelSummary(levels)}</span>
+                        )}
                     </div>
                 )}
             </>
@@ -986,7 +1003,7 @@ export default function QuestionRulesTab() {
                     {renderSection(
                         'Default Form',
                         'Default Form',
-                        'This form is used when no department or position form is available for the evaluator type.',
+                        'This form applies to all active departments, positions, and levels.',
                         defaultCollection ? [defaultCollection] : [],
                         'DEFAULT',
                         'bi-ui-checks',
@@ -1146,7 +1163,7 @@ export default function QuestionRulesTab() {
                                     </select>
                                 </label>
                                 <div>
-                                    <span className="text-sm font-semibold text-slate-700">Evaluator type</span>
+                                    <span className="text-sm font-semibold text-slate-700">Evaluator form</span>
                                     <div className="mt-2 grid grid-cols-2 gap-2">
                                         {ROLE_VALUES.map(role => (
                                             <button

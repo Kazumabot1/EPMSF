@@ -231,8 +231,10 @@ const FeedbackLayoutPage = () => {
     navigate('/hr/feedback/targets', { replace: true });
   }, [activeModule, navigate, targetsDirty]);
 
+  const questionBankLayoutClass = activeModule === 'questions' ? ' !w-full !max-w-none' : '';
+
   return (
-      <div className="feedback-page feedback-page-subnav-mode">
+      <div className={`feedback-page feedback-page-subnav-mode${questionBankLayoutClass}`}>
         {!selfContainedQuestionPage && !['monitoring', 'analytics'].includes(activeModule) && (
             <section className="feedback-hero compact">
               <div>
