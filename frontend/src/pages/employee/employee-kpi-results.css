@@ -1,0 +1,96 @@
+.employee-kpi-page {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: 24px 18px 56px;
+}
+
+.employee-kpi-page .epms-refined-hero {
+  border: 0;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(255, 255, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.24), transparent 34%),
+    linear-gradient(135deg, #2563eb 0%, #1d4ed8 54%, #1e40af 100%);
+  box-shadow: 0 20px 52px rgba(30, 64, 175, 0.22);
+}
+
+.employee-kpi-page .epms-refined-hero h1,
+.employee-kpi-page .epms-refined-hero p,
+.employee-kpi-page .epms-refined-eyebrow {
+  color: #ffffff;
+}
+
+.employee-kpi-page .epms-refined-hero p {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.employee-kpi-page .epms-refined-hero-stat {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.employee-kpi-page .epms-refined-hero-stat strong,
+.employee-kpi-page .epms-refined-hero-stat span {
+  color: #ffffff;
+}
+
+.employee-kpi-page .epms-refined-metric-card,
+.employee-kpi-page .epms-refined-card {
+  border-color: #dbe7f6;
+  border-radius: 22px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.06);
+}
+
+.employee-kpi-page .epms-refined-metric-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.employee-kpi-page .epms-refined-metric-card::after {
+  content: '';
+  position: absolute;
+  top: -48px;
+  right: -48px;
+  width: 116px;
+  height: 116px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.employee-kpi-page .epms-refined-metric-card strong {
+  color: #0f172a;
+}
+
+.employee-kpi-page .epms-refined-score-pill {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.employee-kpi-page .epms-refined-table-wrap {
+  border-color: #dbe7f6;
+  border-radius: 16px;
+}
+
+.employee-kpi-page .epms-refined-table th {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.employee-kpi-page .epms-refined-table tbody tr:hover td {
+  background: #f8fbff;
+}
+
+.employee-kpi-result-card {
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .employee-kpi-page {
+    padding: 18px 12px 40px;
+  }
+
+  .employee-kpi-page .epms-refined-hero,
+  .employee-kpi-page .epms-refined-card-header {
+    display: grid;
+  }
+}

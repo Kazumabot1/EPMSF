@@ -1,5 +1,6 @@
-/*Z*/import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import './employee-kpi-results.css';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
 import type { EmployeeKpiResult } from '../../types/kpiWorkflow';
 

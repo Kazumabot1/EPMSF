@@ -31,10 +31,12 @@ const KpiUnitPage = () => {
     void loadUnits();
   }, []);
 
-  const filteredUnits = useMemo(
-    () => units.filter((unit) => unit.name.toLowerCase().includes(query.trim().toLowerCase())),
-    [query, units],
-  );
+  const filteredUnits = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return [...units]
+      .sort((a, b) => a.id - b.id)
+      .filter((unit) => unit.name.toLowerCase().includes(normalized));
+  }, [query, units]);
 
   const openCreate = () => {
     setEditing(null);
@@ -147,9 +149,9 @@ const KpiUnitPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredUnits.map((unit) => (
+                {filteredUnits.map((unit, index) => (
                   <tr key={unit.id}>
-                    <td>{unit.id}</td>
+                    <td>{index + 1}</td>
                     <td>{unit.name}</td>
                     <td>
                       <div className="kpi-row-actions">

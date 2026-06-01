@@ -31,10 +31,12 @@ const KpiCategoryPage = () => {
     void loadCategories();
   }, []);
 
-  const filteredCategories = useMemo(
-    () => categories.filter((category) => category.name.toLowerCase().includes(query.trim().toLowerCase())),
-    [query, categories],
-  );
+  const filteredCategories = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return [...categories]
+      .sort((a, b) => a.id - b.id)
+      .filter((category) => category.name.toLowerCase().includes(normalized));
+  }, [query, categories]);
 
   const openCreate = () => {
     setEditing(null);
@@ -149,9 +151,9 @@ const KpiCategoryPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredCategories.map((category) => (
+                {filteredCategories.map((category, index) => (
                   <tr key={category.id}>
-                    <td>{category.id}</td>
+                    <td>{index + 1}</td>
                     <td>{category.name}</td>
                     <td>
                       <div className="kpi-row-actions">

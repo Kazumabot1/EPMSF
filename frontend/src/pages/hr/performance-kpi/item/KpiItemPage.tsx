@@ -39,9 +39,11 @@ const KpiItemPage = () => {
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return items.filter(
-      (item) => item.name.toLowerCase().includes(normalized) || item.kpiCategoryName.toLowerCase().includes(normalized),
-    );
+    return [...items]
+      .sort((a, b) => a.id - b.id)
+      .filter(
+        (item) => item.name.toLowerCase().includes(normalized) || item.kpiCategoryName.toLowerCase().includes(normalized),
+      );
   }, [items, query]);
 
   const openCreate = () => {
@@ -162,9 +164,9 @@ const KpiItemPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredItems.map((item) => (
+                {filteredItems.map((item, index) => (
                   <tr key={item.id}>
-                    <td>{item.id}</td>
+                    <td>{index + 1}</td>
                     <td>{item.name}</td>
                     <td>{item.kpiCategoryName}</td>
                     <td>
