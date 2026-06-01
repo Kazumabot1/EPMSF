@@ -13,6 +13,7 @@ import {
   reportingService,
   type DepartmentPerformanceRow,
   type EmployeePerformanceRow,
+  type KpiPerformanceRow,
   type ReportingDashboard,
 } from '../../services/reportingService';
 import type { EmployeeAppraisalFormResponse } from '../../types/appraisal';
@@ -150,32 +151,88 @@ const getPipDate = (row: any) => parseDashboardDate(row.finishedAt || row.endDat
 
 const getFeedbackDate = (row: any) => parseDashboardDate(row.endDate || row.startDate);
 
-const buildDepartmentRowsFromEmployees = (rows: EmployeePerformanceRow[]): DepartmentPerformanceRow[] => {
-  const groups = new Map<string, EmployeePerformanceRow[]>();
+const getKpiPerformanceDate = (row: KpiPerformanceRow) =>
+  parseDashboardDate(row.finalizedAt || row.periodEndDate || row.periodStartDate);
+
+const kpiPerformanceScore = (row: KpiPerformanceRow) =>
+  numberValue(row.totalWeightedScore) || numberValue(row.totalScore);
+
+const labelForScore = (score: number) => {
+  if (score >= 86) return 'Outstanding';
+  if (score >= 71) return 'Exceeds Expectations';
+  if (score >= 60) return 'Meets Expectations';
+  if (score > 0) return 'Needs Review';
+  return 'Not Scored';
+};
+
+const buildDepartmentRowsFromEmployees = (
+  rows: EmployeePerformanceRow[],
+  kpiRows: KpiPerformanceRow[] = [],
+): DepartmentPerformanceRow[] => {
+  type DepartmentGroup = {
+    departmentId?: number | null;
+    departmentName?: string | null;
+    assessmentRows: EmployeePerformanceRow[];
+    kpiRows: KpiPerformanceRow[];
+    employees: Set<string | number>;
+  };
+
+  const groups = new Map<string, DepartmentGroup>();
+
+  const ensureGroup = (departmentId?: number | null, departmentName?: string | null) => {
+    const key = String(departmentId ?? departmentName ?? 'unknown');
+    const existing = groups.get(key);
+
+    if (existing) {
+      return existing;
+    }
+
+    const created: DepartmentGroup = {
+      departmentId: departmentId ?? null,
+      departmentName: departmentName || 'Unknown Department',
+      assessmentRows: [],
+      kpiRows: [],
+      employees: new Set(),
+    };
+
+    groups.set(key, created);
+    return created;
+  };
+
   rows.forEach((row) => {
-    const key = String(row.departmentId ?? row.departmentName ?? 'unknown');
-    groups.set(key, [...(groups.get(key) || []), row]);
+    const group = ensureGroup(row.departmentId, row.departmentName);
+    group.assessmentRows.push(row);
+    group.employees.add(row.employeeId ?? row.userId ?? row.employeeCode ?? row.employeeName ?? `assessment-${group.assessmentRows.length}`);
   });
 
-  return Array.from(groups.values()).map((items) => {
-    const first = items[0];
-    const approved = items.filter((item) => String(item.status || '').toUpperCase().includes('APPROVED') || Boolean(item.approvedAt));
-    const pending = items.filter((item) => String(item.status || '').toUpperCase().includes('PENDING'));
-    const scored = items.map((item) => numberValue(item.scorePercent)).filter((value) => value > 0);
-    const employees = new Set(items.map((item) => item.employeeId ?? item.userId ?? item.employeeCode ?? item.employeeName));
+  kpiRows.forEach((row) => {
+    const group = ensureGroup(row.departmentId, row.departmentName);
+    group.kpiRows.push(row);
+    group.employees.add(row.employeeId ?? row.employeeCode ?? row.employeeName ?? `kpi-${group.kpiRows.length}`);
+  });
+
+  return Array.from(groups.values()).map((group) => {
+    const approved = group.assessmentRows.filter((item) => String(item.status || '').toUpperCase().includes('APPROVED') || Boolean(item.approvedAt));
+    const pending = group.assessmentRows.filter((item) => String(item.status || '').toUpperCase().includes('PENDING'));
+    const appraisalAverage = average(group.assessmentRows.map((item) => numberValue(item.scorePercent)));
+    const kpiAverage = average(group.kpiRows.map(kpiPerformanceScore));
+    const overall = average([appraisalAverage, kpiAverage]);
 
     return {
-      departmentId: first.departmentId ?? null,
-      departmentName: first.departmentName || 'Unknown Department',
-      employeeCount: employees.size || items.length,
-      assessmentCount: items.length,
+      departmentId: group.departmentId ?? null,
+      departmentName: group.departmentName || 'Unknown Department',
+      employeeCount: group.employees.size || group.assessmentRows.length || group.kpiRows.length,
+      assessmentCount: group.assessmentRows.length,
       approvedCount: approved.length,
       pendingCount: pending.length,
       activePipCount: 0,
-      averageScore: average(scored),
-      performanceLabel: average(scored) >= 80 ? 'Outstanding' : average(scored) >= 60 ? 'Healthy' : 'Needs Review',
+      kpiRecordCount: group.kpiRows.length,
+      averageScore: appraisalAverage,
+      averageKpiScore: kpiAverage,
+      overallScore: overall,
+      performanceLabel: labelForScore(overall || appraisalAverage || kpiAverage),
     };
-  }).sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore));
+  }).sort((a, b) => numberValue(b.overallScore || b.averageScore || b.averageKpiScore) - numberValue(a.overallScore || a.averageScore || a.averageKpiScore));
 };
 
 const filterDashboardByDateRange = (source: ReportingDashboard, start?: string, end?: string): ReportingDashboard => {
@@ -184,13 +241,19 @@ const filterDashboardByDateRange = (source: ReportingDashboard, start?: string, 
   const employeePerformance = source.employeePerformance.filter((row) =>
     isWithinDashboardRange(getEmployeePerformanceDate(row), start, end),
   );
-  const departmentPerformance = employeePerformance.length
-    ? buildDepartmentRowsFromEmployees(employeePerformance)
+  const kpiPerformance = source.kpiPerformance.filter((row) =>
+    isWithinDashboardRange(getKpiPerformanceDate(row), start, end),
+  );
+  const departmentPerformance = employeePerformance.length || kpiPerformance.length
+    ? buildDepartmentRowsFromEmployees(employeePerformance, kpiPerformance)
     : [];
   const pipStatusReport = source.pipStatusReport.filter((row) => isWithinDashboardRange(getPipDate(row), start, end));
   const feedbackParticipation = source.feedbackParticipation.filter((row) => isWithinDashboardRange(getFeedbackDate(row), start, end));
   const assessmentStatusBreakdown = source.assessmentStatusBreakdown;
   const scored = employeePerformance.map((row) => numberValue(row.scorePercent)).filter((value) => value > 0);
+  const kpiScores = kpiPerformance.map(kpiPerformanceScore).filter((value) => value > 0);
+  const appraisalAverage = average(scored);
+  const kpiAverage = average(kpiScores);
   const approved = employeePerformance.filter((row) => String(row.status || '').toUpperCase().includes('APPROVED') || Boolean(row.approvedAt));
   const pending = employeePerformance.filter((row) => String(row.status || '').toUpperCase().includes('PENDING'));
   const activePips = pipStatusReport.filter((row) => Boolean(row.active)).length;
@@ -208,7 +271,13 @@ const filterDashboardByDateRange = (source: ReportingDashboard, start?: string, 
       completedPips: pipStatusReport.filter((row) => !row.active).length,
       feedbackCampaigns: feedbackParticipation.length,
       activeFeedbackCampaigns: feedbackParticipation.filter((row) => String(row.status || '').toUpperCase() === 'ACTIVE').length,
-      averageAssessmentScore: average(scored),
+      averageAssessmentScore: appraisalAverage,
+      totalKpiRecords: kpiPerformance.length,
+      finalizedKpiRecords: kpiPerformance.length,
+      averageKpiScore: kpiAverage,
+      highKpiPerformers: kpiScores.filter((score) => score >= 86).length,
+      lowKpiPerformers: kpiScores.filter((score) => score < 60).length,
+      overallPerformanceScore: average([appraisalAverage, kpiAverage]),
       feedbackCompletionRate: completionAverage,
       highPerformers: employeePerformance.filter((row) => numberValue(row.scorePercent) >= 80).length,
       lowPerformers: employeePerformance.filter((row) => {
@@ -218,6 +287,7 @@ const filterDashboardByDateRange = (source: ReportingDashboard, start?: string, 
     },
     departmentPerformance,
     employeePerformance,
+    kpiPerformance,
     assessmentStatusBreakdown,
     pipStatusReport,
     feedbackParticipation,
@@ -415,12 +485,12 @@ const average = (values: number[]) => {
 };
 
 const makeDepartmentComparison = (dashboard: ReportingDashboard, view: RoleDashboardView): ComparisonColumnDatum[] => {
-  const rows = dashboard.departmentPerformance.filter((row) => numberValue(row.averageScore) > 0);
+  const rows = dashboard.departmentPerformance.filter((row) => numberValue(row.overallScore || row.averageScore || row.averageKpiScore) > 0);
 
   if (rows.length > 0 && view !== 'manager') {
     return rows.slice(0, 8).map((row) => {
-      const averageScore = numberValue(row.averageScore);
-      const approvedRate = row.assessmentCount > 0 ? (numberValue(row.approvedCount) / numberValue(row.assessmentCount)) * 100 : averageScore;
+      const averageScore = numberValue(row.overallScore || row.averageScore || row.averageKpiScore);
+      const approvedRate = row.assessmentCount > 0 ? (numberValue(row.approvedCount) / numberValue(row.assessmentCount)) * 100 : numberValue(row.averageKpiScore) || averageScore;
 
       return {
         label: row.departmentName || 'Unknown',
@@ -438,7 +508,7 @@ const makeDepartmentComparison = (dashboard: ReportingDashboard, view: RoleDashb
   return dashboard.employeePerformance.slice(0, 8).map((row, index) => ({
     label: row.employeeName || row.employeeCode || `Employee ${index + 1}`,
     value: numberValue(row.scorePercent),
-    compareValue: dashboard.summary.averageAssessmentScore || numberValue(row.scorePercent),
+    compareValue: dashboard.summary.overallPerformanceScore || dashboard.summary.averageAssessmentScore || numberValue(row.scorePercent),
     detail: row.departmentName || 'Scoped employee',
     color: '#2563eb',
     compareColor: '#9dccff',
@@ -452,6 +522,11 @@ const makeOrgDistribution = (dashboard: ReportingDashboard): DashboardChartDatum
 
   if (bands.some((item) => numberValue(item.value) > 0)) {
     return bands.map((item, index) => ({ ...item, color: ['#2563eb', '#38bdf8', '#2dd4bf', '#f59e0b', '#fb7185'][index] }));
+  }
+
+  const kpiBands = buildScoreBands(dashboard.kpiPerformance, (row: KpiPerformanceRow) => kpiPerformanceScore(row));
+  if (kpiBands.some((item) => numberValue(item.value) > 0)) {
+    return kpiBands.map((item, index) => ({ ...item, color: ['#2563eb', '#38bdf8', '#2dd4bf', '#f59e0b', '#fb7185'][index] }));
   }
 
   return [
@@ -474,11 +549,22 @@ const makeOrgRows = (dashboard: ReportingDashboard): DashboardRow[] => {
 
   if (rows.length) return rows;
 
+  const kpiRows = dashboard.kpiPerformance.slice(0, 6).map((row) => ({
+    employee: row.employeeName || row.employeeCode || 'Employee',
+    role: row.departmentName || row.position || '—',
+    reviewType: row.kpiTitle || 'KPI Result',
+    score: kpiPerformanceScore(row) > 0 ? formatPercent(kpiPerformanceScore(row)) : '—',
+    status: cleanStatus(row.status),
+    date: formatDate(row.finalizedAt || row.periodEndDate),
+  }));
+
+  if (kpiRows.length) return kpiRows;
+
   return dashboard.departmentPerformance.slice(0, 6).map((row: DepartmentPerformanceRow) => ({
     employee: row.departmentName || 'Department',
     role: `${formatNumber(row.employeeCount)} employees`,
     reviewType: 'Department Summary',
-    score: row.averageScore > 0 ? formatPercent(row.averageScore) : '—',
+    score: row.overallScore > 0 ? formatPercent(row.overallScore) : row.averageKpiScore > 0 ? formatPercent(row.averageKpiScore) : row.averageScore > 0 ? formatPercent(row.averageScore) : '—',
     status: row.pendingCount > 0 ? 'Pending Review' : 'Healthy',
     date: '—',
   }));
@@ -655,11 +741,13 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
     return [
       {
         title: 'Overall Score',
-        value: summary.submittedAssessments > 0 ? formatPercent(summary.averageAssessmentScore) : '—',
-        detail: summary.submittedAssessments > 0 ? 'Latest finalized appraisal average' : 'No finalized score yet',
+        value: summary.overallPerformanceScore > 0 ? formatPercent(summary.overallPerformanceScore) : '—',
+        detail: summary.overallPerformanceScore > 0
+          ? `Includes ${formatNumber(summary.finalizedKpiRecords)} finalized KPI record(s)`
+          : 'No finalized appraisal or KPI score yet',
         icon: <i className="bi bi-star" aria-hidden="true" />,
         tone: 'blue' as const,
-        trend: { label: summary.averageAssessmentScore >= 70 ? 'Healthy' : summary.averageAssessmentScore > 0 ? 'Needs review' : 'No data', direction: summary.averageAssessmentScore >= 70 ? 'up' as const : 'flat' as const },
+        trend: { label: summary.overallPerformanceScore >= 70 ? 'Healthy' : summary.overallPerformanceScore > 0 ? 'Needs review' : 'No data', direction: summary.overallPerformanceScore >= 70 ? 'up' as const : 'flat' as const },
       },
       {
         title: 'Participation Rate',
@@ -672,17 +760,17 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
       {
         title: 'Completed Reviews',
         value: formatNumber(summary.approvedAssessments || summary.submittedAssessments),
-        detail: `${formatNumber(summary.totalAssessments)} total assessment(s)`,
+        detail: `${formatNumber(summary.totalAssessments)} assessment(s), ${formatNumber(summary.finalizedKpiRecords)} KPI record(s)`,
         icon: <i className="bi bi-check2-circle" aria-hidden="true" />,
         tone: 'emerald' as const,
         trend: { label: `${formatNumber(summary.pendingAssessments)} pending`, direction: summary.pendingAssessments > 0 ? 'flat' as const : 'up' as const },
       },
       {
         title: 'Pending Actions',
-        value: formatNumber(summary.pendingAssessments + summary.activePips + summary.lowPerformers),
-        detail: 'Pending reviews, active PIPs, and low performers',
+        value: formatNumber(summary.pendingAssessments + summary.activePips + summary.lowPerformers + summary.lowKpiPerformers),
+        detail: 'Pending reviews, active PIPs, low appraisal, and low KPI scores',
         icon: <i className="bi bi-clock" aria-hidden="true" />,
-        tone: summary.pendingAssessments + summary.activePips + summary.lowPerformers > 0 ? 'rose' as const : 'emerald' as const,
+        tone: summary.pendingAssessments + summary.activePips + summary.lowPerformers + summary.lowKpiPerformers > 0 ? 'rose' as const : 'emerald' as const,
         trend: { label: summary.activePips > 0 ? `${formatNumber(summary.activePips)} active PIP` : 'No active PIP', direction: summary.activePips > 0 ? 'down' as const : 'up' as const },
       },
     ];
@@ -730,9 +818,9 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
       ];
     }
 
-    const topDepartment = [...filteredDashboard.departmentPerformance].sort((a, b) => numberValue(b.averageScore) - numberValue(a.averageScore))[0];
+    const topDepartment = [...filteredDashboard.departmentPerformance].sort((a, b) => numberValue(b.overallScore || b.averageKpiScore || b.averageScore) - numberValue(a.overallScore || a.averageKpiScore || a.averageScore))[0];
     return [
-      { icon: 'bi-hand-thumbs-up', title: 'Greatest Strength', detail: topDepartment?.departmentName ? `${topDepartment.departmentName} leads the current performance view.` : 'No department score available yet.', value: topDepartment?.averageScore ? formatPercent(topDepartment.averageScore) : '—', tone: 'success' },
+      { icon: 'bi-hand-thumbs-up', title: 'Greatest Strength', detail: topDepartment?.departmentName ? `${topDepartment.departmentName} leads the current performance view.` : 'No department score available yet.', value: topDepartment?.overallScore ? formatPercent(topDepartment.overallScore) : topDepartment?.averageKpiScore ? formatPercent(topDepartment.averageKpiScore) : topDepartment?.averageScore ? formatPercent(topDepartment.averageScore) : '—', tone: 'success' },
       { icon: 'bi-graph-up-arrow', title: 'Improvement Focus', detail: filteredDashboard.summary.lowPerformers > 0 ? 'Low performers require HR/manager attention.' : 'No low performer risk currently reported.', value: formatNumber(filteredDashboard.summary.lowPerformers), tone: filteredDashboard.summary.lowPerformers > 0 ? 'warning' : 'success' },
       { icon: 'bi-clipboard-check', title: 'Review Queue', detail: 'Assessments currently waiting in workflow.', value: formatNumber(filteredDashboard.summary.pendingAssessments), tone: filteredDashboard.summary.pendingAssessments > 0 ? 'warning' : 'success' },
     ];

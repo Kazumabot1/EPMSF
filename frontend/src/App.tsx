@@ -199,6 +199,13 @@ function App() {
                 <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
                 <Route path="/admin/kpi-scoring" element={<ManagerKpiScoringPage />} />
                 <Route path="/admin/kpi/history" element={<ManagerKpiHistoryPage />} />
+                <Route path="/admin/reports" element={<Navigate to="/admin/reports/performance" replace />} />
+                <Route path="/admin/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
+                <Route path="/admin/reports/kpi" element={<ReportingDashboardPage reportType="kpi" />} />
+                <Route path="/admin/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
+                <Route path="/admin/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
+                <Route path="/admin/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
+                <Route path="/admin/reports/recommendations" element={<ReportingDashboardPage reportType="recommendations" />} />
 
               <Route path="/admin/approval/kpi" element={<KpiApprovalPage />} />
 
@@ -256,6 +263,7 @@ function App() {
 
                 <Route path="/manager/reports" element={<Navigate to="/manager/reports/performance" replace />} />
                 <Route path="/manager/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
+                <Route path="/manager/reports/kpi" element={<ReportingDashboardPage reportType="kpi" />} />
                 <Route path="/manager/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
                 <Route path="/manager/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
                 <Route path="/manager/reports/recommendations" element={<ReportingDashboardPage reportType="recommendations" />} />
@@ -300,6 +308,7 @@ function App() {
               <Route path="/ceo/kpi-scoring" element={<Navigate to="/executive/dashboard" replace />} />
               <Route path="/executive/reports" element={<Navigate to="/executive/reports/performance" replace />} />
               <Route path="/executive/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
+              <Route path="/executive/reports/kpi" element={<ReportingDashboardPage reportType="kpi" />} />
               <Route path="/executive/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
               <Route path="/executive/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
               <Route path="/executive/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
@@ -322,6 +331,7 @@ function App() {
                 </Route>
                 <Route path="/department-head/reports" element={<Navigate to="/department-head/reports/performance" replace />} />
                 <Route path="/department-head/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
+                <Route path="/department-head/reports/kpi" element={<ReportingDashboardPage reportType="kpi" />} />
                 <Route path="/department-head/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
                 <Route path="/department-head/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
                 <Route path="/department-head/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
@@ -400,7 +410,8 @@ function App() {
 
                 <Route path="/hr/reports" element={<Navigate to="/hr/reports/performance" replace />} />
                 <Route path="/hr/reports/performance" element={<ReportingDashboardPage reportType="employees" />} />
-                <Route path="/hr/reports/department-performance" element={<DepartmentComparisonPage />} />
+                <Route path="/hr/reports/kpi" element={<ReportingDashboardPage reportType="kpi" />} />
+                <Route path="/hr/reports/department-performance" element={<ReportingDashboardPage reportType="departments" />} />
                 <Route path="/hr/reports/assessment-scores" element={<AssessmentScoreTablePage />} />
                 <Route path="/hr/reports/pip-status" element={<ReportingDashboardPage reportType="pip" />} />
                 <Route path="/hr/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />

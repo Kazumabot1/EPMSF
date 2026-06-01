@@ -40,6 +40,9 @@ public final class ReportingDtos {
 
         @Builder.Default
         private List<RecommendationRow> promotionRecommendations = new ArrayList<>();
+
+        @Builder.Default
+        private List<KpiPerformanceRow> kpiPerformance = new ArrayList<>();
     }
 
     @Data
@@ -71,6 +74,12 @@ public final class ReportingDtos {
         private Long feedbackCampaigns;
         private Long activeFeedbackCampaigns;
         private Double averageAssessmentScore;
+        private Long totalKpiRecords;
+        private Long finalizedKpiRecords;
+        private Double averageKpiScore;
+        private Long highKpiPerformers;
+        private Long lowKpiPerformers;
+        private Double overallPerformanceScore;
         private Double feedbackCompletionRate;
         private Long highPerformers;
         private Long lowPerformers;
@@ -88,7 +97,10 @@ public final class ReportingDtos {
         private Long approvedCount;
         private Long pendingCount;
         private Long activePipCount;
+        private Long kpiRecordCount;
         private Double averageScore;
+        private Double averageKpiScore;
+        private Double overallScore;
         private String performanceLabel;
     }
 
@@ -116,6 +128,29 @@ public final class ReportingDtos {
         private LocalDate assessmentDate;
         private LocalDateTime submittedAt;
         private LocalDateTime approvedAt;
+    }
+
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class KpiPerformanceRow {
+        private Integer employeeKpiFormId;
+        private Integer employeeId;
+        private String employeeName;
+        private String employeeCode;
+        private Integer departmentId;
+        private String departmentName;
+        private String position;
+        private String kpiTitle;
+        private String status;
+        private Double totalScore;
+        private Double totalWeightedScore;
+        private String performanceLabel;
+        private LocalDate periodStartDate;
+        private LocalDate periodEndDate;
+        private LocalDateTime finalizedAt;
     }
 
     @Data

@@ -116,7 +116,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const isHr =
       !isAdmin &&
       (normalizedRoles.includes('HR') ||
-          normalizedDashboard === 'HR_DASHBOARD');
+      normalizedDashboard === 'HR_DASHBOARD');
 
   const isDepartmentHead =
       normalizedRoles.includes('DEPARTMENT_HEAD') ||
@@ -238,15 +238,28 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
       {
-        to: '/admin/approval/kpi',
-        label: 'Approvals',
-        icon: 'bi bi-bullseye',
+        to: '/admin/reports',
+        label: 'Reports',
+        icon: 'bi bi-file-earmark-bar-graph',
         children: [
-          { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
-
-          { to: '/admin/approval/changes', label: 'Workforce Change Review', icon: 'bi bi-person-check' },
+          { to: '/admin/reports/performance', label: 'Performance Reports', icon: 'bi bi-file-earmark-bar-graph', end: true },
+          { to: '/admin/reports/kpi', label: 'KPI Performance', icon: 'bi bi-bullseye', end: true },
+          { to: '/admin/reports/department-performance', label: 'Department Performance', icon: 'bi bi-building-check', end: true },
+          { to: '/admin/reports/pip-status', label: 'PIP Status', icon: 'bi bi-clipboard2-pulse', end: true },
+          { to: '/admin/reports/feedback-completion', label: 'Feedback Completion', icon: 'bi bi-chat-dots', end: true },
+          { to: '/admin/reports/recommendations', label: 'Recommendations', icon: 'bi bi-stars', end: true },
         ],
       },
+    {
+      to: '/admin/approval/kpi',
+      label: 'Approvals',
+      icon: 'bi bi-bullseye',
+      children: [
+        { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
+
+        { to: '/admin/approval/changes', label: 'Workforce Change Review', icon: 'bi bi-person-check' },
+      ],
+    },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -256,7 +269,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           {
             to: '/position-permissions',
             label: 'Position Permissions',
-            icon: 'bi bi-ui-checks2-vertical',
+            icon: 'bi bi-sliders2-vertical',
           },
         ],
       },
@@ -277,31 +290,31 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-    const organizationChildren = compactItems([
-      allow(positionPermissions, 'departmentCrud') && {
-        to: '/hr/department',
-        label: 'Departments',
-        icon: 'bi bi-building',
-      },
-      allow(positionPermissions, 'departmentComparisonView') && {
-        to: '/hr/department-comparison',
-        label: 'Departments Comparison',
-        icon: 'bi bi-columns-gap',
-        end: true,
-      },
-      allow(positionPermissions, 'employeeCrud') && {
-        to: '/hr/employee',
-        label: 'Employee',
-        icon: 'bi bi-people',
-        end: true,
-      },
-      {
-        to: '/hr/workforce-changes',
-        label: 'Workforce Changes',
-        icon: 'bi bi-arrow-left-right',
-        end: true,
-      },
-    ]);
+const organizationChildren = compactItems([
+  allow(positionPermissions, 'departmentCrud') && {
+    to: '/hr/department',
+    label: 'Departments',
+    icon: 'bi bi-building',
+  },
+  allow(positionPermissions, 'departmentComparisonView') && {
+    to: '/hr/department-comparison',
+    label: 'Departments Comparison',
+    icon: 'bi bi-columns-gap',
+    end: true,
+  },
+  allow(positionPermissions, 'employeeCrud') && {
+    to: '/hr/employee',
+    label: 'Employee',
+    icon: 'bi bi-people',
+    end: true,
+  },
+  {
+    to: '/hr/workforce-changes',
+    label: 'Workforce Changes',
+    icon: 'bi bi-arrow-left-right',
+    end: true,
+  },
+]);
 
     const hrNavItems: NavItem[] = compactItems([
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
@@ -349,6 +362,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             to: '/hr/reports/performance',
             label: 'Performance Reports',
             icon: 'bi bi-file-earmark-bar-graph',
+            end: true,
+          },
+          {
+            to: '/hr/reports/kpi',
+            label: 'KPI Performance',
+            icon: 'bi bi-bullseye',
             end: true,
           },
           {
@@ -434,7 +453,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             icon: 'bi bi-collection',
             end: true,
           },
-          { to: '/hr/feedback/question-rules', label: 'Form Setup', icon: 'bi bi-ui-checks' },
+          { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
@@ -644,6 +663,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             icon: 'bi bi-file-earmark-bar-graph',
           },
           {
+            to: '/manager/reports/kpi',
+            label: 'KPI Performance',
+            icon: 'bi bi-bullseye',
+          },
+          {
             to: '/manager/reports/pip-status',
             label: 'PIP Status',
             icon: 'bi bi-clipboard2-pulse',
@@ -685,6 +709,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-file-earmark-bar-graph',
         children: [
           { to: '/executive/reports/performance', label: 'Performance Reports', icon: 'bi bi-file-earmark-bar-graph', end: true },
+          { to: '/executive/reports/kpi', label: 'KPI Performance', icon: 'bi bi-bullseye', end: true },
           { to: '/executive/reports/department-performance', label: 'Department Performance', icon: 'bi bi-building-check', end: true },
           { to: '/executive/reports/pip-status', label: 'PIP Status', icon: 'bi bi-clipboard2-pulse', end: true },
           { to: '/executive/reports/feedback-completion', label: 'Feedback Completion', icon: 'bi bi-chat-dots', end: true },
@@ -795,6 +820,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
             to: '/department-head/reports/performance',
             label: 'Performance Reports',
             icon: 'bi bi-file-earmark-bar-graph',
+          },
+          {
+            to: '/department-head/reports/kpi',
+            label: 'KPI Performance',
+            icon: 'bi bi-bullseye',
           },
           {
             to: '/department-head/reports/department-performance',

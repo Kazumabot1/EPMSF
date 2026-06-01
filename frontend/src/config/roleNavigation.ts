@@ -28,7 +28,7 @@ export const disabledFeatureMessage = (positionName?: string | null) =>
 
 const feedbackChildren: NavItem[] = [
   { label: 'Question Bank', path: '/hr/feedback/questions', icon: 'bi-question-circle' },
-  { label: 'Form Setup', path: '/hr/feedback/question-rules', icon: 'bi-ui-checks' },
+  { label: 'Question Rules', path: '/hr/feedback/question-rules', icon: 'bi-sliders' },
   { label: 'Campaign Setup', path: '/hr/feedback/campaigns', icon: 'bi-calendar-plus' },
   { label: 'Monitoring', path: '/hr/feedback/monitoring', icon: 'bi-activity' },
   { label: 'Analytics', path: '/hr/feedback/analytics', icon: 'bi-graph-up' },
@@ -36,6 +36,7 @@ const feedbackChildren: NavItem[] = [
 
 const hrReportsChildren: NavItem[] = [
   { label: 'Performance Reports', path: '/hr/reports/performance', icon: 'bi-file-earmark-bar-graph', end: true },
+  { label: 'KPI Performance', path: '/hr/reports/kpi', icon: 'bi-bullseye', end: true },
   { label: 'Department Performance', path: '/hr/reports/department-performance', icon: 'bi-graph-up-arrow', end: true },
   { label: 'Assessment Scores', path: '/hr/reports/assessment-scores', icon: 'bi-clipboard-data', end: true },
   { label: 'PIP Status', path: '/hr/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
@@ -46,6 +47,7 @@ const hrReportsChildren: NavItem[] = [
 
 const departmentHeadReportsChildren: NavItem[] = [
   { label: 'Performance Reports', path: '/department-head/reports/performance', icon: 'bi-file-earmark-bar-graph', end: true },
+  { label: 'KPI Performance', path: '/department-head/reports/kpi', icon: 'bi-bullseye', end: true },
   { label: 'Department Performance', path: '/department-head/reports/department-performance', icon: 'bi-building-check', end: true },
   { label: 'Assessment Scores', path: '/department-head/reports/assessment-scores', icon: 'bi-clipboard-data', end: true },
   { label: 'PIP Status', path: '/department-head/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
@@ -55,6 +57,7 @@ const departmentHeadReportsChildren: NavItem[] = [
 
 const managerReportsChildren: NavItem[] = [
   { label: 'Performance Reports', path: '/manager/reports/performance', icon: 'bi-file-earmark-bar-graph', end: true },
+  { label: 'KPI Performance', path: '/manager/reports/kpi', icon: 'bi-bullseye', end: true },
   { label: 'PIP Status', path: '/manager/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
   { label: 'Feedback Completion', path: '/manager/reports/feedback-completion', icon: 'bi-chat-dots', end: true },
   { label: 'Recommendations', path: '/manager/reports/recommendations', icon: 'bi-stars', end: true },
@@ -94,6 +97,19 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       ],
     },
     {
+      label: 'Reports',
+      path: '/admin/reports',
+      icon: 'bi-file-earmark-bar-graph',
+      children: [
+        { label: 'Performance Reports', path: '/admin/reports/performance', icon: 'bi-file-earmark-bar-graph', end: true },
+        { label: 'KPI Performance', path: '/admin/reports/kpi', icon: 'bi-bullseye', end: true },
+        { label: 'Department Performance', path: '/admin/reports/department-performance', icon: 'bi-building-check', end: true },
+        { label: 'PIP Status', path: '/admin/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
+        { label: 'Feedback Completion', path: '/admin/reports/feedback-completion', icon: 'bi-chat-dots', end: true },
+        { label: 'Recommendations', path: '/admin/reports/recommendations', icon: 'bi-stars', end: true },
+      ],
+    },
+    {
       label: 'KPI Approvals',
       path: '/admin/approval/kpi',
       icon: 'bi-bullseye',
@@ -101,16 +117,16 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
       ],
     },
-    {
-      label: 'Approvals',
-      path: '/admin/approval/kpi',
-      icon: 'bi-shield-check',
-      children: [
-        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+{
+  label: 'Approvals',
+  path: '/admin/approval/kpi',
+  icon: 'bi-shield-check',
+  children: [
+    { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
 
-        { label: 'Workforce Change Review', path: '/admin/approval/changes', icon: 'bi-person-check' },
-      ],
-    },
+    { label: 'Workforce Change Review', path: '/admin/approval/changes', icon: 'bi-person-check' },
+  ],
+},
     {
       label: 'Access Control',
       path: '/position-permissions',
@@ -119,7 +135,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'User Roles', path: '/user-roles', icon: 'bi-person-gear' },
         { label: 'Role Permissions', path: '/role-permissions', icon: 'bi-shield-check' },
         { label: 'Permissions', path: '/permissions', icon: 'bi-key' },
-        { label: 'Position Permissions', path: '/position-permissions', icon: 'bi-ui-checks2-vertical' },
+        { label: 'Position Permissions', path: '/position-permissions', icon: 'bi-sliders2-vertical' },
       ],
     },
   ],
@@ -142,20 +158,20 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/hr/organization',
       icon: 'bi-building',
 
-      children: [
-        { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
-        {
-          label: 'Department Comparison',
-          path: '/hr/department-comparison',
-          icon: 'bi-columns-gap',
-          permissionField: 'departmentComparisonView',
-        },
-        {
-          label: 'Workforce Changes',
-          path: '/hr/workforce-changes',
-          icon: 'bi-arrow-left-right',
-        },
-      ],
+     children: [
+       { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
+       {
+         label: 'Department Comparison',
+         path: '/hr/department-comparison',
+         icon: 'bi-columns-gap',
+         permissionField: 'departmentComparisonView',
+       },
+       {
+         label: 'Workforce Changes',
+         path: '/hr/workforce-changes',
+         icon: 'bi-arrow-left-right',
+       },
+     ],
     },
     {
       label: 'Reports',
@@ -436,6 +452,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       icon: 'bi-bar-chart-line',
       children: [
         { label: 'Performance Reports', path: '/executive/reports/performance', icon: 'bi-file-earmark-bar-graph', end: true },
+        { label: 'KPI Performance', path: '/executive/reports/kpi', icon: 'bi-bullseye', end: true },
         { label: 'Department Performance', path: '/executive/reports/department-performance', icon: 'bi-building-check', end: true },
         { label: 'PIP Status', path: '/executive/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
         { label: 'Feedback Completion', path: '/executive/reports/feedback-completion', icon: 'bi-chat-dots', end: true },

@@ -145,6 +145,32 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
             @Param("status") EmployeeKpiStatus status
     );
 
+    @EntityGraph(attributePaths = {
+            "employee",
+            "employee.position",
+            "employee.employeeDepartments",
+            "employee.employeeDepartments.currentDepartment",
+            "employee.employeeDepartments.parentDepartment",
+            "kpiForm",
+            "kpiTemplateCycle",
+            "cyclePeriod",
+            "scores",
+            "scores.kpiFormItem",
+            "scores.kpiFormItem.kpiUnit"
+    })
+    @Query(
+            """
+                    SELECT DISTINCT ekf FROM EmployeeKpiForm ekf
+                    WHERE ekf.employee.id IN :employeeIds
+                    AND ekf.status IN :statuses
+                    ORDER BY ekf.finalizedAt DESC, ekf.id DESC
+                    """
+    )
+    List<EmployeeKpiForm> findByEmployeeIdInAndStatusInWithDetail(
+            @Param("employeeIds") Collection<Integer> employeeIds,
+            @Param("statuses") Collection<EmployeeKpiStatus> statuses
+    );
+
     @Query(
             """
                     SELECT DISTINCT ekf FROM EmployeeKpiForm ekf

@@ -3,12 +3,14 @@ package com.epms.service.impl;
 import com.epms.dto.ReportingDtos.DepartmentPerformanceRow;
 import com.epms.dto.ReportingDtos.EmployeePerformanceRow;
 import com.epms.dto.ReportingDtos.FeedbackParticipationRow;
+import com.epms.dto.ReportingDtos.KpiPerformanceRow;
 import com.epms.dto.ReportingDtos.PipReportRow;
 import com.epms.dto.ReportingDtos.RecommendationRow;
 import com.epms.dto.ReportingDtos.ReportingAccessResponse;
 import com.epms.dto.ReportingDtos.ReportingDashboardResponse;
 import com.epms.dto.ReportingDtos.ReportingSummaryResponse;
 import com.epms.dto.ReportingDtos.StatusBreakdownRow;
+import com.epms.dto.ManagerKpiAssignmentDto;
 import com.epms.entity.Department;
 import com.epms.entity.Employee;
 import com.epms.entity.EmployeeAssessment;
@@ -28,6 +30,7 @@ import com.epms.repository.PipRepository;
 import com.epms.repository.UserRepository;
 import com.epms.security.SecurityUtils;
 import com.epms.security.UserPrincipal;
+import com.epms.service.EmployeeKpiWorkflowService;
 import com.epms.service.ReportingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -75,8 +78,10 @@ public class ReportingServiceImpl implements ReportingService {
     private final PipRepository pipRepository;
     private final FeedbackCampaignRepository feedbackCampaignRepository;
     private final FeedbackEvaluatorAssignmentRepository feedbackEvaluatorAssignmentRepository;
+    private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @Override
+    @Transactional(readOnly = false)
     public ReportingDashboardResponse getDashboard() {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
@@ -90,6 +95,10 @@ public class ReportingServiceImpl implements ReportingService {
         List<Pip> pips = safeList(() -> scopedPips(principal, roles));
         List<FeedbackCampaign> campaigns = safeList(feedbackCampaignRepository::findAllByOrderByStartDateDesc);
         List<FeedbackParticipationRow> feedbackRows = safeList(() -> feedbackRows(campaigns, principal, roles));
+        List<KpiPerformanceRow> kpiRows = safeList(() -> kpiPerformanceRows(
+                employeeKpiWorkflowService.listFinalizedHistoryForCurrentUserScope(),
+                employees
+        ));
 
         ReportingAccessResponse access = ReportingAccessResponse.builder()
                 .userId(principal.getId())
@@ -102,13 +111,14 @@ public class ReportingServiceImpl implements ReportingService {
 
         return ReportingDashboardResponse.builder()
                 .access(access)
-                .summary(summary(employees, assessments, pips, campaigns, feedbackRows))
-                .departmentPerformance(safeList(() -> departmentPerformance(employees, assessments, pips)))
+                .summary(summary(employees, assessments, pips, campaigns, feedbackRows, kpiRows))
+                .departmentPerformance(safeList(() -> departmentPerformance(employees, assessments, pips, kpiRows)))
                 .employeePerformance(safeList(() -> employeePerformance(assessments)))
                 .assessmentStatusBreakdown(safeList(() -> statusBreakdown(assessments)))
                 .pipStatusReport(safeList(() -> pipRows(pips)))
                 .feedbackParticipation(feedbackRows)
                 .promotionRecommendations(safeList(() -> recommendations(assessments)))
+                .kpiPerformance(kpiRows)
                 .build();
     }
 
@@ -117,7 +127,8 @@ public class ReportingServiceImpl implements ReportingService {
             List<EmployeeAssessment> assessments,
             List<Pip> pips,
             List<FeedbackCampaign> campaigns,
-            List<FeedbackParticipationRow> feedbackRows
+            List<FeedbackParticipationRow> feedbackRows,
+            List<KpiPerformanceRow> kpiRows
     ) {
         long activeEmployees = employees.stream()
                 .filter(employee -> employee.getActive() == null || Boolean.TRUE.equals(employee.getActive()))
@@ -177,6 +188,19 @@ public class ReportingServiceImpl implements ReportingService {
                 .filter(assessment -> nullToZero(assessment.getScorePercent()) < 60.0)
                 .count();
 
+        List<Double> kpiScores = kpiRows.stream()
+                .map(this::kpiScoreValue)
+                .filter(score -> score > 0.0)
+                .toList();
+
+        double averageKpiScore = average(kpiScores);
+        long highKpiPerformers = kpiScores.stream()
+                .filter(score -> score >= 86.0)
+                .count();
+        long lowKpiPerformers = kpiScores.stream()
+                .filter(score -> score < 60.0)
+                .count();
+
         return ReportingSummaryResponse.builder()
                 .totalEmployees((long) employees.size())
                 .activeEmployees(activeEmployees)
@@ -189,6 +213,12 @@ public class ReportingServiceImpl implements ReportingService {
                 .feedbackCampaigns((long) campaigns.size())
                 .activeFeedbackCampaigns(activeCampaigns)
                 .averageAssessmentScore(round2(averageScore))
+                .totalKpiRecords((long) kpiRows.size())
+                .finalizedKpiRecords((long) kpiRows.size())
+                .averageKpiScore(round2(averageKpiScore))
+                .highKpiPerformers(highKpiPerformers)
+                .lowKpiPerformers(lowKpiPerformers)
+                .overallPerformanceScore(round2(averageAvailable(averageScore, averageKpiScore)))
                 .feedbackCompletionRate(percent(submittedFeedback, assignedFeedback))
                 .highPerformers(highPerformers)
                 .lowPerformers(lowPerformers)
@@ -198,7 +228,8 @@ public class ReportingServiceImpl implements ReportingService {
     private List<DepartmentPerformanceRow> departmentPerformance(
             List<Employee> employees,
             List<EmployeeAssessment> assessments,
-            List<Pip> pips
+            List<Pip> pips,
+            List<KpiPerformanceRow> kpiRows
     ) {
         Map<Integer, String> departmentNames = departmentRepository.findAll()
                 .stream()
@@ -227,6 +258,14 @@ public class ReportingServiceImpl implements ReportingService {
                         Collectors.toList()
                 ));
 
+        Map<Integer, List<KpiPerformanceRow>> kpisByDepartment = kpiRows.stream()
+                .filter(row -> row.getDepartmentId() != null)
+                .collect(Collectors.groupingBy(
+                        KpiPerformanceRow::getDepartmentId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
         Map<Integer, Long> activePipCounts = new LinkedHashMap<>();
 
         for (Pip pip : pips) {
@@ -247,12 +286,15 @@ public class ReportingServiceImpl implements ReportingService {
         Set<Integer> departmentIds = new LinkedHashSet<>();
         departmentIds.addAll(employeeCounts.keySet());
         departmentIds.addAll(assessmentsByDepartment.keySet());
+        departmentIds.addAll(kpisByDepartment.keySet());
         departmentIds.addAll(activePipCounts.keySet());
 
         return departmentIds.stream()
                 .map(departmentId -> {
                     List<EmployeeAssessment> departmentAssessments =
                             assessmentsByDepartment.getOrDefault(departmentId, List.of());
+                    List<KpiPerformanceRow> departmentKpis =
+                            kpisByDepartment.getOrDefault(departmentId, List.of());
 
                     long assessmentCount = departmentAssessments.size();
 
@@ -272,6 +314,12 @@ public class ReportingServiceImpl implements ReportingService {
                             .average()
                             .orElse(0.0);
 
+                    double kpiAverage = average(departmentKpis.stream()
+                            .map(this::kpiScoreValue)
+                            .filter(score -> score > 0.0)
+                            .toList());
+                    double overall = averageAvailable(average, kpiAverage);
+
                     return DepartmentPerformanceRow.builder()
                             .departmentId(departmentId)
                             .departmentName(departmentNames.getOrDefault(
@@ -283,12 +331,15 @@ public class ReportingServiceImpl implements ReportingService {
                             .approvedCount(approvedCount)
                             .pendingCount(pendingCount)
                             .activePipCount(activePipCounts.getOrDefault(departmentId, 0L))
+                            .kpiRecordCount((long) departmentKpis.size())
                             .averageScore(round2(average))
-                            .performanceLabel(labelForScore(average))
+                            .averageKpiScore(round2(kpiAverage))
+                            .overallScore(round2(overall))
+                            .performanceLabel(labelForScore(overall > 0.0 ? overall : average))
                             .build();
                 })
                 .sorted(Comparator.comparing(
-                        DepartmentPerformanceRow::getAverageScore,
+                        DepartmentPerformanceRow::getOverallScore,
                         Comparator.nullsLast(Comparator.reverseOrder())
                 ))
                 .toList();
@@ -323,6 +374,64 @@ public class ReportingServiceImpl implements ReportingService {
                         .submittedAt(assessment.getSubmittedAt())
                         .approvedAt(assessment.getApprovedAt())
                         .build())
+                .toList();
+    }
+
+    private List<KpiPerformanceRow> kpiPerformanceRows(
+            List<ManagerKpiAssignmentDto> assignments,
+            List<Employee> scopedEmployees
+    ) {
+        if (assignments == null || assignments.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, Employee> employeeById = scopedEmployees == null
+                ? new LinkedHashMap<>()
+                : scopedEmployees.stream()
+                .filter(employee -> employee.getId() != null)
+                .collect(Collectors.toMap(
+                        Employee::getId,
+                        employee -> employee,
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+
+        return assignments.stream()
+                .map(row -> {
+                    Employee employee = employeeById.get(row.getEmployeeId());
+                    if (employee == null && row.getEmployeeId() != null) {
+                        employee = employeeRepository.findWithDepartmentsById(row.getEmployeeId()).orElse(null);
+                    }
+
+                    Integer departmentId = departmentIdForEmployee(employee);
+                    String departmentName = emptyToDefault(row.getDepartmentName(), departmentName(departmentId));
+                    String position = emptyToDefault(row.getPositionTitle(), employee != null && employee.getPosition() != null
+                            ? employee.getPosition().getPositionTitle()
+                            : null);
+                    double score = kpiScoreValue(row.getTotalWeightedScore(), row.getTotalScore());
+
+                    return KpiPerformanceRow.builder()
+                            .employeeKpiFormId(row.getEmployeeKpiFormId())
+                            .employeeId(row.getEmployeeId())
+                            .employeeName(row.getEmployeeName())
+                            .employeeCode(employee == null ? null : employee.getEmployeeCode())
+                            .departmentId(departmentId)
+                            .departmentName(departmentName)
+                            .position(position)
+                            .kpiTitle(row.getKpiTitle())
+                            .status(row.getStatus() == null ? null : row.getStatus().name())
+                            .totalScore(row.getTotalScore())
+                            .totalWeightedScore(row.getTotalWeightedScore())
+                            .performanceLabel(labelForScore(score))
+                            .periodStartDate(row.getPeriodStartDate())
+                            .periodEndDate(row.getPeriodEndDate())
+                            .finalizedAt(row.getFinalizedAt())
+                            .build();
+                })
+                .sorted(Comparator.comparing(
+                        KpiPerformanceRow::getFinalizedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
                 .toList();
     }
 
@@ -678,6 +787,7 @@ public class ReportingServiceImpl implements ReportingService {
 
     private boolean canViewReports(Set<String> roles) {
         return roles.contains("HR")
+                || roles.contains("HRADMIN")
                 || roles.contains("ADMIN")
                 || roles.contains("EXECUTIVE")
                 || roles.contains("MANAGER")
@@ -686,7 +796,7 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private boolean canViewAllDepartments(Set<String> roles) {
-        return roles.contains("HR") || roles.contains("ADMIN") || roles.contains("EXECUTIVE");
+        return roles.contains("HR") || roles.contains("HRADMIN") || roles.contains("ADMIN") || roles.contains("EXECUTIVE");
     }
 
     private String scopeLabel(UserPrincipal principal, Set<String> roles) {
@@ -706,7 +816,7 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private String primaryRole(Set<String> roles) {
-        if (roles.contains("ADMIN")) return "Admin";
+        if (roles.contains("HRADMIN") || roles.contains("ADMIN")) return "HR Admin";
         if (roles.contains("HR")) return "HR";
         if (roles.contains("EXECUTIVE")) return "Executive";
         if (roles.contains("DEPARTMENT_HEAD")) return "Department Head";
@@ -866,6 +976,47 @@ public class ReportingServiceImpl implements ReportingService {
         }
 
         return value;
+    }
+
+    private double kpiScoreValue(KpiPerformanceRow row) {
+        if (row == null) {
+            return 0.0;
+        }
+        return kpiScoreValue(row.getTotalWeightedScore(), row.getTotalScore());
+    }
+
+    private double kpiScoreValue(Double weightedScore, Double totalScore) {
+        double weighted = nullToZero(weightedScore);
+        if (weighted > 0.0) {
+            return weighted;
+        }
+        return nullToZero(totalScore);
+    }
+
+    private double average(Collection<Double> values) {
+        if (values == null || values.isEmpty()) {
+            return 0.0;
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);
+    }
+
+    private double averageAvailable(double... values) {
+        if (values == null || values.length == 0) {
+            return 0.0;
+        }
+        double sum = 0.0;
+        int count = 0;
+        for (double value : values) {
+            if (value > 0.0) {
+                sum += value;
+                count++;
+            }
+        }
+        return count == 0 ? 0.0 : sum / count;
     }
 
     private <T> List<T> safeList(Supplier<List<T>> supplier) {

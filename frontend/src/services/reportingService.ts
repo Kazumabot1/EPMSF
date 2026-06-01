@@ -12,6 +12,12 @@ export type ReportingSummary = {
   feedbackCampaigns: number;
   activeFeedbackCampaigns: number;
   averageAssessmentScore: number;
+  totalKpiRecords: number;
+  finalizedKpiRecords: number;
+  averageKpiScore: number;
+  highKpiPerformers: number;
+  lowKpiPerformers: number;
+  overallPerformanceScore: number;
   feedbackCompletionRate: number;
   highPerformers: number;
   lowPerformers: number;
@@ -34,7 +40,10 @@ export type DepartmentPerformanceRow = {
   approvedCount: number;
   pendingCount: number;
   activePipCount: number;
+  kpiRecordCount: number;
   averageScore: number;
+  averageKpiScore: number;
+  overallScore: number;
   performanceLabel?: string | null;
 };
 
@@ -58,6 +67,25 @@ export type EmployeePerformanceRow = {
   assessmentDate?: string | null;
   submittedAt?: string | null;
   approvedAt?: string | null;
+};
+
+
+export type KpiPerformanceRow = {
+  employeeKpiFormId?: number | null;
+  employeeId?: number | null;
+  employeeName?: string | null;
+  employeeCode?: string | null;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  position?: string | null;
+  kpiTitle?: string | null;
+  status?: string | null;
+  totalScore: number;
+  totalWeightedScore: number;
+  performanceLabel?: string | null;
+  periodStartDate?: string | null;
+  periodEndDate?: string | null;
+  finalizedAt?: string | null;
 };
 
 export type StatusBreakdownRow = {
@@ -115,6 +143,7 @@ export type ReportingDashboard = {
   pipStatusReport: PipReportRow[];
   feedbackParticipation: FeedbackParticipationRow[];
   promotionRecommendations: RecommendationRow[];
+  kpiPerformance: KpiPerformanceRow[];
 };
 
 const emptySummary: ReportingSummary = {
@@ -129,6 +158,12 @@ const emptySummary: ReportingSummary = {
   feedbackCampaigns: 0,
   activeFeedbackCampaigns: 0,
   averageAssessmentScore: 0,
+  totalKpiRecords: 0,
+  finalizedKpiRecords: 0,
+  averageKpiScore: 0,
+  highKpiPerformers: 0,
+  lowKpiPerformers: 0,
+  overallPerformanceScore: 0,
   feedbackCompletionRate: 0,
   highPerformers: 0,
   lowPerformers: 0,
@@ -143,6 +178,7 @@ export const emptyReportingDashboard: ReportingDashboard = {
   pipStatusReport: [],
   feedbackParticipation: [],
   promotionRecommendations: [],
+  kpiPerformance: [],
 };
 
 const unwrap = <T,>(response: any, fallback: T): T => {
@@ -169,6 +205,12 @@ const normalizeDashboard = (raw: any): ReportingDashboard => {
       feedbackCampaigns: numberValue(raw?.summary?.feedbackCampaigns),
       activeFeedbackCampaigns: numberValue(raw?.summary?.activeFeedbackCampaigns),
       averageAssessmentScore: numberValue(raw?.summary?.averageAssessmentScore),
+      totalKpiRecords: numberValue(raw?.summary?.totalKpiRecords),
+      finalizedKpiRecords: numberValue(raw?.summary?.finalizedKpiRecords),
+      averageKpiScore: numberValue(raw?.summary?.averageKpiScore),
+      highKpiPerformers: numberValue(raw?.summary?.highKpiPerformers),
+      lowKpiPerformers: numberValue(raw?.summary?.lowKpiPerformers),
+      overallPerformanceScore: numberValue(raw?.summary?.overallPerformanceScore),
       feedbackCompletionRate: numberValue(raw?.summary?.feedbackCompletionRate),
       highPerformers: numberValue(raw?.summary?.highPerformers),
       lowPerformers: numberValue(raw?.summary?.lowPerformers),
@@ -185,6 +227,7 @@ const normalizeDashboard = (raw: any): ReportingDashboard => {
     promotionRecommendations: Array.isArray(raw?.promotionRecommendations)
       ? raw.promotionRecommendations
       : [],
+    kpiPerformance: Array.isArray(raw?.kpiPerformance) ? raw.kpiPerformance : [],
   };
 };
 

@@ -551,6 +551,8 @@ public class SecurityConfig {
                                         Set.of(
                                                 "HR",
                                                 "ADMIN",
+                                                "HRADMIN",
+                                                "HR_ADMIN",
                                                 "MANAGER",
                                                 "PROJECT_MANAGER",
                                                 "TEAM_MANAGER",
@@ -564,6 +566,8 @@ public class SecurityConfig {
                                         Set.of(
                                                 "HR_DASHBOARD",
                                                 "ADMIN_DASHBOARD",
+                                                "HRADMIN_DASHBOARD",
+                                                "HR_ADMIN_DASHBOARD",
                                                 "MANAGER_DASHBOARD",
                                                 "DEPARTMENT_HEAD_DASHBOARD",
                                                 "DEPARTMENTHEAD_DASHBOARD",
@@ -1331,4 +1335,3 @@ public class SecurityConfig {
         return configuration.getAuthenticationManager();
     }
 }
-

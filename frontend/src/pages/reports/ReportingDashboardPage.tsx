@@ -30,6 +30,7 @@ import {
     type DepartmentPerformanceRow,
     type EmployeePerformanceRow,
     type FeedbackParticipationRow,
+    type KpiPerformanceRow,
     type PipReportRow,
     type RecommendationRow,
     type ReportingDashboard,
@@ -50,6 +51,12 @@ const emptyDashboard: ReportingDashboard = {
         feedbackCampaigns: 0,
         activeFeedbackCampaigns: 0,
         averageAssessmentScore: 0,
+        totalKpiRecords: 0,
+        finalizedKpiRecords: 0,
+        averageKpiScore: 0,
+        highKpiPerformers: 0,
+        lowKpiPerformers: 0,
+        overallPerformanceScore: 0,
         feedbackCompletionRate: 0,
         highPerformers: 0,
         lowPerformers: 0,
@@ -60,6 +67,7 @@ const emptyDashboard: ReportingDashboard = {
     pipStatusReport: [],
     feedbackParticipation: [],
     promotionRecommendations: [],
+    kpiPerformance: [],
 };
 
 const errorMessage = (error: any) => {
@@ -118,7 +126,7 @@ const scoreClass = (score?: number | null) => {
     return 'report-score report-score--bad';
 };
 
-type ReportType = 'employees' | 'departments' | 'pip' | 'feedback' | 'recommendations';
+type ReportType = 'employees' | 'kpi' | 'departments' | 'pip' | 'feedback' | 'recommendations';
 
 type ReportingDashboardPageProps = {
     reportType?: ReportType;
@@ -143,6 +151,15 @@ const reportCopy: Record<ReportType, ReportCopy> = {
         heroMetricLabel: 'Average score',
         heroMetricValue: (dashboard) => hasSubmittedPerformanceData(dashboard) ? formatPercent(dashboard.summary.averageAssessmentScore) : '—',
         heroMetricDetail: (dashboard) => hasSubmittedPerformanceData(dashboard) ? `${formatNumber(dashboard.summary.submittedAssessments)} submitted assessments` : 'No submitted assessments',
+    },
+    kpi: {
+        title: 'KPI Performance',
+        description: 'Review finalized KPI scores, weighted KPI averages, employee ranking, and department KPI coverage.',
+        exportLabel: 'kpi-performance-report',
+        searchPlaceholder: 'Search employee, department, KPI title, status...',
+        heroMetricLabel: 'KPI average',
+        heroMetricValue: (dashboard) => dashboard.summary.finalizedKpiRecords > 0 ? formatPercent(dashboard.summary.averageKpiScore) : '—',
+        heroMetricDetail: (dashboard) => dashboard.summary.finalizedKpiRecords > 0 ? `${formatNumber(dashboard.summary.finalizedKpiRecords)} finalized KPI record(s)` : 'No finalized KPI records',
     },
     departments: {
         title: 'Department Performance',
@@ -190,6 +207,7 @@ const reportCopy: Record<ReportType, ReportCopy> = {
 
 const reportVariant: Record<ReportType, 'slate' | 'emerald' | 'violet' | 'amber'> = {
     employees: 'slate',
+    kpi: 'slate',
     departments: 'slate',
     pip: 'slate',
     feedback: 'slate',
@@ -199,6 +217,13 @@ const reportVariant: Record<ReportType, 'slate' | 'emerald' | 'violet' | 'amber'
 const hasSubmittedPerformanceData = (dashboard: ReportingDashboard) =>
     toDashboardNumber(dashboard.summary.submittedAssessments) > 0 ||
     dashboard.employeePerformance.some((row) => toDashboardNumber(row.scorePercent) > 0);
+
+const hasKpiPerformanceData = (dashboard: ReportingDashboard) =>
+    toDashboardNumber(dashboard.summary.finalizedKpiRecords) > 0 ||
+    dashboard.kpiPerformance.some((row) => toDashboardNumber(row.totalWeightedScore || row.totalScore) > 0);
+
+const kpiScoreValue = (row: KpiPerformanceRow) =>
+    toDashboardNumber(row.totalWeightedScore) || toDashboardNumber(row.totalScore);
 
 const getFeedbackTotals = (dashboard: ReportingDashboard) => {
     const assigned = dashboard.feedbackParticipation.reduce((sum, row) => sum + toDashboardNumber(row.assignedCount), 0);
@@ -219,6 +244,7 @@ type ReportNavItem = {
 };
 
 const resolveReportBasePath = (pathname: string) => {
+    if (pathname.startsWith('/admin/reports')) return '/admin/reports';
     if (pathname.startsWith('/manager/reports')) return '/manager/reports';
     if (pathname.startsWith('/department-head/reports')) return '/department-head/reports';
     if (pathname.startsWith('/executive/reports')) return '/executive/reports';
@@ -236,6 +262,13 @@ const buildReportNavItems = (basePath: string): ReportNavItem[] => {
             icon: 'bi-graph-up-arrow',
             path: `${basePath}/performance`,
             type: 'employees',
+        },
+        {
+            label: 'KPI',
+            helper: 'Finalized KPI scores',
+            icon: 'bi-bullseye',
+            path: `${basePath}/kpi`,
+            type: 'kpi',
         },
         ...(!isManager
             ? [
@@ -330,6 +363,26 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
         );
     }, [dashboard.employeePerformance, query]);
 
+    const filteredKpis = useMemo(() => {
+        const search = query.trim().toLowerCase();
+
+        if (!search) return dashboard.kpiPerformance;
+
+        return dashboard.kpiPerformance.filter((row) =>
+            [
+                row.employeeName,
+                row.employeeCode,
+                row.departmentName,
+                row.position,
+                row.kpiTitle,
+                row.status,
+                row.performanceLabel,
+            ]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(search)),
+        );
+    }, [dashboard.kpiPerformance, query]);
+
     const filteredDepartments = useMemo(() => {
         const search = query.trim().toLowerCase();
 
@@ -380,11 +433,12 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
 
     const tableRowCount = useMemo(() => {
         if (activeReportType === 'employees') return filteredEmployees.length;
+        if (activeReportType === 'kpi') return filteredKpis.length;
         if (activeReportType === 'departments') return filteredDepartments.length;
         if (activeReportType === 'pip') return filteredPips.length;
         if (activeReportType === 'feedback') return filteredFeedback.length;
         return filteredRecommendations.length;
-    }, [activeReportType, filteredDepartments.length, filteredEmployees.length, filteredFeedback.length, filteredPips.length, filteredRecommendations.length]);
+    }, [activeReportType, filteredDepartments.length, filteredEmployees.length, filteredFeedback.length, filteredKpis.length, filteredPips.length, filteredRecommendations.length]);
 
     const analytics = useMemo(() => buildReportingAnalytics(dashboard), [dashboard]);
     const reportMetrics = useMemo(() => buildReportMetricCards(activeReportType, dashboard, analytics), [activeReportType, dashboard, analytics]);
@@ -412,6 +466,28 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
             return;
         }
 
+        if (activeReportType === 'kpi') {
+            exportToExcel<KpiPerformanceRow & Record<string, unknown>>(
+                filteredKpis as (KpiPerformanceRow & Record<string, unknown>)[],
+                [
+                    { header: 'Employee', key: 'employeeName' },
+                    { header: 'Code', key: 'employeeCode' },
+                    { header: 'Department', key: 'departmentName' },
+                    { header: 'Position', key: 'position' },
+                    { header: 'KPI Title', key: 'kpiTitle' },
+                    { header: 'Status', key: 'status' },
+                    { header: 'Total Score', key: 'totalScore' },
+                    { header: 'Weighted Score', key: 'totalWeightedScore' },
+                    { header: 'Label', key: 'performanceLabel' },
+                    { header: 'Period Start', key: 'periodStartDate' },
+                    { header: 'Period End', key: 'periodEndDate' },
+                    { header: 'Finalized At', key: 'finalizedAt' },
+                ],
+                activeCopy.exportLabel,
+            );
+            return;
+        }
+
         if (activeReportType === 'departments') {
             exportToExcel<DepartmentPerformanceRow & Record<string, unknown>>(
                 filteredDepartments as (DepartmentPerformanceRow & Record<string, unknown>)[],
@@ -422,7 +498,10 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
                     { header: 'Approved', key: 'approvedCount' },
                     { header: 'Pending', key: 'pendingCount' },
                     { header: 'Active PIPs', key: 'activePipCount' },
-                    { header: 'Average Score', key: 'averageScore' },
+                    { header: 'Appraisal Avg', key: 'averageScore' },
+                    { header: 'KPI Records', key: 'kpiRecordCount' },
+                    { header: 'KPI Avg', key: 'averageKpiScore' },
+                    { header: 'Overall Score', key: 'overallScore' },
                     { header: 'Label', key: 'performanceLabel' },
                 ],
                 activeCopy.exportLabel,
@@ -576,6 +655,7 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
                     <strong>{formatNumber(tableRowCount)} row(s)</strong>
                 </div>
                 {activeReportType === 'employees' && <EmployeePerformanceTable rows={filteredEmployees} />}
+                {activeReportType === 'kpi' && <KpiPerformanceTable rows={filteredKpis} />}
                 {activeReportType === 'departments' && <DepartmentPerformanceTable rows={filteredDepartments} />}
                 {activeReportType === 'pip' && <PipTable rows={filteredPips} />}
                 {activeReportType === 'feedback' && <FeedbackTable rows={filteredFeedback} />}
@@ -611,13 +691,42 @@ const buildReportInsightCards = (
     const feedbackTotals = getFeedbackTotals(dashboard);
     const hasScores = hasSubmittedPerformanceData(dashboard);
 
+    if (reportType === 'kpi') {
+        return [
+            {
+                title: hasKpiPerformanceData(dashboard) ? 'KPI data is included in reports' : 'No finalized KPI results yet',
+                description: hasKpiPerformanceData(dashboard)
+                    ? `${formatNumber(summary.finalizedKpiRecords)} finalized KPI record(s) are available in this scope.`
+                    : 'KPI rows appear here after manager, department head, or HR Admin finalization.',
+                icon: 'bi-bullseye',
+                tone: hasKpiPerformanceData(dashboard) ? 'success' : 'neutral',
+            },
+            {
+                title: summary.overallPerformanceScore > 0 ? 'Overall score includes KPI' : 'Overall score waiting for score data',
+                description: summary.overallPerformanceScore > 0
+                    ? `Overall performance is ${formatPercent(summary.overallPerformanceScore)} using available appraisal and KPI averages.`
+                    : 'At least one finalized appraisal or KPI score is needed for the overall performance card.',
+                icon: 'bi-stars',
+                tone: summary.overallPerformanceScore >= 70 ? 'success' : summary.overallPerformanceScore > 0 ? 'warning' : 'neutral',
+            },
+            {
+                title: summary.lowKpiPerformers > 0 ? 'KPI watchlist needs review' : 'No KPI watchlist risk',
+                description: summary.lowKpiPerformers > 0
+                    ? `${formatNumber(summary.lowKpiPerformers)} KPI record(s) are below 60%.`
+                    : 'No finalized KPI score is currently below the watchlist threshold.',
+                icon: 'bi-person-exclamation',
+                tone: summary.lowKpiPerformers > 0 ? 'warning' : 'success',
+            },
+        ];
+    }
+
     if (reportType === 'departments') {
         return [
             {
                 title: dashboard.departmentPerformance.length > 0 ? 'Department comparison ready' : 'No department scores yet',
                 description: dashboard.departmentPerformance.length > 0
                     ? `${formatNumber(dashboard.departmentPerformance.length)} department(s) are available for comparison.`
-                    : 'Approved appraisal results are required before department score comparison can be shown.',
+                    : 'Finalized appraisal or KPI results are required before department score comparison can be shown.',
                 icon: 'bi-building-check',
                 tone: dashboard.departmentPerformance.length > 0 ? 'success' : 'neutral',
             },
@@ -795,6 +904,41 @@ const buildReportMetricCards = (
     const departmentsWithActivePips = analytics.activePipsByDepartment.length;
     const departmentsWithRecommendations = analytics.recommendationDepartments.length;
 
+    if (reportType === 'kpi') {
+        return [
+            {
+                title: 'Finalized KPI Records',
+                value: formatNumber(summary.finalizedKpiRecords),
+                detail: `${formatNumber(summary.totalKpiRecords)} KPI record(s) in this scope`,
+                icon: 'bi-bullseye',
+                tone: 'blue',
+            },
+            {
+                title: 'KPI Average',
+                value: summary.finalizedKpiRecords > 0 ? formatPercent(summary.averageKpiScore) : '—',
+                detail: summary.finalizedKpiRecords > 0 ? 'Average weighted KPI score' : 'No finalized KPI scores yet',
+                icon: 'bi-speedometer2',
+                tone: 'emerald',
+                trend: { label: scoreHealthLabel(summary.averageKpiScore), direction: summary.averageKpiScore >= 70 ? 'up' : summary.averageKpiScore > 0 ? 'down' : 'flat' },
+            },
+            {
+                title: 'Overall Performance',
+                value: summary.overallPerformanceScore > 0 ? formatPercent(summary.overallPerformanceScore) : '—',
+                detail: 'Average of appraisal and KPI averages when available',
+                icon: 'bi-stars',
+                tone: 'cyan',
+                trend: { label: scoreHealthLabel(summary.overallPerformanceScore), direction: summary.overallPerformanceScore >= 70 ? 'up' : summary.overallPerformanceScore > 0 ? 'down' : 'flat' },
+            },
+            {
+                title: 'KPI Watchlist',
+                value: formatNumber(summary.lowKpiPerformers),
+                detail: `${formatNumber(summary.highKpiPerformers)} high KPI performer(s)`,
+                icon: 'bi-person-exclamation',
+                tone: summary.lowKpiPerformers > 0 ? 'amber' : 'emerald',
+            },
+        ];
+    }
+
     if (reportType === 'departments') {
         return [
             {
@@ -805,12 +949,12 @@ const buildReportMetricCards = (
                 tone: 'blue',
             },
             {
-                title: 'Department Average',
-                value: summary.submittedAssessments > 0 ? formatPercent(summary.averageAssessmentScore) : '—',
-                detail: summary.submittedAssessments > 0 ? 'Across approved appraisal data' : 'No finalized scores yet',
+                title: 'Department Overall',
+                value: summary.overallPerformanceScore > 0 ? formatPercent(summary.overallPerformanceScore) : '—',
+                detail: summary.overallPerformanceScore > 0 ? 'Includes available appraisal and KPI averages' : 'No finalized appraisal or KPI scores yet',
                 icon: 'bi-bar-chart-line',
                 tone: 'emerald',
-                trend: { label: scoreHealthLabel(summary.averageAssessmentScore), direction: summary.averageAssessmentScore >= 70 ? 'up' : summary.averageAssessmentScore > 0 ? 'down' : 'flat' },
+                trend: { label: scoreHealthLabel(summary.overallPerformanceScore), direction: summary.overallPerformanceScore >= 70 ? 'up' : summary.overallPerformanceScore > 0 ? 'down' : 'flat' },
             },
             {
                 title: 'Pending Reviews',
@@ -968,7 +1112,7 @@ const buildReportingAnalytics = (dashboard: ReportingDashboard) => {
     const departmentAverageBars = buildTopValueBars(
         dashboard.departmentPerformance,
         (row) => row.departmentName,
-        (row) => row.averageScore,
+        (row) => row.overallScore || row.averageScore || row.averageKpiScore,
         8,
     ).map((item) => ({
         ...item,
@@ -1077,6 +1221,32 @@ const buildReportingAnalytics = (dashboard: ReportingDashboard) => {
         detail: (item.raw as RecommendationRow | undefined)?.recommendationType || 'Recommendation',
     }));
 
+    const kpiScoreBands = buildScoreBands(dashboard.kpiPerformance, (row) => kpiScoreValue(row));
+
+    const topKpiEmployeeBars = buildTopValueBars(
+        dashboard.kpiPerformance,
+        (row) => row.employeeName,
+        (row) => kpiScoreValue(row),
+        8,
+    ).map((item) => ({
+        ...item,
+        detail: (item.raw as KpiPerformanceRow | undefined)?.departmentName || 'No department',
+    }));
+
+    const departmentKpiBars = buildTopValueBars(
+        dashboard.departmentPerformance,
+        (row) => row.departmentName,
+        (row) => row.averageKpiScore,
+        8,
+    );
+
+    const kpiTemplateBars = buildTopValueBars(
+        dashboard.kpiPerformance,
+        (row) => row.kpiTitle,
+        () => 1,
+        8,
+    );
+
     return {
         departmentAverageBars,
         departmentPendingBars,
@@ -1093,10 +1263,53 @@ const buildReportingAnalytics = (dashboard: ReportingDashboard) => {
         recommendationTypes,
         recommendationDepartments,
         recommendationScoreBars,
+        kpiScoreBands,
+        topKpiEmployeeBars,
+        departmentKpiBars,
+        kpiTemplateBars,
     };
 };
 
 const ReportVisuals = ({ reportType, analytics }: { reportType: ReportType; analytics: ReportingAnalytics }) => {
+    if (reportType === 'kpi') {
+        return (
+            <section className="dashboard-grid dashboard-grid--two reporting-visual-grid" aria-label="KPI analytics charts">
+                <DashboardChartCard title="KPI Score Bands" subtitle="Weighted KPI score distribution for finalized records.">
+                    <StatusDistributionChart
+                        data={analytics.kpiScoreBands}
+                        emptyTitle="No KPI score bands yet"
+                        emptyDescription="Finalized KPI scores are required before KPI score bands can be shown."
+                    />
+                </DashboardChartCard>
+                <DashboardChartCard title="Top KPI Scores" subtitle="Highest finalized weighted KPI scores in the current scope.">
+                    <HorizontalBarChart
+                        data={analytics.topKpiEmployeeBars}
+                        emptyTitle="No KPI ranking yet"
+                        emptyDescription="Finalized KPI scores are required before employee KPI ranking can be shown."
+                        valueFormatter={(value) => formatDashboardPercent(value)}
+                        xAxisSuffix="%"
+                    />
+                </DashboardChartCard>
+                <DashboardChartCard title="Department KPI Average" subtitle="Department comparison based on finalized KPI weighted scores.">
+                    <HorizontalBarChart
+                        data={analytics.departmentKpiBars}
+                        emptyTitle="No department KPI data"
+                        emptyDescription="Department KPI averages appear after finalized KPI records are available."
+                        valueFormatter={(value) => formatDashboardPercent(value)}
+                        xAxisSuffix="%"
+                    />
+                </DashboardChartCard>
+                <DashboardChartCard title="KPI Records by Template" subtitle="Finalized KPI record count grouped by template title.">
+                    <HorizontalBarChart
+                        data={analytics.kpiTemplateBars}
+                        emptyTitle="No KPI template data"
+                        emptyDescription="KPI template usage appears after KPI records are finalized."
+                    />
+                </DashboardChartCard>
+            </section>
+        );
+    }
+
     if (reportType === 'departments') {
         return (
             <section className="dashboard-grid dashboard-grid--two reporting-visual-grid" aria-label="Department analytics charts">
@@ -1113,11 +1326,11 @@ const ReportVisuals = ({ reportType, analytics }: { reportType: ReportType; anal
                         emptyDescription="Employee counts grouped by department will appear here after department data is available."
                     />
                 </DashboardChartCard>
-                <DashboardChartCard title="Department Average Score" subtitle="Top departments by appraisal score.">
+                <DashboardChartCard title="Department Overall Score" subtitle="Top departments by available appraisal and KPI score.">
                     <HorizontalBarChart
                         data={analytics.departmentAverageBars}
                         emptyTitle="No department score data"
-                        emptyDescription="Approved assessment results are needed before department score comparison appears."
+                        emptyDescription="Finalized appraisal or KPI results are needed before department score comparison appears."
                         valueFormatter={(value) => formatDashboardPercent(value)}
                         xAxisSuffix="%"
                     />
@@ -1245,7 +1458,7 @@ const ReportVisuals = ({ reportType, analytics }: { reportType: ReportType; anal
                     emptyDescription="Start appraisal reviews to show submitted, pending, and approved status distribution."
                 />
             </DashboardChartCard>
-            <DashboardChartCard title="Department Average Score" subtitle="Quick comparison across departments.">
+            <DashboardChartCard title="Department Overall Score" subtitle="Quick comparison across departments using appraisal and KPI where available.">
                 <HorizontalBarChart
                     data={analytics.departmentAverageBars}
                     emptyTitle="No department averages yet"
@@ -1373,9 +1586,53 @@ const EmployeePerformanceTable = ({ rows }: { rows: EmployeePerformanceRow[] }) 
     );
 };
 
+const KpiPerformanceTable = ({ rows }: { rows: KpiPerformanceRow[] }) => {
+    if (!rows.length) {
+        return <EmptyRows description="Finalized KPI scores will appear here after KPI evaluation is completed." />;
+    }
+
+    return (
+        <div className="reporting-table-wrap">
+            <table className="reporting-table">
+                <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Department</th>
+                    <th>KPI / Period</th>
+                    <th>Status</th>
+                    <th>Weighted Score</th>
+                    <th>Finalized</th>
+                </tr>
+                </thead>
+                <tbody>
+                {rows.map((row, index) => (
+                    <tr key={`${row.employeeKpiFormId ?? 'kpi'}-${index}`}>
+                        <td>
+                            <strong>{row.employeeName || '—'}</strong>
+                            <small>{row.employeeCode || row.position || '—'}</small>
+                        </td>
+                        <td>{row.departmentName || '—'}</td>
+                        <td>
+                            <span>{row.kpiTitle || '—'}</span>
+                            <small>{formatDate(row.periodStartDate)} - {formatDate(row.periodEndDate)}</small>
+                        </td>
+                        <td><span className="report-pill">{cleanStatus(row.status)}</span></td>
+                        <td>
+                            <span className={scoreClass(kpiScoreValue(row))}>{formatPercent(kpiScoreValue(row))}</span>
+                            <small>{row.performanceLabel || 'Not scored'}</small>
+                        </td>
+                        <td>{formatDateTime(row.finalizedAt)}</td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 const DepartmentPerformanceTable = ({ rows }: { rows: DepartmentPerformanceRow[] }) => {
     if (!rows.length) {
-        return <EmptyRows description="Department comparison rows will appear after approved appraisal results are available." />;
+        return <EmptyRows description="Department comparison rows will appear after finalized appraisal or KPI results are available." />;
     }
 
     return (
@@ -1388,7 +1645,9 @@ const DepartmentPerformanceTable = ({ rows }: { rows: DepartmentPerformanceRow[]
                     <th>Assessments</th>
                     <th>Approved / Pending</th>
                     <th>Active PIPs</th>
-                    <th>Average</th>
+                    <th>Appraisal Avg</th>
+                    <th>KPI Avg</th>
+                    <th>Overall</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -1399,8 +1658,13 @@ const DepartmentPerformanceTable = ({ rows }: { rows: DepartmentPerformanceRow[]
                         <td>{formatNumber(row.assessmentCount)}</td>
                         <td>{formatNumber(row.approvedCount)} / {formatNumber(row.pendingCount)}</td>
                         <td>{formatNumber(row.activePipCount)}</td>
+                        <td><span className={scoreClass(row.averageScore)}>{row.averageScore > 0 ? formatPercent(row.averageScore) : '—'}</span></td>
                         <td>
-                            <span className={scoreClass(row.averageScore)}>{formatPercent(row.averageScore)}</span>
+                            <span className={scoreClass(row.averageKpiScore)}>{row.averageKpiScore > 0 ? formatPercent(row.averageKpiScore) : '—'}</span>
+                            <small>{formatNumber(row.kpiRecordCount)} KPI record(s)</small>
+                        </td>
+                        <td>
+                            <span className={scoreClass(row.overallScore)}>{row.overallScore > 0 ? formatPercent(row.overallScore) : '—'}</span>
                             <small>{row.performanceLabel || '—'}</small>
                         </td>
                     </tr>
