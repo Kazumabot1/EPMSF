@@ -6,9 +6,15 @@ import java.util.List;
 
 public interface EmployeeChangeRequestService {
 
+    List<EmployeeChangeRequestDtos.WorkforceEmployeeResponse> getWorkforceEmployees();
+
+    List<EmployeeChangeRequestDtos.WorkforcePositionResponse> getWorkforcePositions();
+
+    List<EmployeeChangeRequestDtos.WorkforceDepartmentResponse> getWorkforceDepartments();
+
     List<EmployeeChangeRequestDtos.SummaryResponse> getAllForHr();
 
-    List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForCeo();
+    List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForHrAdmin();
 
     EmployeeChangeRequestDtos.DetailResponse getDetail(Long requestId);
 
@@ -20,16 +26,37 @@ public interface EmployeeChangeRequestService {
             EmployeeChangeRequestDtos.DepartmentChangeCreateRequest request
     );
 
-    EmployeeChangeRequestDtos.SummaryResponse approveByCeo(
+    EmployeeChangeRequestDtos.SummaryResponse approveByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest request
     );
 
-    EmployeeChangeRequestDtos.SummaryResponse rejectByCeo(
+    EmployeeChangeRequestDtos.SummaryResponse rejectByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest request
     );
 
     EmployeeChangeRequestDtos.EmployeeChangeProfileResponse getEmployeeChangeProfile(Integer employeeId);
 
+    /*
+     * Legacy method names kept only so old internal references do not break.
+     * UI and API now use HR Admin approval.
+     */
+    default List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForCeo() {
+        return getPendingForHrAdmin();
+    }
+
+    default EmployeeChangeRequestDtos.SummaryResponse approveByCeo(
+            Long requestId,
+            EmployeeChangeRequestDtos.ReviewRequest request
+    ) {
+        return approveByHrAdmin(requestId, request);
+    }
+
+    default EmployeeChangeRequestDtos.SummaryResponse rejectByCeo(
+            Long requestId,
+            EmployeeChangeRequestDtos.ReviewRequest request
+    ) {
+        return rejectByHrAdmin(requestId, request);
+    }
 }

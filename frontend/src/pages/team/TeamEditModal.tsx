@@ -298,13 +298,17 @@ const memberRows = useMemo(() => {
       return 'Please select a Team Leader.';
     }
 
-    if (projectManagerId && projectManagerId === teamLeaderId) {
-      return 'Project Manager cannot be the same as Team Leader.';
-    }
+if (!projectManagerId) {
+  return 'Please select a Project Manager.';
+}
 
-    if (projectManagerId && selectedMemberIds.includes(Number(projectManagerId))) {
-      return 'Project Manager cannot be selected as a normal member.';
-    }
+if (projectManagerId === teamLeaderId) {
+  return 'Project Manager cannot be the same as Team Leader.';
+}
+
+if (selectedMemberIds.includes(Number(projectManagerId))) {
+  return 'Project Manager cannot be selected as a normal member.';
+}
 
     if (selectedMemberIds.includes(Number(teamLeaderId))) {
       return 'Team Leader cannot be selected as a normal member.';
@@ -354,7 +358,7 @@ const request: TeamRequest = {
   teamName: teamName.trim(),
   departmentId: isDepartmentHead ? 0 : Number(departmentId),
   teamLeaderId: Number(teamLeaderId),
-  projectManagerId: projectManagerId ? Number(projectManagerId) : null,
+projectManagerId: Number(projectManagerId),
   teamGoal: teamGoal.trim(),
   status: selectedMemberIds.length === 0 ? 'Inactive' : 'Active',
   reason: reason.trim(),
@@ -484,8 +488,7 @@ const request: TeamRequest = {
               onChange={(event) => setProjectManagerId(event.target.value)}
               disabled={loadingCandidates}
             >
-              <option value="">Optional - Select Project Manager</option>
-
+<option value="">Select Project Manager</option>
               {availableProjectManagers.map((pm) => (
                 <option key={pm.id} value={pm.id}>
                   {formatCandidateLabel(pm)}
@@ -494,8 +497,8 @@ const request: TeamRequest = {
             </select>
 
             <small>
-              Optional. Project Manager can manage many teams, but cannot be Team Leader or a
-              normal member in this team.
+             Required. Project Manager can manage many teams, but cannot be Team Leader or a
+             normal member in this team.
             </small>
           </div>
 

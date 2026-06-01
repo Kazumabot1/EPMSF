@@ -97,7 +97,7 @@
 
 .feedback-result-switcher button.active {
     border-color: #4f63d8;
-    background: #eef2ff;
+    background: #eff6ff;
 }
 
 .feedback-result-switcher span,
@@ -214,7 +214,7 @@
     margin: 16px 0 0;
     padding: 14px 16px;
     border-radius: 18px;
-    background: #eef2ff;
+    background: #eff6ff;
     color: #334155 !important;
 }
 

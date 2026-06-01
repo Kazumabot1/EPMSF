@@ -316,7 +316,7 @@ const EmployeeSelfAssessmentPage = () => {
   const isSubmitted = assessment.status === 'SUBMITTED';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50/40 to-indigo-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50/40 to-blue-100 p-6">
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="rounded-3xl border border-white bg-white/90 p-6 shadow-sm backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

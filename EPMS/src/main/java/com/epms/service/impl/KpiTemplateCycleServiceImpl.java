@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -53,6 +54,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     private final KpiFormRepository kpiFormRepository;
     private final UserRepository userRepository;
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -111,16 +113,18 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<KpiTemplateCycleResponseDTO> list() {
+        employeeKpiWorkflowService.runCycleMaintenance();
         return cycleRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toSummaryDto)
                 .toList();
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public KpiTemplateCycleResponseDTO getById(Integer id) {
+        employeeKpiWorkflowService.runCycleMaintenance();
         KpiTemplateCycle cycle = cycleRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "KPI template cycle not found"));
         List<KpiTemplateCycleForm> links = cycleFormRepository.findWithFormsByCycleId(id);
@@ -139,7 +143,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 return getById(id);
             }
             if (cycle.getStatus() == KpiTemplateCycleStatus.CLOSING
-                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL) {
+                    || cycle.getStatus() == KpiTemplateCycleStatus.PENDING_APPROVAL
+                    || cycle.getStatus() == KpiTemplateCycleStatus.CLOSED) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This cycle cannot be activated from its current status.");
             }
             cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
@@ -148,7 +153,8 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
             cycle.setClosedAt(null);
         } else {
             if (cycle.getStatus() != KpiTemplateCycleStatus.ACTIVE) {
-                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED) {
+                if (cycle.getStatus() == KpiTemplateCycleStatus.DEACTIVATED
+                        || cycle.getStatus() == KpiTemplateCycleStatus.CLOSED) {
                     return getById(id);
                 }
                 throw new ResponseStatusException(
@@ -170,6 +176,13 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
             List<KpiTemplateCycleForm> links = cycleFormRepository.findWithFormsByCycleId(id);
             if (links.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This KPI cycle has no KPI templates.");
+            }
+            var readiness = employeeKpiWorkflowService.buildCycleActivationReadiness(id);
+            if (!readiness.isReady()) {
+                String details = readiness.getBlockingIssues() == null || readiness.getBlockingIssues().isEmpty()
+                        ? "Resolve missing KPI evaluators before activating this cycle."
+                        : String.join(" ", readiness.getBlockingIssues());
+                throw new ResponseStatusException(HttpStatus.CONFLICT, details);
             }
             try {
                 employeeKpiWorkflowService.useCycleForAllActiveDepartments(id);
@@ -203,7 +216,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     public KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason) {
         KpiTemplateCycle cycle = requirePendingApproval(id);
         User reviewer = currentUser();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = now();
         KpiGraceExtension extension = cycle.getGraceExtension();
         if (extension == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Grace period extension is missing.");
@@ -227,7 +240,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         KpiTemplateCycle cycle = requirePendingApproval(id);
         User reviewer = currentUser();
         cycle.setStatus(KpiTemplateCycleStatus.ACTIVE);
-        cycle.setEarlyCloseReviewedAt(LocalDateTime.now());
+        cycle.setEarlyCloseReviewedAt(now());
         cycle.setEarlyCloseReviewedByUser(reviewer);
         cycle.setEarlyCloseReviewDecision(KpiEarlyCloseReviewDecision.REJECTED);
         cycle.setEarlyCloseReviewReason(normalizeText(reviewReason, 1000));
@@ -259,7 +272,7 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
         cycle.setStatus(KpiTemplateCycleStatus.PENDING_APPROVAL);
         cycle.setEarlyCloseReason(reason);
         cycle.setGraceExtension(request.getGraceExtension());
-        cycle.setEarlyCloseRequestedAt(LocalDateTime.now());
+        cycle.setEarlyCloseRequestedAt(now());
         cycle.setEarlyCloseRequestedByUser(currentUser());
         cycle.setEarlyCloseReviewedAt(null);
         cycle.setEarlyCloseReviewedByUser(null);
@@ -276,7 +289,15 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 )
                 .map(KpiTemplateCyclePeriod::getEndDate)
                 .orElse(cycle.getEndDate());
-        return officialEnd != null && LocalDate.now().isBefore(officialEnd);
+        return officialEnd != null && today().isBefore(officialEnd);
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock);
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 
     private void validateRequest(KpiTemplateCycleRequestDTO dto) {
@@ -376,15 +397,10 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                         .title(link.getKpiForm().getTitle())
                         .build())
                 .toList();
-        KpiTemplateCyclePeriod currentPeriod = cyclePeriodRepository
-                .findTopByCycle_IdAndStatusInOrderByPeriodNumberDesc(
-                        cycle.getId(),
-                        List.of(KpiTemplateCyclePeriodStatus.OPEN, KpiTemplateCyclePeriodStatus.CLOSING)
-                )
-                .orElse(null);
         Integer durationYears = responseDurationYears(cycle);
 
         List<KpiTemplateCyclePeriod> allPeriods = cyclePeriodRepository.findAllWithFormByCycleIdOrderByFormIdAndPeriodNumber(cycle.getId());
+        KpiTemplateCyclePeriod currentPeriod = displayCurrentPeriod(allPeriods);
         Map<Integer, KpiTemplateCycleResponseDTO.KpiFormPeriodScheduleDTO> schedulesByFormId = new LinkedHashMap<>();
         // Ensure linked forms exist in response even if no periods yet.
         for (KpiTemplateCycleForm link : links) {
@@ -452,6 +468,22 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
                 .kpiForms(forms)
                 .periodSchedules(schedulesByFormId.values().stream().toList())
                 .build();
+    }
+
+    private KpiTemplateCyclePeriod displayCurrentPeriod(List<KpiTemplateCyclePeriod> periods) {
+        if (periods == null || periods.isEmpty()) {
+            return null;
+        }
+        LocalDate today = today();
+        return periods.stream()
+                .filter(p -> p.getStartDate() != null && p.getEndDate() != null)
+                .filter(p -> !today.isBefore(p.getStartDate()) && !today.isAfter(p.getEndDate()))
+                .findFirst()
+                .orElseGet(() -> periods.stream()
+                        .filter(p -> p.getStatus() == KpiTemplateCyclePeriodStatus.OPEN
+                                || p.getStatus() == KpiTemplateCyclePeriodStatus.CLOSING)
+                        .findFirst()
+                        .orElse(null));
     }
 
     private Integer responseDurationYears(KpiTemplateCycle cycle) {

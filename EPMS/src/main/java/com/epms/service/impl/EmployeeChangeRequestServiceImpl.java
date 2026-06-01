@@ -91,6 +91,15 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
             AssessmentStatus.REJECTED
     );
 
+    private static final Set<String> WORKFORCE_CHANGE_TARGET_ROLES = Set.of(
+            "EMPLOYEE",
+            "MANAGER",
+            "PROJECT_MANAGER",
+            "TEAM_MANAGER",
+            "PM"
+    );
+
+
     private final EmployeeChangeRequestRepository requestRepository;
     private final EmployeeChangeRequestAuditRepository auditRepository;
     private final EmployeeRepository employeeRepository;
@@ -117,6 +126,41 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional(readOnly = true)
+    public List<EmployeeChangeRequestDtos.WorkforceEmployeeResponse> getWorkforceEmployees() {
+        return employeeRepository.findAllActiveWithDepartments()
+                .stream()
+                .filter(this::isAllowedWorkforceTargetEmployeeForList)
+                .map(this::toWorkforceEmployeeResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EmployeeChangeRequestDtos.WorkforcePositionResponse> getWorkforcePositions() {
+        return positionRepository.findAllByOrderByPositionTitleAsc()
+                .stream()
+                .filter(position -> position.getStatus() == null || Boolean.TRUE.equals(position.getStatus()))
+                .filter(this::isAllowedWorkforceTargetPositionForList)
+                .map(this::toWorkforcePositionResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EmployeeChangeRequestDtos.WorkforceDepartmentResponse> getWorkforceDepartments() {
+        return departmentRepository.findAll()
+                .stream()
+                .filter(department -> department.getStatus() == null || Boolean.TRUE.equals(department.getStatus()))
+                .sorted(Comparator.comparing(
+                        department -> department.getDepartmentName() == null ? "" : department.getDepartmentName(),
+                        String.CASE_INSENSITIVE_ORDER
+                ))
+                .map(this::toWorkforceDepartmentResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<EmployeeChangeRequestDtos.SummaryResponse> getAllForHr() {
         return requestRepository.findAllByOrderByRequestedAtDesc()
                 .stream()
@@ -126,7 +170,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional(readOnly = true)
-    public List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForCeo() {
+    public List<EmployeeChangeRequestDtos.SummaryResponse> getPendingForHrAdmin() {
         return requestRepository.findByStatusOrderByRequestedAtDesc(EmployeeChangeRequestStatus.PENDING)
                 .stream()
                 .map(this::toSummary)
@@ -167,8 +211,11 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
         String reason = cleanRequiredReason(request.getReason(), "Please write the reason for this position change.");
 
         Employee employee = findEmployee(request.getEmployeeId());
+        assertAllowedWorkforceTargetEmployee(employee);
+
         Position newPosition = positionRepository.findById(request.getNewPositionId())
                 .orElseThrow(() -> new ResourceNotFoundException("New position not found."));
+        assertAllowedWorkforceTargetPosition(newPosition);
 
         if (employee.getPosition() != null
                 && employee.getPosition().getId() != null
@@ -219,16 +266,21 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
             throw new BadRequestException("Employee is required.");
         }
 
-        if (request.getNewCurrentDepartmentId() == null) {
-            throw new BadRequestException("New current department is required.");
-        }
-
         String reason = cleanRequiredReason(request.getReason(), "Please write the reason for this department change.");
 
         Employee employee = findEmployee(request.getEmployeeId());
+        assertAllowedWorkforceTargetEmployee(employee);
 
-        Department newCurrentDepartment = departmentRepository.findById(request.getNewCurrentDepartmentId())
+        DepartmentSnapshot oldSnapshot = activeDepartmentSnapshot(employee.getId());
+
+        Department newCurrentDepartment = request.getNewCurrentDepartmentId() == null
+                ? oldSnapshot.currentDepartment()
+                : departmentRepository.findById(request.getNewCurrentDepartmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("New current department not found."));
+
+        if (newCurrentDepartment == null) {
+            throw new BadRequestException("New current department is required when the employee has no current department yet.");
+        }
 
         Department newParentDepartment = null;
 
@@ -237,7 +289,6 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                     .orElseThrow(() -> new ResourceNotFoundException("New parent department not found."));
         }
 
-        DepartmentSnapshot oldSnapshot = activeDepartmentSnapshot(employee.getId());
         Integer oldCurrentId = oldSnapshot.currentDepartment() == null ? null : oldSnapshot.currentDepartment().getId();
         Integer oldParentId = oldSnapshot.parentDepartment() == null ? null : oldSnapshot.parentDepartment().getId();
         Integer newParentId = newParentDepartment == null ? null : newParentDepartment.getId();
@@ -283,13 +334,13 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional
-    public EmployeeChangeRequestDtos.SummaryResponse approveByCeo(
+    public EmployeeChangeRequestDtos.SummaryResponse approveByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest reviewRequest
     ) {
         String reason = cleanRequiredReason(
                 reviewRequest == null ? null : reviewRequest.getReason(),
-                "CEO approval reason is required."
+                "HR Admin approval reason is required."
         );
 
         EmployeeChangeRequest request = findRequest(requestId);
@@ -300,16 +351,16 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
         /*
          * Re-check blockers at approval time.
-         * This prevents CEO from approving a request that became unsafe after HR submitted it.
+         * This prevents HR Admin from approving a request that became unsafe after HR submitted it.
          */
         ValidationResult validation = validateChangeAllowed(request.getEmployee(), request.getRequestType());
 
-        User ceo = currentUser();
+        User reviewer = currentUser();
 
         EmployeeChangeRequestStatus oldStatus = request.getStatus();
 
         request.setStatus(EmployeeChangeRequestStatus.APPROVED);
-        request.setReviewedByUser(ceo);
+        request.setReviewedByUser(reviewer);
         request.setReviewedAt(java.time.LocalDateTime.now());
         request.setCeoReviewReason(reason);
         request.setValidationSummary(validation.validationSummary());
@@ -319,15 +370,15 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "APPROVED",
                 oldStatus,
                 EmployeeChangeRequestStatus.APPROVED,
-                ceo,
+                reviewer,
                 reason,
-                "CEO approved this workforce change request."
+                "HR Admin approved this workforce change request."
         );
 
         if (request.getRequestType() == EmployeeChangeRequestType.POSITION_CHANGE) {
-            applyApprovedPositionChange(request, ceo, reason);
+            applyApprovedPositionChange(request, reviewer, reason);
         } else if (request.getRequestType() == EmployeeChangeRequestType.DEPARTMENT_CHANGE) {
-            applyApprovedDepartmentChange(request, ceo, reason);
+            applyApprovedDepartmentChange(request, reviewer, reason);
         }
 
         EmployeeChangeRequestStatus approvedStatus = request.getStatus();
@@ -338,7 +389,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "APPLIED",
                 approvedStatus,
                 EmployeeChangeRequestStatus.APPLIED,
-                ceo,
+                reviewer,
                 reason,
                 "Approved workforce change was applied to the employee profile."
         );
@@ -351,13 +402,13 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
     @Override
     @Transactional
-    public EmployeeChangeRequestDtos.SummaryResponse rejectByCeo(
+    public EmployeeChangeRequestDtos.SummaryResponse rejectByHrAdmin(
             Long requestId,
             EmployeeChangeRequestDtos.ReviewRequest reviewRequest
     ) {
         String reason = cleanRequiredReason(
                 reviewRequest == null ? null : reviewRequest.getReason(),
-                "CEO rejection reason is required."
+                "HR Admin rejection reason is required."
         );
 
         EmployeeChangeRequest request = findRequest(requestId);
@@ -366,11 +417,11 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
             throw new BadRequestException("Only pending employee change requests can be rejected.");
         }
 
-        User ceo = currentUser();
+        User reviewer = currentUser();
         EmployeeChangeRequestStatus oldStatus = request.getStatus();
 
         request.setStatus(EmployeeChangeRequestStatus.REJECTED);
-        request.setReviewedByUser(ceo);
+        request.setReviewedByUser(reviewer);
         request.setReviewedAt(java.time.LocalDateTime.now());
         request.setCeoReviewReason(reason);
 
@@ -379,9 +430,9 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 "REJECTED",
                 oldStatus,
                 EmployeeChangeRequestStatus.REJECTED,
-                ceo,
+                reviewer,
                 reason,
-                "CEO rejected this workforce change request."
+                "HR Admin rejected this workforce change request."
         );
 
         EmployeeChangeRequest saved = requestRepository.save(request);
@@ -489,7 +540,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
         newAssignment.setParentDepartment(newParentDepartment);
         newAssignment.setStartdate(new Date());
         newAssignment.setEnddate(null);
-        newAssignment.setAssignBy("CEO Approval");
+        newAssignment.setAssignBy("HR Admin Approval");
 
         employeeDepartmentRepository.save(newAssignment);
 
@@ -582,7 +633,6 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
         employeeAuditHistoryRepository.save(history);
     }
-
     private void notifyAfterDecision(EmployeeChangeRequest request, boolean approved) {
         Employee employee = request.getEmployee();
 
@@ -593,8 +643,8 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 : "Workforce change rejected";
 
         String message = approved
-                ? employeeLabel + "'s " + typeLabel + " request was approved by CEO and applied."
-                : employeeLabel + "'s " + typeLabel + " request was rejected by CEO. Reason: "
+                ? employeeLabel + "'s " + typeLabel + " request was approved by HR Admin and applied."
+                : employeeLabel + "'s " + typeLabel + " request was rejected by HR Admin. Reason: "
                 + nullToBlank(request.getCeoReviewReason());
 
         Integer referenceId = request.getId() == null ? null : request.getId().intValue();
@@ -783,16 +833,23 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
 
         List<String> activeTeams = activeTeamLabels(employeeUser);
 
-        if (!activeTeams.isEmpty()) {
-            blockers.add("This employee is still connected to active team work: " + String.join(", ", activeTeams) + ".");
-        }
+        String teamNote = activeTeams.isEmpty()
+                ? ""
+                : " Note: this employee is currently connected to active team work: "
+                + String.join(", ", activeTeams)
+                + ". Existing team assignment will remain, but future team selection must follow current team eligibility.";
 
         if (!blockers.isEmpty()) {
-            throw new BadRequestException(buildBlockerMessage(requestType, blockers));
+            return new ValidationResult(
+                    "Warning for HR Admin review: "
+                            + String.join(" ", blockers)
+                            + teamNote
+            );
         }
 
         return new ValidationResult(
-                "Ready for CEO approval. No active KPI, PIP, appraisal, self-assessment, or active team blockers were found."
+                "Ready for HR Admin approval. No active KPI, PIP, appraisal, or self-assessment blockers were found."
+                        + teamNote
         );
     }
 
@@ -896,6 +953,45 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
         return clean;
     }
 
+    private void assertAllowedWorkforceTargetEmployee(Employee employee) {
+        if (employee == null) {
+            throw new BadRequestException("Employee is required.");
+        }
+
+        if (!isAllowedWorkforceTargetRole(roleName(employee.getPosition()))) {
+            throw new BadRequestException(
+                    "Workforce changes are allowed only for Employee and Manager roles."
+            );
+        }
+    }
+
+    private void assertAllowedWorkforceTargetPosition(Position position) {
+        if (position == null) {
+            throw new BadRequestException("Position is required.");
+        }
+
+        if (!isAllowedWorkforceTargetRole(roleName(position))) {
+            throw new BadRequestException(
+                    "Target position must be connected to Employee or Manager role."
+            );
+        }
+    }
+
+    private boolean isAllowedWorkforceTargetRole(String roleName) {
+        return WORKFORCE_CHANGE_TARGET_ROLES.contains(normalizeRoleName(roleName));
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        return value.trim()
+                .toUpperCase()
+                .replace('-', '_')
+                .replace(' ', '_');
+    }
+
     private Employee findEmployee(Integer employeeId) {
         return employeeRepository.findWithDepartmentsById(employeeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found."));
@@ -950,6 +1046,90 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
         auditRepository.save(audit);
     }
 
+    private boolean isAllowedWorkforceTargetEmployeeForList(Employee employee) {
+        if (employee == null || Boolean.FALSE.equals(employee.getActive())) {
+            return false;
+        }
+
+        return isAllowedWorkforceTargetRole(roleName(employee.getPosition()));
+    }
+
+    private boolean isAllowedWorkforceTargetPositionForList(Position position) {
+        if (position == null || Boolean.FALSE.equals(position.getStatus())) {
+            return false;
+        }
+
+        return isAllowedWorkforceTargetRole(roleName(position));
+    }
+
+    private EmployeeChangeRequestDtos.WorkforceEmployeeResponse toWorkforceEmployeeResponse(Employee employee) {
+        User user = employee == null || employee.getId() == null
+                ? null
+                : userRepository.findActiveByEmployeeId(employee.getId()).orElse(null);
+
+        Position position = employee == null ? null : employee.getPosition();
+        DepartmentSnapshot snapshot = employee == null || employee.getId() == null
+                ? new DepartmentSnapshot(null, null, null)
+                : activeDepartmentSnapshot(employee.getId());
+
+        Department currentDepartment = snapshot.currentDepartment();
+        Department parentDepartment = snapshot.parentDepartment();
+        Department workingDepartment = snapshot.workingDepartment();
+        List<String> activeTeams = activeTeamLabels(user);
+        String fullName = employeeName(employee);
+
+        return EmployeeChangeRequestDtos.WorkforceEmployeeResponse.builder()
+                .id(employee == null ? null : employee.getId())
+                .employeeId(employee == null ? null : employee.getId())
+                .userId(user == null ? null : user.getId())
+                .firstName(employee == null ? null : employee.getFirstName())
+                .lastName(employee == null ? null : employee.getLastName())
+                .fullName(fullName)
+                .name(fullName)
+                .email(employee == null ? null : employee.getEmail())
+                .workEmail(employee == null ? null : employee.getEmail())
+                .positionId(position == null ? null : position.getId())
+                .positionTitle(positionName(position))
+                .positionName(positionName(position))
+                .roleName(roleName(position))
+                .role(roleName(position))
+                .dashboard(user == null ? null : user.getDashboard())
+                .currentDepartmentId(currentDepartment == null ? null : currentDepartment.getId())
+                .departmentId(workingDepartment == null ? null : workingDepartment.getId())
+                .departmentName(departmentName(workingDepartment))
+                .currentDepartmentName(departmentName(currentDepartment))
+                .parentDepartmentId(parentDepartment == null ? null : parentDepartment.getId())
+                .parentDepartmentName(departmentName(parentDepartment))
+                .workingDepartmentId(workingDepartment == null ? null : workingDepartment.getId())
+                .workingDepartmentName(departmentName(workingDepartment))
+                .teamName(activeTeams.isEmpty() ? null : String.join(", ", activeTeams))
+                .activeTeamName(activeTeams.isEmpty() ? null : String.join(", ", activeTeams))
+                .active(employee == null ? null : !Boolean.FALSE.equals(employee.getActive()))
+                .build();
+    }
+
+    private EmployeeChangeRequestDtos.WorkforcePositionResponse toWorkforcePositionResponse(Position position) {
+        return EmployeeChangeRequestDtos.WorkforcePositionResponse.builder()
+                .id(position == null ? null : position.getId())
+                .positionTitle(positionName(position))
+                .title(positionName(position))
+                .positionName(positionName(position))
+                .levelCode(positionLevelCode(position))
+                .roleName(roleName(position))
+                .status(position == null ? null : !Boolean.FALSE.equals(position.getStatus()))
+                .build();
+    }
+
+    private EmployeeChangeRequestDtos.WorkforceDepartmentResponse toWorkforceDepartmentResponse(Department department) {
+        return EmployeeChangeRequestDtos.WorkforceDepartmentResponse.builder()
+                .id(department == null ? null : department.getId())
+                .departmentName(departmentName(department))
+                .name(departmentName(department))
+                .departmentCode(department == null ? null : department.getDepartmentCode())
+                .status(department == null ? null : !Boolean.FALSE.equals(department.getStatus()))
+                .build();
+    }
+
     private EmployeeChangeRequestDtos.SummaryResponse toSummary(EmployeeChangeRequest request) {
         if (request == null) {
             return null;
@@ -978,6 +1158,7 @@ public class EmployeeChangeRequestServiceImpl implements EmployeeChangeRequestSe
                 .newWorkingDepartmentName(departmentName(request.getNewWorkingDepartment()))
                 .oldTeamName(request.getOldTeamName())
                 .requestReason(request.getRequestReason())
+                .hrAdminReviewReason(request.getCeoReviewReason())
                 .ceoReviewReason(request.getCeoReviewReason())
                 .validationSummary(request.getValidationSummary())
                 .blockingSummary(request.getBlockingSummary())

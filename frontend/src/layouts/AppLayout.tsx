@@ -19,8 +19,11 @@ const AppLayout = () => {
     }
 
     const usesHrShell = role === 'HR' || role === 'Admin';
+    const roleClassName = role === 'DepartmentHead' ? 'app-shell--department-head' : `app-shell--${role.toLowerCase()}`;
     const contentOffsetClass = usesHrShell ? '' : collapsed ? 'employee-collapsed' : '';
-    const shellClassName = usesHrShell ? 'hr-shell' : `app-shell ${contentOffsetClass}`;
+    const shellClassName = usesHrShell
+        ? `hr-shell hr-shell--${role.toLowerCase()}`
+        : `app-shell ${roleClassName} ${contentOffsetClass}`;
 
     return (
         <div className={shellClassName}>

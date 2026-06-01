@@ -58,8 +58,9 @@ const allow = (permissions: PositionPermission, key: keyof PositionPermission) =
       return Boolean(permissions.appraisalPermission);
 
     case 'continuousFeedbackView':
-    case 'continuousFeedbackGive':
       return Boolean(permissions.continuousFeedbackView);
+    case 'continuousFeedbackGive':
+      return Boolean(permissions.continuousFeedbackGive);
 
     case 'feedback360Permission':
       return Boolean(permissions.feedback360Permission);
@@ -77,8 +78,7 @@ const allow = (permissions: PositionPermission, key: keyof PositionPermission) =
     case 'kpiPermission':
       return Boolean(permissions.kpiPermission);
 
-    case 'departmentKpiPermission':
-      return Boolean(permissions.departmentKpiPermission);
+
 
     default:
       return Boolean(permissions[key]);
@@ -107,11 +107,16 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
   const isAdmin =
       normalizedRoles.includes('ADMIN') ||
-      normalizedDashboard === 'ADMIN_DASHBOARD';
+      normalizedRoles.includes('HRADMIN') ||
+      normalizedRoles.includes('HR_ADMIN') ||
+      normalizedDashboard === 'ADMIN_DASHBOARD' ||
+      normalizedDashboard === 'HRADMIN_DASHBOARD' ||
+      normalizedDashboard === 'HR_ADMIN_DASHBOARD';
 
   const isHr =
-      normalizedRoles.includes('HR') ||
-      normalizedDashboard === 'HR_DASHBOARD';
+      !isAdmin &&
+      (normalizedRoles.includes('HR') ||
+      normalizedDashboard === 'HR_DASHBOARD');
 
   const isDepartmentHead =
       normalizedRoles.includes('DEPARTMENT_HEAD') ||
@@ -146,11 +151,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
 
   const roleLabel =
       variant === 'admin'
-          ? 'Admin'
+          ? 'HR Admin'
           : variant === 'hr'
               ? 'HR'
               : isAdmin
-                  ? 'Admin'
+                  ? 'HR Admin'
                   : isHr
                       ? 'HR'
                       : isDepartmentHead
@@ -220,9 +225,28 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         : [{ to: '/pip/past-plans', label: 'Past Plans', icon: 'bi bi-clock-history' }];
 
     const adminNavItems: NavItem[] = [
-      { to: '/admin/dashboard', label: 'Admin Dashboard', icon: 'bi bi-shield-lock' },
+      { to: '/admin/dashboard', label: 'HR Admin Dashboard', icon: 'bi bi-shield-lock' },
       { to: '/admin/users', label: 'User Accounts', icon: 'bi bi-person-plus' },
       { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'bi bi-clock-history' },
+      {
+        to: '/admin/kpi-scoring',
+        label: 'KPI Scoring',
+        icon: 'bi bi-ui-checks-grid',
+        children: [
+          { to: '/admin/kpi-scoring', label: 'Score Senior KPIs', icon: 'bi bi-clipboard2-check', end: true },
+          { to: '/admin/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
+        ],
+      },
+    {
+      to: '/admin/approval/kpi',
+      label: 'Approvals',
+      icon: 'bi bi-bullseye',
+      children: [
+        { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
+
+        { to: '/admin/approval/changes', label: 'Workforce Change Review', icon: 'bi bi-person-check' },
+      ],
+    },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -253,25 +277,31 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-    const organizationChildren = compactItems([
-      allow(positionPermissions, 'departmentCrud') && {
-        to: '/hr/department',
-        label: 'Departments',
-        icon: 'bi bi-building',
-      },
-      allow(positionPermissions, 'departmentComparisonView') && {
-        to: '/hr/department-comparison',
-        label: 'Departments Comparison',
-        icon: 'bi bi-columns-gap',
-        end: true,
-      },
-      allow(positionPermissions, 'employeeCrud') && {
-        to: '/hr/employee',
-        label: 'Employee',
-        icon: 'bi bi-people',
-        end: true,
-      },
-    ]);
+const organizationChildren = compactItems([
+  allow(positionPermissions, 'departmentCrud') && {
+    to: '/hr/department',
+    label: 'Departments',
+    icon: 'bi bi-building',
+  },
+  allow(positionPermissions, 'departmentComparisonView') && {
+    to: '/hr/department-comparison',
+    label: 'Departments Comparison',
+    icon: 'bi bi-columns-gap',
+    end: true,
+  },
+  allow(positionPermissions, 'employeeCrud') && {
+    to: '/hr/employee',
+    label: 'Employee',
+    icon: 'bi bi-people',
+    end: true,
+  },
+  {
+    to: '/hr/workforce-changes',
+    label: 'Workforce Changes',
+    icon: 'bi bi-arrow-left-right',
+    end: true,
+  },
+]);
 
     const hrNavItems: NavItem[] = compactItems([
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
@@ -468,33 +498,8 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      allow(positionPermissions, 'departmentKpiPermission') && {
-        to: '/hr/department-kpi-template',
-        label: 'Department KPI Management',
-        icon: 'bi bi-building-gear',
-        children: [
-          {
-            to: '/hr/department-kpi-template',
-            label: 'Department KPI Templates',
-            icon: 'bi bi-building-gear',
-          },
-          {
-            to: '/hr/department-kpi-cycle',
-            label: 'Department KPI Cycle',
-            icon: 'bi bi-arrow-repeat',
-          },
-          {
-            to: '/hr/department-kpi-scoring',
-            label: 'Department KPI Scoring',
-            icon: 'bi bi-clipboard2-check',
-          },
-          {
-            to: '/hr/department-kpi-results',
-            label: 'Department KPI Results',
-            icon: 'bi bi-building-check',
-          },
-        ],
-      },
+
+
     ]);
 
     const employeeNavItems: NavItem[] = compactItems([
@@ -536,7 +541,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'My Self-Assessment',
         icon: 'bi bi-pencil-square',
       },
-      {
+      allow(positionPermissions, 'selfAssessmentSign') && {
         to: '/manager/assessment-review',
         label: 'Assessment Review',
         icon: 'bi bi-clipboard-check',
@@ -546,14 +551,14 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'My KPIs',
         icon: 'bi bi-bullseye',
       },
-      {
+      (allow(positionPermissions, 'kpiInput') || allow(positionPermissions, 'kpiScore') || allow(positionPermissions, 'kpiView')) && {
         to: '/manager/kpi-scoring',
-        label: 'Team KPIs',
+        label: 'KPI Evaluation',
         icon: 'bi bi-bullseye',
         children: [
           {
             to: '/manager/kpi-scoring',
-            label: 'KPI Scoring',
+            label: 'Evaluate KPIs',
             icon: 'bi bi-clipboard2-check',
             end: true,
           },
@@ -565,7 +570,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'appraisalPermission') && {
         to: '/manager/appraisals',
         label: 'Appraisal Review',
         icon: 'bi bi-clipboard-data',
@@ -584,7 +589,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'feedback360Permission') && {
         to: '/manager/feedback',
         label: '360 Feedback',
         icon: 'bi bi-chat-square-dots',
@@ -595,13 +600,13 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      (allow(positionPermissions, 'continuousFeedbackView') || allow(positionPermissions, 'continuousFeedbackGive')) && {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
 
-      {
+      allow(positionPermissions, 'oneOnOnePermission') && {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -619,22 +624,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      canViewPip && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
-        children: [
-          {
-            to: '/pip/create',
-            label: 'Create PIP',
-            icon: 'bi bi-plus-square',
-          },
-          {
-            to: '/pip/past-plans',
-            label: 'Past Plans',
-            icon: 'bi bi-clock-history',
-          },
-        ],
+        children: pipChildren,
       },
 
       {
@@ -682,15 +676,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
     const executiveNavItems: NavItem[] = [
       { to: '/executive/dashboard', label: 'Executive Dashboard', icon: 'bi bi-building' },
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
-      {
-        to: '/executive/kpi-scoring',
-        label: 'KPI Management',
-        icon: 'bi bi-bullseye',
-        children: [
-          { to: '/executive/kpi-scoring', label: 'KPI Scoring', icon: 'bi bi-ui-checks-grid', end: true },
-          { to: '/executive/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
-        ],
-      },
+
       {
         to: '/executive/reports',
         label: 'Reports',
@@ -718,23 +704,28 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         icon: 'bi bi-person',
       },
       {
+        to: '/department-head/employee-lists',
+        label: 'Department Employee Lists',
+        icon: 'bi bi-people',
+      },
+      {
         to: '/department-head/self-assessment-forms',
         label: 'View Self-assessment Form',
         icon: 'bi bi-eye',
       },
-      {
+      allow(positionPermissions, 'selfAssessmentView') && {
         to: '/department-head/assessment-scores',
         label: 'Assessment Review',
         icon: 'bi bi-clipboard-data',
       },
 
-      {
+      (allow(positionPermissions, 'continuousFeedbackView') || allow(positionPermissions, 'continuousFeedbackGive')) && {
         to: '/continuous-feedback',
         label: 'Continuous Feedback',
         icon: 'bi bi-chat-dots',
       },
 
-      {
+      allow(positionPermissions, 'feedback360Permission') && {
         to: '/department-head/feedback',
         label: '360 Feedback',
         icon: 'bi bi-chat-square-dots',
@@ -750,7 +741,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'Department KPIs',
         icon: 'bi bi-building-check',
       },
-      {
+      (allow(positionPermissions, 'kpiInput') || allow(positionPermissions, 'kpiScore') || allow(positionPermissions, 'kpiView')) && {
         to: '/department-head/kpi-scoring',
         label: 'Manager KPI Scoring',
         icon: 'bi bi-ui-checks-grid',
@@ -769,7 +760,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'teamView') && {
         to: '/department-head/teams',
         label: 'Teams',
         icon: 'bi bi-people-fill',
@@ -850,7 +841,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      allow(positionPermissions, 'oneOnOnePermission') && {
         to: '/one-on-one-meetings',
         label: 'One-on-One',
         icon: 'bi bi-chat-left-text',
@@ -868,22 +859,11 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         ],
       },
 
-      {
+      canViewPip && {
         to: '/pip',
         label: 'PIP',
         icon: 'bi bi-clipboard2-pulse',
-        children: [
-          {
-            to: '/pip/create',
-            label: 'Create PIP',
-            icon: 'bi bi-plus-square',
-          },
-          {
-            to: '/pip/past-plans',
-            label: 'Past Plans',
-            icon: 'bi bi-clock-history',
-          },
-        ],
+        children: pipChildren,
       },
 
       {

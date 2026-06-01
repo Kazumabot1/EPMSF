@@ -20,6 +20,7 @@ import com.epms.repository.UserRepository;
 import com.epms.security.UserPrincipal;
 import com.epms.service.EmployeeKpiWorkflowService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,8 +31,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -67,8 +72,17 @@ class KpiTemplateCycleServiceImplTest {
     @Mock
     private EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private KpiTemplateCycleServiceImpl service;
+
+    @BeforeEach
+    void setUpClock() {
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-06-01T00:00:00Z"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Rangoon"));
+    }
 
     @AfterEach
     void clearSecurityContext() {
@@ -228,6 +242,7 @@ class KpiTemplateCycleServiceImplTest {
                 .kpiForm(form)
                 .build();
         authenticate(hr, List.of("HR"), "HR_DASHBOARD");
+        when(userRepository.findById(17)).thenReturn(Optional.of(hr));
         when(cycleFormRepository.findConflictingLinks(anyCollection(), any(), anyCollection()))
                 .thenReturn(List.of(link));
 
@@ -240,6 +255,37 @@ class KpiTemplateCycleServiceImplTest {
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("already used by the running cycle");
+    }
+
+    @Test
+    void detailUsesDateMatchedCurrentPeriodEvenWhenEarlierPeriodRemainsOpen() {
+        KpiTemplateCycle cycle = activeCycle();
+        KpiForm form = new KpiForm();
+        form.setId(200);
+        form.setTitle("Engineering KPI");
+        KpiTemplateCycleForm link = KpiTemplateCycleForm.builder()
+                .cycle(cycle)
+                .kpiForm(form)
+                .build();
+        KpiTemplateCyclePeriod staleOpen = period(cycle, form, 1,
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 5, 31),
+                KpiTemplateCyclePeriodStatus.OPEN);
+        KpiTemplateCyclePeriod dateMatched = period(cycle, form, 2,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 30),
+                KpiTemplateCyclePeriodStatus.SCHEDULED);
+
+        when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
+        when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of(link));
+        when(cyclePeriodRepository.findAllWithFormByCycleIdOrderByFormIdAndPeriodNumber(100))
+                .thenReturn(List.of(staleOpen, dateMatched));
+
+        var response = service.getById(100);
+
+        assertThat(response.getCurrentPeriodNumber()).isEqualTo(2);
+        assertThat(response.getCurrentPeriodStartDate()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(response.getCurrentPeriodEndDate()).isEqualTo(LocalDate.of(2026, 6, 30));
     }
 
     private KpiTemplateCycle draftCycle() {
@@ -260,8 +306,8 @@ class KpiTemplateCycleServiceImplTest {
 
     private void stubCycle(KpiTemplateCycle cycle) {
         when(cycleRepository.findById(100)).thenReturn(Optional.of(cycle));
-        when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of());
-        when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(100)).thenReturn(Optional.empty());
+        lenient().when(cycleFormRepository.findWithFormsByCycleId(100)).thenReturn(List.of());
+        lenient().when(cyclePeriodRepository.findTopByCycle_IdOrderByPeriodNumberDesc(100)).thenReturn(Optional.empty());
     }
 
     private KpiTemplateCycle activeCycle() {
@@ -291,6 +337,25 @@ class KpiTemplateCycleServiceImplTest {
         period.setStartDate(LocalDate.now().minusDays(10));
         period.setEndDate(endDate);
         period.setStatus(KpiTemplateCyclePeriodStatus.OPEN);
+        return period;
+    }
+
+    private KpiTemplateCyclePeriod period(
+            KpiTemplateCycle cycle,
+            KpiForm form,
+            int number,
+            LocalDate startDate,
+            LocalDate endDate,
+            KpiTemplateCyclePeriodStatus status
+    ) {
+        KpiTemplateCyclePeriod period = new KpiTemplateCyclePeriod();
+        period.setId(500 + number);
+        period.setCycle(cycle);
+        period.setKpiForm(form);
+        period.setPeriodNumber(number);
+        period.setStartDate(startDate);
+        period.setEndDate(endDate);
+        period.setStatus(status);
         return period;
     }
 

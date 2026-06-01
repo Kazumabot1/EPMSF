@@ -92,8 +92,8 @@ const ComparisonColumnChart = ({
             <svg className="dashboard-comparison-chart__svg" viewBox="0 0 100 62" preserveAspectRatio="none" aria-hidden="true">
                 <defs>
                     <linearGradient id="dashboardComparisonArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="rgba(124, 92, 255, 0.22)" />
-                        <stop offset="100%" stopColor="rgba(124, 92, 255, 0.02)" />
+                        <stop offset="0%" stopColor="rgba(37, 99, 235, 0.22)" />
+                        <stop offset="100%" stopColor="rgba(37, 99, 235, 0.02)" />
                     </linearGradient>
                 </defs>
                 <path className="dashboard-comparison-chart__area" d={areaPath} fill="url(#dashboardComparisonArea)" />

@@ -58,6 +58,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    boolean existsByEmployeeCodeIgnoreCase(String employeeCode);
+
     @Query("""
             SELECT COUNT(u)
             FROM User u

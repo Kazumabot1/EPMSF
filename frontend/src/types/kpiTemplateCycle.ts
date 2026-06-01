@@ -1,4 +1,4 @@
-export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'PENDING_APPROVAL' | 'CLOSING' | 'DEACTIVATED';
+export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'PENDING_APPROVAL' | 'CLOSING' | 'DEACTIVATED' | 'CLOSED';
 export type KpiTemplateCyclePeriodStatus = 'SCHEDULED' | 'OPEN' | 'CLOSING' | 'CLOSED';
 export type KpiGraceExtension = 'ONE_WEEK' | 'TWO_WEEKS' | 'THREE_WEEKS' | 'ONE_MONTH';
 export type KpiEarlyCloseReviewDecision = 'APPROVED' | 'REJECTED';
@@ -59,6 +59,24 @@ export interface KpiTemplateCycleStatusRequest {
   active: boolean;
   reason?: string;
   graceExtension?: KpiGraceExtension;
+}
+
+export interface KpiUnassignedEvaluator {
+  employeeId: number;
+  employeeName: string;
+  departmentId: number;
+  departmentName: string;
+  positionTitle: string;
+  reason: string;
+}
+
+export interface KpiCycleActivationReadiness {
+  cycleId: number;
+  cycleName: string;
+  ready: boolean;
+  targetEmployeeCount: number;
+  unassignedEvaluators: KpiUnassignedEvaluator[];
+  blockingIssues: string[];
 }
 
 export interface KpiTemplateCycleRequest {

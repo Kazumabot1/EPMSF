@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import '../../components/one-on-one.css';
 import { extractErrorMessage } from '../../services/apiError';
 import { profileService, type UserProfile } from '../../services/profileService';
+import { emptyPositionPermission, positionPermissionService } from '../../services/positionPermissionService';
 import {
   createContinuousFeedback,
   getContinuousFeedbackEmployees,
@@ -14,6 +15,7 @@ import {
 import type { TeamEmployeeOption, TeamOption } from '../../services/oneOnOneService';
 
 const categories = ['Positive', 'Improvement', 'General'];
+type HistoryTab = 'received' | 'given';
 
 const formatDate = (value?: string | null) => {
   if (!value) return '-';
@@ -22,6 +24,9 @@ const formatDate = (value?: string | null) => {
   return date.toLocaleString();
 };
 
+const filterCurrentEmployee = (items: TeamEmployeeOption[], currentEmployeeId?: number | null) =>
+  currentEmployeeId == null ? items : items.filter((employee) => employee.employeeId !== currentEmployeeId);
+
 const ContinuousFeedbackPage = () => {
   const location = useLocation();
   const isEmployeeView = location.pathname.startsWith('/employee');
@@ -29,7 +34,10 @@ const ContinuousFeedbackPage = () => {
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [employees, setEmployees] = useState<TeamEmployeeOption[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [history, setHistory] = useState<ContinuousFeedback[]>([]);
+  const [givenHistory, setGivenHistory] = useState<ContinuousFeedback[]>([]);
+  const [receivedHistory, setReceivedHistory] = useState<ContinuousFeedback[]>([]);
+  const [activeHistoryTab, setActiveHistoryTab] = useState<HistoryTab>(isEmployeeView ? 'received' : 'given');
+  const [canGiveFeedback, setCanGiveFeedback] = useState(false);
 
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -44,25 +52,38 @@ const ContinuousFeedbackPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const currentEmployeeId = profile?.employeeId ?? null;
-
-  const removeCurrentUser = useMemo(
-    () => (items: TeamEmployeeOption[]) =>
-      currentEmployeeId == null ? items : items.filter((employee) => employee.employeeId !== currentEmployeeId),
-    [currentEmployeeId],
-  );
 
   const selectedTeam = useMemo(
     () => teams.find((team) => String(team.id) === selectedTeamId) ?? null,
     [teams, selectedTeamId],
   );
 
-  const loadHistory = async () => {
-    const data = isEmployeeView
-      ? await getReceivedContinuousFeedback()
-      : await getGivenContinuousFeedback();
+  const activeHistory = activeHistoryTab === 'received' ? receivedHistory : givenHistory;
 
-    setHistory(Array.isArray(data) ? data : []);
+  const loadHistories = async () => {
+    const [receivedData, givenData] = await Promise.all([
+      getReceivedContinuousFeedback().catch(() => [] as ContinuousFeedback[]),
+      getGivenContinuousFeedback().catch(() => [] as ContinuousFeedback[]),
+    ]);
+
+    setReceivedHistory(Array.isArray(receivedData) ? receivedData : []);
+    setGivenHistory(Array.isArray(givenData) ? givenData : []);
+  };
+
+  const loadEligibleEmployees = async (teamId: string, profileData = profile) => {
+    setLoadingEmployees(true);
+    setEmployees([]);
+    setSelectedEmployeeId('');
+
+    try {
+      const numericTeamId = teamId ? Number(teamId) : null;
+      const data = await getContinuousFeedbackEmployees(numericTeamId);
+      setEmployees(Array.isArray(data) ? filterCurrentEmployee(data, profileData?.employeeId ?? null) : []);
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to load eligible employees.'));
+    } finally {
+      setLoadingEmployees(false);
+    }
   };
 
   useEffect(() => {
@@ -71,28 +92,43 @@ const ContinuousFeedbackPage = () => {
     const loadInitial = async () => {
       setLoading(true);
       setError('');
+      setSuccess('');
 
       try {
-        if (!isEmployeeView) {
-          const [teamData, employeeData, profileData] = await Promise.all([
-            getContinuousFeedbackTeams(),
-            getContinuousFeedbackEmployees(null),
-            profileService.getMyProfile().catch(() => null),
-          ]);
-          if (mounted) {
+        const [profileData, permissionData, receivedData, givenData] = await Promise.all([
+          profileService.getMyProfile().catch(() => null),
+          positionPermissionService.getMyPermissions().catch(() => emptyPositionPermission()),
+          getReceivedContinuousFeedback().catch(() => [] as ContinuousFeedback[]),
+          getGivenContinuousFeedback().catch(() => [] as ContinuousFeedback[]),
+        ]);
+
+        if (!mounted) return;
+
+        const giveAllowed = Boolean(permissionData.continuousFeedbackGive || permissionData.feedbackSend);
+        setProfile(profileData);
+        setCanGiveFeedback(giveAllowed);
+        setReceivedHistory(Array.isArray(receivedData) ? receivedData : []);
+        setGivenHistory(Array.isArray(givenData) ? givenData : []);
+        setActiveHistoryTab(isEmployeeView ? 'received' : giveAllowed ? 'given' : 'received');
+
+        if (giveAllowed) {
+          try {
+            const [teamData, employeeData] = await Promise.all([
+              getContinuousFeedbackTeams(),
+              getContinuousFeedbackEmployees(null),
+            ]);
+
+            if (!mounted) return;
+
             setTeams(Array.isArray(teamData) ? teamData : []);
-            setProfile(profileData);
-            const currentId = profileData?.employeeId ?? null;
-            const safeEmployees = Array.isArray(employeeData) ? employeeData.filter((employee) => employee.employeeId !== currentId) : [];
-            setEmployees(safeEmployees);
+            setEmployees(Array.isArray(employeeData) ? filterCurrentEmployee(employeeData, profileData?.employeeId ?? null) : []);
+          } catch (err) {
+            if (mounted) setError(extractErrorMessage(err, 'Failed to load continuous feedback recipients.'));
           }
+        } else {
+          setTeams([]);
+          setEmployees([]);
         }
-
-        const historyData = isEmployeeView
-          ? await getReceivedContinuousFeedback()
-          : await getGivenContinuousFeedback();
-
-        if (mounted) setHistory(Array.isArray(historyData) ? historyData : []);
       } catch (err) {
         if (mounted) setError(extractErrorMessage(err, 'Failed to load continuous feedback.'));
       } finally {
@@ -108,36 +144,12 @@ const ContinuousFeedbackPage = () => {
   }, [isEmployeeView]);
 
   useEffect(() => {
-    let mounted = true;
-
-    const loadEmployees = async () => {
-      if (isEmployeeView) {
-        return;
-      }
-
-      setLoadingEmployees(true);
-      setError('');
-      setSuccess('');
-      setEmployees([]);
-      setSelectedEmployeeId('');
-
-      try {
-        const teamId = selectedTeamId ? Number(selectedTeamId) : null;
-        const data = await getContinuousFeedbackEmployees(teamId);
-        if (mounted) setEmployees(Array.isArray(data) ? removeCurrentUser(data) : []);
-      } catch (err) {
-        if (mounted) setError(extractErrorMessage(err, 'Failed to load eligible employees.'));
-      } finally {
-        if (mounted) setLoadingEmployees(false);
-      }
-    };
-
-    void loadEmployees();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isEmployeeView, selectedTeamId, removeCurrentUser]);
+    if (!canGiveFeedback) return;
+    setError('');
+    setSuccess('');
+    void loadEligibleEmployees(selectedTeamId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeamId, canGiveFeedback]);
 
   const resetForm = () => {
     setSelectedEmployeeId('');
@@ -151,6 +163,11 @@ const ContinuousFeedbackPage = () => {
 
     setError('');
     setSuccess('');
+
+    if (!canGiveFeedback) {
+      setError('Your position does not have permission to give continuous feedback.');
+      return;
+    }
 
     if (!selectedEmployeeId) {
       setError('Please select an employee.');
@@ -181,8 +198,9 @@ const ContinuousFeedbackPage = () => {
       });
 
       setSuccess('Continuous feedback submitted successfully.');
+      setActiveHistoryTab('given');
       resetForm();
-      await loadHistory();
+      await Promise.all([loadHistories(), loadEligibleEmployees(selectedTeamId)]);
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to submit continuous feedback.'));
     } finally {
@@ -190,21 +208,29 @@ const ContinuousFeedbackPage = () => {
     }
   };
 
+  const renderHistoryMeta = (item: ContinuousFeedback) => {
+    const peopleText = activeHistoryTab === 'received'
+      ? `From: ${item.giverName || '-'} • For: ${item.employeeName || '-'}`
+      : `To: ${item.employeeName || '-'} • From: ${item.giverName || '-'}`;
+
+    return `${peopleText} • Team: ${item.teamName || '-'} • ${formatDate(item.createdAt)}`;
+  };
+
   return (
     <div className="oom-page continuous-feedback-page">
       <div className="oom-header continuous-feedback-hero">
         <h1>Continuous Feedback</h1>
         <p>
-          {isEmployeeView
-            ? 'View continuous feedback you received.'
-            : 'Give feedback to eligible employees in your department. Your own account is excluded automatically.'}
+          {canGiveFeedback
+            ? 'Give continuous feedback and track feedback you have given or received.'
+            : 'View continuous feedback you received.'}
         </p>
       </div>
 
       {error && <div className="oom-alert oom-alert--error">{error}</div>}
       {success && <div className="oom-alert oom-alert--success">{success}</div>}
 
-      {!isEmployeeView && (
+      {canGiveFeedback ? (
         <div className="oom-card">
           <form className="oom-form" onSubmit={handleSubmit}>
             <div className="oom-field">
@@ -314,34 +340,69 @@ const ContinuousFeedbackPage = () => {
             </button>
           </form>
         </div>
+      ) : (
+        <div className="oom-card">
+          <h2>Received Feedback</h2>
+          <p>Your current position can view received continuous feedback only.</p>
+        </div>
       )}
 
       <div className="oom-card" style={{ marginTop: 20 }}>
-        <h2>{isEmployeeView ? 'Received Continuous Feedback' : 'Given Feedback'}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>Continuous Feedback History</h2>
+          <div style={{ display: 'inline-flex', gap: 8, padding: 4, border: '1px solid #dbeafe', borderRadius: 999, background: '#eff6ff' }}>
+            <button
+              type="button"
+              onClick={() => setActiveHistoryTab('received')}
+              style={{
+                border: 0,
+                borderRadius: 999,
+                padding: '8px 14px',
+                fontWeight: 700,
+                color: activeHistoryTab === 'received' ? '#ffffff' : '#1d4ed8',
+                background: activeHistoryTab === 'received' ? '#2563eb' : 'transparent',
+              }}
+            >
+              Received by me ({receivedHistory.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveHistoryTab('given')}
+              style={{
+                border: 0,
+                borderRadius: 999,
+                padding: '8px 14px',
+                fontWeight: 700,
+                color: activeHistoryTab === 'given' ? '#ffffff' : '#1d4ed8',
+                background: activeHistoryTab === 'given' ? '#2563eb' : 'transparent',
+              }}
+            >
+              Given by me ({givenHistory.length})
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <p>Loading feedback...</p>
-        ) : history.length === 0 ? (
-          <p>No continuous feedback found.</p>
+        ) : activeHistory.length === 0 ? (
+          <p>No {activeHistoryTab === 'received' ? 'received' : 'given'} continuous feedback found.</p>
         ) : (
-          <div style={{ display: 'grid', gap: 12 }}>
-            {history.map((item) => (
+          <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+            {activeHistory.map((item) => (
               <div
                 key={item.id}
                 style={{
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
+                  border: '1px solid #dbeafe',
+                  borderRadius: 14,
                   padding: 14,
                   background: '#fff',
+                  boxShadow: '0 10px 25px rgba(37, 99, 235, 0.08)',
                 }}
               >
                 <strong>{item.category}</strong>
                 {item.rating ? <span> • Rating: {item.rating}/5</span> : null}
                 <p style={{ margin: '8px 0' }}>{item.feedbackText}</p>
-                <small>
-                  Team: {item.teamName || '-'} • Employee: {item.employeeName || '-'} • Given by:{' '}
-                  {item.giverName || '-'} • {formatDate(item.createdAt)}
-                </small>
+                <small>{renderHistoryMeta(item)}</small>
               </div>
             ))}
           </div>

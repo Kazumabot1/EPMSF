@@ -425,22 +425,22 @@ const canDeactivate = (item: AssessmentFormResponse) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/60 to-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-sky-700 p-6 shadow-xl">
-          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10" />
-          <div className="absolute -bottom-20 right-20 h-56 w-56 rounded-full bg-white/10" />
+        <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white p-6 shadow-sm shadow-blue-100/70">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-blue-100/70" />
+          <div className="pointer-events-none absolute -bottom-20 right-20 h-56 w-56 rounded-full bg-sky-100/70" />
 
           <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-center">
             <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
                 <i className="bi bi-ui-checks-grid" />
                 HR Assessment Forms
               </p>
 
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-bold text-slate-950">
                 Self-Assessment Form Builder
               </h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                 Create reusable self-assessment forms first. Activate a form only when the assessment period is ready.
               </p>
             </div>
@@ -448,7 +448,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-blue-700 shadow-lg shadow-blue-950/20 transition hover:-translate-y-0.5 hover:bg-blue-50"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-blue-700"
             >
               <i className="bi bi-plus-circle" />
               Create Form
@@ -540,7 +540,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
                         {formatDate(item.startDate)} - {formatDate(item.endDate)}
                       </span>
-                      <span className="rounded-full bg-purple-50 px-2.5 py-1 text-purple-700">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
                         {getQuestionCount(item)} assessment subject(s)
                       </span>
                     </div>
@@ -613,7 +613,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     value={form.formName}
                     onChange={(event) => setForm((prev) => ({ ...prev, formName: event.target.value }))}
                     disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                     placeholder="Employee Self-assessment Form"
                   />
                 </label>
@@ -624,7 +624,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     value={form.companyName ?? ''}
                     onChange={(event) => setForm((prev) => ({ ...prev, companyName: event.target.value }))}
                     disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                     placeholder="ACE Data Systems Ltd."
                   />
                 </label>
@@ -637,7 +637,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                   disabled={viewOnly}
                   rows={3}
-                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                  className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                   placeholder="Short description for HR reference"
                 />
               </label>
@@ -655,7 +655,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                     <button
                       type="button"
                       onClick={addSubject}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                     >
                       <i className="bi bi-plus-circle" />
                       Add Assessment
@@ -676,7 +676,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                           onChange={(event) => updateSubject(index, event.target.value)}
                           disabled={viewOnly}
                           rows={2}
-                          className="min-h-[72px] flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                          className="min-h-[72px] flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                           placeholder="Type assessment subject, for example: I completed my assigned tasks on time"
                         />
 
@@ -734,7 +734,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   type="button"
                   onClick={saveForm}
                   disabled={saving}
-                  className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? 'Saving...' : 'Create Form'}
                 </button>
@@ -777,7 +777,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                    min={nowDateTimeLocal()}
                    max={oneYearFromNowDateTimeLocal()}
                    onChange={(event) => setActivationStartDate(event.target.value)}
-                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                  />
                 </label>
 
@@ -789,7 +789,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                    min={activationStartDate || nowDateTimeLocal()}
                    max={oneYearFromNowDateTimeLocal()}
                    onChange={(event) => setActivationEndDate(event.target.value)}
-                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                  />
                 </label>
               </div>

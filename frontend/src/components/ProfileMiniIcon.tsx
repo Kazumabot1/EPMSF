@@ -104,6 +104,17 @@ const ProfileMiniIcon = ({
           src={avatarSrc}
           alt="Profile"
           className="profile-mini-avatar"
+          style={{
+            width: 36,
+            height: 36,
+            minWidth: 36,
+            maxWidth: 36,
+            maxHeight: 36,
+            borderRadius: 9999,
+            objectFit: 'cover',
+            display: 'block',
+            flex: '0 0 36px',
+          }}
         />
       ) : (
         <span className="profile-mini-initials">

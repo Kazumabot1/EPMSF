@@ -49,6 +49,10 @@ const isDepartmentHeadUser = (user: any) => {
   });
 };
 
+
+const isAvailableCandidate = (candidate: CandidateUser) =>
+  candidate.available !== false && candidate.isAvailable !== false;
+
 const getApiErrorMessage = (err: any) => {
   const data = err?.response?.data;
 
@@ -152,8 +156,8 @@ const TeamCreate: React.FC = () => {
         ]);
 
         if (!cancelled) {
-          setLeaders(Array.isArray(leaderData) ? leaderData : []);
-          setMembers(Array.isArray(memberData) ? memberData : []);
+          setLeaders(Array.isArray(leaderData) ? leaderData.filter(isAvailableCandidate) : []);
+          setMembers(Array.isArray(memberData) ? memberData.filter(isAvailableCandidate) : []);
           setProjectManagers(Array.isArray(pmData) ? pmData : []);
           setTeamLeaderId('');
           setProjectManagerId('');
@@ -187,8 +191,8 @@ const TeamCreate: React.FC = () => {
         ]);
 
         if (!cancelled) {
-          setLeaders(Array.isArray(leaderData) ? leaderData : []);
-          setMembers(Array.isArray(memberData) ? memberData : []);
+          setLeaders(Array.isArray(leaderData) ? leaderData.filter(isAvailableCandidate) : []);
+          setMembers(Array.isArray(memberData) ? memberData.filter(isAvailableCandidate) : []);
           setProjectManagers(Array.isArray(pmData) ? pmData : []);
           setTeamLeaderId('');
           setProjectManagerId('');
@@ -261,15 +265,11 @@ const TeamCreate: React.FC = () => {
       .filter((member) => !roleCandidateIds.has(member.id))
       .filter((member) => member.id !== selectedLeaderIdNumber)
       .filter((member) => member.id !== selectedProjectManagerIdNumber)
-      .map((member) => {
-        const alreadyInTeam = member.available === false || member.isAvailable === false;
-
-        return {
-          ...member,
-          disabled: alreadyInTeam,
-          disabledReason: alreadyInTeam ? getCandidateTeamWarning(member) : '',
-        };
-      });
+      .map((member) => ({
+        ...member,
+        disabled: false,
+        disabledReason: '',
+      }));
   }, [members, roleCandidateIds, selectedLeaderIdNumber, selectedProjectManagerIdNumber]);
 
   const toggleMember = (memberId: number) => {
@@ -291,13 +291,17 @@ const TeamCreate: React.FC = () => {
       return 'Please enter a team name.';
     }
 
-    if (!teamLeaderId) {
-      return 'Please select a Team Leader.';
-    }
+if (!teamLeaderId) {
+  return 'Please select a Team Leader.';
+}
 
-    if (selectedMemberIds.length === 0) {
-      return 'Please select at least one Team Member.';
-    }
+if (!projectManagerId) {
+  return 'Please select a Project Manager.';
+}
+
+if (selectedMemberIds.length === 0) {
+  return 'Please select at least one Team Member.';
+}
 
     if (projectManagerId && projectManagerId === teamLeaderId) {
       return 'Project Manager cannot be the same as Team Leader.';
@@ -348,8 +352,7 @@ const TeamCreate: React.FC = () => {
         teamName: teamName.trim(),
         departmentId: isDepartmentHead ? 0 : Number(departmentId),
         teamLeaderId: Number(teamLeaderId),
-        projectManagerId: projectManagerId ? Number(projectManagerId) : null,
-        teamGoal: teamGoal.trim(),
+projectManagerId: Number(projectManagerId),        teamGoal: teamGoal.trim(),
         status: 'Active',
         memberUserIds: selectedMemberIds,
         memberEmployeeIds: selectedMemberIds,
@@ -480,8 +483,7 @@ const TeamCreate: React.FC = () => {
             onChange={(event) => setProjectManagerId(event.target.value)}
             disabled={loadingCandidates || (!isDepartmentHead && !departmentId)}
           >
-            <option value="">Optional - Select Project Manager</option>
-
+<option value="">Select Project Manager</option>
             {availableProjectManagers.map((pm) => (
               <option key={pm.id} value={pm.id}>
                 {formatCandidateLabel(pm)}
@@ -490,8 +492,8 @@ const TeamCreate: React.FC = () => {
           </select>
 
           <small>
-            Optional. Project Manager can manage many teams, but cannot be the Team Leader
-            or a normal member in this team.
+           Required. Project Manager can manage many teams, but cannot be the Team Leader
+           or a normal member in this team.
           </small>
 
           {selectedProjectManager?.currentTeamNames && (

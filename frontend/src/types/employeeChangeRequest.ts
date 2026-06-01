@@ -37,6 +37,7 @@ export type EmployeeChangeSummary = {
   oldTeamName?: string;
 
   requestReason?: string;
+  hrAdminReviewReason?: string;
   ceoReviewReason?: string;
 
   validationSummary?: string;
@@ -67,7 +68,7 @@ export type PositionChangeCreatePayload = {
 
 export type DepartmentChangeCreatePayload = {
   employeeId: number;
-  newCurrentDepartmentId: number;
+  newCurrentDepartmentId?: number | null;
   newParentDepartmentId?: number | null;
   reason: string;
 };
@@ -88,6 +89,9 @@ export type WorkforceEmployee = {
   positionId?: number;
   positionTitle?: string;
   positionName?: string;
+  roleName?: string;
+  role?: string;
+  dashboard?: string;
 
   currentDepartmentId?: number;
   departmentId?: number;

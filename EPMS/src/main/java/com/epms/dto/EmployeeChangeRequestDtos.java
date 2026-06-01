@@ -72,6 +72,16 @@ public class EmployeeChangeRequestDtos {
         private String oldTeamName;
 
         private String requestReason;
+
+        /**
+         * New UI/API name. The database column is still ceo_review_reason for compatibility,
+         * but HR Admin is the actual reviewer in the current flow.
+         */
+        private String hrAdminReviewReason;
+
+        /**
+         * Backward compatibility for older frontend code. New code should use hrAdminReviewReason.
+         */
         private String ceoReviewReason;
 
         private String validationSummary;
@@ -248,4 +258,72 @@ public class EmployeeChangeRequestDtos {
         private String editedAt;
         private String reason;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WorkforceEmployeeResponse {
+        private Integer id;
+        private Integer employeeId;
+        private Integer userId;
+
+        private String firstName;
+        private String lastName;
+        private String fullName;
+        private String name;
+
+        private String email;
+        private String workEmail;
+
+        private Integer positionId;
+        private String positionTitle;
+        private String positionName;
+        private String roleName;
+        private String role;
+        private String dashboard;
+
+        private Integer currentDepartmentId;
+        private Integer departmentId;
+        private String departmentName;
+        private String currentDepartmentName;
+
+        private Integer parentDepartmentId;
+        private String parentDepartmentName;
+
+        private Integer workingDepartmentId;
+        private String workingDepartmentName;
+
+        private String teamName;
+        private String activeTeamName;
+
+        private Boolean active;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WorkforcePositionResponse {
+        private Integer id;
+        private String positionTitle;
+        private String title;
+        private String positionName;
+        private String levelCode;
+        private String roleName;
+        private Boolean status;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WorkforceDepartmentResponse {
+        private Integer id;
+        private String departmentName;
+        private String name;
+        private String departmentCode;
+        private Boolean status;
+    }
+
 }

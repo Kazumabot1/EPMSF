@@ -5,5 +5,6 @@ public enum KpiTemplateCycleStatus {
     ACTIVE,
     PENDING_APPROVAL,
     CLOSING,
-    DEACTIVATED
+    DEACTIVATED,
+    CLOSED
 }

@@ -54,15 +54,15 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             return;
         }
         String columnType = columnType(conn, "kpi_template_cycle", "status");
-        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'closed'")) {
             return;
         }
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(
                     "ALTER TABLE kpi_template_cycle "
-                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
+                            + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED','CLOSED') NOT NULL"
             );
-            log.info("Aligned kpi_template_cycle.status enum with early close approval status.");
+            log.info("Aligned kpi_template_cycle.status enum with closed status.");
         }
     }
 
@@ -202,14 +202,14 @@ public class KpiCycleSchemaFix implements ApplicationRunner {
             return;
         }
         String columnType = columnType(conn, "department_kpi_cycle", "status");
-        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'pending_approval'")) {
+        if (columnType != null && columnType.toLowerCase(Locale.ROOT).contains("'closed'")) {
             return;
         }
         if (columnType != null && columnType.toLowerCase(Locale.ROOT).startsWith("enum")) {
             try (Statement stmt = conn.createStatement()) {
                 stmt.executeUpdate(
                         "ALTER TABLE department_kpi_cycle "
-                                + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED') NOT NULL"
+                                + "MODIFY COLUMN status ENUM('DRAFT','ACTIVE','PENDING_APPROVAL','CLOSING','DEACTIVATED','CLOSED') NOT NULL"
                 );
                 log.info("Aligned department_kpi_cycle.status enum.");
             }

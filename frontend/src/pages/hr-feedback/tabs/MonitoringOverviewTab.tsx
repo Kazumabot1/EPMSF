@@ -209,12 +209,12 @@ const toneClasses: Record<Tone, { badge: string; icon: string; soft: string; tex
         border: 'border-slate-200',
     },
     violet: {
-        badge: 'border-violet-200 bg-violet-50 text-violet-700',
-        icon: 'bg-violet-50 text-violet-600 ring-violet-100',
-        soft: 'bg-violet-50 text-violet-700',
-        text: 'text-violet-700',
-        bar: 'bg-violet-500',
-        border: 'border-violet-200',
+        badge: 'border-blue-200 bg-blue-50 text-blue-700',
+        icon: 'bg-blue-50 text-blue-600 ring-blue-100',
+        soft: 'bg-blue-50 text-blue-700',
+        text: 'text-blue-700',
+        bar: 'bg-blue-500',
+        border: 'border-blue-200',
     },
 };
 

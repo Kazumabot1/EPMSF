@@ -60,7 +60,7 @@ const KpiTemplateCycleViewModal = ({ open, cycleId, onClose }: Props) => {
 
         {loading ? (
           <div className="kpi-tpl-modal-loading">
-            <div className="kpi-tpl-shimmer h-10 w-10 rounded-xl bg-gradient-to-br from-violet-300 to-gray-200" />
+            <div className="kpi-tpl-shimmer h-10 w-10 rounded-xl bg-gradient-to-br from-blue-300 to-gray-200" />
             Loading cycle...
           </div>
         ) : cycle ? (

@@ -1,283 +1,3 @@
-/*
-package com.epms.controller;
-
-import com.epms.dto.AuditLogResponse;
-import com.epms.dto.GenericApiResponse;
-import com.epms.entity.AuditLog;
-import com.epms.entity.User;
-import com.epms.exception.UnauthorizedActionException;
-import com.epms.repository.UserRepository;
-import com.epms.security.SecurityUtils;
-import com.epms.service.AuditLogService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-@RestController
-@RequestMapping("/api/audit-logs")
-@RequiredArgsConstructor
-public class AuditLogController {
-
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "ROLE");
-    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL");
-
-    private final AuditLogService auditLogService;
-    private final UserRepository userRepository;
-
-    @GetMapping
-    public ResponseEntity<GenericApiResponse<List<AuditLogResponse>>> getAuditLogs(
-            @RequestParam(required = false) String entityType,
-            @RequestParam(required = false) Integer entityId
-    ) {
-        boolean admin = isAdmin();
-        boolean hr = isHr();
-
-        if (!admin && !hr) {
-            throw new UnauthorizedActionException("Only HR/Admin can access audit logs.");
-        }
-
-        Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
-        String normalizedEntityType = normalizeEntityType(entityType);
-
-        List<AuditLog> logs;
-        if (normalizedEntityType != null) {
-            if (!allowedTypes.contains(normalizedEntityType)) {
-                throw new UnauthorizedActionException("You are not allowed to view this audit log type.");
-            }
-            logs = auditLogService.getRecent(normalizedEntityType, entityId);
-        } else {
-            logs = auditLogService.getRecentForEntityTypes(allowedTypes);
-        }
-
-        Map<Integer, String> names = userRepository.findAllById(
-                        logs.stream()
-                                .map(AuditLog::getUserId)
-                                .filter(id -> id != null)
-                                .distinct()
-                                .toList()
-                )
-                .stream()
-                .collect(Collectors.toMap(User::getId, this::displayName));
-
-        List<AuditLogResponse> response = logs.stream()
-                .map(log -> map(log, names))
-                .toList();
-
-        return ResponseEntity.ok(GenericApiResponse.success("Audit logs retrieved successfully", response));
-    }
-
-    private AuditLogResponse map(AuditLog auditLog, Map<Integer, String> names) {
-        return AuditLogResponse.builder()
-                .id(auditLog.getId())
-                .userId(auditLog.getUserId())
-                .changedByName(names.getOrDefault(auditLog.getUserId(), auditLog.getUserId() == null ? "System" : "User #" + auditLog.getUserId()))
-                .action(auditLog.getAction())
-                .entityType(auditLog.getEntityType())
-                .entityId(auditLog.getEntityId())
-                .changedColumn(auditLog.getChangedColumn())
-                .oldValue(auditLog.getOldValue())
-                .newValue(auditLog.getNewValue())
-                .reason(auditLog.getReason())
-                .timestamp(auditLog.getTimestamp())
-                .build();
-    }
-
-    private String displayName(User user) {
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
-            return user.getFullName();
-        }
-        if (user.getEmail() != null && !user.getEmail().isBlank()) {
-            return user.getEmail();
-        }
-        return "User #" + user.getId();
-    }
-
-    private String normalizeEntityType(String entityType) {
-        if (entityType == null || entityType.isBlank()) {
-            return null;
-        }
-        return entityType.trim().replace('-', '_').replace(' ', '_').toUpperCase(Locale.ROOT);
-    }
-
-    private boolean isAdmin() {
-        return SecurityUtils.currentUser().getRoles().stream()
-                .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN"));
-    }
-
-    private boolean isHr() {
-        return SecurityUtils.currentUser().getRoles().stream()
-                .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("HR") || role.equals("HUMAN_RESOURCE") || role.equals("HUMAN_RESOURCES") || role.equals("HR_MANAGER") || role.equals("HR_ADMIN"));
-    }
-
-    private String normalizeRole(String role) {
-        if (role == null) {
-            return "";
-        }
-        return role.replaceFirst("(?i)^ROLE_", "")
-                .trim()
-                .replaceAll("[^A-Za-z0-9]+", "_")
-                .replaceAll("^_+|_+$", "")
-                .toUpperCase(Locale.ROOT);
-    }
-}*/
-
-
-
-
-
-/*
-package com.epms.controller;
-
-import com.epms.dto.AuditLogResponse;
-import com.epms.dto.GenericApiResponse;
-import com.epms.entity.AuditLog;
-import com.epms.entity.User;
-import com.epms.exception.UnauthorizedActionException;
-import com.epms.repository.UserRepository;
-import com.epms.security.SecurityUtils;
-import com.epms.service.AuditLogService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-@RestController
-@RequestMapping("/api/audit-logs")
-@RequiredArgsConstructor
-public class AuditLogController {
-
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
-    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
-    private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of("APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
-
-    private final AuditLogService auditLogService;
-    private final UserRepository userRepository;
-
-    @GetMapping
-    public ResponseEntity<GenericApiResponse<List<AuditLogResponse>>> getAuditLogs(
-            @RequestParam(required = false) String entityType,
-            @RequestParam(required = false) Integer entityId
-    ) {
-        boolean admin = isAdmin();
-        boolean hr = isHr();
-
-        if (!admin && !hr) {
-            throw new UnauthorizedActionException("Only HR/Admin can access audit logs.");
-        }
-
-        Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
-        String normalizedEntityType = normalizeEntityType(entityType);
-
-        List<AuditLog> logs;
-        if (normalizedEntityType != null) {
-            if (!allowedTypes.contains(normalizedEntityType)) {
-                throw new UnauthorizedActionException("You are not allowed to view this audit log type.");
-            }
-            logs = auditLogService.getRecent(normalizedEntityType, entityId);
-        } else {
-            logs = auditLogService.getRecentForEntityTypes(allowedTypes);
-        }
-
-        Map<Integer, String> names = userRepository.findAllById(
-                        logs.stream()
-                                .map(AuditLog::getUserId)
-                                .filter(id -> id != null)
-                                .distinct()
-                                .toList()
-                )
-                .stream()
-                .collect(Collectors.toMap(User::getId, this::displayName));
-
-        List<AuditLogResponse> response = logs.stream()
-                .map(log -> map(log, names))
-                .toList();
-
-        return ResponseEntity.ok(GenericApiResponse.success("Audit logs retrieved successfully", response));
-    }
-
-    private AuditLogResponse map(AuditLog auditLog, Map<Integer, String> names) {
-        return AuditLogResponse.builder()
-                .id(auditLog.getId())
-                .userId(auditLog.getUserId())
-                .changedByName(names.getOrDefault(auditLog.getUserId(), auditLog.getUserId() == null ? "System" : "User #" + auditLog.getUserId()))
-                .action(auditLog.getAction())
-                .entityType(auditLog.getEntityType())
-                .entityId(auditLog.getEntityId())
-                .changedColumn(auditLog.getChangedColumn())
-                .oldValue(auditLog.getOldValue())
-                .newValue(auditLog.getNewValue())
-                .reason(auditLog.getReason())
-                .timestamp(auditLog.getTimestamp())
-                .build();
-    }
-
-    private String displayName(User user) {
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
-            return user.getFullName();
-        }
-        if (user.getEmail() != null && !user.getEmail().isBlank()) {
-            return user.getEmail();
-        }
-        return "User #" + user.getId();
-    }
-
-    private String normalizeEntityType(String entityType) {
-        if (entityType == null || entityType.isBlank()) {
-            return null;
-        }
-        return entityType.trim().replace('-', '_').replace(' ', '_').toUpperCase(Locale.ROOT);
-    }
-
-    private boolean isAdmin() {
-        return SecurityUtils.currentUser().getRoles().stream()
-                .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN"));
-    }
-
-    private boolean isHr() {
-        return SecurityUtils.currentUser().getRoles().stream()
-                .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("HR") || role.equals("HUMAN_RESOURCE") || role.equals("HUMAN_RESOURCES") || role.equals("HR_MANAGER") || role.equals("HR_ADMIN"));
-    }
-
-    private String normalizeRole(String role) {
-        if (role == null) {
-            return "";
-        }
-        return role.replaceFirst("(?i)^ROLE_", "")
-                .trim()
-                .replaceAll("[^A-Za-z0-9]+", "_")
-                .replaceAll("^_+|_+$", "")
-                .toUpperCase(Locale.ROOT);
-    }
-}*/
-
-
-
-
-
-
-
-
 package com.epms.controller;
 
 import com.epms.dto.AuditLogEditorResponse;
@@ -311,9 +31,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AuditLogController {
 
-    private static final Set<String> ADMIN_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "ROLE", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
-    private static final Set<String> HR_ENTITY_TYPES = Set.of("DEPARTMENT", "POSITION_LEVEL", "POSITION", "APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
-    private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of("APPRAISAL_TEMPLATE", "APPRAISAL_CYCLE");
+    private static final Set<String> HR_ENTITY_TYPES = Set.of(
+            "DEPARTMENT",
+            "POSITION_LEVEL",
+            "POSITION",
+            "APPRAISAL_TEMPLATE",
+            "APPRAISAL_CYCLE"
+    );
+
+    private static final Set<String> SHARED_HR_ENTITY_TYPES = Set.of(
+            "APPRAISAL_TEMPLATE",
+            "APPRAISAL_CYCLE"
+    );
 
     private final AuditLogService auditLogService;
     private final UserRepository userRepository;
@@ -324,26 +53,29 @@ public class AuditLogController {
             @RequestParam(required = false) Integer entityId,
             @RequestParam(required = false) Integer userId
     ) {
-        boolean admin = isAdmin();
+        boolean auditAdmin = isAuditAdmin();
         boolean hr = isHr();
 
-        if (!admin && !hr) {
-            throw new UnauthorizedActionException("Only HR/Admin can access audit logs.");
+        if (!auditAdmin && !hr) {
+            throw new UnauthorizedActionException("Only HR Admin or HR can access audit logs.");
         }
 
-        Set<String> allowedTypes = admin ? ADMIN_ENTITY_TYPES : HR_ENTITY_TYPES;
         String normalizedEntityType = normalizeEntityType(entityType);
-        Integer effectiveUserId = resolveEffectiveUserId(admin, userId, normalizedEntityType);
+        Integer effectiveUserId = resolveEffectiveUserId(auditAdmin, userId, normalizedEntityType);
 
         List<AuditLog> logs;
-        if (normalizedEntityType != null) {
-            if (!allowedTypes.contains(normalizedEntityType)) {
+        if (auditAdmin) {
+            logs = auditLogService.getRecent(normalizedEntityType, entityId, effectiveUserId);
+        } else {
+            if (normalizedEntityType != null && !HR_ENTITY_TYPES.contains(normalizedEntityType)) {
                 throw new UnauthorizedActionException("You are not allowed to view this audit log type.");
             }
 
-            logs = auditLogService.getRecent(normalizedEntityType, entityId, effectiveUserId);
-        } else {
-            logs = auditLogService.getRecentForEntityTypes(allowedTypes, effectiveUserId);
+            if (normalizedEntityType != null) {
+                logs = auditLogService.getRecent(normalizedEntityType, entityId, effectiveUserId);
+            } else {
+                logs = auditLogService.getRecentForEntityTypes(HR_ENTITY_TYPES, effectiveUserId);
+            }
         }
 
         Map<Integer, String> names = userRepository.findAllById(
@@ -365,11 +97,17 @@ public class AuditLogController {
 
     @GetMapping("/editors")
     public ResponseEntity<GenericApiResponse<List<AuditLogEditorResponse>>> getAuditLogEditors() {
-        if (!isAdmin()) {
-            throw new UnauthorizedActionException("Only Admin can view audit log editor list.");
+        if (!isAuditAdmin()) {
+            throw new UnauthorizedActionException("Only HR Admin can view audit log editor list.");
         }
 
-        List<Integer> editorIds = auditLogService.getEditorUserIdsForEntityTypes(ADMIN_ENTITY_TYPES);
+        List<AuditLog> recentLogs = auditLogService.getRecent(null, null, null);
+        List<Integer> editorIds = recentLogs.stream()
+                .map(AuditLog::getUserId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+
         if (editorIds.isEmpty()) {
             return ResponseEntity.ok(GenericApiResponse.success("Audit log editors retrieved successfully", List.of()));
         }
@@ -413,8 +151,8 @@ public class AuditLogController {
         return ResponseEntity.ok(GenericApiResponse.success("Audit log editors retrieved successfully", response));
     }
 
-    private Integer resolveEffectiveUserId(boolean admin, Integer requestedUserId, String normalizedEntityType) {
-        if (admin) {
+    private Integer resolveEffectiveUserId(boolean auditAdmin, Integer requestedUserId, String normalizedEntityType) {
+        if (auditAdmin) {
             return requestedUserId;
         }
 
@@ -470,10 +208,12 @@ public class AuditLogController {
         return entityType.trim().replace('-', '_').replace(' ', '_').toUpperCase(Locale.ROOT);
     }
 
-    private boolean isAdmin() {
+    private boolean isAuditAdmin() {
         return SecurityUtils.currentUser().getRoles().stream()
                 .map(this::normalizeRole)
-                .anyMatch(role -> role.equals("ADMIN"));
+                .anyMatch(role -> role.equals("ADMIN")
+                        || role.equals("HRADMIN")
+                        || role.equals("HR_ADMIN"));
     }
 
     private boolean isHr() {
@@ -482,8 +222,7 @@ public class AuditLogController {
                 .anyMatch(role -> role.equals("HR")
                         || role.equals("HUMAN_RESOURCE")
                         || role.equals("HUMAN_RESOURCES")
-                        || role.equals("HR_MANAGER")
-                        || role.equals("HR_ADMIN"));
+                        || role.equals("HR_MANAGER"));
     }
 
     private String normalizeRole(String role) {

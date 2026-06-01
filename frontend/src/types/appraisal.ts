@@ -32,7 +32,7 @@ export interface AppraisalSectionRequest {
 
 export interface AppraisalTemplateRequest {
   templateName: string;
-  description?: string;
+  description?: string | null;
   appraiseeSignatureId?: number | null;
   appraiserSignatureId?: number | null;
   hrSignatureId?: number | null;
@@ -174,6 +174,7 @@ export interface AppraisalReviewResponse {
   reviewerUserId?: number | null;
   reviewerName?: string | null;
   reviewerEmployeeId?: string | null;
+  signatureId?: number | null;
   recommendation?: string | null;
   comment?: string | null;
   signatureImageData?: string | null;

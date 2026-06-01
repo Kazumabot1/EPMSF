@@ -54,40 +54,40 @@ a {
 }
 
 /* Common Tailwind purple/violet utility overrides used by older pages. */
-.bg-purple-50, .bg-violet-50, .bg-indigo-50 { background-color: var(--epms-blue-bg) !important; }
-.bg-purple-100, .bg-violet-100, .bg-indigo-100 { background-color: var(--epms-blue-soft) !important; }
-.text-purple-400, .text-violet-400, .text-indigo-400 { color: #60a5fa !important; }
-.text-purple-500, .text-violet-500, .text-indigo-500,
-.text-purple-600, .text-violet-600, .text-indigo-600,
-.text-purple-700, .text-violet-700, .text-indigo-700,
-.text-purple-800, .text-violet-800, .text-indigo-800,
-.text-purple-900, .text-violet-900, .text-indigo-900 { color: var(--epms-blue-dark) !important; }
-.border-purple-100, .border-violet-100, .border-indigo-100,
-.border-purple-200, .border-violet-200, .border-indigo-200 { border-color: #bfdbfe !important; }
-.ring-purple-100, .ring-violet-100, .ring-indigo-100 { --tw-ring-color: #dbeafe !important; }
-.ring-purple-500\/10, .ring-violet-500\/10, .ring-indigo-500\/10,
-.ring-purple-500\/15, .ring-violet-500\/15, .ring-indigo-500\/15,
-.ring-purple-600\/15, .ring-violet-600\/15, .ring-indigo-600\/15,
-.ring-purple-500\/20, .ring-violet-500\/20, .ring-indigo-500\/20 { --tw-ring-color: rgba(37, 99, 235, 0.16) !important; }
-.shadow-purple-200, .shadow-violet-200, .shadow-indigo-200 { --tw-shadow-color: rgba(37, 99, 235, 0.18) !important; }
-.shadow-purple-900\/20, .shadow-violet-900\/20, .shadow-indigo-900\/20,
-.shadow-purple-900\/25, .shadow-violet-900\/25, .shadow-indigo-900\/25,
-.shadow-indigo-950\/20 { --tw-shadow-color: rgba(37, 99, 235, 0.22) !important; }
-.hover\:bg-purple-50:hover, .hover\:bg-violet-50:hover, .hover\:bg-indigo-50:hover,
-.hover\:bg-purple-50\/25:hover, .hover\:bg-violet-50\/25:hover, .hover\:bg-indigo-50\/25:hover,
-.hover\:bg-purple-50\/50:hover, .hover\:bg-violet-50\/50:hover, .hover\:bg-indigo-50\/50:hover { background-color: #eff6ff !important; }
-.hover\:text-purple-700:hover, .hover\:text-violet-700:hover, .hover\:text-indigo-700:hover { color: var(--epms-blue-dark) !important; }
-.bg-purple-600, .bg-violet-600, .bg-indigo-600,
-.bg-purple-700, .bg-violet-700, .bg-indigo-700 { background-color: var(--epms-blue) !important; }
-.hover\:bg-purple-700:hover, .hover\:bg-violet-700:hover, .hover\:bg-indigo-700:hover { background-color: var(--epms-blue-dark) !important; }
+.bg-blue-50, .bg-blue-50, .bg-blue-50 { background-color: var(--epms-blue-bg) !important; }
+.bg-blue-100, .bg-blue-100, .bg-blue-100 { background-color: var(--epms-blue-soft) !important; }
+.text-blue-400, .text-blue-400, .text-blue-400 { color: #60a5fa !important; }
+.text-blue-500, .text-blue-500, .text-blue-500,
+.text-blue-600, .text-blue-600, .text-blue-600,
+.text-blue-700, .text-blue-700, .text-blue-700,
+.text-blue-800, .text-blue-800, .text-blue-800,
+.text-blue-900, .text-blue-900, .text-blue-900 { color: var(--epms-blue-dark) !important; }
+.border-blue-100, .border-blue-100, .border-blue-100,
+.border-blue-200, .border-blue-200, .border-blue-200 { border-color: #bfdbfe !important; }
+.ring-blue-100, .ring-blue-100, .ring-blue-100 { --tw-ring-color: #dbeafe !important; }
+.ring-blue-500\/10, .ring-blue-500\/10, .ring-blue-500\/10,
+.ring-blue-500\/15, .ring-blue-500\/15, .ring-blue-500\/15,
+.ring-blue-600\/15, .ring-blue-600\/15, .ring-blue-600\/15,
+.ring-blue-500\/20, .ring-blue-500\/20, .ring-blue-500\/20 { --tw-ring-color: rgba(37, 99, 235, 0.16) !important; }
+.shadow-blue-200, .shadow-blue-200, .shadow-blue-200 { --tw-shadow-color: rgba(37, 99, 235, 0.18) !important; }
+.shadow-blue-900\/20, .shadow-blue-900\/20, .shadow-blue-900\/20,
+.shadow-blue-900\/25, .shadow-blue-900\/25, .shadow-blue-900\/25,
+.shadow-blue-950\/20 { --tw-shadow-color: rgba(37, 99, 235, 0.22) !important; }
+.hover\:bg-blue-50:hover, .hover\:bg-blue-50:hover, .hover\:bg-blue-50:hover,
+.hover\:bg-blue-50\/25:hover, .hover\:bg-blue-50\/25:hover, .hover\:bg-blue-50\/25:hover,
+.hover\:bg-blue-50\/50:hover, .hover\:bg-blue-50\/50:hover, .hover\:bg-blue-50\/50:hover { background-color: #eff6ff !important; }
+.hover\:text-blue-700:hover, .hover\:text-blue-700:hover, .hover\:text-blue-700:hover { color: var(--epms-blue-dark) !important; }
+.bg-blue-600, .bg-blue-600, .bg-blue-600,
+.bg-blue-700, .bg-blue-700, .bg-blue-700 { background-color: var(--epms-blue) !important; }
+.hover\:bg-blue-700:hover, .hover\:bg-blue-700:hover, .hover\:bg-blue-700:hover { background-color: var(--epms-blue-dark) !important; }
 
 /* Replace common gradient directions on older hero panels with EPMS blue. */
-.from-purple-600, .from-violet-600, .from-indigo-600 { --tw-gradient-from: #2563eb var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
-.via-purple-600, .via-violet-600, .via-indigo-600 { --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), #1d4ed8 var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
-.to-purple-600, .to-violet-600, .to-indigo-600,
-.to-purple-800, .to-violet-800, .to-indigo-800 { --tw-gradient-to: #0f5ea8 var(--tw-gradient-to-position) !important; }
-.via-indigo-50\/30, .via-indigo-50\/40, .via-purple-50, .via-violet-50 { --tw-gradient-to: rgb(239 246 255 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), rgba(239,246,255,.55) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
-.to-purple-50, .to-violet-50, .to-indigo-50 { --tw-gradient-to: #f8fafc var(--tw-gradient-to-position) !important; }
+.from-blue-600, .from-blue-600, .from-blue-600 { --tw-gradient-from: #2563eb var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+.via-blue-600, .via-blue-600, .via-blue-600 { --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), #1d4ed8 var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+.to-blue-600, .to-blue-600, .to-blue-600,
+.to-blue-800, .to-blue-800, .to-blue-800 { --tw-gradient-to: #0f5ea8 var(--tw-gradient-to-position) !important; }
+.via-blue-50\/30, .via-blue-50\/40, .via-blue-50, .via-blue-50 { --tw-gradient-to: rgb(239 246 255 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), rgba(239,246,255,.55) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+.to-blue-50, .to-blue-50, .to-blue-50 { --tw-gradient-to: #f8fafc var(--tw-gradient-to-position) !important; }
 
 /* Generic old-page polish without changing routes or logic. */
 .rounded-3xl { border-radius: 1.35rem !important; }
@@ -179,4 +179,290 @@ input:focus, select:focus, textarea:focus {
 
 .role-dashboard-chart-card--comparison .dashboard-comparison-chart__bar--primary {
   width: min(52%, 44px);
+}
+
+/* Final EPMS page consistency polish: same blue/white language across plain pages. */
+:root {
+  --epms-ui-blue: #2563eb;
+  --epms-ui-blue-dark: #1d4ed8;
+  --epms-ui-blue-soft: #eff6ff;
+  --epms-ui-cyan: #38bdf8;
+  --epms-ui-mint: #2dd4bf;
+  --epms-ui-amber: #f59e0b;
+  --epms-ui-red: #ef4444;
+  --epms-ui-ink: #0f172a;
+  --epms-ui-muted: #64748b;
+  --epms-ui-border: #dbe7f6;
+  --epms-ui-page: #f5f8fd;
+  --epms-ui-shadow: 0 18px 46px rgba(15, 23, 42, 0.07);
+}
+
+.epms-refined-page {
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: 28px 24px 44px;
+  color: var(--epms-ui-ink);
+}
+
+.epms-refined-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  border: 1px solid var(--epms-ui-border);
+  border-radius: 24px;
+  padding: 26px 28px;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(37, 99, 235, 0.11), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: var(--epms-ui-shadow);
+}
+
+.epms-refined-hero--light {
+  background:
+    radial-gradient(circle at 94% 0%, rgba(56, 189, 248, 0.16), transparent 30%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+}
+
+.epms-refined-eyebrow {
+  margin: 0 0 8px;
+  color: var(--epms-ui-blue);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.epms-refined-hero h1,
+.epms-refined-card h2 {
+  margin: 0;
+  color: var(--epms-ui-ink);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.epms-refined-hero h1 {
+  font-size: clamp(2rem, 3.2vw, 3rem);
+}
+
+.epms-refined-hero p,
+.epms-refined-card-header p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.epms-refined-hero-stat,
+.epms-refined-score-pill {
+  display: grid;
+  place-items: center;
+  min-width: 150px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  text-align: center;
+}
+
+.epms-refined-hero-stat strong,
+.epms-refined-score-pill strong {
+  color: var(--epms-ui-blue);
+  font-size: 2rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.epms-refined-hero-stat span,
+.epms-refined-score-pill span {
+  margin-top: 6px;
+  color: var(--epms-ui-muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.epms-refined-metric-grid {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.epms-refined-metric-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.epms-refined-metric-card,
+.epms-refined-card {
+  border: 1px solid var(--epms-ui-border);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.055);
+}
+
+.epms-refined-metric-card {
+  padding: 18px;
+}
+
+.epms-refined-metric-card span {
+  display: block;
+  color: var(--epms-ui-muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.epms-refined-metric-card strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--epms-ui-ink);
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 950;
+  letter-spacing: -0.035em;
+}
+
+.epms-refined-metric-card small {
+  display: block;
+  margin-top: 6px;
+  color: #7b8aa0;
+  font-weight: 700;
+}
+
+.epms-refined-card {
+  padding: 20px;
+}
+
+.epms-refined-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.epms-refined-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.epms-refined-note {
+  margin-bottom: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 750;
+}
+
+.epms-refined-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e6edf7;
+  border-radius: 16px;
+}
+
+.epms-refined-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.epms-refined-table th {
+  padding: 13px 14px;
+  color: #334155;
+  background: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.76rem;
+  font-weight: 900;
+  border-bottom: 1px solid #e6edf7;
+}
+
+.epms-refined-table td {
+  padding: 13px 14px;
+  color: #1e293b;
+  border-bottom: 1px solid #eef3fa;
+}
+
+.epms-refined-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.epms-refined-empty {
+  color: var(--epms-ui-muted);
+  font-weight: 750;
+  text-align: center;
+}
+
+.text-end { text-align: right !important; }
+
+/* One-off cleanup for old pages that used oversized/alien gradients. */
+.appraisal-dashboard-hero,
+.appraisal-history-hero,
+.appraisal-template-hero,
+.hr-assessment-hero,
+.position-hero,
+.department-compare-hero,
+.pip-page-header,
+.oom-header {
+  border: 1px solid var(--epms-ui-border) !important;
+  border-radius: 24px !important;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(37, 99, 235, 0.12), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%) !important;
+  color: var(--epms-ui-ink) !important;
+  box-shadow: var(--epms-ui-shadow) !important;
+}
+
+.appraisal-dashboard-hero *,
+.appraisal-history-hero *,
+.appraisal-template-hero *,
+.hr-assessment-hero *,
+.position-hero *,
+.department-compare-hero *,
+.pip-page-header *,
+.oom-header * {
+  color: inherit;
+}
+
+.appraisal-dashboard-kicker,
+.pip-eyebrow,
+.oom-eyebrow,
+.department-compare-kicker,
+.position-kicker {
+  color: var(--epms-ui-blue) !important;
+}
+
+.appraisal-dashboard-orb,
+.appraisal-dashboard-hero .one,
+.appraisal-dashboard-hero .two,
+.hr-assessment-hero::before,
+.hr-assessment-hero::after {
+  opacity: 0.14 !important;
+}
+
+.appraisal-button,
+.pip-button,
+.oom-submit,
+.oom-calendar-btn,
+.oom-cal-btn,
+.oom-refresh-btn,
+.oom-secondary-btn,
+button[class*="btn"],
+a[class*="btn"] {
+  border-radius: 13px !important;
+  font-weight: 850 !important;
+}
+
+@media (max-width: 900px) {
+  .epms-refined-page { padding: 18px 14px 32px; }
+  .epms-refined-hero,
+  .epms-refined-card-header { display: grid; }
+  .epms-refined-metric-grid--three { grid-template-columns: 1fr; }
+  .epms-refined-hero-stat,
+  .epms-refined-score-pill { min-width: 0; width: 100%; }
 }

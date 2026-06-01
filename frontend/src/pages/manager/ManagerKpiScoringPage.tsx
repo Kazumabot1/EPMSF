@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
 import type { ManagerKpiAssignment, ManagerKpiTemplateSummary } from '../../types/kpiWorkflow';
@@ -23,6 +23,25 @@ const sortTemplateSummaries = (rows: ManagerKpiTemplateSummary[]) =>
 
 const summaryKey = (summary: Pick<ManagerKpiTemplateSummary, 'kpiFormId' | 'cyclePeriodId'>) =>
   `${summary.kpiFormId}:${summary.cyclePeriodId ?? 'legacy'}`;
+
+const parseSummaryKey = (key: string) => {
+  if (key === '') return null;
+  const colon = key.indexOf(':');
+  if (colon <= 0) return null;
+
+  const kpiFormId = Number(key.slice(0, colon));
+  const cyclePart = key.slice(colon + 1);
+  if (!Number.isFinite(kpiFormId)) return null;
+
+  if (cyclePart === 'legacy') {
+    return { kpiFormId, cyclePeriodId: null as number | null };
+  }
+
+  const cyclePeriodId = Number(cyclePart);
+  if (!Number.isFinite(cyclePeriodId)) return null;
+
+  return { kpiFormId, cyclePeriodId };
+};
 
 function lineEffectivelyScored(
   line: ManagerKpiAssignment['lines'][number],
@@ -49,6 +68,7 @@ const ManagerKpiScoringPage = () => {
   const [finalizeTarget, setFinalizeTarget] = useState<ManagerKpiAssignment | null>(null);
   const [finalizeReason, setFinalizeReason] = useState('');
   const [savingFormId, setSavingFormId] = useState<number | null>(null);
+  const assignmentsRequestRef = useRef(0);
 
   const loadSummaries = useCallback(async () => {
     try {
@@ -70,10 +90,21 @@ const ManagerKpiScoringPage = () => {
     void loadSummaries();
   }, [loadSummaries]);
 
-  const loadAssignments = useCallback(async (summary: ManagerKpiTemplateSummary) => {
+  const loadAssignmentsForKey = useCallback(async (key: string) => {
+    const parsed = parseSummaryKey(key);
+    if (!parsed) {
+      setAssignments([]);
+      setDrafts({});
+      return;
+    }
+
+    const requestId = ++assignmentsRequestRef.current;
+
     try {
       setLoadingAssignments(true);
-      const data = await kpiWorkflowService.listAssignments(summary.kpiFormId, summary.cyclePeriodId);
+      const data = await kpiWorkflowService.listAssignments(parsed.kpiFormId, parsed.cyclePeriodId);
+      if (requestId !== assignmentsRequestRef.current) return;
+
       setAssignments(data);
       const nextDrafts: DraftScores = {};
       for (const row of data) {
@@ -85,17 +116,23 @@ const ManagerKpiScoringPage = () => {
       }
       setDrafts(nextDrafts);
     } catch (err) {
+      if (requestId !== assignmentsRequestRef.current) return;
       toast.error(err instanceof Error ? err.message : 'Failed to load assignments.');
     } finally {
-      setLoadingAssignments(false);
+      if (requestId === assignmentsRequestRef.current) {
+        setLoadingAssignments(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    const summary = summaries.find((s) => summaryKey(s) === selectedSummaryKey);
-    if (!summary) return;
-    void loadAssignments(summary);
-  }, [selectedSummaryKey, summaries, loadAssignments]);
+    if (selectedSummaryKey === '') {
+      setAssignments([]);
+      setDrafts({});
+      return;
+    }
+    void loadAssignmentsForKey(selectedSummaryKey);
+  }, [selectedSummaryKey, loadAssignmentsForKey]);
 
   const selectedSummary = useMemo(
     () => summaries.find((s) => summaryKey(s) === selectedSummaryKey),
@@ -167,7 +204,8 @@ const ManagerKpiScoringPage = () => {
       setModalAssignment((prev) =>
         prev?.employeeKpiFormId === updated.employeeKpiFormId ? updated : prev,
       );
-      void loadSummaries();
+      await loadSummaries();
+      await loadAssignmentsForKey(selectedSummaryKey);
       if (closeModalAfter) setModalAssignment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed.');
@@ -195,7 +233,7 @@ const ManagerKpiScoringPage = () => {
       const result = await kpiWorkflowService.finalizeDepartment(selectedSummary.kpiFormId, selectedSummary.cyclePeriodId);
       toast.success(`Finalized ${result.assignmentsCreated} employee record(s).`);
       await loadSummaries();
-      await loadAssignments(selectedSummary);
+      await loadAssignmentsForKey(selectedSummaryKey);
       setModalAssignment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Finalize failed.');
@@ -242,7 +280,8 @@ const ManagerKpiScoringPage = () => {
       );
       setFinalizeTarget(null);
       setFinalizeReason('');
-      void loadSummaries();
+      await loadSummaries();
+      await loadAssignmentsForKey(selectedSummaryKey);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Finalize failed.');
     } finally {
@@ -269,7 +308,7 @@ const ManagerKpiScoringPage = () => {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 font-sans">
       <header className="mb-7">
-        <span className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+        <span className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
           <i className="bi bi-clipboard-data" /> KPI Management
         </span>
         <h1 className="mb-1.5 text-3xl font-bold text-slate-800">KPI scoring</h1>
@@ -287,7 +326,7 @@ const ManagerKpiScoringPage = () => {
           </label>
           <select
             id="kpi-template-select"
-            className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
+            className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
             disabled={loadingMeta || summaries.length === 0}
             value={selectedSummaryKey}
             onChange={(e) => setSelectedSummaryKey(e.target.value)}
@@ -315,7 +354,7 @@ const ManagerKpiScoringPage = () => {
             selectedSummary.openAssignments === 0
           }
           onClick={() => void finalize()}
-          className="inline-flex h-11 items-center justify-center rounded-xl bg-emerald-600 px-4 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-4 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
           {finalizing ? 'Finalizing...' : 'Finalize KPI'}
         </button>
@@ -403,7 +442,7 @@ const ManagerKpiScoringPage = () => {
                       <button
                         type="button"
                         onClick={() => setModalAssignment(a)}
-                        className="text-left font-bold text-emerald-700 underline decoration-emerald-700/30 hover:text-emerald-800"
+                        className="text-left font-bold text-blue-700 underline decoration-blue-700/30 hover:text-blue-800"
                       >
                         {a.employeeName}
                       </button>
@@ -432,7 +471,7 @@ const ManagerKpiScoringPage = () => {
                           disabled={isFinalized || !isComplete || finalizingEmployeeId === a.employeeKpiFormId}
                           onClick={() => openEmployeeFinalize(a)}
                           title={!isComplete ? 'Complete all KPI rows before finalizing' : 'Finalize this employee KPI'}
-                          className="inline-flex h-9 items-center rounded-lg border border-emerald-600 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                          className="inline-flex h-9 items-center rounded-lg border border-blue-600 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                         >
                           {finalizingEmployeeId === a.employeeKpiFormId ? 'Finalizing...' : 'Finalized'}
                         </button>
@@ -483,7 +522,7 @@ const ManagerKpiScoringPage = () => {
               onChange={(e) => setFinalizeReason(e.target.value)}
               rows={4}
               maxLength={2000}
-              className="mt-1.5 w-full resize-y rounded-xl border border-slate-300 p-3 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              className="mt-1.5 w-full resize-y rounded-xl border border-slate-300 p-3 text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
             <div className="mt-4 flex justify-end gap-3">
               <button
@@ -501,7 +540,7 @@ const ManagerKpiScoringPage = () => {
                 type="button"
                 disabled={finalizingEmployeeId === finalizeTarget.employeeKpiFormId || finalizeReason.trim() === ''}
                 onClick={() => void submitEmployeeFinalize()}
-                className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {finalizingEmployeeId === finalizeTarget.employeeKpiFormId ? 'Finalizing...' : 'Submit finalization'}
               </button>

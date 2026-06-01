@@ -411,7 +411,7 @@
 //         {showBuilder && (
 //             <div className="hfd-form-builder-card">
 //               <h3 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 700, color: '#1f2937' }}>
-//                 <i className="bi bi-pencil-square" style={{ marginRight: 6, color: '#6366f1' }} />
+//                 <i className="bi bi-pencil-square" style={{ marginRight: 6, color: '#2563eb' }} />
 //                 {builderTitle()}
 //               </h3>
 //

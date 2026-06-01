@@ -74,6 +74,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     return created;
                 });
 
+        normalizeOneOnOnePermissions(dto);
         normalizeTeamAssignmentPermissions(dto);
 
         List<PositionPermissionAudit> auditRows = buildAuditRows(
@@ -241,9 +242,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     || safe(pp.getKpiEdit())
                     || safe(pp.getKpiScore())
                     || safe(pp.getKpiView());
-            case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate())
-                    || safe(pp.getOneOnOneDeptSelection())
-                    || safe(pp.getOneOnOneTeamSelection());
+            case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate());
             case "feedback360Permission" -> safe(pp.getFeedbackFormCreate())
                     || safe(pp.getFeedbackSend());
             case "positionPermission" -> safe(pp.getPositionCrud());
@@ -504,6 +503,17 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .editedByName(audit.getEditedByName())
                 .editedAt(audit.getEditedAt())
                 .build();
+    }
+
+    private void normalizeOneOnOnePermissions(PositionPermissionDto dto) {
+        if (dto == null) {
+            return;
+        }
+
+        if (!safe(dto.getOneOnOneCreate())) {
+            dto.setOneOnOneDeptSelection(false);
+            dto.setOneOnOneTeamSelection(false);
+        }
     }
 
     private void normalizeTeamAssignmentPermissions(PositionPermissionDto dto) {

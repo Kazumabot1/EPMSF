@@ -191,7 +191,7 @@ const KpiTemplateCycleEditorPage = () => {
     return (
       <div className="kpi-tpl-page">
         <div className="mx-auto flex max-w-4xl flex-col items-center px-4 py-28">
-          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-300 to-gray-200" />
+          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-300 to-gray-200" />
           <p className="text-sm font-medium text-gray-600">Loading cycle form…</p>
         </div>
       </div>
@@ -203,7 +203,7 @@ const KpiTemplateCycleEditorPage = () => {
       <div className="mx-auto max-w-4xl px-4 py-8 pb-20">
         <div className="mb-10 flex flex-col gap-6 border-b border-gray-200/90 pb-8 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-700">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">
               {isEdit ? 'Edit cycle' : 'Create cycle'}
             </p>
             <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">KPI template cycle</h1>
@@ -283,7 +283,7 @@ const KpiTemplateCycleEditorPage = () => {
                         invalidSelection
                           ? 'border-red-300 bg-red-50/80'
                           : checked
-                            ? 'border-violet-300 bg-violet-50/80'
+                            ? 'border-blue-300 bg-blue-50/80'
                             : 'border-transparent hover:bg-gray-50'
                       }`}
                     >
@@ -291,7 +291,7 @@ const KpiTemplateCycleEditorPage = () => {
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleFormSelection(template.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="min-w-0 flex-1 text-sm font-medium text-gray-900">
                         {formatKpiFormCycleOptionLabel(template)}

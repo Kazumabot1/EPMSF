@@ -155,7 +155,7 @@ const UserRoles = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => handleEdit(userRole)}
-                        className="text-indigo-600 hover:text-indigo-900 transition duration-300"
+                        className="text-blue-600 hover:text-blue-900 transition duration-300"
                       >
                         Edit
                       </button>

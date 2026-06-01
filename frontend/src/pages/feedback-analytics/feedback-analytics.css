@@ -341,9 +341,9 @@
   min-width: 200px;
 }
 .feedback-results-chip-row span {
-  border: 1px solid #e0e7ff;
-  background: #eef2ff;
-  color: #4338ca;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
   border-radius: 999px;
   padding: 4px 8px;
   font-size: 0.72rem;

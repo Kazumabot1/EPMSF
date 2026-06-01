@@ -144,14 +144,14 @@ const sortByMostRecent = <T,>(items: T[], keys: (keyof T)[]) => {
 const iconClassByTone: Record<MetricCard['tone'], string> = {
   blue: 'bg-blue-50 text-blue-600 ring-blue-100',
   emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
-  violet: 'bg-violet-50 text-violet-600 ring-violet-100',
+  violet: 'bg-blue-50 text-blue-600 ring-blue-100',
   rose: 'bg-rose-50 text-rose-600 ring-rose-100',
 };
 
 const progressClassByTone: Record<MetricCard['tone'], string> = {
   blue: 'bg-blue-600',
   emerald: 'bg-emerald-500',
-  violet: 'bg-violet-500',
+  violet: 'bg-blue-500',
   rose: 'bg-rose-500',
 };
 
@@ -474,7 +474,7 @@ const EmployeeMyDashboard = () => {
       <div className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-hidden bg-slate-50 pb-6 text-slate-950 dashboard-page-shell">
         <div className="mx-auto flex w-full min-w-0 max-w-[1180px] flex-col gap-5 overflow-hidden">
           <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-            <div className="absolute inset-y-0 right-0 hidden w-[31%] bg-gradient-to-l from-blue-50 via-indigo-50/80 to-transparent xl:block" />
+            <div className="absolute inset-y-0 right-0 hidden w-[31%] bg-gradient-to-l from-blue-50 via-blue-50/80 to-transparent xl:block" />
             <div className="relative grid gap-6 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-center">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-blue-700">
@@ -518,7 +518,7 @@ const EmployeeMyDashboard = () => {
 
               <div className="hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-5 shadow-inner xl:block">
                 <div className="rounded-2xl border border-blue-100 bg-white/90 p-4">
-                  <div className="h-24 rounded-2xl bg-gradient-to-br from-blue-100 via-indigo-50 to-white p-4">
+                  <div className="h-24 rounded-2xl bg-gradient-to-br from-blue-100 via-blue-50 to-white p-4">
                     <div className="flex h-full items-end gap-2">
                       {[42, 58, 50, 68, 62, 77, 88].map((height, index) => (
                           <span key={`${height}-${index}`} className="w-full rounded-t-lg bg-blue-500/80" style={{ height: `${height}%` }} />
@@ -527,7 +527,7 @@ const EmployeeMyDashboard = () => {
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
                     <span className="h-2 rounded-full bg-blue-100" />
-                    <span className="h-2 rounded-full bg-indigo-100" />
+                    <span className="h-2 rounded-full bg-blue-100" />
                     <span className="h-2 rounded-full bg-slate-100" />
                   </div>
                 </div>
