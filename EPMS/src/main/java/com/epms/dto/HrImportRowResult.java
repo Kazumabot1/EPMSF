@@ -14,7 +14,11 @@ import java.util.List;
 @AllArgsConstructor
 public class HrImportRowResult {
     private int rowNumber;
+    private String fullName;
+    private String employeeCode;
     private String email;
+    private String status;
+    private String message;
     private String employeeAction;
     private String accountAction;
     private String emailAction;

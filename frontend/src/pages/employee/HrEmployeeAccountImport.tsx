@@ -100,6 +100,10 @@ const IMPORT_ENDPOINTS = [
     '/users/import-accounts',
 ];
 
+// Keep this false for bulk test imports so the server does not wait on SMTP for every row.
+// After accounts are visible, use the existing resend temporary password action for real users.
+const SEND_TEMP_PASSWORD_EMAIL_ON_IMPORT = false;
+
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
@@ -279,10 +283,10 @@ const normalizeStatus = (value: unknown, success?: unknown): ImportRowStatus => 
     const raw = stringValue(value).trim().toUpperCase();
 
     if (raw.includes('CREATED')) return 'CREATED';
-    if (raw.includes('UPDATED')) return 'UPDATED';
+    if (raw.includes('UPDATED') || raw.includes('LINKED') || raw.includes('LINK')) return 'UPDATED';
     if (raw.includes('SKIP')) return 'SKIPPED';
     if (raw.includes('FAIL') || raw.includes('ERROR') || raw.includes('INVALID')) return 'FAILED';
-    if (raw.includes('SUCCESS')) return 'SUCCESS';
+    if (raw.includes('SUCCESS') || raw.includes('CREATED_OR_UPDATED')) return 'SUCCESS';
 
     if (success === true) return 'SUCCESS';
     if (success === false) return 'FAILED';
@@ -1021,7 +1025,7 @@ function HrEmployeeAccountImport() {
         const formData = new FormData();
 
         formData.append('file', file);
-        formData.append('sendTemporaryPasswordEmail', 'true');
+        formData.append('sendTemporaryPasswordEmail', String(SEND_TEMP_PASSWORD_EMAIL_ON_IMPORT));
 
         return api.post(endpoint, formData, {
             headers: {
@@ -1086,9 +1090,11 @@ function HrEmployeeAccountImport() {
             setResult(normalizedResult);
             setUploadProgress(100);
 
+            const importMessage = `${normalizedResult.message} Created: ${normalizedResult.summary.created}, Updated: ${normalizedResult.summary.updated}, Skipped: ${normalizedResult.summary.skipped}, Failed: ${normalizedResult.summary.failed}.`;
+
             setNotice({
                 type: normalizedResult.summary.failed > 0 ? 'info' : 'success',
-                message: normalizedResult.message,
+                message: importMessage,
             });
         } catch (error: unknown) {
             setUploadProgress(0);
