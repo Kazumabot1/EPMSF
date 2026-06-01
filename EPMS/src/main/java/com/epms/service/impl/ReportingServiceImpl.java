@@ -864,7 +864,11 @@ public class ReportingServiceImpl implements ReportingService {
             roles.add("HR");
         }
 
-        if (role.equals("EXECUTIVE") || role.equals("CEO")) {
+        if (role.equals("EXECUTIVE")
+                || role.equals("CEO")
+                || role.contains("EXECUTIVE")
+                || role.contains("CEO")
+                || role.contains("CHIEF_EXECUTIVE")) {
             roles.add("EXECUTIVE");
         }
 

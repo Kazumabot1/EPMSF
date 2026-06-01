@@ -94,6 +94,7 @@ function Login() {
       case 'DEPARTMENT_HEAD_DASHBOARD':
         return '/department-head/dashboard';
       case 'EXECUTIVE_DASHBOARD':
+      case 'CEO_DASHBOARD':
         return '/executive/dashboard';
       case 'HR_DASHBOARD':
         return '/dashboard';
@@ -111,7 +112,7 @@ function Login() {
         if (normalizedRoles.includes('MANAGER')) {
           return '/manager/dashboard';
         }
-        if (normalizedRoles.includes('CEO') || normalizedRoles.includes('EXECUTIVE')) {
+        if (normalizedRoles.some((role) => role.includes('CEO') || role.includes('EXECUTIVE'))) {
           return '/executive/dashboard';
         }
         return '/employee/dashboard';

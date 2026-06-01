@@ -189,13 +189,13 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
           path: '/hr/assessment-scores',
           icon: 'bi-clipboard-data',
           end: true,
-          permissionField: 'selfAssessmentView',
+          permissionField: 'assessmentScoresView',
         },
         {
           label: 'Form Create',
           path: '/hr/assessment-forms',
           icon: 'bi-ui-checks-grid',
-          permissionField: 'selfAssessmentInput',
+          permissionField: 'assessmentFormCreate',
         },
         {
           label: 'Review Form',
@@ -275,7 +275,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI Version History', path: '/hr/kpi-version-history', icon: 'bi-clock-history' },
         { label: 'KPI Template Cycle', path: '/hr/kpi-template-cycle', icon: 'bi-arrow-repeat' },
         { label: 'Employee KPI', path: '/hr/employee-kpis', icon: 'bi-person-lines-fill' },
-        { label: 'KPI History', path: '/hr/kpi/history', icon: 'bi-clock-history' },
       ],
     },
 
@@ -445,7 +444,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
-    { label: 'People Change Review', path: '/executive/approval/changes', icon: 'bi-person-check' },
     {
       label: 'Reports',
       path: '/executive/reports',
@@ -501,6 +499,19 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
   }
 
   if (
+      normalizedRoles.includes('CEO') ||
+      normalizedRoles.includes('EXECUTIVE') ||
+      normalizedRoles.some((role) => role.includes('CEO') || role.includes('EXECUTIVE')) ||
+      dashboard === 'CEO_DASHBOARD' ||
+      dashboard === 'EXECUTIVE_DASHBOARD' ||
+      normalizedPosition.includes('CEO') ||
+      normalizedPosition.includes('EXECUTIVE') ||
+      normalizedPosition.includes('CHIEF_EXECUTIVE')
+  ) {
+    return 'Executive';
+  }
+
+  if (
       normalizedRoles.includes('HR') ||
       dashboard === 'HR_DASHBOARD' ||
       normalizedPosition.includes('HR') ||
@@ -516,15 +527,6 @@ export const resolveUserRole = (user?: UserLike | null): UserRole => {
       dashboard === 'MANAGER_DASHBOARD'
   ) {
     return 'Manager';
-  }
-
-  if (
-      normalizedRoles.includes('CEO') ||
-      normalizedRoles.includes('EXECUTIVE') ||
-      dashboard === 'CEO_DASHBOARD' ||
-      dashboard === 'EXECUTIVE_DASHBOARD'
-  ) {
-    return 'Executive';
   }
 
   return 'Employee';

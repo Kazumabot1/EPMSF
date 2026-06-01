@@ -386,12 +386,7 @@ public class SecurityConfig {
                                 "/api/self-assessment-score-table",
                                 "/api/self-assessment-score-table/**"
                         ).access((authentication, context) ->
-                                hasAnyRoleAndPositionPermission(
-                                        authentication.get(),
-                                        HR_ROLES,
-                                        HR_DASHBOARDS,
-                                        "assessmentScoresView"
-                                )
+                                hasRoleDashboardOrPosition(authentication.get(), HR_ROLES, HR_DASHBOARDS)
                         )
 
                         .requestMatchers(
