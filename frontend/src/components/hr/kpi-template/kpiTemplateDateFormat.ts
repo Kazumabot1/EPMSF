@@ -23,7 +23,7 @@ export const formatDate = (value?: string | null): string => {
   return formatParts(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
 };
 
-/** Formats a date-time as `DD-MM-YYYY, h:mm AM/PM`. */
+/** Formats a date-time as `DD-MM-YYYY (hh:mm AM/PM)`. */
 export const formatDateTime = (value?: string | null): string => {
   if (!value) return '—';
   const raw = String(value).trim();
@@ -42,7 +42,7 @@ export const formatDateTime = (value?: string | null): string => {
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours %= 12;
   if (hours === 0) hours = 12;
-  return `${datePart}, ${hours}:${minutes} ${ampm}`;
+  return `${datePart} (${pad2(hours)}:${minutes} ${ampm})`;
 };
 
 /** Formats a date-time as `DD-MM-YYYY (hh:mm AM/PM)`. */

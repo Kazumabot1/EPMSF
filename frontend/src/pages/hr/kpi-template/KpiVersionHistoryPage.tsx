@@ -87,7 +87,7 @@ const KpiVersionHistoryPage = () => {
       style={{ fontFamily: '"Times New Roman", Times, serif' }}
     >
       <div className="mx-auto max-w-6xl px-4 py-6 pb-16">
-        <header className="rounded-xl border border-slate-200 bg-[radial-gradient(circle_at_92%_16%,rgba(37,99,235,0.1),transparent_14rem),linear-gradient(135deg,#ffffff_0%,#eff6ff_100%)] px-5 py-4 shadow-sm">
+        <header className="rounded-2xl border border-blue-100 bg-[radial-gradient(circle_at_92%_18%,rgba(255,255,255,0.22),transparent_13rem),linear-gradient(135deg,#ffffff_0%,#eff6ff_56%,#1e3a8a_100%)] px-5 py-4 shadow-sm shadow-blue-900/10">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.05em] text-blue-700">
