@@ -37,8 +37,9 @@ public class SelfAssessmentScoreBandService {
     private final AssessmentFormDefinitionRepository assessmentFormRepository;
     private final EmployeeAssessmentRepository employeeAssessmentRepository;
 
-    @Transactional(readOnly = true)
     public ScoreTableResponse getTable() {
+        ensureDefaults();
+
         LocalDateTime now = LocalDateTime.now();
         int activeFormCount = assessmentFormRepository
                 .findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(now, now)
@@ -109,7 +110,7 @@ public class SelfAssessmentScoreBandService {
         List<SelfAssessmentScoreBandAudit> audits = new ArrayList<>();
 
         for (ScoreBandRequest row : incoming) {
-            SelfAssessmentScoreBand band = row.getId() == null
+            SelfAssessmentScoreBand band = row.getId() == null || row.getId() <= 0
                     ? existingBySortOrder.get(row.getSortOrder())
                     : existingById.get(row.getId());
 
@@ -284,13 +285,20 @@ public class SelfAssessmentScoreBandService {
         boolean isHr = user.getRoles() != null && user.getRoles()
                 .stream()
                 .map(this::canonicalRole)
-                .anyMatch("HR"::equals);
+                .anyMatch(role -> role.equals("HR")
+                        || role.equals("HRADMIN")
+                        || role.equals("HR_ADMIN")
+                        || role.equals("ADMIN"));
 
         String dashboardRole = canonicalRole(user.getDashboard());
-        boolean dashboardIsHr = "HR_DASHBOARD".equals(dashboardRole) || "HR".equals(dashboardRole);
+        boolean dashboardIsHr = "HR_DASHBOARD".equals(dashboardRole)
+                || "HR".equals(dashboardRole)
+                || "ADMIN_DASHBOARD".equals(dashboardRole)
+                || "HRADMIN_DASHBOARD".equals(dashboardRole)
+                || "HR_ADMIN_DASHBOARD".equals(dashboardRole);
 
         if (!isHr && !dashboardIsHr) {
-            throw new UnauthorizedActionException("Only HR can edit the self-assessment score table.");
+            throw new UnauthorizedActionException("Only HR or HR Admin can edit the self-assessment score table.");
         }
     }
 

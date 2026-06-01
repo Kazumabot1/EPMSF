@@ -93,10 +93,11 @@ type FileValidation = {
 };
 
 const IMPORT_ENDPOINTS = [
-    '/users/import',
-    '/users/import-accounts',
+    '/hr/employee-accounts/import',
     '/employees/import-accounts',
     '/employees/import',
+    '/users/import',
+    '/users/import-accounts',
 ];
 
 const MAX_FILE_SIZE_MB = 20;
@@ -321,6 +322,16 @@ const getSummaryFromRows = (rows: ImportResultRow[]): ImportSummary => {
 
 const normalizeImportRow = (row: unknown, index: number): ImportResultRow => {
     const item = row as Record<string, unknown>;
+    const validationErrors = Array.isArray(item.validationErrors)
+        ? item.validationErrors.filter(Boolean).join(', ')
+        : '';
+    const action =
+        item.status ??
+        item.result ??
+        item.action ??
+        item.accountAction ??
+        item.employeeAction ??
+        item.emailAction;
 
     return {
         rowNumber: numberValue(
@@ -329,9 +340,16 @@ const normalizeImportRow = (row: unknown, index: number): ImportResultRow => {
         fullName: stringValue(item.fullName ?? item.name ?? item.employeeName ?? item.userName) || null,
         employeeCode: stringValue(item.employeeCode ?? item.staffId ?? item.code ?? item.employeeId) || null,
         email: stringValue(item.email ?? item.gmail ?? item.username) || null,
-        status: normalizeStatus(item.status ?? item.result ?? item.action, item.success),
+        status: normalizeStatus(action, item.success),
         message:
-            stringValue(item.message ?? item.error ?? item.reason ?? item.details ?? item.smtpErrorDetail) || null,
+            stringValue(
+                item.message ??
+                item.error ??
+                item.reason ??
+                item.details ??
+                item.smtpErrorDetail ??
+                validationErrors,
+            ) || null,
     };
 };
 

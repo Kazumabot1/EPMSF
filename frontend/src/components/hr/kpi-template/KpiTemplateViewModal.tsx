@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
+import { formatDateTimeParen } from './kpiTemplateDateFormat';
 import { formatTemplatePositionLabels, kpiStatusBadgeClass, sumTemplateItemWeights } from './kpiTemplateUi';
 import { kpiTemplateService } from '../../../services/kpiTemplateService';
 import type { KpiTemplateItem, KpiTemplateResponse, KpiVersionDetail } from '../../../types/kpiTemplate';
@@ -109,7 +110,7 @@ const KpiTemplateViewModal = ({ open, templateId, onClose }: Props) => {
         className="max-h-[min(92vh,920px)] w-full max-w-5xl overflow-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
         style={{ fontFamily: '"Times New Roman", Times, serif' }}
       >
-        <div className="border-b border-slate-200 bg-[linear-gradient(to_right,#ffffff_0%,#eff6ff_42%,#1e3a8a_100%)] px-6 py-4">
+        <div className="border-b border-blue-100 bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_54%,#1e3a8a_100%)] px-6 py-4 shadow-sm shadow-blue-900/10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 max-w-[calc(100%-3.5rem)]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">View detail</p>
@@ -147,11 +148,23 @@ const KpiTemplateViewModal = ({ open, templateId, onClose }: Props) => {
 
         {!loading && !error && template && (
           <div className="space-y-5 px-6 py-5">
-            <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Position(s)</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-950">
-                {formatTemplatePositionLabels(template.positions)}
-              </dd>
+            <section className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Position(s)</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-950">
+                  {formatTemplatePositionLabels(template.positions)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Created</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-950">{formatDateTimeParen(template.createdAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Updated</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-950">
+                  {formatDateTimeParen(template.updatedAt ?? template.createdAt)}
+                </dd>
+              </div>
             </section>
 
             <section className="overflow-hidden rounded-xl border border-slate-200">

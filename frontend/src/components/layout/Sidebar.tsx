@@ -104,6 +104,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const dashboard = user?.dashboard ?? '';
   const normalizedRoles = (user?.roles ?? []).map(normalizeRoleName);
   const normalizedDashboard = normalizeRoleName(dashboard);
+  const normalizedPosition = normalizeRoleName(String(user?.position ?? user?.positionName ?? ''));
 
   const isAdmin =
       normalizedRoles.includes('ADMIN') ||
@@ -134,8 +135,12 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const isExecutive =
       normalizedRoles.includes('CEO') ||
       normalizedRoles.includes('EXECUTIVE') ||
+      normalizedRoles.some((role) => role.includes('CEO') || role.includes('EXECUTIVE')) ||
       normalizedDashboard === 'CEO_DASHBOARD' ||
-      normalizedDashboard === 'EXECUTIVE_DASHBOARD';
+      normalizedDashboard === 'EXECUTIVE_DASHBOARD' ||
+      normalizedPosition.includes('CEO') ||
+      normalizedPosition.includes('EXECUTIVE') ||
+      normalizedPosition.includes('CHIEF_EXECUTIVE');
 
   const isEmployee =
       !isAdmin &&
@@ -514,7 +519,6 @@ const organizationChildren = compactItems([
           { to: '/hr/kpi-version-history', label: 'KPI Version History', icon: 'bi bi-clock-history' },
           { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
           { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
-          { to: '/hr/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
 

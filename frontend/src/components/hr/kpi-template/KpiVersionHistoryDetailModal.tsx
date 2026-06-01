@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { formatDate, formatDateTimeParen } from './kpiTemplateDateFormat';
+import { formatDateTimeParen } from './kpiTemplateDateFormat';
 import type { KpiVersionDetail } from '../../../types/kpiTemplate';
 
 type Props = {
@@ -58,7 +58,7 @@ const KpiVersionHistoryDetailModal = ({ open, detail, loading, onClose }: Props)
         className="max-h-[min(92vh,920px)] w-full max-w-5xl overflow-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
         style={{ fontFamily: '"Times New Roman", Times, serif' }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-[linear-gradient(to_right,#ffffff_0%,#eff6ff_42%,#1e3a8a_100%)] px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-blue-100 bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_54%,#1e3a8a_100%)] px-6 py-4 shadow-sm shadow-blue-900/10">
           <div className="min-w-0 max-w-[calc(100%-3.5rem)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">View detail</p>
             <h2 id="kpi-version-detail-title" className="mt-1 text-xl font-semibold text-slate-950">

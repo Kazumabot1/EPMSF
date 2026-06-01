@@ -326,11 +326,11 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
     const reportBasePath = resolveReportBasePath(location.pathname);
     const reportNavItems = useMemo(() => buildReportNavItems(reportBasePath), [reportBasePath]);
 
-    const loadDashboard = async () => {
+    const loadDashboard = async (forceRefresh = false) => {
         try {
             setLoading(true);
             setError('');
-            const data = await reportingService.getDashboard();
+            const data = await reportingService.getDashboard(forceRefresh);
             setDashboard(data);
         } catch (err) {
             setError(errorMessage(err));
@@ -634,7 +634,7 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
                         />
                     </label>
 
-                    <button type="button" className="reporting-button reporting-button--ghost" onClick={() => void loadDashboard()}>
+                    <button type="button" className="reporting-button reporting-button--ghost" onClick={() => void loadDashboard(true)}>
                         <i className="bi bi-arrow-clockwise" />
                         Refresh
                     </button>

@@ -355,7 +355,6 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
     return [
       { icon: 'bi-bar-chart', title: 'Performance Report', description: 'Organization results', to: '/executive/reports/performance' },
       { icon: 'bi-building-check', title: 'Department Performance', description: 'Department comparison', to: '/executive/reports/department-performance' },
-      { icon: 'bi-person-check', title: 'People Change Review', description: 'Approve workforce changes', to: '/executive/approval/changes' },
       { icon: 'bi-stars', title: 'Recommendations', description: 'Promotion insights', to: '/executive/reports/recommendations' },
     ];
   }

@@ -1177,7 +1177,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         runAutoFinalizePastDueAssignments();
 
         UserPrincipal principal = SecurityUtils.currentUser();
-        if (hasHrAdminScope(principal) || hasHrScope(principal)) {
+        if (hasHrAdminScope(principal) || hasHrScope(principal) || hasExecutiveScope(principal)) {
             return employeeKpiFormRepository.findAllByStatusWithDetail(EmployeeKpiStatus.FINALIZED).stream()
                     .map(this::toManagerDto)
                     .toList();
