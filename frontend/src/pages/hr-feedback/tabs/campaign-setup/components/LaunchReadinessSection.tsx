@@ -69,8 +69,8 @@ const launchCheckLabels: Record<string, string> = {
     CAMPAIGN_INFO: 'Campaign Details',
     TARGETS: 'Recipients',
     EVALUATOR_ASSIGNMENTS: 'Evaluator Assignments',
-    QUESTION_SELECTION: 'Question Snapshot',
-    QUESTION_SNAPSHOT: 'Question Snapshot',
+    QUESTION_SELECTION: 'Campaign Question Preview',
+    QUESTION_SNAPSHOT: 'Campaign Question Preview',
     RELATIONSHIP_WEIGHTS: 'Evaluator & Weight Rules',
     COMPETENCY_WEIGHTS: 'Competency Weights',
     SUBMISSION_WINDOW: 'Launch Window',
@@ -95,7 +95,7 @@ const launchStepNames: Record<LaunchStepTarget, string> = {
     foundation: 'Campaign Details',
     targets: 'Recipients',
     evaluators: 'Evaluator & Weight Rules',
-    questions: 'Question Snapshot',
+    questions: 'Campaign Question Preview',
 };
 
 const launchCheckLabel = (key?: string | null, fallback?: string | null) =>
@@ -227,7 +227,7 @@ export function LaunchReadinessSection({
                     <strong>Save question snapshot first</strong>
                     <p>Launch requires saved recipients, evaluator assignments, question snapshot, and scoring weights.</p>
                     <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => onGoToStep('questions')}>
-                        <i className="bi bi-arrow-left" /> Back to Question Snapshot
+                        <i className="bi bi-arrow-left" /> Back to Campaign Question Preview
                     </button>
                 </div>
             ) : loadingActivation ? (
@@ -353,7 +353,7 @@ export function LaunchReadinessSection({
                             <i className="bi bi-arrow-clockwise" /> Refresh Check
                         </button>
                         <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => onGoToStep('questions')}>
-                            <i className="bi bi-ui-checks-grid" /> Back to Question Snapshot
+                            <i className="bi bi-ui-checks-grid" /> Back to Campaign Question Preview
                         </button>
                         {selectedCampaign.status === 'DRAFT' && (
                             <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canValidateSetup || activatingCampaign} onClick={() => setConfirmationMode('validate')}>

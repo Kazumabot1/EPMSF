@@ -70,13 +70,6 @@ const formatScore = (value?: number | null, digits = 1) => {
   return `${Number(value).toFixed(digits)}%`;
 };
 
-const formatShortDate = (value?: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: '2-digit', year: 'numeric' }).format(date);
-};
-
 const statusText = (status?: string | null) => {
   switch (String(status ?? 'HIDDEN').toUpperCase()) {
     case 'PUBLISHED': return 'Published';

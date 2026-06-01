@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import DynamicQuestionBankTab from '../hr-feedback/tabs/DynamicQuestionBankTab';
 import QuestionRulesTab from '../hr-feedback/tabs/QuestionRulesTab';
-import DynamicFormPreviewTab from '../hr-feedback/tabs/DynamicFormPreviewTab';
 import CampaignSetupTab from '../hr-feedback/tabs/CampaignSetupTab';
 import EmployeeTargetingTab from '../hr-feedback/tabs/EmployeeTargetingTab';
 import AssignmentPreviewTab from '../hr-feedback/tabs/AssignmentPreviewTab';
@@ -50,15 +49,15 @@ const MODULE_COPY: Record<
         'Manage reusable 360 feedback questions without mixing targeting rules into question creation.',
   },
   'question-rules': {
-    eyebrow: 'Targeting rules',
-    title: 'Question Rules',
+    eyebrow: 'Form setup',
+    title: 'Form Setup',
     description:
-        'Control who sees each question by employee level, evaluator role, competency, department, or position.',
+        'Prepare default, department, and position evaluator forms before campaigns use them.',
   },
   'dynamic-preview': {
-    eyebrow: 'Generated feedback preview',
-    title: 'Dynamic Preview',
-    description: 'Preview the exact evaluator question set before HR activates a campaign.',
+    eyebrow: 'Form setup',
+    title: 'Form Setup',
+    description: 'Live Preview is now included inside Form Setup.',
   },
   campaigns: {
     eyebrow: 'Campaign workspace',
@@ -232,8 +231,10 @@ const FeedbackLayoutPage = () => {
     navigate('/hr/feedback/targets', { replace: true });
   }, [activeModule, navigate, targetsDirty]);
 
+  const questionBankLayoutClass = activeModule === 'questions' ? ' !w-full !max-w-none' : '';
+
   return (
-      <div className="feedback-page feedback-page-subnav-mode">
+      <div className={`feedback-page feedback-page-subnav-mode${questionBankLayoutClass}`}>
         {!selfContainedQuestionPage && !['monitoring', 'analytics'].includes(activeModule) && (
             <section className="feedback-hero compact">
               <div>
@@ -263,8 +264,8 @@ const FeedbackLayoutPage = () => {
           <Route path="questions" element={<DynamicQuestionBankTab />} />
           <Route path="question-rules" element={<QuestionRulesTab />} />
           <Route path="rules" element={<Navigate to="/hr/feedback/question-rules" replace />} />
-          <Route path="dynamic-preview" element={<DynamicFormPreviewTab />} />
-          <Route path="preview" element={<Navigate to="/hr/feedback/dynamic-preview" replace />} />
+          <Route path="dynamic-preview" element={<Navigate to="/hr/feedback/question-rules" replace />} />
+          <Route path="preview" element={<Navigate to="/hr/feedback/question-rules" replace />} />
           <Route path="forms" element={<Navigate to="/hr/feedback/questions" replace />} />
 
           <Route

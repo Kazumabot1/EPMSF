@@ -22,14 +22,14 @@ public class FeedbackCompetencyServiceImpl implements FeedbackCompetencyService 
     private static final String DEFAULT_CATEGORY = "PERFORMANCE_360";
 
     private static final List<SeedCompetency> DEFAULT_COMPETENCIES = List.of(
-            new SeedCompetency("COMMUNICATION_SKILLS", "Communication Skills", "Measures how clearly, respectfully, and effectively employees share information and listen to others.", 10),
-            new SeedCompetency("TEAMWORK_COLLABORATION", "Teamwork & Collaboration", "Measures how effectively employees work with others toward shared outcomes.", 20),
-            new SeedCompetency("TECHNICAL_SKILLS", "Technical Skills", "Measures role-specific knowledge, technical capability, and effective application of skills.", 30),
-            new SeedCompetency("WORK_QUALITY", "Work Quality", "Measures accuracy, consistency, and quality of delivered work.", 40),
-            new SeedCompetency("ACCOUNTABILITY_RESPONSIBILITY", "Accountability & Responsibility", "Measures ownership of assigned work, follow-through, and responsibility for outcomes.", 50),
-            new SeedCompetency("PROBLEM_SOLVING", "Problem Solving", "Measures how employees analyze issues and propose practical solutions.", 60),
-            new SeedCompetency("LEARNING_IMPROVEMENT", "Learning & Improvement", "Measures willingness to learn, improve, and adapt based on feedback and changing needs.", 70),
-            new SeedCompetency("ATTITUDE_PROFESSIONALISM", "Attitude & Professionalism", "Measures professional conduct, respect, reliability, and positive workplace behavior.", 80)
+            new SeedCompetency("COMMUNICATION_SKILLS", "Communication Skills", 10),
+            new SeedCompetency("TEAMWORK_COLLABORATION", "Teamwork & Collaboration", 20),
+            new SeedCompetency("TECHNICAL_SKILLS", "Technical Skills", 30),
+            new SeedCompetency("WORK_QUALITY", "Work Quality", 40),
+            new SeedCompetency("ACCOUNTABILITY_RESPONSIBILITY", "Accountability & Responsibility", 50),
+            new SeedCompetency("PROBLEM_SOLVING", "Problem Solving", 60),
+            new SeedCompetency("LEARNING_IMPROVEMENT", "Learning & Improvement", 70),
+            new SeedCompetency("ATTITUDE_PROFESSIONALISM", "Attitude & Professionalism", 80)
     );
 
     private final FeedbackCompetencyRepository competencyRepository;
@@ -85,16 +85,13 @@ public class FeedbackCompetencyServiceImpl implements FeedbackCompetencyService 
                 FeedbackCompetency created = new FeedbackCompetency();
                 created.setCode(seed.code());
                 created.setName(seed.name());
-                created.setDescription(seed.description());
                 created.setDisplayOrder(seed.displayOrder());
                 return created;
             });
             if (competency.getName() == null || competency.getName().isBlank()) {
                 competency.setName(seed.name());
             }
-            if (competency.getDescription() == null || competency.getDescription().isBlank()) {
-                competency.setDescription(seed.description());
-            }
+            competency.setDescription(null);
             if (competency.getDisplayOrder() == null || competency.getDisplayOrder() >= 500) {
                 competency.setDisplayOrder(seed.displayOrder());
             }
@@ -118,7 +115,7 @@ public class FeedbackCompetencyServiceImpl implements FeedbackCompetencyService 
 
     private void applyEditableFields(FeedbackCompetency competency, FeedbackCompetencyUpsertRequest request) {
         competency.setName(requireText(request.getName(), "Competency name is required."));
-        competency.setDescription(blankToNull(request.getDescription()));
+        competency.setDescription(null);
     }
 
     private void applyInternalDefaults(FeedbackCompetency competency) {
@@ -141,7 +138,7 @@ public class FeedbackCompetencyServiceImpl implements FeedbackCompetencyService 
                 .id(competency.getId())
                 .code(competency.getCode())
                 .name(competency.getName())
-                .description(competency.getDescription())
+                .description(null)
                 .category(competency.getCategory())
                 .displayOrder(competency.getDisplayOrder())
                 .status(competency.getStatus())
@@ -202,9 +199,5 @@ public class FeedbackCompetencyServiceImpl implements FeedbackCompetencyService 
         return value.trim();
     }
 
-    private String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private record SeedCompetency(String code, String name, String description, int displayOrder) {}
+    private record SeedCompetency(String code, String name, int displayOrder) {}
 }

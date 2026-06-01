@@ -28,7 +28,7 @@ export const disabledFeatureMessage = (positionName?: string | null) =>
 
 const feedbackChildren: NavItem[] = [
   { label: 'Question Bank', path: '/hr/feedback/questions', icon: 'bi-question-circle' },
-  { label: 'Question Rules', path: '/hr/feedback/question-rules', icon: 'bi-sliders' },
+  { label: 'Form Setup', path: '/hr/feedback/question-rules', icon: 'bi-ui-checks' },
   { label: 'Campaign Setup', path: '/hr/feedback/campaigns', icon: 'bi-calendar-plus' },
   { label: 'Monitoring', path: '/hr/feedback/monitoring', icon: 'bi-activity' },
   { label: 'Analytics', path: '/hr/feedback/analytics', icon: 'bi-graph-up' },
@@ -101,16 +101,16 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
       ],
     },
-{
-  label: 'Approvals',
-  path: '/admin/approval/kpi',
-  icon: 'bi-shield-check',
-  children: [
-    { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+    {
+      label: 'Approvals',
+      path: '/admin/approval/kpi',
+      icon: 'bi-shield-check',
+      children: [
+        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
 
-    { label: 'Workforce Change Review', path: '/admin/approval/changes', icon: 'bi-person-check' },
-  ],
-},
+        { label: 'Workforce Change Review', path: '/admin/approval/changes', icon: 'bi-person-check' },
+      ],
+    },
     {
       label: 'Access Control',
       path: '/position-permissions',
@@ -119,7 +119,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'User Roles', path: '/user-roles', icon: 'bi-person-gear' },
         { label: 'Role Permissions', path: '/role-permissions', icon: 'bi-shield-check' },
         { label: 'Permissions', path: '/permissions', icon: 'bi-key' },
-        { label: 'Position Permissions', path: '/position-permissions', icon: 'bi-sliders2-vertical' },
+        { label: 'Position Permissions', path: '/position-permissions', icon: 'bi-ui-checks2-vertical' },
       ],
     },
   ],
@@ -142,20 +142,20 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
       path: '/hr/organization',
       icon: 'bi-building',
 
-     children: [
-       { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
-       {
-         label: 'Department Comparison',
-         path: '/hr/department-comparison',
-         icon: 'bi-columns-gap',
-         permissionField: 'departmentComparisonView',
-       },
-       {
-         label: 'Workforce Changes',
-         path: '/hr/workforce-changes',
-         icon: 'bi-arrow-left-right',
-       },
-     ],
+      children: [
+        { label: 'Departments', path: '/hr/department', icon: 'bi-building', permissionField: 'departmentCrud' },
+        {
+          label: 'Department Comparison',
+          path: '/hr/department-comparison',
+          icon: 'bi-columns-gap',
+          permissionField: 'departmentComparisonView',
+        },
+        {
+          label: 'Workforce Changes',
+          path: '/hr/workforce-changes',
+          icon: 'bi-arrow-left-right',
+        },
+      ],
     },
     {
       label: 'Reports',

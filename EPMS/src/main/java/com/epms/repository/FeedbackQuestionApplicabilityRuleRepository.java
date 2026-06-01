@@ -91,6 +91,66 @@ public interface FeedbackQuestionApplicabilityRuleRepository extends JpaReposito
     """, nativeQuery = true)
     int deactivateRulesWithBrokenQuestionBankReferences();
 
+    /**
+     * HR-facing Form Setup uses a simple best-match model:
+     * Position form -> Department form -> Default form. Department + position specific
+     * legacy rows are ignored so hidden compatibility data cannot unexpectedly affect
+     * campaign previews.
+     */
+    default List<FeedbackQuestionApplicabilityRule> findBestMatchingFormRules(
+            Integer levelRank,
+            Long targetPositionId,
+            Long targetDepartmentId,
+            String relationshipType,
+            LocalDate today
+    ) {
+        List<FeedbackQuestionApplicabilityRule> candidates = findApplicableRules(
+                levelRank,
+                targetPositionId,
+                targetDepartmentId,
+                relationshipType,
+                today
+        );
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+
+        int bestScope = candidates.stream()
+                .mapToInt(rule -> formScopeScore(rule, targetPositionId, targetDepartmentId))
+                .filter(score -> score > 0)
+                .max()
+                .orElse(0);
+
+        if (bestScope <= 0) {
+            return List.of();
+        }
+
+        return candidates.stream()
+                .filter(rule -> formScopeScore(rule, targetPositionId, targetDepartmentId) == bestScope)
+                .toList();
+    }
+
+    private static int formScopeScore(FeedbackQuestionApplicabilityRule rule, Long targetPositionId, Long targetDepartmentId) {
+        if (rule == null) {
+            return 0;
+        }
+        if (rule.getTargetPositionId() != null && rule.getTargetDepartmentId() != null) {
+            return 0;
+        }
+        if (targetPositionId != null && targetPositionId.equals(rule.getTargetPositionId())) {
+            return 3;
+        }
+        if (targetDepartmentId != null
+                && rule.getTargetPositionId() == null
+                && targetDepartmentId.equals(rule.getTargetDepartmentId())) {
+            return 2;
+        }
+        if (rule.getTargetPositionId() == null && rule.getTargetDepartmentId() == null) {
+            return 1;
+        }
+        return 0;
+    }
+
     @Query("""
         SELECT COUNT(r)
         FROM FeedbackQuestionApplicabilityRule r
