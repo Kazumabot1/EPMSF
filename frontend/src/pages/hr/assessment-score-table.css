@@ -162,10 +162,11 @@
 .ast-modal-backdrop {
   position: fixed; inset: 0; background: rgba(15,23,42,0.5);
   z-index: 1000; display: flex; align-items: flex-start; justify-content: center;
-  padding: 40px 20px; overflow-y: auto;
+  padding: 16px; overflow-y: auto;
 }
 .ast-modal {
-  background: #fff; border-radius: 20px; max-width: 1100px; width: 100%;
+  background: #fff; border-radius: 20px; max-width: none; width: min(1480px, calc(100vw - 32px));
+  min-height: calc(100vh - 32px); display: flex; flex-direction: column;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: astPopIn 0.22s ease-out;
 }
 @keyframes astPopIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
@@ -175,7 +176,9 @@
 }
 .ast-modal-header h2 { margin: 0 0 4px; font-size: 18px; color: #0f172a; }
 .ast-modal-header p { margin: 0; font-size: 13px; color: #64748b; }
-.ast-modal-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
+.ast-modal-body { padding: 18px; max-height: calc(100vh - 130px); overflow-y: auto; flex: 1 1 auto; background: #f8fafc; }
+.ast-modal-body .appraisal-form-sheet { max-width: none; width: 100%; }
+.ast-single-field-grid { grid-template-columns: 1fr; }
 
 /* Self-assessment table inside modal */
 .self-assessment-table { width: 100%; border-collapse: collapse; font-size: 13px; }

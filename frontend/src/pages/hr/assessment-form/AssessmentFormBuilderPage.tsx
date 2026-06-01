@@ -279,7 +279,6 @@ const AssessmentFormBuilderPage = () => {
       const payload: AssessmentFormPayload = {
         ...form,
         formName: form.formName.trim(),
-        companyName: form.companyName?.trim(),
         description: form.description?.trim(),
         startDate: null,
         endDate: null,
@@ -606,7 +605,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
             </div>
 
             <div className="max-h-[calc(92vh-150px)] overflow-y-auto px-6 py-5">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 <label className="block">
                   <span className="mb-1 block text-sm font-black text-slate-700">Form Name</span>
                   <input
@@ -618,16 +617,6 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-1 block text-sm font-black text-slate-700">Company Name</span>
-                  <input
-                    value={form.companyName ?? ''}
-                    onChange={(event) => setForm((prev) => ({ ...prev, companyName: event.target.value }))}
-                    disabled={viewOnly}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
-                    placeholder="ACE Data Systems Ltd."
-                  />
-                </label>
               </div>
 
               <label className="mt-4 block">
@@ -767,7 +756,7 @@ const canDeactivate = (item: AssessmentFormResponse) => {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 <label className="block">
                   <span className="mb-1 block text-sm font-black text-slate-700">Start Date & Time
 </span>

@@ -13,6 +13,8 @@ import {
     StatusDistributionChart,
 } from '../../components/dashboard';
 import { exportToExcel } from '../../utils/exportExcel';
+import { pipService } from '../../services/pipService';
+import type { PipDetail } from '../../types/pip';
 import {
     buildCompletionBars,
     buildScoreBands,
@@ -227,7 +229,7 @@ const resolveReportBasePath = (pathname: string) => {
 
 const buildReportNavItems = (basePath: string): ReportNavItem[] => {
     const isManager = basePath.includes('/manager/');
-    const supportsAssessmentScores = basePath.includes('/hr/') || basePath.includes('/department-head/');
+    const supportsAssessmentScores = basePath.includes('/department-head/');
 
     return [
         {
@@ -288,6 +290,9 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
+    const [selectedPip, setSelectedPip] = useState<PipDetail | null>(null);
+    const [pipDetailLoadingId, setPipDetailLoadingId] = useState<number | null>(null);
+    const [pipDetailError, setPipDetailError] = useState('');
     const activeReportType: ReportType = reportCopy[reportType] ? reportType : 'employees';
     const activeCopy = reportCopy[activeReportType];
     const reportBasePath = resolveReportBasePath(location.pathname);
@@ -309,6 +314,21 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
     useEffect(() => {
         void loadDashboard();
     }, []);
+
+    const openPipDetail = async (pipId?: number | null) => {
+        if (!pipId) return;
+
+        try {
+            setPipDetailLoadingId(pipId);
+            setPipDetailError('');
+            const data = await pipService.getPipById(pipId);
+            setSelectedPip(data);
+        } catch (err) {
+            setPipDetailError(errorMessage(err));
+        } finally {
+            setPipDetailLoadingId(null);
+        }
+    };
 
     const filteredEmployees = useMemo(() => {
         const search = query.trim().toLowerCase();
@@ -577,10 +597,13 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
                 </div>
                 {activeReportType === 'employees' && <EmployeePerformanceTable rows={filteredEmployees} />}
                 {activeReportType === 'departments' && <DepartmentPerformanceTable rows={filteredDepartments} />}
-                {activeReportType === 'pip' && <PipTable rows={filteredPips} />}
+                {activeReportType === 'pip' && <PipTable rows={filteredPips} onOpenDetail={openPipDetail} loadingId={pipDetailLoadingId} />}
                 {activeReportType === 'feedback' && <FeedbackTable rows={filteredFeedback} />}
                 {activeReportType === 'recommendations' && <RecommendationTable rows={filteredRecommendations} />}
             </section>
+
+            {pipDetailError && <div className="reporting-detail-alert">{pipDetailError}</div>}
+            {selectedPip && <PipDetailModal pip={selectedPip} onClose={() => setSelectedPip(null)} />}
         </DashboardShell>
     );
 };
@@ -1411,7 +1434,7 @@ const DepartmentPerformanceTable = ({ rows }: { rows: DepartmentPerformanceRow[]
     );
 };
 
-const PipTable = ({ rows }: { rows: PipReportRow[] }) => {
+const PipTable = ({ rows, onOpenDetail, loadingId }: { rows: PipReportRow[]; onOpenDetail: (pipId?: number | null) => void; loadingId?: number | null }) => {
     if (!rows.length) {
         return <EmptyRows description="PIP rows will appear after performance improvement plans are created." />;
     }
@@ -1433,8 +1456,15 @@ const PipTable = ({ rows }: { rows: PipReportRow[] }) => {
                 {rows.map((row) => (
                     <tr key={row.pipId}>
                         <td>
-                            <strong>{row.employeeName || '—'}</strong>
-                            <small>{row.employeeCode || '—'}</small>
+                            <button
+                                type="button"
+                                className="reporting-employee-detail-btn"
+                                onClick={() => onOpenDetail(row.pipId)}
+                                disabled={!row.pipId || loadingId === row.pipId}
+                            >
+                                <strong>{row.employeeName || '—'}</strong>
+                                <small>{loadingId === row.pipId ? 'Opening PIP...' : row.employeeCode || 'Click to view PIP'}</small>
+                            </button>
                         </td>
                         <td>{row.departmentName || '—'}</td>
                         <td className="reporting-long-text">{row.goal || '—'}</td>
@@ -1448,6 +1478,77 @@ const PipTable = ({ rows }: { rows: PipReportRow[] }) => {
         </div>
     );
 };
+
+
+const pipPhaseStatusLabel = (status?: string | null) => {
+    if (status === 'HASNT_STARTED_YET') return "Hasn't started yet";
+    if (status === 'ONGOING') return 'Ongoing';
+    if (status === 'COMPLETED') return 'Completed';
+    return cleanStatus(status || 'UNKNOWN');
+};
+
+const PipDetailModal = ({ pip, onClose }: { pip: PipDetail; onClose: () => void }) => (
+    <div className="reporting-pip-modal-backdrop" role="presentation" onClick={onClose}>
+        <div className="reporting-pip-modal" role="dialog" aria-modal="true" aria-label="PIP detail" onClick={(event) => event.stopPropagation()}>
+            <div className="reporting-pip-modal__header">
+                <div>
+                    <span className="reporting-pip-modal__eyebrow">Performance Improvement Plan</span>
+                    <h2>{pip.employeeName || 'Employee PIP'}</h2>
+                    <p>{pip.employeeDepartmentName || 'Department not assigned'} • {pip.status ? 'Active' : 'Closed'}</p>
+                </div>
+                <button type="button" className="reporting-pip-modal__close" onClick={onClose} aria-label="Close PIP detail">
+                    <i className="bi bi-x-lg" />
+                </button>
+            </div>
+
+            <div className="reporting-pip-modal__body">
+                <section className="reporting-pip-summary-grid">
+                    <div>
+                        <span>Period</span>
+                        <strong>{formatDate(pip.startDate)} - {formatDate(pip.endDate)}</strong>
+                    </div>
+                    <div>
+                        <span>Created By</span>
+                        <strong>{pip.createdByName || '—'}</strong>
+                    </div>
+                    <div>
+                        <span>Finished By</span>
+                        <strong>{pip.finishedByName || (pip.status ? 'Not finished yet' : '—')}</strong>
+                    </div>
+                </section>
+
+                <section className="reporting-pip-text-card">
+                    <h3>PIP Goal</h3>
+                    <p>{pip.goal || '—'}</p>
+                </section>
+
+                <section className="reporting-pip-text-card">
+                    <h3>Expected Outcomes</h3>
+                    <p>{pip.expectedOutcomes || '—'}</p>
+                </section>
+
+                <section className="reporting-pip-phase-list">
+                    <h3>Phases</h3>
+                    {pip.phases?.length ? (
+                        pip.phases.map((phase) => (
+                            <article key={phase.id} className="reporting-pip-phase-card">
+                                <div>
+                                    <strong>Phase {phase.phaseNumber}</strong>
+                                    <span>{formatDate(phase.startDate)} - {formatDate(phase.endDate)}</span>
+                                </div>
+                                <span className="report-pill report-pill--green">{pipPhaseStatusLabel(phase.status)}</span>
+                                <p>{phase.phaseGoal || '—'}</p>
+                                {phase.reasonNote ? <small>{phase.reasonNote}</small> : null}
+                            </article>
+                        ))
+                    ) : (
+                        <EmptyRows description="No PIP phases were saved for this plan." />
+                    )}
+                </section>
+            </div>
+        </div>
+    </div>
+);
 
 const FeedbackTable = ({ rows }: { rows: FeedbackParticipationRow[] }) => {
     if (!rows.length) {
@@ -1505,8 +1606,15 @@ const RecommendationTable = ({ rows }: { rows: RecommendationRow[] }) => {
                 {rows.map((row, index) => (
                     <tr key={`${row.employeeId ?? row.userId}-${index}`}>
                         <td>
-                            <strong>{row.employeeName || '—'}</strong>
-                            <small>{row.employeeCode || '—'}</small>
+                            <button
+                                type="button"
+                                className="reporting-employee-detail-btn"
+                                onClick={() => onOpenDetail(row.pipId)}
+                                disabled={!row.pipId || loadingId === row.pipId}
+                            >
+                                <strong>{row.employeeName || '—'}</strong>
+                                <small>{loadingId === row.pipId ? 'Opening PIP...' : row.employeeCode || 'Click to view PIP'}</small>
+                            </button>
                         </td>
                         <td>{row.departmentName || '—'}</td>
                         <td><span className="report-pill report-pill--purple">{row.recommendationType || 'Recommendation'}</span></td>

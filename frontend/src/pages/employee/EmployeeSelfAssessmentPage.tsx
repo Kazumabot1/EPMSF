@@ -580,7 +580,7 @@ const EmployeeSelfAssessmentPage = () => {
   };
 
   const renderSignatureGrid = (assessment: EmployeeAssessment, editable: boolean) => (
-    <div className="ess-sig-grid">
+    <div className="ess-sig-grid ess-sig-grid--employee-only">
       <div className="ess-sig-slot">
         {editable ? (
           <FormSignaturePicker
@@ -612,69 +612,6 @@ const EmployeeSelfAssessmentPage = () => {
             <span className="ess-sig-label">Employee Signature</span>
             <span className="ess-sig-pending">Pending</span>
           </>
-        )}
-      </div>
-
-      <div className="ess-sig-slot">
-        <span className="ess-sig-label">Manager Signature</span>
-
-        {assessment.managerSignatureImageData ? (
-          <>
-            <img
-              className="ess-sig-img"
-              src={sigSrc(
-                assessment.managerSignatureImageData,
-                assessment.managerSignatureImageType,
-              )}
-              alt="Manager signature"
-            />
-            <p className="ess-sig-date">Date: {fmtDate(assessment.managerSignedAt)}</p>
-            <small className="ess-sig-name">{assessment.managerSignatureName}</small>
-          </>
-        ) : (
-          <span className="ess-sig-pending">Pending</span>
-        )}
-      </div>
-
-      <div className="ess-sig-slot">
-        <span className="ess-sig-label">Department Head Signature</span>
-
-        {assessment.departmentHeadSignatureImageData ? (
-          <>
-            <img
-              className="ess-sig-img"
-              src={sigSrc(
-                assessment.departmentHeadSignatureImageData,
-                assessment.departmentHeadSignatureImageType,
-              )}
-              alt="Department head signature"
-            />
-            <p className="ess-sig-date">Date: {fmtDate(assessment.departmentHeadSignedAt)}</p>
-            <small className="ess-sig-name">{assessment.departmentHeadSignatureName}</small>
-          </>
-        ) : (
-          <span className="ess-sig-pending">Pending</span>
-        )}
-      </div>
-
-      <div className="ess-sig-slot">
-        <span className="ess-sig-label">HR Signature</span>
-
-        {assessment.hrSignatureImageData ? (
-          <>
-            <img
-              className="ess-sig-img"
-              src={sigSrc(
-                assessment.hrSignatureImageData,
-                assessment.hrSignatureImageType,
-              )}
-              alt="HR signature"
-            />
-            <p className="ess-sig-date">Date: {fmtDate(assessment.hrSignedAt)}</p>
-            <small className="ess-sig-name">{assessment.hrSignatureName}</small>
-          </>
-        ) : (
-          <span className="ess-sig-pending">Pending</span>
         )}
       </div>
     </div>

@@ -17,6 +17,7 @@ import com.epms.repository.PositionRepository;
 import com.epms.repository.RoleRepository;
 import com.epms.repository.TeamRepository;
 import com.epms.repository.UserRepository;
+import com.epms.security.SecurityUtils;
 import com.epms.service.PositionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -60,7 +61,7 @@ public class PositionServiceImpl implements PositionService {
         position.setRole(role);
         position.setDescription(cleanNullable(request.getDescription()));
         position.setStatus(request.getStatus() == null || Boolean.TRUE.equals(request.getStatus()));
-        position.setCreatedBy(cleanRequired(request.getCreatedBy(), "Created by"));
+        position.setCreatedBy(resolveCreatedBy());
 
         return toResponse(positionRepository.save(position));
     }
@@ -366,7 +367,6 @@ public class PositionServiceImpl implements PositionService {
         cleanRequired(request.getPositionTitle(), "Position title");
         getLevel(request.getLevelId());
         getRole(request.getRoleId());
-        cleanRequired(request.getCreatedBy(), "Created by");
     }
 
     private void validateUpdate(PositionRequestDto request) {
@@ -431,6 +431,19 @@ public class PositionServiceImpl implements PositionService {
         }
 
         return true;
+    }
+
+
+    private String resolveCreatedBy() {
+        try {
+            Integer currentUserId = SecurityUtils.currentUserId();
+            return userRepository.findById(currentUserId)
+                    .map(this::displayName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .orElse("User #" + currentUserId);
+        } catch (RuntimeException ignored) {
+            return "System";
+        }
     }
 
     private String displayName(User user) {

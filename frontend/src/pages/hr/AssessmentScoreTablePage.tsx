@@ -529,12 +529,7 @@ if (updated.status === 'DRAFT') {
             </div>
             </div>
 
-            <div className="appraisal-inline-grid">
-              <div className="appraisal-review-block">
-                <h4>HR Comment</h4>
-                <p>{assessment.hrComment || 'No HR comment yet.'}</p>
-              </div>
-
+            <div className="appraisal-inline-grid ast-single-field-grid">
               <div className="appraisal-review-block">
                 <h4>Decline Reason</h4>
                 <p>{assessment.declineReason || 'Not declined.'}</p>

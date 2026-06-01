@@ -309,10 +309,12 @@ const EmployeeHeader = ({
 
   return (
       <header className={`employee-header ${collapsed ? 'collapsed' : ''}`}>
-        <div className="employee-header-search">
-          <i className="bi bi-search" />
-          <input type="text" placeholder="Search employees, KPIs, appraisals..." />
-        </div>
+        {role !== 'DepartmentHead' && (
+          <div className="employee-header-search">
+            <i className="bi bi-search" />
+            <input type="text" placeholder="Search employees, KPIs, appraisals..." />
+          </div>
+        )}
 
         <div className="employee-header-actions">
           <div className="hr-notification-wrap" ref={notifRef}>

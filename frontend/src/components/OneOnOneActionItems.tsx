@@ -13,8 +13,6 @@ import {
 import type { Meeting } from '../services/oneOnOneService';
 import { useNotificationsWebSocket } from '../hooks/useNotificationsWebSocket';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
 const fmtDateTime = (iso?: string | null): string => {
   if (!iso) return '—';
 
@@ -68,30 +66,15 @@ const stageLocation = (meeting: Meeting) =>
 const stageGoal = (meeting: Meeting) =>
   isFollowUpStage(meeting) ? meeting.followUpGoal : meeting.notes;
 
-const buildIso = (
-  day: string,
-  month: string,
-  year: string,
-  hour: string,
-  minute: string,
-  ampm: 'AM' | 'PM'
-): string | null => {
-  const d = parseInt(day);
-  const m = parseInt(month);
-  const y = parseInt(year);
-  let h = parseInt(hour);
-  const min = parseInt(minute);
+const toDateTimeLocalValue = (date: Date) => {
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+};
 
-  if (isNaN(d) || isNaN(m) || isNaN(y) || isNaN(h) || isNaN(min)) return null;
-
-  if (ampm === 'PM' && h < 12) h += 12;
-  if (ampm === 'AM' && h === 12) h = 0;
-
-  const dt = new Date(y, m - 1, d, h, min, 0);
-
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(
-    dt.getHours()
-  )}:${pad(dt.getMinutes())}:00`;
+const normalizeDateTimeLocalForApi = (value: string) => {
+  if (!value) return '';
+  return value.length === 16 ? `${value}:00` : value;
 };
 
 type Tab = 'upcoming' | 'ongoing' | 'past';
@@ -116,12 +99,7 @@ const OneOnOneActionItems: React.FC<OneOnOneActionItemsProps> = ({ readOnly = fa
   const [followUpGoal, setFollowUpGoal] = useState('');
   const [followUpNotes, setFollowUpNotes] = useState('');
 
-  const [fuDay, setFuDay] = useState('');
-  const [fuMonth, setFuMonth] = useState('');
-  const [fuYear, setFuYear] = useState('');
-  const [fuHour, setFuHour] = useState('');
-  const [fuMinute, setFuMinute] = useState('');
-  const [fuAmPm, setFuAmPm] = useState<'AM' | 'PM'>('AM');
+  const [followUpDateTime, setFollowUpDateTime] = useState('');
   const [fuLocation, setFuLocation] = useState('');
 
   const [modalSaving, setModalSaving] = useState(false);
@@ -195,12 +173,7 @@ const OneOnOneActionItems: React.FC<OneOnOneActionItemsProps> = ({ readOnly = fa
     setFollowUpGoal(m.followUpGoal ?? '');
     setFollowUpNotes(m.followUpNotes ?? '');
 
-    setFuDay('');
-    setFuMonth('');
-    setFuYear('');
-    setFuHour('');
-    setFuMinute('');
-    setFuAmPm('AM');
+    setFollowUpDateTime('');
     setFuLocation('');
 
     setModalError('');
@@ -271,10 +244,10 @@ const OneOnOneActionItems: React.FC<OneOnOneActionItemsProps> = ({ readOnly = fa
       return;
     }
 
-    const fuIso = buildIso(fuDay, fuMonth, fuYear, fuHour, fuMinute, fuAmPm);
+    const fuIso = normalizeDateTimeLocalForApi(followUpDateTime);
 
     if (!fuIso) {
-      setModalError('Please fill in all follow-up date and time fields.');
+      setModalError('Please select a follow-up date and time.');
       return;
     }
 
@@ -610,43 +583,14 @@ const OneOnOneActionItems: React.FC<OneOnOneActionItemsProps> = ({ readOnly = fa
                   <div className="oom-field">
                     <label className="oom-label">Follow-Up Date &amp; Time</label>
 
-                    <div className="oom-date-row" style={{ flexWrap: 'wrap' }}>
-                      <div className="oom-date-part oom-date-part--dd">
-                        <label>Day</label>
-                        <input type="number" min={1} max={31} placeholder="DD" value={fuDay} onChange={(e) => setFuDay(e.target.value.slice(0, 2))} />
-                      </div>
-
-                      <span className="oom-date-sep">/</span>
-
-                      <div className="oom-date-part oom-date-part--mm">
-                        <label>Month</label>
-                        <input type="number" min={1} max={12} placeholder="MM" value={fuMonth} onChange={(e) => setFuMonth(e.target.value.slice(0, 2))} />
-                      </div>
-
-                      <span className="oom-date-sep">/</span>
-
-                      <div className="oom-date-part oom-date-part--yy">
-                        <label>Year</label>
-                        <input type="number" min={2024} max={2099} placeholder="YYYY" value={fuYear} onChange={(e) => setFuYear(e.target.value.slice(0, 4))} />
-                      </div>
-
-                      <div className="oom-date-part">
-                        <label>Hour</label>
-                        <input type="number" min={1} max={12} placeholder="HH" style={{ width: 56 }} value={fuHour} onChange={(e) => setFuHour(e.target.value.slice(0, 2))} />
-                      </div>
-
-                      <span className="oom-date-sep" style={{ marginTop: 18 }}>:</span>
-
-                      <div className="oom-date-part">
-                        <label>Min</label>
-                        <input type="number" min={0} max={59} placeholder="MM" style={{ width: 56 }} value={fuMinute} onChange={(e) => setFuMinute(e.target.value.slice(0, 2))} />
-                      </div>
-
-                      <div className="oom-ampm-toggle">
-                        <button type="button" className={fuAmPm === 'AM' ? 'active' : ''} onClick={() => setFuAmPm('AM')}>AM</button>
-                        <button type="button" className={fuAmPm === 'PM' ? 'active' : ''} onClick={() => setFuAmPm('PM')}>PM</button>
-                      </div>
-                    </div>
+                    <input
+                      className="oom-select"
+                      type="datetime-local"
+                      min={toDateTimeLocalValue(new Date())}
+                      value={followUpDateTime}
+                      onChange={(e) => setFollowUpDateTime(e.target.value)}
+                    />
+                    <small>Select date and time from the calendar picker.</small>
                   </div>
 
                   <div className="oom-field">

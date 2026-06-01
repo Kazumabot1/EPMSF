@@ -17,7 +17,6 @@ type PositionFormState = {
   roleId: string;
   description: string;
   status: boolean;
-  createdBy: string;
 };
 
 const initialForm: PositionFormState = {
@@ -26,7 +25,6 @@ const initialForm: PositionFormState = {
   roleId: '',
   description: '',
   status: true,
-  createdBy: '',
 };
 
 const unwrap = <T,>(payload: any, fallback: T): T => {
@@ -36,10 +34,7 @@ const unwrap = <T,>(payload: any, fallback: T): T => {
 };
 
 const PositionCreate = () => {
-  const [form, setForm] = useState<PositionFormState>({
-    ...initialForm,
-    createdBy: localStorage.getItem('epmsUserEmail') ?? '',
-  });
+  const [form, setForm] = useState<PositionFormState>(initialForm);
 
   const [levels, setLevels] = useState<PositionLevelResponse[]>([]);
   const [roles, setRoles] = useState<DashboardRoleOption[]>([]);
@@ -140,9 +135,6 @@ const PositionCreate = () => {
       return 'Selected dashboard role is no longer available. Please choose again.';
     }
 
-    if (form.createdBy.trim().length === 0) {
-      return 'Created by is required.';
-    }
 
     return '';
   };
@@ -169,15 +161,11 @@ const PositionCreate = () => {
         roleId: Number(form.roleId),
         description: form.description.trim(),
         status: form.status,
-        createdBy: form.createdBy.trim(),
       });
 
       setSuccessMessage(`Position "${createdPosition.positionTitle}" created successfully.`);
 
-      setForm((prev) => ({
-        ...initialForm,
-        createdBy: prev.createdBy,
-      }));
+      setForm(initialForm);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to create position.';
@@ -198,8 +186,7 @@ const PositionCreate = () => {
         <h1>Position Create</h1>
 
         <p>
-          Create a new role profile with level mapping, dashboard role, ownership,
-          and activation status.
+          Create a new role profile with level mapping, dashboard role, and activation status.
         </p>
       </div>
 
@@ -324,43 +311,20 @@ const PositionCreate = () => {
               />
             </div>
 
-            <div className="position-form-grid">
-              <div className="position-field">
-                <label htmlFor="createdBy">
-                  Created By <span className="position-required">*</span>
-                </label>
-
+            <div className="position-checkbox-row">
+              <label className="position-checkbox">
                 <input
-                  id="createdBy"
-                  type="text"
-                  value={form.createdBy}
+                  type="checkbox"
+                  checked={form.status}
                   onChange={(event) =>
                     setForm((prev) => ({
                       ...prev,
-                      createdBy: event.target.value,
+                      status: event.target.checked,
                     }))
                   }
-                  className="position-input"
-                  placeholder="Creator email or username"
-                  maxLength={100}
                 />
-              </div>
-
-              <div className="position-checkbox-row">
-                <label className="position-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={form.status}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        status: event.target.checked,
-                      }))
-                    }
-                  />
-                  Active status
-                </label>
-              </div>
+                Active status
+              </label>
             </div>
 
             {formError && <div className="position-alert error">{formError}</div>}

@@ -453,10 +453,20 @@
   line-height: 1.6;
 }
 
+
+
+.ess-sig-grid--employee-only {
+  grid-template-columns: minmax(260px, 420px);
+}
+
 .ess-sig-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+.ess-sig-grid.ess-sig-grid--employee-only {
+  grid-template-columns: minmax(260px, 420px);
 }
 
 .ess-sig-slot {

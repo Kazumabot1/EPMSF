@@ -37,7 +37,6 @@ const feedbackChildren: NavItem[] = [
 const hrReportsChildren: NavItem[] = [
   { label: 'Performance Reports', path: '/hr/reports/performance', icon: 'bi-file-earmark-bar-graph', end: true },
   { label: 'Department Performance', path: '/hr/reports/department-performance', icon: 'bi-graph-up-arrow', end: true },
-  { label: 'Assessment Scores', path: '/hr/reports/assessment-scores', icon: 'bi-clipboard-data', end: true },
   { label: 'PIP Status', path: '/hr/reports/pip-status', icon: 'bi-clipboard2-pulse', end: true },
   { label: 'Feedback Completion', path: '/hr/reports/feedback-completion', icon: 'bi-chat-dots', end: true },
   { label: 'Recommendations', path: '/hr/reports/recommendations', icon: 'bi-stars', end: true },

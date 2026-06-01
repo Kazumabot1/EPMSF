@@ -14,7 +14,7 @@ import {
 } from '../../services/continuousFeedbackService';
 import type { TeamEmployeeOption, TeamOption } from '../../services/oneOnOneService';
 
-const categories = ['Positive', 'Improvement', 'General'];
+const categories = ['PIP', '1:1 Meetings', 'KPI', '360 Feedback', 'Self-Assessment', 'Team Performance'];
 type HistoryTab = 'received' | 'given';
 
 const formatDate = (value?: string | null) => {
@@ -24,8 +24,20 @@ const formatDate = (value?: string | null) => {
   return date.toLocaleString();
 };
 
-const filterCurrentEmployee = (items: TeamEmployeeOption[], currentEmployeeId?: number | null) =>
-  currentEmployeeId == null ? items : items.filter((employee) => employee.employeeId !== currentEmployeeId);
+const filterCurrentEmployee = (items: TeamEmployeeOption[], currentProfile?: UserProfile | null) => {
+  if (!currentProfile) return items;
+
+  const currentEmployeeId = currentProfile.employeeId ?? null;
+  const currentUserId = currentProfile.userId ?? null;
+  const currentEmail = currentProfile.email?.trim().toLowerCase() ?? null;
+
+  return items.filter((employee) => {
+    if (currentEmployeeId != null && employee.employeeId === currentEmployeeId) return false;
+    if (currentUserId != null && employee.userId === currentUserId) return false;
+    if (currentEmail && employee.email?.trim().toLowerCase() === currentEmail) return false;
+    return true;
+  });
+};
 
 const ContinuousFeedbackPage = () => {
   const location = useLocation();
@@ -42,7 +54,7 @@ const ContinuousFeedbackPage = () => {
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
-  const [category, setCategory] = useState('General');
+  const [category, setCategory] = useState('KPI');
   const [rating, setRating] = useState('');
 
   const [loading, setLoading] = useState(true);
@@ -78,7 +90,7 @@ const ContinuousFeedbackPage = () => {
     try {
       const numericTeamId = teamId ? Number(teamId) : null;
       const data = await getContinuousFeedbackEmployees(numericTeamId);
-      setEmployees(Array.isArray(data) ? filterCurrentEmployee(data, profileData?.employeeId ?? null) : []);
+      setEmployees(Array.isArray(data) ? filterCurrentEmployee(data, profileData) : []);
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to load eligible employees.'));
     } finally {
@@ -121,7 +133,7 @@ const ContinuousFeedbackPage = () => {
             if (!mounted) return;
 
             setTeams(Array.isArray(teamData) ? teamData : []);
-            setEmployees(Array.isArray(employeeData) ? filterCurrentEmployee(employeeData, profileData?.employeeId ?? null) : []);
+            setEmployees(Array.isArray(employeeData) ? filterCurrentEmployee(employeeData, profileData) : []);
           } catch (err) {
             if (mounted) setError(extractErrorMessage(err, 'Failed to load continuous feedback recipients.'));
           }
@@ -154,7 +166,7 @@ const ContinuousFeedbackPage = () => {
   const resetForm = () => {
     setSelectedEmployeeId('');
     setFeedbackText('');
-    setCategory('General');
+    setCategory('KPI');
     setRating('');
   };
 
@@ -313,10 +325,10 @@ const ContinuousFeedbackPage = () => {
                 disabled={submitting}
               >
                 <option value="">No rating</option>
-                <option value="1">1 - Needs improvement</option>
-                <option value="2">2</option>
-                <option value="3">3 - Good</option>
-                <option value="4">4</option>
+                <option value="1">1 - Unsatisfactory</option>
+                <option value="2">2 - Needs improvement</option>
+                <option value="3">3 - Meet requirement</option>
+                <option value="4">4 - Good</option>
                 <option value="5">5 - Excellent</option>
               </select>
             </div>

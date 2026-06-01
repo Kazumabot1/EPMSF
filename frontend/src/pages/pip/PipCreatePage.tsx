@@ -13,6 +13,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { pipService } from "../../services/pipService";
+import { profileService } from "../../services/profileService";
 import type { PipCreateRequest, PipEligibleEmployee, PipPhaseRequest } from "../../types/pip";
 import "./pip.css";
 
@@ -110,8 +111,13 @@ export default function PipCreatePage() {
     try {
       setEmployeesLoading(true);
       setError("");
-      const data = await pipService.getEligibleEmployees();
-      setEmployees(data);
+      const [data, profile] = await Promise.all([
+        pipService.getEligibleEmployees(),
+        profileService.getMyProfile().catch(() => null),
+      ]);
+
+      const currentUserId = profile?.userId ?? null;
+      setEmployees(Array.isArray(data) ? data.filter((employee) => employee.userId !== currentUserId) : []);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
