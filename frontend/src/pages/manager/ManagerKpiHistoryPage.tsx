@@ -3,8 +3,6 @@ import toast from 'react-hot-toast';
 import { authStorage } from '../../services/authStorage';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
 import type { ManagerKpiAssignment } from '../../types/kpiWorkflow';
-import '../../components/hr/kpi-template/kpi-template.css';
-import './manager-kpi-history.css';
 
 const normalizeRoleName = (role?: string | null) =>
   String(role ?? '')
@@ -13,21 +11,56 @@ const normalizeRoleName = (role?: string | null) =>
     .replace(/[\s-]+/g, '_')
     .toUpperCase();
 
+const missing = '-';
+
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
 const formatWhen = (value: string | null | undefined) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+  if (!value) return missing;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const day = pad2(date.getDate());
+  const month = pad2(date.getMonth() + 1);
+  const year = date.getFullYear();
+  const hours24 = date.getHours();
+  const minutes = pad2(date.getMinutes());
+  const suffix = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = pad2(hours24 % 12 || 12);
+
+  return `${day}-${month}-${year} (${hours12}:${minutes} ${suffix})`;
 };
 
-const formatScore = (value?: number | null, digits = 2) => {
-  if (value == null || Number.isNaN(Number(value))) return '—';
-  return Number(value).toFixed(digits);
+const formatDate = (value: string | null | undefined) => {
+  if (!value) return missing;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}-${date.getFullYear()}`;
+};
+
+const formatPeriod = (row: ManagerKpiAssignment) => {
+  if (!row.periodStartDate && !row.periodEndDate) return missing;
+  return `${formatDate(row.periodStartDate)} to ${formatDate(row.periodEndDate)}`;
+};
+
+const formatPercent = (value?: number | null, digits = 1) => {
+  if (value == null || Number.isNaN(Number(value))) return missing;
+  return `${Number(value).toFixed(digits)}%`;
 };
 
 const average = (values: Array<number | null | undefined>) => {
   const valid = values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
   if (!valid.length) return null;
   return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+};
+
+const totalWeightedScore = (row: ManagerKpiAssignment) => {
+  const lineTotal = row.lines
+    .map((line) => Number(line.weightedScore))
+    .filter((value) => Number.isFinite(value))
+    .reduce((sum, value) => sum + value, 0);
+
+  return lineTotal || row.totalWeightedScore;
 };
 
 const getScopeCopy = () => {
@@ -106,7 +139,9 @@ const ManagerKpiHistoryPage = () => {
         if (!cancelled) setLoading(false);
       }
     };
+
     void load();
+
     return () => {
       cancelled = true;
     };
@@ -123,8 +158,16 @@ const ManagerKpiHistoryPage = () => {
     );
 
     if (!needle) return list;
+
     return list.filter((row) =>
-      [row.employeeName, row.departmentName, row.positionTitle, row.kpiTitle, row.earlyFinalizedReason]
+      [
+        row.employeeName,
+        row.departmentName,
+        row.positionTitle,
+        row.kpiTitle,
+        formatPeriod(row),
+        row.earlyFinalizedReason,
+      ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(needle)),
     );
@@ -147,161 +190,227 @@ const ManagerKpiHistoryPage = () => {
   }, [rows]);
 
   return (
-    <div className="kpi-tpl-page kpi-history-page">
-      <div className="kpi-history-shell">
-        <section className="kpi-tpl-card--hero kpi-history-hero">
-          <div>
-            <span className="kpi-history-badge">
-              <i className="bi bi-clock-history" aria-hidden />
-              {scopeCopy.badge}
-            </span>
-            <h1>{scopeCopy.title}</h1>
-            <p>{scopeCopy.description}</p>
-          </div>
-          <div className="kpi-history-hero-score">
-            <strong>{summary.total}</strong>
-            <span>Finalized records</span>
-          </div>
-        </section>
+    <main className="min-h-[calc(100vh-86px)] bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-gradient-to-br from-white via-blue-50/60 to-slate-50 px-5 py-6 sm:px-7">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-blue-700 shadow-sm">
+                  <i className="bi bi-clock-history" aria-hidden />
+                  {scopeCopy.badge}
+                </div>
+                <h1 className="text-3xl font-black tracking-normal text-slate-950 sm:text-4xl">
+                  {scopeCopy.title}
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
+                  {scopeCopy.description}
+                </p>
+              </div>
 
-        <section className="kpi-history-metrics" aria-label="KPI history summary">
-          <article className="kpi-tpl-card kpi-history-metric-card">
-            <span>Average weighted score</span>
-            <strong>{formatScore(summary.weightedAverage)}</strong>
-          </article>
-          <article className="kpi-tpl-card kpi-history-metric-card">
-            <span>Highest weighted score</span>
-            <strong>{formatScore(summary.highestScore)}</strong>
-          </article>
-          <article className="kpi-tpl-card kpi-history-metric-card">
-            <span>Departments shown</span>
-            <strong>{summary.departments || '—'}</strong>
-          </article>
-        </section>
+              <div className="min-w-[170px] rounded-2xl bg-[#0b2f6b] p-5 text-center text-white shadow-lg shadow-blue-950/20">
+                <strong className="block text-4xl font-black leading-none">{summary.total}</strong>
+                <span className="mt-2 block text-xs font-black uppercase tracking-[0.12em] text-blue-100">
+                  Finalized records
+                </span>
+              </div>
+            </div>
 
-        <section className="kpi-tpl-card kpi-history-toolbar" aria-label="KPI history filters">
-          <div>
-            <h2>Finalized KPI scores</h2>
-            <p>Open a row to review KPI line targets, actual values, achievement, and weighted score.</p>
-          </div>
-          <label className="kpi-history-search" htmlFor="kpi-history-search">
-            <i className="bi bi-search" aria-hidden />
-            <input
-              id="kpi-history-search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search employee, department, position, or KPI template"
-            />
-          </label>
-        </section>
-
-        {loading && (
-          <div className="kpi-tpl-card kpi-history-empty">
-            <span className="kpi-tpl-shimmer">Loading KPI history…</span>
-          </div>
-        )}
-
-        {!loading && filtered.length === 0 && (
-          <div className="kpi-tpl-card kpi-history-empty">
-            <i className="bi bi-clipboard-data" aria-hidden />
-            <div>
-              <strong>{query.trim() ? 'No matching KPI history found.' : scopeCopy.empty}</strong>
-              <p>{query.trim() ? 'Clear the search field to show all records in your scope.' : 'Records appear here after KPI scoring is finalized.'}</p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <MetricCard label="Average Weighted Score" value={formatPercent(summary.weightedAverage, 1)} icon="bi-speedometer2" />
+              <MetricCard label="Highest Weighted Score" value={formatPercent(summary.highestScore, 1)} icon="bi-graph-up-arrow" />
+              <MetricCard label="Departments Shown" value={summary.departments ? String(summary.departments) : missing} icon="bi-building" />
             </div>
           </div>
-        )}
 
-        {!loading && filtered.length > 0 && (
-          <section className="kpi-tpl-card kpi-history-table-card">
-            <div className="kpi-tpl-table-wrap">
-              <table className="kpi-history-table">
-                <thead className="kpi-tpl-thead">
-                  <tr>
-                    <th>Employee</th>
-                    <th>Department</th>
-                    <th>Position</th>
-                    <th>KPI template</th>
-                    <th className="text-end">Weighted total</th>
-                    <th>Finalized</th>
-                    <th>Reason</th>
-                    <th className="text-end">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row) => (
-                    <Fragment key={row.employeeKpiFormId}>
+          <div className="px-5 py-5 sm:px-7">
+            <section className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Finalized KPI Scores</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Open a row to review KPI line targets, actual values, achievement, and weighted score.
+                </p>
+              </div>
+              <label className="relative w-full lg:max-w-md" htmlFor="kpi-history-search">
+                <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
+                <input
+                  id="kpi-history-search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search employee, department, position, KPI title, or period"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                />
+              </label>
+            </section>
+
+            {loading && <LoadingRows />}
+
+            {!loading && filtered.length === 0 && (
+              <div className="grid place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-16 text-center">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-2xl text-blue-700 shadow-sm">
+                  <i className="bi bi-clipboard-data" aria-hidden />
+                </div>
+                <h2 className="mt-4 text-lg font-black text-slate-900">
+                  {query.trim() ? 'No matching KPI history found.' : scopeCopy.empty}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {query.trim() ? 'Clear the search field to show all records in your scope.' : 'Records appear here after KPI scoring is finalized.'}
+                </p>
+              </div>
+            )}
+
+            {!loading && filtered.length > 0 && (
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
                       <tr>
-                        <td className="kpi-history-employee-cell">
-                          <strong>{row.employeeName}</strong>
-                          <small>#{row.employeeId}</small>
-                        </td>
-                        <td>{row.departmentName ?? '—'}</td>
-                        <td>{row.positionTitle ?? '—'}</td>
-                        <td>
-                          <strong>{row.kpiTitle ?? '—'}</strong>
-                        </td>
-                        <td className="text-end kpi-history-score-cell">{formatScore(row.totalWeightedScore)}</td>
-                        <td>{formatWhen(row.finalizedAt)}</td>
-                        <td className="kpi-history-reason-cell">
-                          {row.earlyFinalizedReason ? <span title={row.earlyFinalizedReason}>{row.earlyFinalizedReason}</span> : '—'}
-                        </td>
-                        <td>
-                          <div className="kpi-history-actions">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedId((prev) => (prev === row.employeeKpiFormId ? null : row.employeeKpiFormId))}
-                              className="kpi-tpl-btn-secondary kpi-small-btn"
-                            >
-                              {expandedId === row.employeeKpiFormId ? 'Hide lines' : 'View lines'}
-                            </button>
-                          </div>
-                        </td>
+                        <th className="px-4 py-3">Employee Name</th>
+                        <th className="px-4 py-3">Department</th>
+                        <th className="px-4 py-3">Position</th>
+                        <th className="px-4 py-3">KPI Title</th>
+                        <th className="px-4 py-3">Period</th>
+                        <th className="px-4 py-3 text-right">Weighted Total</th>
+                        <th className="px-4 py-3">Finalized</th>
+                        <th className="px-4 py-3">Reason</th>
+                        <th className="px-4 py-3 text-right">Action</th>
                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filtered.map((row) => (
+                        <Fragment key={row.employeeKpiFormId}>
+                          <tr className="align-top transition hover:bg-blue-50/40">
+                            <td className="px-4 py-4">
+                              <strong className="block font-black text-slate-950">{row.employeeName || missing}</strong>
+                              <span className="mt-1 block text-xs font-bold text-slate-400">#{row.employeeId}</span>
+                            </td>
+                            <td className="px-4 py-4 font-semibold text-slate-700">{row.departmentName ?? missing}</td>
+                            <td className="px-4 py-4 font-semibold text-slate-700">{row.positionTitle ?? missing}</td>
+                            <td className="px-4 py-4">
+                              <strong className="font-black text-slate-950">{row.kpiTitle ?? missing}</strong>
+                            </td>
+                            <td className="px-4 py-4 font-semibold text-slate-700">{formatPeriod(row)}</td>
+                            <td className="px-4 py-4 text-right font-black tabular-nums text-blue-700">
+                              {formatPercent(row.totalWeightedScore, 1)}
+                            </td>
+                            <td className="px-4 py-4 font-semibold text-slate-700">{formatWhen(row.finalizedAt)}</td>
+                            <td className="max-w-[240px] px-4 py-4 font-semibold text-slate-600">
+                              <span className="block truncate" title={row.earlyFinalizedReason ?? ''}>
+                                {row.earlyFinalizedReason || missing}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedId((prev) => (prev === row.employeeKpiFormId ? null : row.employeeKpiFormId))}
+                                className="inline-flex h-9 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                              >
+                                <i className={expandedId === row.employeeKpiFormId ? 'bi bi-eye-slash' : 'bi bi-eye'} aria-hidden />
+                                {expandedId === row.employeeKpiFormId ? 'Hide lines' : 'View lines'}
+                              </button>
+                            </td>
+                          </tr>
 
-                      {expandedId === row.employeeKpiFormId && (
-                        <tr className="kpi-history-detail-row">
-                          <td colSpan={8}>
-                            <div className="kpi-history-lines-panel">
-                              <div className="kpi-tpl-table-wrap">
-                                <table className="kpi-history-lines-table">
-                                  <thead>
-                                    <tr>
-                                      <th>KPI</th>
-                                      <th className="text-end">Target</th>
-                                      <th className="text-end">Weight %</th>
-                                      <th className="text-end">Actual</th>
-                                      <th className="text-end">Achievement %</th>
-                                      <th className="text-end">Weighted score</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {row.lines.map((line) => (
-                                      <tr key={line.kpiFormItemId}>
-                                        <td>{line.kpiLabel ?? '—'}</td>
-                                        <td className="text-end kpi-num">{line.target ?? '—'}</td>
-                                        <td className="text-end kpi-num">{line.weight ?? '—'}</td>
-                                        <td className="text-end kpi-num">{line.actualValue ?? '—'}</td>
-                                        <td className="text-end kpi-num">{formatScore(line.score)}</td>
-                                        <td className="text-end kpi-num">{formatScore(line.weightedScore, 4)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                          {expandedId === row.employeeKpiFormId && (
+                            <tr>
+                              <td colSpan={9} className="bg-slate-50 px-4 py-5">
+                                <KpiLineDetails row={row} />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 };
+
+const MetricCard = ({ label, value, icon }: { label: string; value: string; icon: string }) => (
+  <article className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm">
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm font-black uppercase tracking-[0.08em] text-slate-500">{label}</span>
+      <i className={`bi ${icon} text-blue-700`} aria-hidden />
+    </div>
+    <strong className="mt-3 block text-3xl font-black text-slate-950">{value}</strong>
+  </article>
+);
+
+const LoadingRows = () => (
+  <div className="grid gap-3">
+    {[0, 1, 2].map((item) => (
+      <div key={item} className="flex animate-pulse gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="h-12 w-12 rounded-2xl bg-slate-100" />
+        <div className="flex-1 space-y-3">
+          <div className="h-4 w-2/5 rounded bg-slate-100" />
+          <div className="h-4 w-4/5 rounded bg-slate-100" />
+          <div className="h-3 w-32 rounded bg-slate-100" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const DetailCard = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</p>
+    <p className="mt-1 truncate text-sm font-black text-slate-950">{value || missing}</p>
+  </div>
+);
+
+const KpiLineDetails = ({ row }: { row: ManagerKpiAssignment }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <DetailCard label="Employee Name" value={row.employeeName || missing} />
+      <DetailCard label="Department" value={row.departmentName || missing} />
+      <DetailCard label="Position" value={row.positionTitle || missing} />
+      <DetailCard label="KPI Title" value={row.kpiTitle || missing} />
+      <DetailCard label="Period" value={formatPeriod(row)} />
+    </div>
+
+    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+      <table className="w-full min-w-[840px] border-collapse text-left text-sm">
+        <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+          <tr>
+            <th className="px-4 py-3">KPI</th>
+            <th className="px-4 py-3 text-right">Target</th>
+            <th className="px-4 py-3 text-right">Weight</th>
+            <th className="px-4 py-3 text-right">Actual</th>
+            <th className="px-4 py-3 text-right">Achievement</th>
+            <th className="px-4 py-3 text-right">Weight Score</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {row.lines.map((line) => (
+            <tr key={line.kpiFormItemId} className="transition hover:bg-slate-50">
+              <td className="px-4 py-3 font-semibold text-slate-700">{line.kpiLabel ?? missing}</td>
+              <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-700">{formatPercent(line.target, 1)}</td>
+              <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-700">{formatPercent(line.weight, 1)}</td>
+              <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-700">{formatPercent(line.actualValue, 1)}</td>
+              <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-700">{formatPercent(line.score, 1)}</td>
+              <td className="px-4 py-3 text-right font-black tabular-nums text-blue-700">{formatPercent(line.weightedScore, 1)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-slate-200 bg-blue-50/70">
+            <td colSpan={5} className="px-4 py-4 text-right text-sm font-black uppercase tracking-[0.08em] text-blue-900">
+              Total Weight Score
+            </td>
+            <td className="px-4 py-4 text-right text-base font-black tabular-nums text-blue-900">
+              {formatPercent(totalWeightedScore(row), 1)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+);
 
 export default ManagerKpiHistoryPage;

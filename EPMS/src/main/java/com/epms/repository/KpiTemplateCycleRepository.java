@@ -18,4 +18,6 @@ public interface KpiTemplateCycleRepository extends JpaRepository<KpiTemplateCyc
     List<KpiTemplateCycle> findByStatusAndEndDateBefore(KpiTemplateCycleStatus status, LocalDate endDate);
 
     List<KpiTemplateCycle> findByStatusOrderByEarlyCloseRequestedAtAsc(KpiTemplateCycleStatus status);
+
+    List<KpiTemplateCycle> findByEarlyCloseReviewDecisionIsNotNullOrderByEarlyCloseReviewedAtDesc();
 }

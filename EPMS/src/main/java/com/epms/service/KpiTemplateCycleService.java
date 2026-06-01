@@ -20,6 +20,8 @@ public interface KpiTemplateCycleService {
 
     List<KpiTemplateCycleResponseDTO> listPendingEarlyCloseRequests();
 
+    List<KpiTemplateCycleResponseDTO> listEarlyCloseReviewHistory();
+
     KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason);
 
     KpiTemplateCycleResponseDTO rejectEarlyClose(Integer id, String reviewReason);

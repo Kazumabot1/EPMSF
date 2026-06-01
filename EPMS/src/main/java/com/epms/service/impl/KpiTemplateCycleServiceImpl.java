@@ -210,6 +210,16 @@ public class KpiTemplateCycleServiceImpl implements KpiTemplateCycleService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<KpiTemplateCycleResponseDTO> listEarlyCloseReviewHistory() {
+        return cycleRepository
+                .findByEarlyCloseReviewDecisionIsNotNullOrderByEarlyCloseReviewedAtDesc()
+                .stream()
+                .map(this::toSummaryDto)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public KpiTemplateCycleResponseDTO approveEarlyClose(Integer id, String reviewReason) {
         KpiTemplateCycle cycle = requirePendingApproval(id);
