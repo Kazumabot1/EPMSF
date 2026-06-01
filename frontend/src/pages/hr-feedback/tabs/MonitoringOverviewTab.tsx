@@ -634,16 +634,18 @@ function Badge({ label, tone = 'slate' }: { label: string; tone?: Tone }) {
 
 function SummaryCard({ icon, label, value, detail, tone }: { icon: string; label: string; value: string; detail: string; tone: Tone }) {
     return (
-        <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
+        <article className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
-                    <strong className="mt-2 block text-2xl font-black tracking-tight text-slate-950">{value}</strong>
-                    <span className="mt-1 block text-sm font-bold leading-5 text-slate-500">{detail}</span>
+                    <p className="truncate text-[11px] font-black uppercase tracking-[0.13em] text-slate-500">{label}</p>
+                    <div className="mt-1 flex min-w-0 items-baseline gap-2">
+                        <strong className="block text-xl font-black tracking-tight text-slate-950">{value}</strong>
+                        <span className="truncate text-xs font-bold text-slate-500">{detail}</span>
+                    </div>
                 </div>
-                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ${toneClasses[tone].icon}`}>
-          <i className={`bi ${icon}`} />
-        </span>
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 ${toneClasses[tone].icon}`}>
+                    <i className={`bi ${icon}`} />
+                </span>
             </div>
         </article>
     );
@@ -684,47 +686,30 @@ function EmptyState({ icon, title, description }: { icon: string; title: string;
 function OverallProgressCard({ monitoring }: { monitoring: FeedbackCampaignMonitoringResponse }) {
     const overview = monitoring.overview;
     const percent = clampPercent(overview.completionPercent);
-    const radius = 46;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (percent / 100) * circumference;
     const tone = percent >= 80 ? 'emerald' : percent >= 50 ? 'blue' : percent > 0 ? 'amber' : 'slate';
 
     return (
-        <article className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-1 flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Overall progress</p>
-                    <h2 className="mt-2 text-xl font-black text-slate-950">Feedback submission completion</h2>
-                    <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-500">
-                        Tracks submitted evaluator forms only. Scores and comments stay outside monitoring.
-                    </p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Relationship completion</p>
+                    <h2 className="mt-1 text-lg font-black text-slate-950">Feedback submission completion</h2>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">Submitted evaluator forms only. Scores and comments stay hidden.</p>
                 </div>
-                <div className="relative mx-auto h-32 w-32 shrink-0 md:mx-0">
-                    <svg className="h-32 w-32" viewBox="0 0 120 120" role="img" aria-label={`Overall completion ${formatPercent(percent)}`}>
-                        <circle cx="60" cy="60" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="12" />
-                        <circle
-                            cx="60"
-                            cy="60"
-                            r={radius}
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="12"
-                            strokeLinecap="round"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={offset}
-                            className={`f360-monitoring-progress-ring ${toneClasses[tone].text}`}
-                        />
-                    </svg>
-                    <div className="absolute inset-0 grid place-items-center text-center">
-                        <div>
-                            <strong className="block text-2xl font-black text-slate-950">{formatPercent(percent)}</strong>
-                            <span className="text-xs font-black uppercase tracking-wide text-slate-500">complete</span>
-                        </div>
-                    </div>
+                <Badge label={`${formatPercent(percent)} complete`} tone={tone} />
+            </div>
+
+            <div className="mt-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-wide text-slate-500">
+                    <span>{formatCount(overview.submittedCount)} submitted</span>
+                    <span>{formatCount(overview.totalAssignments)} total</span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+                    <div className={`h-full rounded-full ${toneClasses[tone].bar}`} style={{ width: `${percent}%` }} />
                 </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2.5 md:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:mt-auto">
                 <ProgressMiniMetric label="Submitted" value={overview.submittedCount} />
                 <ProgressMiniMetric label="Pending" value={overview.pendingCount} />
                 <ProgressMiniMetric label="In progress" value={overview.inProgressCount} />
@@ -747,15 +732,15 @@ function RelationshipProgressCard({ relationships }: { relationships: Relationsh
     const ordered = sortRelationships(relationships);
 
     return (
-        <article className="h-full min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Relationship completion</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Relationship coverage</p>
                     <h2 className="mt-1 text-lg font-black text-slate-950">360 coverage balance</h2>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-slate-500">
-          Live status
-        </span>
+                    Live status
+                </span>
             </div>
 
             {ordered.length === 0 ? (
@@ -763,7 +748,7 @@ function RelationshipProgressCard({ relationships }: { relationships: Relationsh
                     Relationship progress will appear after evaluator assignments are generated.
                 </div>
             ) : (
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 grid gap-2">
                     {ordered.map((relationship) => (
                         <RelationshipRow key={relationship.relationshipType} relationship={relationship} />
                     ))}
@@ -776,45 +761,29 @@ function RelationshipProgressCard({ relationships }: { relationships: Relationsh
 function RelationshipRow({ relationship }: { relationship: RelationshipProgress }) {
     const percent = clampPercent(relationship.completionPercent);
     const tone: Tone = percent >= 80 ? 'emerald' : percent >= 50 ? 'blue' : relationship.overdueCount > 0 ? 'red' : 'amber';
-    const privacyIssue = Boolean(relationship.protectedRelationship && relationship.targetsFailingPrivacy > 0);
-    const pendingText = `${formatCount(relationship.pendingCount)} pending`;
-    const overdueText = relationship.overdueCount > 0 ? `${formatCount(relationship.overdueCount)} overdue` : '';
-    const privacyText = relationship.protectedRelationship
-        ? privacyIssue
-            ? `${formatCount(relationship.targetsFailingPrivacy)} anonymity issue${relationship.targetsFailingPrivacy === 1 ? '' : 's'}`
-            : 'Anonymity ready'
-        : '';
+    const note = compactRelationshipNote(relationship);
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-            <div className="grid min-w-0 grid-cols-1 gap-2 lg:grid-cols-[minmax(165px,0.75fr)_minmax(180px,0.9fr)_44px] lg:items-center">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+            <div className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-[minmax(145px,0.75fr)_minmax(160px,1fr)_48px] md:items-center">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                         <strong className="text-sm font-black text-slate-950">{normalizeRelationshipLabel(relationship)}</strong>
                         <span className="text-xs font-bold text-slate-500">
-              {formatCount(relationship.submittedCount)} / {formatCount(relationship.assignedCount)} submitted
-            </span>
+                            {formatCount(relationship.submittedCount)} / {formatCount(relationship.assignedCount)}
+                        </span>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black uppercase tracking-wide">
-                        <span className="rounded-full bg-white px-2 py-0.5 text-slate-500 ring-1 ring-slate-200">{pendingText}</span>
-                        {overdueText && <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700 ring-1 ring-red-100">{overdueText}</span>}
-                        {privacyText && (
-                            <span className={`rounded-full px-2 py-0.5 ring-1 ${privacyIssue ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>
-                {privacyText}
-              </span>
-                        )}
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-black uppercase tracking-wide">
+                        <span className="rounded-full bg-white px-2 py-0.5 text-slate-500 ring-1 ring-slate-200">{formatCount(relationship.pendingCount)} pending</span>
+                        {relationship.overdueCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700 ring-1 ring-red-100">{formatCount(relationship.overdueCount)} overdue</span>}
                     </div>
                 </div>
 
                 <div className="min-w-0">
-                    <div className="f360-monitoring-striped-bar-track">
+                    <div className="f360-monitoring-striped-bar-track f360-monitoring-compact-bar">
                         <div className={`f360-monitoring-striped-bar-fill ${toneClasses[tone].bar}`} style={{ width: `${percent}%` }} />
                     </div>
-                    {compactRelationshipNote(relationship) && (
-                        <p className="mt-1.5 truncate text-xs font-semibold text-amber-700" title={compactRelationshipNote(relationship)}>
-                            {compactRelationshipNote(relationship)}
-                        </p>
-                    )}
+                    {note && <p className="mt-1 truncate text-[11px] font-semibold text-amber-700" title={note}>{note}</p>}
                 </div>
 
                 <strong className={`text-right text-sm font-black ${toneClasses[tone].text}`}>{formatPercent(percent)}</strong>
@@ -832,7 +801,7 @@ function RiskPanel({ monitoring }: { monitoring: FeedbackCampaignMonitoringRespo
     const closeTone = closeReadinessTone(monitoring);
 
     return (
-        <article className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Risk status</p>
@@ -859,7 +828,7 @@ function RiskPanel({ monitoring }: { monitoring: FeedbackCampaignMonitoringRespo
                 />
             </div>
 
-            <div className="mt-3 flex flex-1 flex-wrap content-end gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2 xl:mt-auto">
                 <TargetStatusPill label="Ready" value={overview.readyTargetCount} tone="emerald" />
                 <TargetStatusPill label="On track" value={overview.onTrackTargetCount} tone="blue" />
                 <TargetStatusPill label="Attention" value={overview.needsAttentionTargetCount} tone="amber" />
@@ -886,77 +855,72 @@ function CloseReadinessSection({
     const tone = closeReadinessStatusTone(readiness);
     const active = String(monitoring.campaignStatus ?? '').toUpperCase() === 'ACTIVE';
     const checklist = readiness?.checklist ?? [];
-    const visibleChecklist = checklist.slice(0, 6);
+    const visibleChecklist = checklist.slice(0, 4);
     const canClose = active && Boolean(readiness?.canClose);
     const disabledReason = !active
-        ? 'Close action is available only while the campaign is active.'
+        ? 'Close is available only while the campaign is active.'
         : !readiness?.canClose
             ? 'Resolve blocking setup issues before closing.'
             : '';
 
     return (
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         <Badge label="Close readiness" tone="blue" />
                         <Badge label={closeReadinessStatusLabel(readiness)} tone={tone} />
                     </div>
-                    <h2 className="mt-3 text-xl font-black text-slate-950">Ready to close checklist</h2>
-                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                        {readiness?.summary || 'Review setup, submission, target coverage, and privacy checks before closing feedback collection.'}
-                    </p>
-                    <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                        Closing locks evaluator submissions. It does not automatically publish results or expose scores/comments.
+                    <h2 className="mt-2 text-lg font-black text-slate-950">Ready to close checklist</h2>
+                    <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-slate-500">
+                        {readiness?.summary || 'Review setup, submissions, coverage, and privacy checks before closing feedback collection.'}
                     </p>
                 </div>
 
-                <div className="grid min-w-[260px] gap-2 sm:grid-cols-3 xl:w-[430px]">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
                     <CloseReadinessMetric label="Blockers" value={readiness?.hardBlockerCount ?? 0} tone={(readiness?.hardBlockerCount ?? 0) > 0 ? 'red' : 'emerald'} />
                     <CloseReadinessMetric label="Warnings" value={readiness?.warningCount ?? 0} tone={(readiness?.warningCount ?? 0) > 0 ? 'amber' : 'emerald'} />
-                    <CloseReadinessMetric label="Ready targets" value={`${formatCount(readiness?.readyTargets ?? 0)}/${formatCount(readiness?.totalTargets ?? 0)}`} tone="blue" />
+                    <CloseReadinessMetric label="Ready" value={`${formatCount(readiness?.readyTargets ?? 0)}/${formatCount(readiness?.totalTargets ?? 0)}`} tone="blue" />
+                    <button
+                        type="button"
+                        disabled={!canClose || closing}
+                        onClick={onOpenCloseConfirm}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+                        title={disabledReason || 'Close campaign'}
+                    >
+                        {closing ? <i className="bi bi-arrow-repeat f360-monitoring-spin" /> : <i className="bi bi-lock-fill" />}
+                        {closing ? 'Closing...' : readiness?.primaryActionLabel || 'Close campaign'}
+                    </button>
                 </div>
             </div>
 
-            <div className="mt-4 grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 {visibleChecklist.map((item) => (
                     <CloseChecklistRow key={item.key || `${item.title}-${item.status}`} item={item} />
                 ))}
                 {checklist.length > visibleChecklist.length && (
-                    <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
-                        + {formatCount(checklist.length - visibleChecklist.length)} more checklist item{checklist.length - visibleChecklist.length === 1 ? '' : 's'} included in this readiness review.
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
+                        + {formatCount(checklist.length - visibleChecklist.length)} more checklist item{checklist.length - visibleChecklist.length === 1 ? '' : 's'}
                     </div>
                 )}
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0 text-xs font-bold leading-5 text-slate-500">
-                    {disabledReason || (readiness?.canCloseWithWarnings
-                        ? 'Warnings remain. HR acknowledgement is required before closing.'
-                        : 'No close blockers detected. HR can lock feedback collection when ready.')}
+            {(disabledReason || closeMessage || closeError) && (
+                <div className="mt-3 grid gap-2">
+                    {disabledReason && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-500">{disabledReason}</p>}
+                    {closeMessage && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{closeMessage}</p>}
+                    {closeError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{closeError}</p>}
                 </div>
-                <button
-                    type="button"
-                    disabled={!canClose || closing}
-                    onClick={onOpenCloseConfirm}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                    {closing ? <i className="bi bi-arrow-repeat f360-monitoring-spin" /> : <i className="bi bi-lock-fill" />}
-                    {closing ? 'Closing...' : readiness?.primaryActionLabel || 'Close campaign'}
-                </button>
-            </div>
-
-            {closeMessage && <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{closeMessage}</p>}
-            {closeError && <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{closeError}</p>}
+            )}
         </section>
     );
 }
 
 function CloseReadinessMetric({ label, value, tone }: { label: string; value: number | string; tone: Tone }) {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-            <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</span>
-            <strong className={`mt-1 block text-base font-black ${toneClasses[tone].text}`}>{typeof value === 'number' ? formatCount(value) : value}</strong>
+        <div className="min-w-[92px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className="block text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</span>
+            <strong className={`mt-0.5 block text-sm font-black ${toneClasses[tone].text}`}>{typeof value === 'number' ? formatCount(value) : value}</strong>
         </div>
     );
 }
@@ -966,26 +930,25 @@ function CloseChecklistRow({ item }: { item: CloseReadinessChecklistItem }) {
     const status = String(item.status ?? 'INFO').toUpperCase();
     const icon = status === 'PASS' ? 'bi-check-circle-fill' : status === 'BLOCKER' ? 'bi-x-octagon-fill' : status === 'WARNING' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill';
     return (
-        <div className="flex min-w-0 gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-            <span className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${toneClasses[tone].icon}`}>
+        <div className="flex min-w-0 items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <span className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${toneClasses[tone].icon}`}>
                 <i className={`bi ${icon}`} />
             </span>
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                    <strong className="text-sm font-black text-slate-900">{item.title}</strong>
-                    <Badge label={labelFromValue(item.status)} tone={tone} />
+                    <strong className="truncate text-sm font-black text-slate-900">{item.title}</strong>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${toneClasses[tone].soft}`}>{labelFromValue(item.status)}</span>
                 </div>
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{item.message}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">{item.message}</p>
             </div>
         </div>
     );
 }
 
-
 function RiskMetric({ label, value, tone = 'slate' }: { label: string; value: string; tone?: Tone }) {
     return (
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <span className="block truncate text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</span>
+        <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className="block truncate text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</span>
             <strong className={`mt-0.5 block truncate text-sm font-black ${toneClasses[tone].text}`}>{value}</strong>
         </div>
     );
@@ -993,8 +956,8 @@ function RiskMetric({ label, value, tone = 'slate' }: { label: string; value: st
 
 function TargetStatusPill({ label, value, tone }: { label: string; value: number; tone: Tone }) {
     return (
-        <div className={`flex min-w-[112px] flex-1 items-center justify-between gap-2 rounded-full border ${toneClasses[tone].border} bg-white px-3 py-2`}>
-            <span className="truncate text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</span>
+        <div className={`flex min-w-0 items-center justify-between gap-2 rounded-xl border ${toneClasses[tone].border} bg-white px-3 py-2`}>
+            <span className="truncate text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</span>
             <strong className={`text-sm font-black ${toneClasses[tone].text}`}>{formatCount(value)}</strong>
         </div>
     );
@@ -1013,11 +976,11 @@ function AlertsPanel({
 }) {
     const [expanded, setExpanded] = useState(false);
     const sortedAlerts = sortAlerts(alerts);
-    const visibleAlerts = expanded ? sortedAlerts : sortedAlerts.slice(0, 3);
+    const visibleAlerts = expanded ? sortedAlerts : sortedAlerts.slice(0, 4);
     const hiddenAlertCount = Math.max(0, sortedAlerts.length - visibleAlerts.length);
 
     return (
-        <article className="flex h-full min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Main alerts</p>
@@ -1027,11 +990,11 @@ function AlertsPanel({
             </div>
 
             {sortedAlerts.length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-700">
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold leading-6 text-emerald-700">
                     No monitoring alerts right now.
                 </div>
             ) : (
-                <div className="mt-4 flex flex-1 flex-col gap-2.5">
+                <div className="mt-4 flex flex-1 flex-col gap-2">
                     {visibleAlerts.map((alert, index) => (
                         <AlertCard
                             key={`${alert.alertType}-${alert.severity}-${index}`}
@@ -1041,15 +1004,13 @@ function AlertsPanel({
                             onRequestReminders={onRequestReminders}
                         />
                     ))}
-                    {sortedAlerts.length > 3 && (
+                    {sortedAlerts.length > 4 && (
                         <button
                             type="button"
                             onClick={() => setExpanded((current) => !current)}
-                            className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-left text-sm font-black text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            className="mt-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-black text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                         >
-                            {expanded
-                                ? 'Show fewer alerts'
-                                : `Show ${hiddenAlertCount} more alert${hiddenAlertCount === 1 ? '' : 's'}`}
+                            {expanded ? 'Show fewer alerts' : `Show ${hiddenAlertCount} more alert${hiddenAlertCount === 1 ? '' : 's'}`}
                         </button>
                     )}
                 </div>
@@ -1074,26 +1035,22 @@ function AlertCard({
     const canUseReminder = alertCanUseCampaignReminder(alert);
 
     return (
-        <div className={`rounded-2xl border ${toneClasses[tone].border} bg-white px-3.5 py-3 shadow-sm`}>
-            <div className="flex min-w-0 items-start gap-2.5">
-        <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl ring-1 ${toneClasses[tone].icon}`}>
-          <i className={`bi ${normalizedSeverity === 'CRITICAL' ? 'bi-x-octagon' : normalizedSeverity === 'WARNING' ? 'bi-exclamation-triangle' : 'bi-info-circle'}`} />
-        </span>
+        <div className={`rounded-xl border ${toneClasses[tone].border} bg-white px-3 py-2 shadow-sm`}>
+            <div className="flex min-w-0 items-start gap-2">
+                <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-xl text-xs ring-1 ${toneClasses[tone].icon}`}>
+                    <i className={`bi ${normalizedSeverity === 'CRITICAL' ? 'bi-x-octagon' : normalizedSeverity === 'WARNING' ? 'bi-exclamation-triangle' : 'bi-info-circle'}`} />
+                </span>
                 <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <strong className="min-w-0 text-sm font-black leading-5 text-slate-950">{alert.title}</strong>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${toneClasses[tone].soft}`}>
-              {labelFromValue(normalizedSeverity)}
-            </span>
+                            {labelFromValue(normalizedSeverity)}
+                        </span>
                     </div>
-                    <p className="mt-0.5 text-sm font-semibold leading-5 text-slate-600">{alert.message}</p>
+                    <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-5 text-slate-600">{alert.message}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-black text-slate-500">
                         <span className="rounded-full bg-slate-100 px-2.5 py-1">Affected: {formatCount(alert.affectedCount)}</span>
-                        <button
-                            type="button"
-                            onClick={() => onAlertAction(alert)}
-                            className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
-                        >
+                        <button type="button" onClick={() => onAlertAction(alert)} className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100">
                             {alertActionLabel(alert)}
                         </button>
                         {canUseReminder && (
@@ -1106,9 +1063,9 @@ function AlertCard({
                                 })}
                                 disabled={!canSendReminders}
                                 title={canSendReminders ? 'Send reminders for this alert scope.' : 'Reminders are only available while the campaign is active.'}
-                                className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                             >
-                                Send scoped reminder
+                                Send reminder
                             </button>
                         )}
                     </div>
@@ -1172,6 +1129,11 @@ function EvaluatorWorkloadSection({
         setWorkloadFilter('ALL');
         setRelationshipFilter('ALL');
     };
+    const disabledReason = campaignStatus !== 'ACTIVE'
+        ? 'Reminders are available only while the campaign is active.'
+        : Number(monitoring.overview.pendingCount ?? 0) <= 0
+            ? 'No pending evaluator assignments need reminders.'
+            : '';
 
     useEffect(() => {
         if (!filterPreset) return;
@@ -1181,94 +1143,137 @@ function EvaluatorWorkloadSection({
     }, [filterPreset?.token]);
 
     return (
-        <article ref={sectionRef} className="min-w-0 scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-            <div className="flex min-w-0 flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+        <article ref={sectionRef} className="min-w-0 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Evaluator workload</p>
-                    <h2 className="mt-2 text-xl font-black text-slate-950">Pending evaluators and reminders</h2>
-                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                        Track evaluator workload, pending or overdue assignments, and reminder history without exposing scores or comments.
+                    <h2 className="mt-1 text-lg font-black text-slate-950">Pending evaluators and reminders</h2>
+                    <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-slate-500">
+                        Track evaluator workload, pending assignments, overdue items, and reminder history without exposing scores or comments.
                     </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
                     <Badge label={`${formatCount(filteredEvaluators.length)} shown`} tone="blue" />
                     <Badge label={`${formatCount(evaluators.length)} evaluators`} tone="slate" />
                     {heavyCount > 0 && <Badge label={`${formatCount(heavyCount)} heavy`} tone={overloadedCount > 0 ? 'red' : 'amber'} />}
+                    <button
+                        type="button"
+                        onClick={onSendReminders}
+                        disabled={!canSendReminders || reminderSending}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+                        title={disabledReason || 'Send reminders to pending evaluators'}
+                    >
+                        {reminderSending ? <i className="bi bi-arrow-repeat f360-monitoring-spin" /> : <i className="bi bi-send" />}
+                        {reminderSending ? 'Sending...' : 'Send reminders'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onRefreshHistory}
+                        className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                        Refresh
+                    </button>
                 </div>
             </div>
 
+            <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                <EvaluatorMiniMetric label="Pending evaluators" value={pendingEvaluatorCount} tone={pendingEvaluatorCount > 0 ? 'amber' : 'emerald'} />
+                <EvaluatorMiniMetric label="Overdue evaluators" value={overdueEvaluatorCount} tone={overdueEvaluatorCount > 0 ? 'red' : 'slate'} />
+                <EvaluatorMiniMetric label="Heavy workload" value={heavyCount} tone={heavyCount > 0 ? 'amber' : 'emerald'} />
+                <EvaluatorMiniMetric label="Overloaded" value={overloadedCount} tone={overloadedCount > 0 ? 'red' : 'slate'} />
+            </div>
+
             {heavyCount > 0 && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold leading-6 text-amber-800">
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-800">
                     <i className="bi bi-exclamation-triangle mr-2" />
                     {overloadedCount > 0
-                        ? `${formatCount(overloadedCount)} evaluator${overloadedCount === 1 ? '' : 's'} are overloaded. Consider reminders or reassignment before closing.`
+                        ? `${formatCount(overloadedCount)} evaluator${overloadedCount === 1 ? '' : 's'} are overloaded.`
                         : `${formatCount(heavyCount)} evaluator${heavyCount === 1 ? '' : 's'} have a heavy pending workload.`}
                 </div>
             )}
 
-            <div className="mt-5 grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.75fr)]">
-                <section className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
-                    <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                        <EvaluatorMiniMetric label="Pending evaluators" value={pendingEvaluatorCount} tone={pendingEvaluatorCount > 0 ? 'amber' : 'emerald'} />
-                        <EvaluatorMiniMetric label="Overdue evaluators" value={overdueEvaluatorCount} tone={overdueEvaluatorCount > 0 ? 'red' : 'slate'} />
-                        <EvaluatorMiniMetric label="Heavy workload" value={heavyCount} tone={heavyCount > 0 ? 'amber' : 'emerald'} />
-                        <EvaluatorMiniMetric label="Overloaded" value={overloadedCount} tone={overloadedCount > 0 ? 'red' : 'slate'} />
-                    </div>
+            <EvaluatorFilters
+                search={search}
+                onSearchChange={setSearch}
+                workloadFilter={workloadFilter}
+                onWorkloadFilterChange={setWorkloadFilter}
+                relationshipFilter={relationshipFilter}
+                onRelationshipFilterChange={setRelationshipFilter}
+                activeFilterCount={activeFilterCount}
+                onClearFilters={clearFilters}
+            />
 
-                    <EvaluatorFilters
-                        search={search}
-                        onSearchChange={setSearch}
-                        workloadFilter={workloadFilter}
-                        onWorkloadFilterChange={setWorkloadFilter}
-                        relationshipFilter={relationshipFilter}
-                        onRelationshipFilterChange={setRelationshipFilter}
-                        activeFilterCount={activeFilterCount}
-                        onClearFilters={clearFilters}
-                    />
+            {evaluators.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
+                    Evaluator workload will appear after assignments are generated.
+                </div>
+            ) : filteredEvaluators.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
+                    No evaluators match the selected workload filters.
+                </div>
+            ) : (
+                <div className="f360-monitoring-target-table mt-3 max-w-full overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full min-w-[1040px] border-separate border-spacing-0 text-left">
+                        <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
+                        <tr>
+                            <th className="px-3 py-2">Evaluator</th>
+                            <th className="px-3 py-2">Relationships</th>
+                            <th className="px-3 py-2">Targets</th>
+                            <th className="px-3 py-2">Progress</th>
+                            <th className="px-3 py-2">Pending</th>
+                            <th className="px-3 py-2">Overdue</th>
+                            <th className="px-3 py-2">Workload</th>
+                            <th className="px-3 py-2 text-right">Action</th>
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                        {filteredEvaluators.map((evaluator) => (
+                            <EvaluatorWorkloadRow
+                                key={`${evaluator.evaluatorEmployeeId}-${evaluator.evaluatorEmployeeName}`}
+                                evaluator={evaluator}
+                                canSendReminders={canSendReminders}
+                                onRequestReminder={onRequestEvaluatorReminder}
+                            />
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-                    {evaluators.length === 0 ? (
-                        <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm font-semibold leading-6 text-slate-500">
-                            Evaluator workload will appear after assignments are generated.
-                        </div>
-                    ) : filteredEvaluators.length === 0 ? (
-                        <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm font-semibold leading-6 text-slate-500">
-                            No evaluators match the selected workload filters.
-                        </div>
-                    ) : (
-                        <div className="mt-4 grid gap-3">
-                            {filteredEvaluators.map((evaluator) => (
-                                <EvaluatorWorkloadRow
-                                    key={`${evaluator.evaluatorEmployeeId}-${evaluator.evaluatorEmployeeName}`}
-                                    evaluator={evaluator}
-                                    canSendReminders={canSendReminders}
-                                    onRequestReminder={onRequestEvaluatorReminder}
-                                />
-                            ))}
+            {(disabledReason || reminderMessage || reminderError || lastReminderResult || reminderHistory.length > 0) && (
+                <div className="mt-3 grid gap-2">
+                    {disabledReason && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-500">{disabledReason}</p>}
+                    {reminderMessage && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{reminderMessage}</p>}
+                    {reminderError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{reminderError}</p>}
+                    {lastReminderResult && (
+                        <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold leading-5 text-blue-700">
+                            Pending {formatCount(lastReminderResult.pendingAssignmentCount)} · Notified {formatCount(lastReminderResult.notifiedEvaluatorCount)} · Skipped {formatCount(lastReminderResult.skippedAssignmentCount)}
+                        </p>
+                    )}
+                    {reminderHistory.length > 0 && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Reminder history</span>
+                                <Badge label={`${formatCount(reminderHistory.length)} record${reminderHistory.length === 1 ? '' : 's'}`} tone="slate" />
+                            </div>
+                            <div className="grid gap-2 lg:grid-cols-2">
+                                {reminderHistory.slice(0, 4).map((item) => (
+                                    <ReminderHistoryRow key={item.id} item={item} />
+                                ))}
+                            </div>
                         </div>
                     )}
-                </section>
-
-                <ReminderPanel
-                    monitoring={monitoring}
-                    reminderHistory={reminderHistory}
-                    reminderSending={reminderSending}
-                    reminderMessage={reminderMessage}
-                    reminderError={reminderError}
-                    lastReminderResult={lastReminderResult}
-                    canSendReminders={canSendReminders}
-                    onSendReminders={onSendReminders}
-                    onRefreshHistory={onRefreshHistory}
-                />
-            </div>
+                </div>
+            )}
         </article>
     );
 }
 
 function EvaluatorMiniMetric({ label, value, tone }: { label: string; value: number; tone: Tone }) {
     return (
-        <div className={`rounded-2xl border ${toneClasses[tone].border} bg-white px-3 py-2.5`}>
-            <span className="block truncate text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</span>
-            <strong className={`mt-0.5 block text-base font-black ${toneClasses[tone].text}`}>{formatCount(value)}</strong>
+        <div className={`rounded-xl border ${toneClasses[tone].border} bg-slate-50 px-3 py-2`}>
+            <span className="block truncate text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</span>
+            <strong className={`mt-0.5 block text-sm font-black ${toneClasses[tone].text}`}>{formatCount(value)}</strong>
         </div>
     );
 }
@@ -1293,34 +1298,26 @@ function EvaluatorFilters({
     onClearFilters: () => void;
 }) {
     return (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="f360-monitoring-evaluator-filter-grid">
                 <label className="min-w-0">
-                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.13em] text-slate-500">Search</span>
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.13em] text-slate-500">Search</span>
                     <div className="relative min-w-0">
                         <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             value={search}
                             onChange={(event) => onSearchChange(event.target.value)}
                             placeholder="Evaluator, code, target..."
-                            className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                            className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                         />
                     </div>
                 </label>
-                <TargetFilterSelect
-                    label="Workload"
-                    value={workloadFilter}
-                    onChange={(value) => onWorkloadFilterChange(value as EvaluatorWorkloadFilter)}
-                >
+                <TargetFilterSelect label="Workload" value={workloadFilter} onChange={(value) => onWorkloadFilterChange(value as EvaluatorWorkloadFilter)}>
                     {EVALUATOR_WORKLOAD_FILTERS.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                 </TargetFilterSelect>
-                <TargetFilterSelect
-                    label="Relationship"
-                    value={relationshipFilter}
-                    onChange={(value) => onRelationshipFilterChange(value as EvaluatorRelationshipFilter)}
-                >
+                <TargetFilterSelect label="Relationship" value={relationshipFilter} onChange={(value) => onRelationshipFilterChange(value as EvaluatorRelationshipFilter)}>
                     {EVALUATOR_RELATIONSHIP_FILTERS.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -1330,7 +1327,7 @@ function EvaluatorFilters({
                         type="button"
                         onClick={onClearFilters}
                         disabled={activeFilterCount === 0}
-                        className="h-[42px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-[38px] w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
                     >
                         Clear
                     </button>
@@ -1355,71 +1352,98 @@ function EvaluatorWorkloadRow({
     const relationshipEntries = RELATIONSHIP_ORDER
         .map((relationship) => ({ relationship, count: Number((evaluator.relationshipCounts ?? {})[relationship] ?? 0) }))
         .filter((item) => item.count > 0);
-    const shownTargets = (evaluator.targetNames ?? []).slice(0, 3);
+    const shownTargets = (evaluator.targetNames ?? []).slice(0, 2);
     const extraTargets = Math.max(0, (evaluator.targetNames ?? []).length - shownTargets.length);
 
     return (
-        <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-            <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(210px,0.85fr)_minmax(220px,1fr)_minmax(190px,0.75fr)_minmax(220px,1fr)] xl:items-center">
+        <tr className="align-middle text-sm text-slate-700 hover:bg-slate-50/70">
+            <td className="px-3 py-2.5">
                 <div className="min-w-0">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <strong className="truncate text-sm font-black text-slate-950">{evaluator.evaluatorEmployeeName || 'Unnamed evaluator'}</strong>
-                        <Badge label={workloadBadgeLabel(workload)} tone={tone} />
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-black text-slate-500">
+                    <strong className="block max-w-[190px] truncate font-black text-slate-950">{evaluator.evaluatorEmployeeName || 'Unnamed evaluator'}</strong>
+                    <div className="mt-1 flex flex-wrap gap-1 text-[10px] font-black text-slate-500">
                         {evaluator.evaluatorEmployeeCode && <span className="rounded-full bg-slate-100 px-2 py-0.5">{evaluator.evaluatorEmployeeCode}</span>}
                         {evaluator.positionName && <span className="rounded-full bg-slate-100 px-2 py-0.5">{evaluator.positionName}</span>}
                     </div>
                 </div>
-
-                <div className="min-w-0">
-                    <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-black uppercase tracking-wide text-slate-500">
-                        <span>{formatCount(evaluator.submittedCount)} / {formatCount(evaluator.assignedCount)} submitted</span>
-                        <span className={toneClasses[tone].text}>{formatPercent(percent)}</span>
-                    </div>
-                    <div className="f360-monitoring-striped-bar-track f360-monitoring-workload-bar">
-                        <div className={`f360-monitoring-striped-bar-fill ${toneClasses[tone].bar}`} style={{ width: `${percent}%` }} />
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-black uppercase tracking-wide">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">{formatCount(evaluator.pendingCount)} pending</span>
-                        {evaluator.overdueCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700 ring-1 ring-red-100">{formatCount(evaluator.overdueCount)} overdue</span>}
-                    </div>
+            </td>
+            <td className="px-3 py-2.5">
+                <div className="flex max-w-[200px] flex-wrap gap-1">
+                    {relationshipEntries.length === 0 ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">None</span>
+                    ) : relationshipEntries.map((item) => (
+                        <span key={item.relationship} className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
+                            {relationshipLabelFromKey(item.relationship)} {item.count}
+                        </span>
+                    ))}
                 </div>
-
-                <div className="min-w-0">
-                    <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">Relationships</span>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {relationshipEntries.length === 0 ? (
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">None</span>
-                        ) : relationshipEntries.map((item) => (
-                            <span key={item.relationship} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">
-                                {relationshipLabelFromKey(item.relationship)} {item.count}
-                            </span>
-                        ))}
+            </td>
+            <td className="px-3 py-2.5">
+                <p className="max-w-[220px] truncate text-xs font-semibold text-slate-600" title={(evaluator.targetNames ?? []).join(', ')}>
+                    {shownTargets.length ? shownTargets.join(', ') : 'No targets'}{extraTargets > 0 ? ` +${extraTargets} more` : ''}
+                </p>
+                <p className="mt-1 text-[10px] font-bold text-slate-400">Last: {formatDateTime(evaluator.lastActivityAt)}</p>
+            </td>
+            <td className="px-3 py-2.5">
+                <div className="flex min-w-[130px] items-center gap-2">
+                    <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+                        <div className={`h-full rounded-full ${toneClasses[tone].bar}`} style={{ width: `${percent}%` }} />
                     </div>
+                    <span className={`text-xs font-black ${toneClasses[tone].text}`}>{formatPercent(percent)}</span>
                 </div>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-500">{formatCount(evaluator.submittedCount)} / {formatCount(evaluator.assignedCount)} submitted</p>
+            </td>
+            <td className="px-3 py-2.5 font-black text-slate-700">{formatCount(evaluator.pendingCount)}</td>
+            <td className={`px-3 py-2.5 font-black ${Number(evaluator.overdueCount ?? 0) > 0 ? 'text-red-700' : 'text-slate-500'}`}>{formatCount(evaluator.overdueCount)}</td>
+            <td className="px-3 py-2.5"><Badge label={workloadBadgeLabel(workload)} tone={tone} /></td>
+            <td className="px-3 py-2.5 text-right">
+                {Number(evaluator.pendingCount ?? 0) > 0 ? (
+                    <button
+                        type="button"
+                        onClick={() => onRequestReminder(evaluator)}
+                        disabled={!canSendReminders}
+                        title={canSendReminders ? 'Send a reminder only to this evaluator.' : 'Evaluator reminders are only available while this campaign is active.'}
+                        className="rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:ring-slate-200"
+                    >
+                        Remind
+                    </button>
+                ) : (
+                    <span className="text-xs font-black text-slate-400">Done</span>
+                )}
+            </td>
+        </tr>
+    );
+}
 
+function ReminderHistoryRow({ item }: { item: FeedbackReminderHistoryItem }) {
+    const action = String(item.action ?? '').toUpperCase();
+    const title = reminderActionLabels[action] ?? labelFromValue(action);
+    const pending = parseReminderMetric(item.newValue, 'pendingAssignments');
+    const notified = parseReminderMetric(item.newValue, 'notifiedUsers') ?? parseReminderMetric(item.newValue, 'notifiedAssignments');
+    const skipped = parseReminderMetric(item.newValue, 'skippedAssignments');
+    const scope = parseReminderText(item.newValue, 'scope');
+    const relationship = parseReminderText(item.newValue, 'relationshipType');
+    const tone: Tone = action.includes('OVERDUE') ? 'red' : 'blue';
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-2 text-xs shadow-sm">
+            <div className="flex min-w-0 items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">Targets</span>
-                    <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-600">
-                        {shownTargets.length ? shownTargets.join(', ') : 'No target names available'}
-                        {extraTargets > 0 ? ` +${extraTargets} more` : ''}
-                    </p>
-                    <p className="mt-1 text-[11px] font-bold text-slate-400">Last activity: {formatDateTime(evaluator.lastActivityAt)}</p>
-                    {Number(evaluator.pendingCount ?? 0) > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => onRequestReminder(evaluator)}
-                            disabled={!canSendReminders}
-                            title={canSendReminders ? 'Send a reminder only to this evaluator.' : 'Evaluator reminders are only available while this campaign is active.'}
-                            className="mt-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Remind evaluator
-                        </button>
-                    )}
+                    <strong className="block truncate text-sm font-black text-slate-900">{title}</strong>
+                    <span className="mt-0.5 block font-semibold text-slate-500">{formatDateTime(item.timestamp)}</span>
                 </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${toneClasses[tone].soft}`}>
+                    {action.includes('OVERDUE') ? 'Overdue' : 'Pending'}
+                </span>
             </div>
-        </article>
+            <div className="mt-2 flex flex-wrap gap-1.5 font-black text-slate-500">
+                {scope && <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">Scope: {labelFromValue(scope)}</span>}
+                {relationship && <span className="rounded-full bg-slate-100 px-2 py-1">{relationshipLabelFromKey(relationship)}</span>}
+                {pending !== null && <span className="rounded-full bg-slate-100 px-2 py-1">Pending: {formatCount(pending)}</span>}
+                {notified !== null && <span className="rounded-full bg-slate-100 px-2 py-1">Notified: {formatCount(notified)}</span>}
+                {skipped !== null && <span className="rounded-full bg-slate-100 px-2 py-1">Skipped: {formatCount(skipped)}</span>}
+            </div>
+            {item.reason && <p className="mt-2 font-semibold leading-5 text-slate-500">{item.reason}</p>}
+        </div>
     );
 }
 
@@ -1594,239 +1618,66 @@ function CloseCampaignConfirmDialog({
 }
 
 
-function ReminderPanel({
-                           monitoring,
-                           reminderHistory,
-                           reminderSending,
-                           reminderMessage,
-                           reminderError,
-                           lastReminderResult,
-                           canSendReminders,
-                           onSendReminders,
-                           onRefreshHistory,
-                       }: {
-    monitoring: FeedbackCampaignMonitoringResponse;
-    reminderHistory: FeedbackReminderHistoryItem[];
-    reminderSending: boolean;
-    reminderMessage: string;
-    reminderError: string;
-    lastReminderResult: FeedbackReminderResponse | null;
-    canSendReminders: boolean;
-    onSendReminders: () => void;
-    onRefreshHistory: () => void;
+function ActivityTimelineExportSection({
+                                           activity,
+                                           onRefresh,
+                                       }: {
+    activity: MonitoringActivityItem[];
+    onRefresh: () => void;
 }) {
-    const campaignStatus = String(monitoring.campaignStatus ?? '').toUpperCase();
-    const disabledReason = campaignStatus !== 'ACTIVE'
-        ? 'Reminders can only be sent while the campaign is active.'
-        : Number(monitoring.overview.pendingCount ?? 0) <= 0
-            ? 'No pending evaluator assignments need reminders.'
-            : '';
+    const [expanded, setExpanded] = useState(false);
+    const rows = expanded ? activity : activity.slice(0, 5);
+    const hiddenCount = Math.max(0, activity.length - rows.length);
 
     return (
-        <aside className="flex min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Reminder action</p>
-                    <h3 className="mt-1 text-lg font-black text-slate-950">Follow up with evaluators</h3>
+        <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Activity timeline</p>
+                    <h2 className="mt-1 text-lg font-black text-slate-950">Operational campaign history</h2>
+                    <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-slate-500">
+                        Tracks setup, assignment, reminder, close, publish, and export events. Ratings and comments are never shown here.
+                    </p>
                 </div>
                 <button
                     type="button"
-                    onClick={onRefreshHistory}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    onClick={onRefresh}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
                     Refresh
                 </button>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-600">
-                Send one campaign-level reminder to pending evaluators. The system automatically sends overdue wording after the campaign deadline.
-            </div>
-
-            <button
-                type="button"
-                onClick={onSendReminders}
-                disabled={!canSendReminders || reminderSending}
-                className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
-            >
-                {reminderSending ? <i className="bi bi-arrow-repeat f360-monitoring-spin" /> : <i className="bi bi-send" />}
-                {reminderSending ? 'Sending reminders...' : 'Send pending reminders'}
-            </button>
-
-            {disabledReason && <p className="mt-2 text-xs font-bold leading-5 text-slate-500">{disabledReason}</p>}
-            {reminderMessage && <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{reminderMessage}</p>}
-            {reminderError && <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{reminderError}</p>}
-            {lastReminderResult && (
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                    <ReminderResultMetric label="Pending" value={lastReminderResult.pendingAssignmentCount} />
-                    <ReminderResultMetric label="Notified" value={lastReminderResult.notifiedEvaluatorCount} />
-                    <ReminderResultMetric label="Skipped" value={lastReminderResult.skippedAssignmentCount} />
+            {activity.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
+                    No operational activity has been recorded for this campaign yet.
+                </div>
+            ) : (
+                <div className="mt-4 grid gap-2">
+                    {rows.map((item, index) => (
+                        <ActivityTimelineRow key={`${item.id ?? index}-${item.activityType}-${item.occurredAt ?? index}`} activity={item} />
+                    ))}
                 </div>
             )}
 
-            <div className="mt-5 flex min-w-0 flex-1 flex-col">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Reminder history</span>
-                    <Badge label={`${formatCount(reminderHistory.length)} record${reminderHistory.length === 1 ? '' : 's'}`} tone="slate" />
-                </div>
-                {reminderHistory.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs font-semibold leading-5 text-slate-500">
-                        No manual reminder history for this campaign yet.
-                    </div>
-                ) : (
-                    <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
-                        {reminderHistory.slice(0, 8).map((item) => (
-                            <ReminderHistoryRow key={item.id} item={item} />
-                        ))}
-                    </div>
-                )}
-            </div>
-        </aside>
-    );
-}
-
-function ReminderResultMetric({ label, value }: { label: string; value: number }) {
-    return (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2">
-            <span className="block text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</span>
-            <strong className="mt-0.5 block text-sm font-black text-slate-950">{formatCount(value)}</strong>
-        </div>
-    );
-}
-
-function ReminderHistoryRow({ item }: { item: FeedbackReminderHistoryItem }) {
-    const action = String(item.action ?? '').toUpperCase();
-    const title = reminderActionLabels[action] ?? labelFromValue(action);
-    const pending = parseReminderMetric(item.newValue, 'pendingAssignments');
-    const notified = parseReminderMetric(item.newValue, 'notifiedUsers') ?? parseReminderMetric(item.newValue, 'notifiedAssignments');
-    const skipped = parseReminderMetric(item.newValue, 'skippedAssignments');
-    const scope = parseReminderText(item.newValue, 'scope');
-    const relationship = parseReminderText(item.newValue, 'relationshipType');
-    const targetEmployeeId = parseReminderText(item.newValue, 'targetEmployeeId');
-    const evaluatorEmployeeId = parseReminderText(item.newValue, 'evaluatorEmployeeId');
-    const tone: Tone = action.includes('OVERDUE') ? 'red' : 'blue';
-
-    return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs shadow-sm">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-                <div className="min-w-0">
-                    <strong className="block truncate text-sm font-black text-slate-900">{title}</strong>
-                    <span className="mt-0.5 block font-semibold text-slate-500">{formatDateTime(item.timestamp)}</span>
-                </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${toneClasses[tone].soft}`}>
-                    {action.includes('OVERDUE') ? 'Overdue' : 'Pending'}
-                </span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5 font-black text-slate-500">
-                {scope && <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">Scope: {labelFromValue(scope)}</span>}
-                {relationship && <span className="rounded-full bg-slate-100 px-2 py-1">{relationshipLabelFromKey(relationship)}</span>}
-                {targetEmployeeId && <span className="rounded-full bg-slate-100 px-2 py-1">Target #{targetEmployeeId}</span>}
-                {evaluatorEmployeeId && <span className="rounded-full bg-slate-100 px-2 py-1">Evaluator #{evaluatorEmployeeId}</span>}
-                {pending !== null && <span className="rounded-full bg-slate-100 px-2 py-1">Pending: {formatCount(pending)}</span>}
-                {notified !== null && <span className="rounded-full bg-slate-100 px-2 py-1">Notified: {formatCount(notified)}</span>}
-                {skipped !== null && <span className="rounded-full bg-slate-100 px-2 py-1">Skipped: {formatCount(skipped)}</span>}
-            </div>
-            {item.reason && <p className="mt-2 font-semibold leading-5 text-slate-500">{item.reason}</p>}
-        </div>
-    );
-}
-
-
-
-function ActivityTimelineExportSection({
-                                           activity,
-                                           exporting,
-                                           exportMessage,
-                                           exportError,
-                                           onExport,
-                                           onRefresh,
-                                       }: {
-    activity: MonitoringActivityItem[];
-    exporting: boolean;
-    exportMessage: string;
-    exportError: string;
-    onExport: () => void;
-    onRefresh: () => void;
-}) {
-    const [expanded, setExpanded] = useState(false);
-    const rows = expanded ? activity : activity.slice(0, 6);
-    const hiddenCount = Math.max(0, activity.length - rows.length);
-
-    return (
-        <section className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
-            <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Activity timeline</p>
-                        <h2 className="mt-2 text-xl font-black text-slate-950">Operational campaign history</h2>
-                        <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                            Tracks campaign setup, assignment, reminder, close, publish, and export events. Ratings, comments, and answer content are never shown here.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onRefresh}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                        Refresh
-                    </button>
-                </div>
-
-                {activity.length === 0 ? (
-                    <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-semibold leading-6 text-slate-500">
-                        No operational activity has been recorded for this campaign yet.
-                    </div>
-                ) : (
-                    <div className="mt-5 grid gap-3">
-                        {rows.map((item, index) => (
-                            <ActivityTimelineRow key={`${item.id ?? index}-${item.activityType}-${item.occurredAt ?? index}`} activity={item} />
-                        ))}
-                    </div>
-                )}
-
-                {activity.length > 6 && (
-                    <button
-                        type="button"
-                        onClick={() => setExpanded((current) => !current)}
-                        className="mt-4 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                        {expanded ? 'Show fewer activity records' : `Show ${hiddenCount} more activity record${hiddenCount === 1 ? '' : 's'}`}
-                    </button>
-                )}
-            </article>
-
-            <aside className="min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
-                    <i className="bi bi-download" />
-                </span>
-                <p className="mt-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Export monitoring report</p>
-                <h3 className="mt-2 text-xl font-black text-slate-950">Download CSV report</h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-                    Export campaign progress, relationship coverage, target health, evaluator workload, alerts, and activity for HR follow-up. Scores, comments, and evaluator answers are excluded.
-                </p>
+            {activity.length > 5 && (
                 <button
                     type="button"
-                    onClick={onExport}
-                    disabled={exporting}
-                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
+                    onClick={() => setExpanded((current) => !current)}
+                    className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
-                    {exporting ? <i className="bi bi-arrow-repeat f360-monitoring-spin" /> : <i className="bi bi-filetype-csv" />}
-                    {exporting ? 'Preparing CSV...' : 'Export CSV'}
+                    {expanded ? 'Show fewer activity records' : `Show ${hiddenCount} more activity record${hiddenCount === 1 ? '' : 's'}`}
                 </button>
-                {exportMessage && <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{exportMessage}</p>}
-                {exportError && <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{exportError}</p>}
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-500">
-                    Export downloads are recorded in the activity timeline for audit visibility.
-                </div>
-            </aside>
-        </section>
+            )}
+        </article>
     );
 }
 
 function ActivityTimelineRow({ activity }: { activity: MonitoringActivityItem }) {
     const tone = activityTone(activity);
     return (
-        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-            <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-2xl ring-1 ${toneClasses[tone].icon}`}>
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+            <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl ring-1 ${toneClasses[tone].icon}`}>
                 <i className={`bi ${activityIcon(activity.activityType)}`} />
             </span>
             <div className="min-w-0">
@@ -1837,8 +1688,8 @@ function ActivityTimelineRow({ activity }: { activity: MonitoringActivityItem })
                     </div>
                     <Badge label={labelFromValue(String(activity.severity ?? 'INFO'))} tone={tone} />
                 </div>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{activity.message || 'Campaign activity was recorded.'}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-600">{activity.message || 'Campaign activity was recorded.'}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500">
                     {activity.actorName && <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">By {activity.actorName}</span>}
                     {activity.actorRole && <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">{activity.actorRole}</span>}
                     {activity.metadata && <span className="max-w-full truncate rounded-full bg-white px-2 py-1 normal-case tracking-normal ring-1 ring-slate-200" title={activity.metadata}>{activity.metadata}</span>}
@@ -1902,13 +1753,13 @@ function TargetHealthTable({
     }, [filterPreset?.token]);
 
     return (
-        <article ref={sectionRef} className="min-w-0 scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-            <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <article ref={sectionRef} className="min-w-0 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Target health</p>
-                    <h2 className="mt-2 text-xl font-black text-slate-950">Target-by-target monitoring</h2>
-                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                        Review each target employee by relationship completion, required coverage, anonymity readiness, and the next HR action.
+                    <h2 className="mt-1 text-lg font-black text-slate-950">Target-by-target monitoring</h2>
+                    <p className="mt-1 max-w-3xl text-xs font-semibold leading-5 text-slate-500">
+                        Review each target by relationship completion, required coverage, anonymity readiness, and next HR action.
                     </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1935,24 +1786,42 @@ function TargetHealthTable({
             />
 
             {targets.length === 0 ? (
-                <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold leading-6 text-slate-500">
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
                     Target health will appear after campaign targets and evaluator assignments are available.
                 </div>
             ) : filteredTargets.length === 0 ? (
-                <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-semibold leading-6 text-slate-500">
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
                     No targets match the selected filters. Clear filters or choose a different status.
                 </div>
             ) : (
-                <div className="mt-5 grid min-w-0 gap-4">
-                    {filteredTargets.map((target) => (
-                        <TargetHealthCard
-                            key={`${target.feedbackRequestId ?? target.targetEmployeeId}-${target.targetEmployeeName}`}
-                            target={target}
-                            canSendReminders={canSendReminders}
-                            onViewEvaluators={onViewEvaluators}
-                            onRequestReminders={onRequestReminders}
-                        />
-                    ))}
+                <div className="f360-monitoring-target-table mt-3 max-w-full overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full min-w-[1120px] border-separate border-spacing-0 text-left">
+                        <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
+                        <tr>
+                            <th className="px-3 py-2">Employee</th>
+                            <th className="px-3 py-2">Department</th>
+                            <th className="px-3 py-2">Reports to</th>
+                            <th className="px-3 py-2">Manager review</th>
+                            <th className="px-3 py-2">Peer</th>
+                            <th className="px-3 py-2">Subordinate</th>
+                            <th className="px-3 py-2">Self</th>
+                            <th className="px-3 py-2">Coverage</th>
+                            <th className="px-3 py-2">Health</th>
+                            <th className="px-3 py-2 text-right">Action</th>
+                        </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                        {filteredTargets.map((target) => (
+                            <TargetHealthCard
+                                key={`${target.feedbackRequestId ?? target.targetEmployeeId}-${target.targetEmployeeName}`}
+                                target={target}
+                                canSendReminders={canSendReminders}
+                                onViewEvaluators={onViewEvaluators}
+                                onRequestReminders={onRequestReminders}
+                            />
+                        ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
         </article>
@@ -1991,17 +1860,17 @@ function TargetHealthFilters({
     onClearFilters: () => void;
 }) {
     return (
-        <div className="mt-5 min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mt-3 min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="f360-monitoring-filter-grid">
                 <label className="min-w-0">
-                    <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.13em] text-slate-500">Search</span>
+                    <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.13em] text-slate-500">Search</span>
                     <div className="relative min-w-0">
                         <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             value={search}
                             onChange={(event) => onSearchChange(event.target.value)}
                             placeholder="Employee, department, manager..."
-                            className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white py-3 pl-9 pr-4 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                            className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                         />
                     </div>
                 </label>
@@ -2017,20 +1886,12 @@ function TargetHealthFilters({
                         <option key={option} value={option}>{healthLabels[option] ?? labelFromValue(option)}</option>
                     ))}
                 </TargetFilterSelect>
-                <TargetFilterSelect
-                    label="Relationship"
-                    value={relationshipFilter}
-                    onChange={(value) => onRelationshipFilterChange(value as TargetRelationshipFilter)}
-                >
+                <TargetFilterSelect label="Relationship" value={relationshipFilter} onChange={(value) => onRelationshipFilterChange(value as TargetRelationshipFilter)}>
                     {TARGET_RELATIONSHIP_FILTERS.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                 </TargetFilterSelect>
-                <TargetFilterSelect
-                    label="Readiness"
-                    value={readyFilter}
-                    onChange={(value) => onReadyFilterChange(value as TargetReadyFilter)}
-                >
+                <TargetFilterSelect label="Readiness" value={readyFilter} onChange={(value) => onReadyFilterChange(value as TargetReadyFilter)}>
                     {TARGET_READY_FILTERS.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -2040,7 +1901,7 @@ function TargetHealthFilters({
                         type="button"
                         onClick={onClearFilters}
                         disabled={activeFilterCount === 0}
-                        className="h-[46px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-[38px] w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
                     >
                         Clear
                     </button>
@@ -2063,11 +1924,11 @@ function TargetFilterSelect({
 }) {
     return (
         <label className="min-w-0">
-            <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.13em] text-slate-500">{label}</span>
+            <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.13em] text-slate-500">{label}</span>
             <select
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
             >
                 {children}
             </select>
@@ -2088,217 +1949,106 @@ function TargetHealthCard({
 }) {
     const health = String(target.healthStatus ?? 'ON_TRACK').toUpperCase();
     const healthBadgeTone = resolveTone(health, healthTone);
+    const percent = clampPercent(target.requiredCoveragePercent);
+    const coverageTone: Tone = percent >= 100 ? 'emerald' : percent >= 67 ? 'blue' : percent > 0 ? 'amber' : 'red';
+    const hasPending = Number(target.pendingCount ?? 0) > 0;
 
     return (
-        <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md md:p-5">
-            <TargetEmployeeSummary target={target} />
-
-            <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-                {RELATIONSHIP_ORDER.map((relationshipType) => (
-                    <TargetRelationshipMiniCard
-                        key={relationshipType}
-                        relationshipType={relationshipType}
-                        relationship={getTargetRelationship(target, relationshipType)}
-                    />
-                ))}
-            </div>
-
-            <div className="mt-3 grid min-w-0 gap-3 lg:grid-cols-3 2xl:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(260px,1.25fr)]">
-                <CoveragePanel target={target} />
-                <PrivacyPanel target={target} />
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">Health</span>
-                    <div className="mt-2">
-                        <Badge label={healthLabels[health] ?? labelFromValue(health)} tone={healthBadgeTone} />
+        <tr className="align-middle text-sm text-slate-700 hover:bg-slate-50/70">
+            <td className="px-3 py-2.5">
+                <div className="min-w-0">
+                    <strong className="block max-w-[190px] truncate font-black text-slate-950">{target.targetEmployeeName || 'Unnamed employee'}</strong>
+                    <div className="mt-1 flex flex-wrap gap-1 text-[10px] font-black text-slate-500">
+                        {target.targetEmployeeCode && <span className="rounded-full bg-slate-100 px-2 py-0.5">{target.targetEmployeeCode}</span>}
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">Last: {formatDateTime(target.lastActivityAt)}</span>
                     </div>
                 </div>
-                <RecommendedActionPanel
-                    target={target}
-                    canSendReminders={canSendReminders}
-                    onViewEvaluators={onViewEvaluators}
-                    onRequestReminders={onRequestReminders}
-                />
-            </div>
-        </article>
+            </td>
+            <td className="px-3 py-2.5">
+                <span className="block max-w-[140px] truncate text-xs font-bold text-slate-600" title={target.departmentName || ''}>{target.departmentName || '-'}</span>
+                <span className="mt-1 block max-w-[140px] truncate text-[10px] font-bold text-slate-400" title={target.positionName || ''}>{target.positionName || 'Position not set'}</span>
+            </td>
+            <td className="px-3 py-2.5">
+                <span className="block max-w-[140px] truncate text-xs font-bold text-slate-600" title={target.managerName || ''}>{target.managerName || '-'}</span>
+            </td>
+            {RELATIONSHIP_ORDER.map((relationshipType) => (
+                <td key={relationshipType} className="px-3 py-2.5">
+                    <TargetRelationshipStatusCell relationshipType={relationshipType} relationship={getTargetRelationship(target, relationshipType)} />
+                </td>
+            ))}
+            <td className="px-3 py-2.5">
+                <div className="flex min-w-[125px] items-center gap-2">
+                    <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+                        <div className={`h-full rounded-full ${toneClasses[coverageTone].bar}`} style={{ width: `${percent}%` }} />
+                    </div>
+                    <span className={`text-xs font-black ${toneClasses[coverageTone].text}`}>{formatPercent(percent)}</span>
+                </div>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-500">{formatCount(target.submittedCount)} / {formatCount(target.assignedCount)} submitted</p>
+            </td>
+            <td className="px-3 py-2.5">
+                <Badge label={healthLabels[health] ?? labelFromValue(health)} tone={healthBadgeTone} />
+                {!target.privacyCoveragePassed && <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-amber-700">Anonymity risk</p>}
+            </td>
+            <td className="px-3 py-2.5 text-right">
+                <div className="flex justify-end gap-1.5">
+                    <button type="button" onClick={() => onViewEvaluators(target)} className="rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100">
+                        Evaluators
+                    </button>
+                    {hasPending && (
+                        <button
+                            type="button"
+                            onClick={() => onRequestReminders({
+                                title: 'Send target reminder?',
+                                description: `This will send reminders only to pending evaluators assigned to ${target.targetEmployeeName || 'this target'}.`,
+                                request: {
+                                    scope: 'TARGET',
+                                    targetEmployeeId: target.targetEmployeeId,
+                                    onlyOverdue: false,
+                                },
+                            })}
+                            disabled={!canSendReminders}
+                            title={canSendReminders ? 'Send reminders only for this target.' : 'Target reminders are only available while this campaign is active.'}
+                            className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                            Remind
+                        </button>
+                    )}
+                </div>
+            </td>
+        </tr>
     );
 }
 
-function TargetEmployeeSummary({ target }: { target: TargetHealth }) {
-    return (
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0">
-                    <strong className="block truncate text-base font-black text-slate-950">{target.targetEmployeeName || 'Unnamed employee'}</strong>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                        {target.positionName || 'Position not set'}{target.managerName ? ` · Manager: ${target.managerName}` : ''}
-                    </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-1.5 text-[11px] font-black text-slate-500">
-                    {target.targetEmployeeCode && <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">{target.targetEmployeeCode}</span>}
-                    {target.departmentName && <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">{target.departmentName}</span>}
-                    <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Last activity: {formatDateTime(target.lastActivityAt)}</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function TargetRelationshipMiniCard({
-                                        relationshipType,
-                                        relationship,
-                                    }: {
+function TargetRelationshipStatusCell({
+                                          relationshipType,
+                                          relationship,
+                                      }: {
     relationshipType: string;
     relationship?: TargetRelationshipStatus;
 }) {
-    const label = relationshipType === 'SUBORDINATE' ? 'Subordinate reviewer' : labelFromValue(relationshipType);
-
+    const label = relationshipType === 'SUBORDINATE' ? 'Sub' : labelFromValue(relationshipType);
     if (!relationship) {
-        return (
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="truncate text-xs font-black text-slate-900">{label}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500">Not assigned</span>
-                </div>
-                <p className="mt-2 text-xs font-bold text-slate-500">No evaluator assignment generated yet.</p>
-            </div>
-        );
+        return <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">Not assigned</span>;
     }
 
     const status = String(relationship.status ?? 'PENDING').toUpperCase();
     const tone = resolveTone(status, targetRelationshipStatusTone, 'slate');
-    const minimum = Number(relationship.minimumResponses ?? 1);
     const statusLabel = targetRelationshipStatusLabels[status] ?? labelFromValue(status);
-    const protectedText = relationship.protectedRelationship ? `Needs ${minimum} for anonymity` : '';
+    const minimum = Number(relationship.minimumResponses ?? 1);
+    const protectedText = relationship.protectedRelationship ? ` · min ${minimum}` : '';
 
     return (
-        <div className={`min-w-0 rounded-2xl border ${toneClasses[tone].border} bg-white p-3 shadow-sm`}>
-            <div className="flex min-w-0 items-center justify-between gap-2">
-                <span className="truncate text-xs font-black text-slate-900">{label}</span>
-                {relationship.required && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500">Req</span>}
-            </div>
-            <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${toneClasses[tone].soft}`}>
-                {statusLabel}
+        <div className="min-w-[96px]">
+            <span
+                className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${toneClasses[tone].soft}`}
+                title={`${label}: ${statusLabel}`}
+            >
+                {label} {formatCount(relationship.submittedCount)}/{formatCount(relationship.assignedCount)}
             </span>
-            <p className="mt-2 text-sm font-black text-slate-950">
-                {formatCount(relationship.submittedCount)} / {formatCount(relationship.assignedCount)} submitted
-            </p>
-            <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">
-                {formatCount(relationship.pendingCount)} pending
-                {relationship.overdueCount > 0 ? ` · ${formatCount(relationship.overdueCount)} overdue` : ''}
-                {protectedText ? ` · ${protectedText}` : ''}
+            <p className="mt-1 text-[10px] font-bold text-slate-500">
+                {formatCount(relationship.pendingCount)} pending{relationship.overdueCount > 0 ? ` · ${formatCount(relationship.overdueCount)} overdue` : ''}{protectedText}
             </p>
         </div>
-    );
-}
-
-function CoveragePanel({ target }: { target: TargetHealth }) {
-    const percent = clampPercent(target.requiredCoveragePercent);
-    const tone: Tone = percent >= 100 ? 'emerald' : percent >= 67 ? 'blue' : percent > 0 ? 'amber' : 'red';
-
-    return (
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
-                <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">Required coverage</span>
-                <strong className={`text-sm font-black ${toneClasses[tone].text}`}>{formatPercent(percent)}</strong>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
-                <div className={`h-full rounded-full ${toneClasses[tone].bar}`} style={{ width: `${percent}%` }} />
-            </div>
-            <p className="mt-2 text-[11px] font-bold text-slate-500">
-                {formatCount(target.submittedCount)} / {formatCount(target.assignedCount)} total submitted
-            </p>
-        </div>
-    );
-}
-
-function PrivacyPanel({ target }: { target: TargetHealth }) {
-    const hasProtectedRelationship = (target.relationshipStatuses ?? []).some((relationship) => relationship.protectedRelationship && relationship.assignedCount > 0);
-    if (!hasProtectedRelationship) {
-        return (
-            <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">Privacy</span>
-                <p className="mt-2 text-sm font-black text-slate-700">No protected group</p>
-                <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">Only non-anonymous relationships are assigned.</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className={`min-w-0 rounded-2xl border ${target.privacyCoveragePassed ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'} p-3`}>
-            <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">Privacy</span>
-            <p className={`mt-2 text-sm font-black ${target.privacyCoveragePassed ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {target.privacyCoveragePassed ? 'Anonymity ready' : 'Anonymity not ready'}
-            </p>
-            <p className="mt-1 text-[11px] font-bold leading-5 text-slate-500">
-                Peer or subordinate reviewer feedback needs the minimum submitted responses before breakdowns are safe.
-            </p>
-        </div>
-    );
-}
-
-function RecommendedActionPanel({
-                                    target,
-                                    canSendReminders,
-                                    onViewEvaluators,
-                                    onRequestReminders,
-                                }: {
-    target: TargetHealth;
-    canSendReminders: boolean;
-    onViewEvaluators: (target: TargetHealth) => void;
-    onRequestReminders: (intent?: ReminderIntent) => void;
-}) {
-    const hasPending = Number(target.pendingCount ?? 0) > 0;
-
-    return (
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:col-span-3 2xl:col-span-1">
-            <span className="block text-[11px] font-black uppercase tracking-wide text-slate-500">Recommended action</span>
-            <p className="mt-2 text-sm font-black leading-6 text-slate-800">{target.recommendedAction || 'Review this target before closing.'}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                    type="button"
-                    onClick={() => onViewEvaluators(target)}
-                    className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
-                >
-                    View affected evaluators
-                </button>
-                {hasPending && (
-                    <button
-                        type="button"
-                        onClick={() => onRequestReminders({
-                            title: 'Send target reminder?',
-                            description: `This will send reminders only to pending evaluators assigned to ${target.targetEmployeeName || 'this target'}.`,
-                            request: {
-                                scope: 'TARGET',
-                                targetEmployeeId: target.targetEmployeeId,
-                                onlyOverdue: Number(target.overdueCount ?? 0) > 0,
-                            },
-                        })}
-                        disabled={!canSendReminders}
-                        title={canSendReminders ? 'Send reminders only for this target.' : 'Target reminders are only available while this campaign is active.'}
-                        className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        Send target reminder
-                    </button>
-                )}
-            </div>
-            <TargetIssueSummary target={target} />
-        </div>
-    );
-}
-
-function TargetIssueSummary({ target }: { target: TargetHealth }) {
-    const issues = [...(target.blockingReasons ?? []), ...(target.warnings ?? [])].slice(0, 3);
-    if (issues.length === 0) return null;
-
-    return (
-        <ul className="mt-3 grid gap-1.5">
-            {issues.map((issue, index) => (
-                <li key={`${issue}-${index}`} className="flex min-w-0 gap-2 text-xs font-semibold leading-5 text-slate-500">
-                    <i className="bi bi-dot shrink-0 text-slate-400" />
-                    <span className="min-w-0 break-words">{issue}</span>
-                </li>
-            ))}
-        </ul>
     );
 }
 
@@ -2308,12 +2058,22 @@ function Header({
                     onChangeCampaign,
                     monitoring,
                     loading,
+                    exporting,
+                    exportMessage,
+                    exportError,
+                    onExport,
+                    onRefresh,
                 }: {
     campaigns: FeedbackCampaign[];
     selectedCampaignId: number | '';
     onChangeCampaign: (campaignId: number | '') => void;
     monitoring: FeedbackCampaignMonitoringResponse;
     loading: boolean;
+    exporting: boolean;
+    exportMessage: string;
+    exportError: string;
+    onExport: () => void;
+    onRefresh: () => void;
 }) {
     const status = String(monitoring.campaignStatus ?? 'DRAFT').toUpperCase();
     const health = String(monitoring.campaignHealthStatus ?? 'BLOCKED').toUpperCase();
@@ -2322,43 +2082,64 @@ function Header({
     const dayTone = daysRemainingTone(monitoring.daysRemaining);
 
     return (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <Badge label="360 monitoring" tone="blue" />
                         <Badge label={statusLabels[status] ?? labelFromValue(status)} tone={statusBadgeTone} />
                         <Badge label={monitoringHealthLabel(status, health)} tone={healthBadgeTone} />
                     </div>
-                    <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+                    <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
                         {monitoring.campaignName || 'Campaign monitoring'}
                     </h1>
-                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                        Live campaign control center for submission progress, relationship coverage, target risk, and HR follow-up alerts.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs font-black text-slate-500">
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-black text-slate-500">
                         <span className="rounded-full bg-slate-100 px-3 py-1">Review year: {monitoring.reviewYear ?? '-'}</span>
                         <span className="rounded-full bg-slate-100 px-3 py-1">{formatCampaignWindow(monitoring)}</span>
                         <span className={`rounded-full px-3 py-1 ${toneClasses[dayTone].soft}`}>{daysRemainingDisplay(monitoring)}</span>
                     </div>
                 </div>
 
-                <label className="w-full min-w-0 xl:w-[360px]">
-                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Campaign</span>
-                    <select
-                        value={selectedCampaignId}
-                        disabled={loading || campaigns.length === 0}
-                        onChange={(event) => onChangeCampaign(event.target.value ? Number(event.target.value) : '')}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-                    >
-                        <option value="">Select campaign</option>
-                        {campaigns.map((campaign) => (
-                            <option key={campaign.id} value={campaign.id}>
-                                {campaign.name} · {statusLabels[campaign.status] ?? campaign.status}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                <div className="grid w-full min-w-0 gap-2 md:w-[340px] md:shrink-0">
+                    <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+                        <button
+                            type="button"
+                            onClick={onExport}
+                            disabled={exporting || !selectedCampaignId}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+                        >
+                            {exporting ? <i className="bi bi-arrow-repeat f360-monitoring-spin" /> : <i className="bi bi-filetype-csv" />}
+                            {exporting ? 'Exporting...' : 'Export CSV'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onRefresh}
+                            disabled={!selectedCampaignId}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-xs font-black text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                            <i className="bi bi-arrow-clockwise" />
+                            Refresh
+                        </button>
+                    </div>
+                    <label className="min-w-0">
+                        <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Campaign</span>
+                        <select
+                            value={selectedCampaignId}
+                            disabled={loading || campaigns.length === 0}
+                            onChange={(event) => onChangeCampaign(event.target.value ? Number(event.target.value) : '')}
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                        >
+                            <option value="">Select campaign</option>
+                            {campaigns.map((campaign) => (
+                                <option key={campaign.id} value={campaign.id}>
+                                    {campaign.name} · {statusLabels[campaign.status] ?? campaign.status}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    {exportMessage && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-700">{exportMessage}</p>}
+                    {exportError && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">{exportError}</p>}
+                </div>
             </div>
         </section>
     );
@@ -2525,7 +2306,7 @@ export default function MonitoringOverviewTab({ activeCampaign = null }: Monitor
             request: {
                 scope: 'EVALUATOR',
                 evaluatorEmployeeId: evaluator.evaluatorEmployeeId,
-                onlyOverdue: Number(evaluator.overdueCount ?? 0) > 0,
+                onlyOverdue: false,
             },
         });
     };
@@ -2658,13 +2439,18 @@ export default function MonitoringOverviewTab({ activeCampaign = null }: Monitor
     }, [selectedCampaignId]);
 
     return (
-        <div className="f360-monitoring-root min-w-0 max-w-full space-y-5 overflow-x-hidden bg-slate-50/60 p-1 text-slate-900 md:p-2">
+        <div className="f360-monitoring-root min-w-0 max-w-full space-y-4 overflow-x-hidden bg-slate-50/60 p-1 text-slate-900 md:p-2">
             <Header
                 campaigns={campaigns}
                 selectedCampaignId={selectedCampaignId}
                 onChangeCampaign={setSelectedCampaignId}
                 monitoring={monitoring}
                 loading={campaignLoadState === 'loading'}
+                exporting={exporting}
+                exportMessage={exportMessage}
+                exportError={exportError}
+                onExport={handleExportCsv}
+                onRefresh={() => selectedCampaignId && void loadMonitoring(Number(selectedCampaignId))}
             />
 
             {error && (
@@ -2710,10 +2496,13 @@ export default function MonitoringOverviewTab({ activeCampaign = null }: Monitor
 
                     {hasAssignments && (
                         <>
-                            <section className="f360-monitoring-dashboard-grid">
-                                <OverallProgressCard monitoring={monitoring} />
+                            <section className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch">
                                 <RiskPanel monitoring={monitoring} />
                                 <RelationshipProgressCard relationships={monitoring.relationships ?? []} />
+                            </section>
+
+                            <section className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch">
+                                <OverallProgressCard monitoring={monitoring} />
                                 <AlertsPanel
                                     alerts={monitoring.alerts ?? []}
                                     canSendReminders={canSendCampaignReminders}
@@ -2755,10 +2544,6 @@ export default function MonitoringOverviewTab({ activeCampaign = null }: Monitor
 
                             <ActivityTimelineExportSection
                                 activity={monitoring.activity ?? []}
-                                exporting={exporting}
-                                exportMessage={exportMessage}
-                                exportError={exportError}
-                                onExport={handleExportCsv}
                                 onRefresh={() => selectedCampaignId && void loadMonitoring(Number(selectedCampaignId))}
                             />
                         </>

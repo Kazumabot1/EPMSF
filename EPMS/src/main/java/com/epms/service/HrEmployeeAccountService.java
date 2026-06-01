@@ -28,6 +28,8 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -55,6 +57,7 @@ public class HrEmployeeAccountService {
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final UserAccountProvisioningService userAccountProvisioningService;
     private final EmployeeCodeGeneratorService employeeCodeGeneratorService;
+    private final TransactionTemplate importTransactionTemplate;
 
     public HrEmployeeAccountService(
             UserRepository userRepository,
@@ -65,7 +68,8 @@ public class HrEmployeeAccountService {
             EmployeeRepository employeeRepository,
             EmployeeDepartmentRepository employeeDepartmentRepository,
             UserAccountProvisioningService userAccountProvisioningService,
-            EmployeeCodeGeneratorService employeeCodeGeneratorService
+            EmployeeCodeGeneratorService employeeCodeGeneratorService,
+            PlatformTransactionManager transactionManager
     ) {
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
@@ -76,6 +80,7 @@ public class HrEmployeeAccountService {
         this.employeeDepartmentRepository = employeeDepartmentRepository;
         this.userAccountProvisioningService = userAccountProvisioningService;
         this.employeeCodeGeneratorService = employeeCodeGeneratorService;
+        this.importTransactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
@@ -127,7 +132,8 @@ public class HrEmployeeAccountService {
         AccountProvisionResult provision = userAccountProvisioningService.provisionFromEmployee(
                 employee,
                 normalizedRole,
-                Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail())
+                Boolean.TRUE.equals(request.getSendTemporaryPasswordEmail()),
+                request.getDashboard()
         );
 
         if (provision.getUserId() == null) {
@@ -144,6 +150,7 @@ public class HrEmployeeAccountService {
         user.setDepartmentId(department == null ? null : department.getId());
         user.setManagerId(manager == null ? null : manager.getId());
         user.setPosition(position);
+        user.setDashboard(userAccountProvisioningService.resolveDashboardForEmployee(position, normalizedRole, request.getDashboard()));
         user.setActive(true);
         user.setUpdatedAt(new Date());
         user = userRepository.save(user);
@@ -250,14 +257,17 @@ public class HrEmployeeAccountService {
         return user;
     }
 
-    @Transactional
     public HrImportResult importEmployeeAccounts(MultipartFile file) throws Exception {
+        return importEmployeeAccounts(file, false);
+    }
+
+    public HrImportResult importEmployeeAccounts(MultipartFile file, boolean sendTemporaryPasswordEmail) throws Exception {
         HrImportResult result = new HrImportResult();
 
         List<Map<String, String>> rows;
         String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
 
-        if (filename.endsWith(".xlsx")) {
+        if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
             rows = readXlsx(file);
         } else {
             rows = readCsv(file);
@@ -268,33 +278,46 @@ public class HrEmployeeAccountService {
         for (Map<String, String> row : rows) {
             rowNumber++;
 
-            String email = value(row, "EmailAddress", "Email", "email");
-            String staffNo = value(row, "StaffNo", "EmployeeCode", "employeeCode");
-            String staffName = value(row, "StaffName", "FullName", "fullName");
-            String department = value(row, "Department", "departmentName");
-            String position = value(row, "Position", "positionName");
-            String firstName = value(row, "FirstName", "firstName");
-            String lastName = value(row, "LastName", "lastName");
+            if (isBlankImportRow(row)) {
+                continue;
+            }
+
+            result.setTotalRows(result.getTotalRows() + 1);
+
+            String email = value(row, "EmailAddress", "Email", "email", "userEmail", "mail");
+            String staffNo = value(row, "StaffNo", "EmployeeCode", "employeeCode", "employeeId", "staffId", "code");
+            String staffName = value(row, "StaffName", "FullName", "fullName", "employeeName", "name");
+            String department = value(row, "Department", "departmentName", "department_name", "dept", "deptName");
+            String position = value(row, "Position", "positionName", "position_name", "jobTitle", "job_title");
+            String firstName = value(row, "FirstName", "firstName", "first_name");
+            String lastName = value(row, "LastName", "lastName", "last_name");
             String roleName = value(
                     row,
                     "Role",
                     "RoleName",
                     "role",
                     "roleName",
+                    "role_name",
                     "UserRole",
                     "userRole",
                     "AccountRole",
                     "accountRole"
             );
+            String dashboard = value(row, "Dashboard", "dashboard", "dashboardName", "dashboard_name", "landingDashboard", "workspace");
 
             HrImportRowResult rowResult = HrImportRowResult.builder()
                     .rowNumber(rowNumber)
+                    .fullName(clean(staffName))
+                    .employeeCode(clean(staffNo))
                     .email(cleanEmail(email))
                     .build();
 
             if (clean(email) == null) {
                 result.setSkipped(result.getSkipped() + 1);
-                result.getWarnings().add("Row " + rowNumber + ": skipped because email is empty");
+                String message = "Row " + rowNumber + ": skipped because email is empty";
+                result.getWarnings().add(message);
+                rowResult.setStatus("SKIPPED");
+                rowResult.setMessage(message);
                 rowResult.setEmployeeAction("skipped");
                 rowResult.setAccountAction("skipped");
                 rowResult.setEmailAction("skipped");
@@ -303,38 +326,87 @@ public class HrEmployeeAccountService {
                 continue;
             }
 
-            boolean existed = userRepository.findByEmailIgnoreCase(cleanEmail(email)).isPresent();
-
-            HrEmployeeAccountCreateRequest request = new HrEmployeeAccountCreateRequest();
-            request.setEmployeeCode(staffNo);
-            request.setFullName(staffName);
-            request.setEmail(email);
-            request.setDepartmentName(department);
-            request.setPositionName(position);
-            request.setRoleName(roleName);
-            request.setFirstName(firstName);
-            request.setLastName(lastName);
-            request.setSendTemporaryPasswordEmail(true);
-
-            AccountProvisionResult provision = createOrUpdateEmployeeAccount(request);
-
-            if (existed) {
-                result.setUpdated(result.getUpdated() + 1);
-                rowResult.setAccountAction("linked");
-            } else {
-                result.setCreated(result.getCreated() + 1);
-                rowResult.setAccountAction("created");
+            if (clean(staffName) == null && (clean(firstName) == null && clean(lastName) == null)) {
+                result.setSkipped(result.getSkipped() + 1);
+                String message = "Row " + rowNumber + ": skipped because full name is empty";
+                result.getWarnings().add(message);
+                rowResult.setStatus("SKIPPED");
+                rowResult.setMessage(message);
+                rowResult.setEmployeeAction("skipped");
+                rowResult.setAccountAction("skipped");
+                rowResult.setEmailAction("skipped");
+                rowResult.getValidationErrors().add("Full name is required");
+                result.getRows().add(rowResult);
+                continue;
             }
 
-            rowResult.setEmployeeAction("created_or_updated");
-            rowResult.setEmailAction(provision.isTemporaryPasswordEmailSent() ? "sent" : "failed");
+            try {
+                boolean existed = userRepository.findByEmailIgnoreCase(cleanEmail(email)).isPresent();
 
-            if (!provision.isSuccess() && provision.getMessage() != null) {
-                rowResult.getValidationErrors().add(provision.getMessage());
+                HrEmployeeAccountCreateRequest request = new HrEmployeeAccountCreateRequest();
+                request.setEmployeeCode(staffNo);
+                request.setFullName(staffName);
+                request.setEmail(email);
+                request.setDepartmentName(department);
+                request.setPositionName(position);
+                request.setRoleName(roleName);
+                request.setDashboard(dashboard);
+                request.setFirstName(firstName);
+                request.setLastName(lastName);
+                request.setSendTemporaryPasswordEmail(sendTemporaryPasswordEmail);
+
+                AccountProvisionResult provision = importTransactionTemplate.execute(status -> createOrUpdateEmployeeAccount(request));
+
+                if (existed) {
+                    result.setUpdated(result.getUpdated() + 1);
+                    rowResult.setStatus("UPDATED");
+                    rowResult.setAccountAction("linked");
+                    rowResult.setMessage("Existing account updated.");
+                } else {
+                    result.setCreated(result.getCreated() + 1);
+                    rowResult.setStatus("CREATED");
+                    rowResult.setAccountAction("created");
+                    rowResult.setMessage("New account created.");
+                }
+
+                rowResult.setEmployeeAction("created_or_updated");
+
+                boolean emailSent = provision != null && provision.isTemporaryPasswordEmailSent();
+                rowResult.setEmailAction(sendTemporaryPasswordEmail ? (emailSent ? "sent" : "not_sent") : "not_requested");
+
+                if (provision != null && provision.getMessage() != null) {
+                    rowResult.setMessage(rowResult.getMessage() + " " + provision.getMessage());
+                }
+
+                if (sendTemporaryPasswordEmail && !emailSent) {
+                    String warning = "Row " + rowNumber + ": account saved, but temporary password email was not sent";
+                    result.getWarnings().add(warning);
+                    rowResult.getValidationErrors().add(warning);
+                }
+
+                result.getRows().add(rowResult);
+            } catch (Exception ex) {
+                result.setFailed(result.getFailed() + 1);
+                String message = "Row " + rowNumber + ": " + safeImportErrorMessage(ex);
+                result.getWarnings().add(message);
+
+                rowResult.setStatus("FAILED");
+                rowResult.setMessage(message);
+                rowResult.setEmployeeAction("failed");
+                rowResult.setAccountAction("failed");
+                rowResult.setEmailAction("failed");
+                rowResult.getValidationErrors().add(message);
+                result.getRows().add(rowResult);
             }
-
-            result.getRows().add(rowResult);
         }
+
+        result.setMessage(
+                "Import completed: "
+                        + result.getCreated() + " created, "
+                        + result.getUpdated() + " updated, "
+                        + result.getSkipped() + " skipped, "
+                        + result.getFailed() + " failed."
+        );
 
         return result;
     }
@@ -988,10 +1060,18 @@ public class HrEmployeeAccountService {
         }
 
         List<String> headers = new ArrayList<>();
+        List<Integer> headerIndexes = new ArrayList<>();
         DataFormatter formatter = new DataFormatter();
 
         for (Cell cell : headerRow) {
-            headers.add(formatter.formatCellValue(cell).trim());
+            String header = formatter.formatCellValue(cell).trim();
+
+            if (clean(header) == null) {
+                continue;
+            }
+
+            headers.add(header);
+            headerIndexes.add(cell.getColumnIndex());
         }
 
         for (int i = 1; i <= sheet.getLastRowNum(); i++) {
@@ -1002,13 +1082,22 @@ public class HrEmployeeAccountService {
             }
 
             Map<String, String> row = new HashMap<>();
+            boolean hasValue = false;
 
             for (int j = 0; j < headers.size(); j++) {
-                Cell cell = excelRow.getCell(j);
-                row.put(headers.get(j), cell == null ? "" : formatter.formatCellValue(cell));
+                Cell cell = excelRow.getCell(headerIndexes.get(j));
+                String cellValue = cell == null ? "" : formatter.formatCellValue(cell).trim();
+
+                if (clean(cellValue) != null) {
+                    hasValue = true;
+                }
+
+                row.put(headers.get(j), cellValue);
             }
 
-            rows.add(row);
+            if (hasValue) {
+                rows.add(row);
+            }
         }
 
         workbook.close();
@@ -1044,7 +1133,60 @@ public class HrEmployeeAccountService {
             }
         }
 
+        Map<String, String> normalizedRow = new HashMap<>();
+
+        for (Map.Entry<String, String> entry : row.entrySet()) {
+            normalizedRow.put(normalizeImportHeader(entry.getKey()), entry.getValue());
+        }
+
+        for (String key : keys) {
+            String value = normalizedRow.get(normalizeImportHeader(key));
+
+            if (value != null) {
+                return value;
+            }
+        }
+
         return null;
+    }
+
+    private boolean isBlankImportRow(Map<String, String> row) {
+        if (row == null || row.isEmpty()) {
+            return true;
+        }
+
+        return row.values().stream().allMatch(value -> clean(value) == null);
+    }
+
+    private String normalizeImportHeader(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace("\uFEFF", "")
+                .replaceAll("[^A-Za-z0-9]+", "")
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private String safeImportErrorMessage(Exception ex) {
+        Throwable current = ex;
+
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+
+        String message = current.getMessage();
+
+        if (message == null || message.isBlank()) {
+            message = ex.getMessage();
+        }
+
+        if (message == null || message.isBlank()) {
+            return "Import failed for this row.";
+        }
+
+        return message.length() > 240 ? message.substring(0, 240) + "..." : message;
     }
 
     private String clean(String value) {

@@ -142,10 +142,6 @@ export function useCampaignEvaluatorActions({
 
     const previewEvaluatorRules = async () => {
         if (!validateEvaluatorRules() || !selectedCampaign) return;
-        if (hasAssignmentPreview) {
-            const confirmed = window.confirm('Refresh suggested evaluators? Changes added by HR will be kept.');
-            if (!confirmed) return;
-        }
         setPreviewingAssignments(true);
         setError('');
         setSuccess('');
@@ -167,8 +163,6 @@ export function useCampaignEvaluatorActions({
             setError('Preview evaluators before saving.');
             return;
         }
-        const confirmed = window.confirm('Save the prepared evaluator list?');
-        if (!confirmed) return;
         setGeneratingAssignments(true);
         setError('');
         setSuccess('');
@@ -285,9 +279,6 @@ export function useCampaignEvaluatorActions({
             setError('Submitted feedback cannot be changed.');
             return;
         }
-        const confirmed = window.confirm('Remove this evaluator?');
-        if (!confirmed) return;
-
         const key = assignmentKey(assignment);
         if (assignment.assignmentId == null) {
             setDraftManualAdditions(current => current.filter(item => `${item.targetEmployeeId}:${item.evaluatorEmployeeId}:${item.relationshipType}` !== key));

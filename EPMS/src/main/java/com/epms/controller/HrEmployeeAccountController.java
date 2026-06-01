@@ -30,10 +30,11 @@ public class HrEmployeeAccountController {
 
     @PostMapping("/import")
     public ResponseEntity<HrImportResult> importEmployeeAccounts(
-            @RequestParam("file") MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "sendTemporaryPasswordEmail", required = false, defaultValue = "false") boolean sendTemporaryPasswordEmail
     ) throws Exception {
         return ResponseEntity.ok(
-                hrEmployeeAccountService.importEmployeeAccounts(file)
+                hrEmployeeAccountService.importEmployeeAccounts(file, sendTemporaryPasswordEmail)
         );
     }
 
