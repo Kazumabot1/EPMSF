@@ -81,7 +81,7 @@ public class ReportingServiceImpl implements ReportingService {
     private final EmployeeKpiWorkflowService employeeKpiWorkflowService;
 
     @Override
-    @Transactional(readOnly = false)
+    @Transactional(readOnly = true)
     public ReportingDashboardResponse getDashboard() {
         UserPrincipal principal = SecurityUtils.currentUser();
         Set<String> roles = currentUserTargetRoles(principal);
