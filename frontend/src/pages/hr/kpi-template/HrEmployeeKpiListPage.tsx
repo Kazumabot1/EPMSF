@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import '../../../components/hr/kpi-template/kpi-template.css';
 import { kpiWorkflowService } from '../../../services/kpiWorkflowService';
@@ -9,8 +9,10 @@ import { exportExcelTable } from '../../../utils/exportExcelTable';
 
 type HrKpiTab = 'finalized' | 'in_progress';
 
+const EMPTY = '-';
+
 const formatWhen = (value: string | null) => {
-  if (!value) return '—';
+  if (!value) return EMPTY;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
 };
@@ -28,20 +30,19 @@ const yyyyMmDd = (value?: string | null): string | null => {
 const formatPeriod = (start?: string | null, end?: string | null): string => {
   const s = yyyyMmDd(start);
   const e = yyyyMmDd(end);
-  if (!s || !e) return '—';
+  if (!s || !e) return EMPTY;
   return `${s} to ${e}`;
 };
 
-const formatScore = (value?: number | null, digits = 2) =>
-  value != null && Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
+const formatPercent = (value?: number | null) =>
+  value != null && Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : EMPTY;
 
-const cleanStatus = (value?: string | null) => (value ? value.replace(/_/g, ' ') : '—');
+const cleanStatus = (value?: string | null) => (value ? value.replace(/_/g, ' ') : EMPTY);
 
 const HrEmployeeKpiListPage = () => {
   const [tab, setTab] = useState<HrKpiTab>('finalized');
   const [rows, setRows] = useState<HrEmployeeKpiRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<HrEmployeeKpiRow | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<number | null>(null);
@@ -67,7 +68,6 @@ const HrEmployeeKpiListPage = () => {
     const load = async () => {
       try {
         setLoading(true);
-        setExpandedId(null);
         const data =
           tab === 'finalized'
             ? await kpiWorkflowService.hrFinalizedResults()
@@ -171,49 +171,47 @@ const HrEmployeeKpiListPage = () => {
     }
   };
 
-  const colCount = tab === 'in_progress' ? 8 : 8;
+  const openDetails = (row: HrEmployeeKpiRow) => setSelectedRow(row);
 
   return (
-    <div className="kpi-tpl-page kpi-employee-kpi-page">
-      <div className="mx-auto max-w-7xl px-4 py-8 pb-20">
-        <header className="kpi-tpl-card--hero relative overflow-hidden p-6 sm:p-8 lg:p-10">
-          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/20 blur-3xl" />
-          <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex max-w-3xl gap-5">
-              <div className="kpi-tpl-hero-icon" aria-hidden>
-                <i className="bi bi-people-fill" />
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="kpi-tpl-hero-kicker">KPI Management</p>
-                <h1>Employee KPI</h1>
-                <p>
-                  Review KPI assignments across departments. In progress records show saved manager inputs; finalized
-                  records are locked and ready for HR review.
-                </p>
-              </div>
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 text-slate-700" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+      <div className="mx-auto max-w-7xl px-4 py-6 pb-16">
+        <header className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">KPI Management</p>
+              <h1 className="mt-1 text-2xl font-bold leading-tight text-slate-950">Employee KPI</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                Review employee KPI progress, finalized scores, and detailed KPI line performance across departments.
+              </p>
             </div>
 
-            <div className="kpi-employee-hero-stats" aria-label="Employee KPI summary">
-              <article>
-                <strong>{summary.visible}</strong>
-                <span>Visible records</span>
+            <div className="grid grid-cols-2 gap-3 sm:w-[320px]" aria-label="Employee KPI summary">
+              <article className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <strong className="block text-2xl font-bold leading-none text-slate-950">{summary.visible}</strong>
+                <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Visible Records</span>
               </article>
-              <article>
-                <strong>{formatScore(summary.averageScore)}</strong>
-                <span>Avg weighted score</span>
+              <article className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                <strong className="block text-2xl font-bold leading-none text-blue-700">{formatPercent(summary.averageScore)}</strong>
+                <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Avg Weighted</span>
               </article>
             </div>
           </div>
         </header>
 
-        <section className="kpi-tpl-card kpi-employee-toolbar" aria-label="Employee KPI filters">
-          <div className="kpi-employee-filter">
-            <label htmlFor="dept-filter">Department</label>
+        <section
+          className="mt-4 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+          aria-label="Employee KPI filters"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="dept-filter" className="text-sm font-bold text-slate-700">
+              Department
+            </label>
             <select
               id="dept-filter"
               value={selectedDeptId ?? ''}
               onChange={(event) => setSelectedDeptId(event.target.value ? Number(event.target.value) : null)}
-              className="kpi-tpl-input"
+              className="min-h-10 min-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm outline-none transition hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             >
               <option value="">All departments</option>
               {departments.map((department) => (
@@ -223,33 +221,41 @@ const HrEmployeeKpiListPage = () => {
               ))}
             </select>
             {selectedDeptId != null && (
-              <button type="button" onClick={() => setSelectedDeptId(null)} className="kpi-tpl-btn-secondary kpi-small-btn">
+              <button
+                type="button"
+                onClick={() => setSelectedDeptId(null)}
+                className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700"
+              >
                 Clear
               </button>
             )}
           </div>
 
-          <div className="kpi-employee-toolbar-actions">
-            <div className="kpi-employee-tabs" role="tablist" aria-label="Employee KPI status">
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+            <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="Employee KPI status">
               <button
                 type="button"
-                className={tab === 'finalized' ? 'is-active' : ''}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                  tab === 'finalized' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-blue-700'
+                }`}
                 onClick={() => setTab('finalized')}
                 role="tab"
                 aria-selected={tab === 'finalized'}
               >
                 Finalized
-                <span>{summary.finalizedCount}</span>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{summary.finalizedCount}</span>
               </button>
               <button
                 type="button"
-                className={tab === 'in_progress' ? 'is-active' : ''}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                  tab === 'in_progress' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-blue-700'
+                }`}
                 onClick={() => setTab('in_progress')}
                 role="tab"
                 aria-selected={tab === 'in_progress'}
               >
                 In progress
-                <span>{summary.inProgressCount}</span>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{summary.inProgressCount}</span>
               </button>
             </div>
 
@@ -258,7 +264,7 @@ const HrEmployeeKpiListPage = () => {
                 type="button"
                 onClick={() => void onExport()}
                 disabled={!canExport}
-                className="kpi-tpl-btn-primary kpi-export-btn"
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 title={!canExport ? 'No finalized rows to export.' : 'Export filtered finalized KPI scores.'}
               >
                 <i className="bi bi-file-earmark-excel" aria-hidden />
@@ -269,17 +275,19 @@ const HrEmployeeKpiListPage = () => {
         </section>
 
         {loading && (
-          <div className="kpi-tpl-card kpi-employee-empty">
-            <span className="kpi-tpl-shimmer">Loading employee KPI records…</span>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 text-slate-500 shadow-sm">
+            <span className="animate-pulse">Loading employee KPI records...</span>
           </div>
         )}
 
         {!loading && sorted.length === 0 && (
-          <div className="kpi-tpl-card kpi-employee-empty">
-            <i className="bi bi-clipboard-data" aria-hidden />
+          <div className="mt-4 flex items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-slate-500 shadow-sm">
+            <i className="bi bi-clipboard-data grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-xl text-blue-700" aria-hidden />
             <div>
-              <strong>{tab === 'finalized' ? 'No finalized employee KPI records yet.' : 'No in-progress KPI assignments yet.'}</strong>
-              <p>
+              <strong className="block text-slate-950">
+                {tab === 'finalized' ? 'No finalized employee KPI records yet.' : 'No in-progress KPI assignments yet.'}
+              </strong>
+              <p className="mt-1 text-sm">
                 {tab === 'finalized'
                   ? 'Finalized results will appear here after the manager completes the KPI review.'
                   : 'In-progress records appear when managers start entering actual values and scores.'}
@@ -289,121 +297,83 @@ const HrEmployeeKpiListPage = () => {
         )}
 
         {!loading && sorted.length > 0 && (
-          <section className="kpi-tpl-card kpi-employee-table-card">
-            <div className="kpi-tpl-table-wrap">
+          <section className="mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="overflow-hidden rounded-lg border border-slate-200">
               <div className="overflow-x-auto">
-                <table className="kpi-employee-table">
-                  <thead className="kpi-tpl-thead">
+                <table className="w-full min-w-[980px] border-collapse text-sm">
+                  <thead className="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
                     <tr>
-                      <th>Employee</th>
-                      <th>Department</th>
-                      <th>Position</th>
-                      <th>KPI template</th>
+                      <th className="px-4 py-3">Employee</th>
+                      <th className="px-4 py-3">Department</th>
+                      <th className="px-4 py-3">Position</th>
+                      <th className="px-4 py-3">KPI Template</th>
                       {tab === 'in_progress' && (
                         <>
-                          <th>Workflow status</th>
-                          <th className="text-end">Lines entered</th>
+                          <th className="px-4 py-3">Workflow Status</th>
+                          <th className="px-4 py-3 text-right">Lines Entered</th>
                         </>
                       )}
-                      <th className="text-end">Weighted total</th>
-                      {tab === 'finalized' && <th>Finalized</th>}
-                      {tab === 'finalized' && <th>Reason</th>}
-                      <th className="text-end">Action</th>
+                      <th className="px-4 py-3 text-right">Weighted Total</th>
+                      {tab === 'finalized' && <th className="px-4 py-3">Finalized</th>}
+                      {tab === 'finalized' && <th className="px-4 py-3">Reason</th>}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100 bg-white">
                     {sorted.map((row) => (
-                      <Fragment key={row.employeeKpiFormId}>
-                        <tr>
-                          <td>
-                            <button type="button" onClick={() => setSelectedRow(row)} className="kpi-employee-name-btn">
-                              {row.employeeName}
-                            </button>
-                          </td>
-                          <td>{row.departmentName ?? '—'}</td>
-                          <td>{row.positionTitle ?? '—'}</td>
-                          <td>
-                            <strong>{row.kpiTitle ?? '—'}</strong>
-                            <small>{formatPeriod(row.periodStartDate, row.periodEndDate)}</small>
-                          </td>
-                          {tab === 'in_progress' && (
-                            <>
-                              <td>
-                                <span className="kpi-status-pill">{cleanStatus(row.status)}</span>
-                              </td>
-                              <td className="text-end kpi-num">
-                                {linesEnteredCount(row)}/{row.lines.length}
-                              </td>
-                            </>
-                          )}
-                          <td className="text-end kpi-num kpi-score-cell">{formatScore(row.totalWeightedScore)}</td>
-                          {tab === 'finalized' && <td>{formatWhen(row.finalizedAt)}</td>}
-                          {tab === 'finalized' && (
-                            <td className="kpi-reason-cell">
-                              {row.earlyFinalizedReason ? <span title={row.earlyFinalizedReason}>{row.earlyFinalizedReason}</span> : '—'}
+                      <tr
+                        key={row.employeeKpiFormId}
+                        tabIndex={0}
+                        role="button"
+                        onClick={() => openDetails(row)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openDetails(row);
+                          }
+                        }}
+                        className="cursor-pointer transition hover:bg-blue-50/70 focus:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                      >
+                        <td className="px-4 py-3">
+                          <span className="font-bold text-blue-700">
+                            {row.employeeName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{row.departmentName ?? EMPTY}</td>
+                        <td className="px-4 py-3 text-slate-600">{row.positionTitle ?? EMPTY}</td>
+                        <td className="px-4 py-3">
+                          <strong className="block font-bold text-slate-950">{row.kpiTitle ?? EMPTY}</strong>
+                          <small className="mt-1 block text-xs font-semibold text-slate-500">
+                            {formatPeriod(row.periodStartDate, row.periodEndDate)}
+                          </small>
+                        </td>
+                        {tab === 'in_progress' && (
+                          <>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-bold capitalize text-blue-700">
+                                {cleanStatus(row.status)}
+                              </span>
                             </td>
-                          )}
-                          <td>
-                            <div className="kpi-row-actions">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setExpandedId((prev) => (prev === row.employeeKpiFormId ? null : row.employeeKpiFormId))
-                                }
-                                className="kpi-tpl-btn-secondary kpi-small-btn"
-                              >
-                                {expandedId === row.employeeKpiFormId ? 'Hide' : 'Lines'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-
-                        {expandedId === row.employeeKpiFormId && (
-                          <tr className="kpi-employee-detail-row">
-                            <td colSpan={colCount}>
-                              <div className="kpi-employee-lines-panel">
-                                {tab === 'in_progress' && (
-                                  <p className="kpi-employee-lines-note">
-                                    Draft view — totals update as managers save. Numbers are locked after finalization.
-                                  </p>
-                                )}
-                                <div className="kpi-tpl-table-wrap">
-                                  <table className="kpi-employee-lines-table">
-                                    <thead>
-                                      <tr>
-                                        <th>KPI</th>
-                                        <th className="text-end">Target</th>
-                                        <th className="text-end">Weight %</th>
-                                        <th className="text-end">Actual</th>
-                                        <th className="text-end">Achievement %</th>
-                                        <th className="text-end">Weighted score</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {row.lines.map((line) => (
-                                        <tr key={line.kpiFormItemId}>
-                                          <td>{line.kpiLabel ?? '—'}</td>
-                                          <td className="text-end kpi-num">{line.target ?? '—'}</td>
-                                          <td className="text-end kpi-num">{line.weight ?? '—'}</td>
-                                          <td className="text-end kpi-num">{line.actualValue ?? '—'}</td>
-                                          <td className="text-end kpi-num">{formatScore(line.score)}</td>
-                                          <td className="text-end kpi-num">{formatScore(line.weightedScore, 4)}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-
-                                {row.totalScore != null && (
-                                  <p className="kpi-employee-total-note">
-                                    Avg achievement % (weighted): <strong>{formatScore(row.totalScore)}</strong>
-                                  </p>
-                                )}
-                              </div>
+                            <td className="px-4 py-3 text-right font-mono text-slate-700">
+                              {linesEnteredCount(row)}/{row.lines.length}
                             </td>
-                          </tr>
+                          </>
                         )}
-                      </Fragment>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-slate-950">
+                          {formatPercent(row.totalWeightedScore)}
+                        </td>
+                        {tab === 'finalized' && <td className="px-4 py-3 text-slate-600">{formatWhen(row.finalizedAt)}</td>}
+                        {tab === 'finalized' && (
+                          <td className="max-w-[230px] px-4 py-3 text-slate-600">
+                            {row.earlyFinalizedReason ? (
+                              <span className="line-clamp-2" title={row.earlyFinalizedReason}>
+                                {row.earlyFinalizedReason}
+                              </span>
+                            ) : (
+                              EMPTY
+                            )}
+                          </td>
+                        )}
+                      </tr>
                     ))}
                   </tbody>
                 </table>
