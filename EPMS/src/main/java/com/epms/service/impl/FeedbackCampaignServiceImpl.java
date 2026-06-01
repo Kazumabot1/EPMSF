@@ -278,10 +278,10 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
             String blockerMessage = readiness == null
                     ? "Campaign close readiness could not be verified."
                     : readiness.getChecklist().stream()
-                      .filter(item -> "BLOCKER".equals(item.getStatus()))
-                      .map(CloseReadinessChecklistItemDto::getMessage)
-                      .filter(message -> message != null && !message.isBlank())
-                      .collect(Collectors.joining(" "));
+                    .filter(item -> "BLOCKER".equals(item.getStatus()))
+                    .map(CloseReadinessChecklistItemDto::getMessage)
+                    .filter(message -> message != null && !message.isBlank())
+                    .collect(Collectors.joining(" "));
             throw new BusinessValidationException(blockerMessage == null || blockerMessage.isBlank()
                     ? "Campaign is not ready to close. Resolve blocking issues first."
                     : blockerMessage);
@@ -289,21 +289,32 @@ public class FeedbackCampaignServiceImpl implements FeedbackCampaignService {
 
         boolean closeWithWarnings = Boolean.TRUE.equals(readiness.getCanCloseWithWarnings())
                 || "CLOSE_WITH_WARNINGS".equalsIgnoreCase(readiness.getStatus());
-        if (closeWithWarnings && (request == null || !Boolean.TRUE.equals(request.getAcknowledgedWarnings()))) {
+
+        String requestMode = request == null ? null : normalizeText(request.getCloseMode(), 40);
+        boolean acknowledgedWarnings = request != null && Boolean.TRUE.equals(request.getAcknowledgedWarnings());
+
+        // Older close buttons in the campaign setup screen call this endpoint without a body.
+        // Treat that as an explicit HR/Admin close-with-warnings request when readiness has only warnings.
+        // Hard blockers are still blocked by the readiness.canClose check above.
+        if (closeWithWarnings && request == null) {
+            requestMode = "WITH_WARNINGS";
+            acknowledgedWarnings = true;
+        }
+
+        if (closeWithWarnings && !acknowledgedWarnings) {
             throw new BusinessValidationException("Acknowledge the close warnings before closing this campaign.");
         }
 
-        String requestMode = request == null ? null : normalizeText(request.getCloseMode(), 40);
         if (requestMode != null && requestMode.equalsIgnoreCase("STANDARD") && closeWithWarnings) {
             throw new BusinessValidationException("This campaign still has warnings. Use close with warnings and acknowledge them before closing.");
         }
 
-        String reason = request == null ? null : normalizeText(request.getReason(), 1000);
+        String reason = request == null ? "Closed from campaign action with warning acknowledgement." : normalizeText(request.getReason(), 1000);
         String readinessNote = closeWithWarnings
                 ? "Readiness status=CLOSE_WITH_WARNINGS, warnings=" + readiness.getWarningCount()
-                  + ", pendingAssignments=" + readiness.getPendingAssignments()
-                  + ", overdueAssignments=" + readiness.getOverdueAssignments()
-                  + ", privacyRiskTargets=" + readiness.getPrivacyRiskTargets()
+                + ", pendingAssignments=" + readiness.getPendingAssignments()
+                + ", overdueAssignments=" + readiness.getOverdueAssignments()
+                + ", privacyRiskTargets=" + readiness.getPrivacyRiskTargets()
                 : "Readiness status=READY_TO_CLOSE";
         String finalReason = reason == null ? readinessNote : readinessNote + "; HR note=" + reason;
         return campaignLifecycleService.closeCampaignWithReadiness(campaignId, actorUserId, finalReason, closeWithWarnings);

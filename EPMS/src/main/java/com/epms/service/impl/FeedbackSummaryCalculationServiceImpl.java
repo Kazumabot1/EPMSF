@@ -20,7 +20,6 @@ import com.epms.repository.FeedbackRequestRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
 import com.epms.service.FeedbackSummaryCalculationService;
-import com.epms.util.FeedbackPrivacyUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -148,7 +147,7 @@ public class FeedbackSummaryCalculationServiceImpl implements FeedbackSummaryCal
         Double rawAverage = averageScore(responses);
         Double relationshipWeightedAverage = weightedScoreByRelationship(campaign, responses);
         String confidenceLevel = determineConfidenceLevel(assignedCount, submittedCount, completionRate);
-        boolean insufficientFeedback = isInsufficientFeedback(assignedCount, submittedCount, responses);
+        boolean insufficientFeedback = isInsufficientFeedback(assignedCount, submittedCount);
 
         summary.setCampaign(campaign);
         summary.setTargetEmployeeId(targetEmployeeId);
@@ -183,6 +182,7 @@ public class FeedbackSummaryCalculationServiceImpl implements FeedbackSummaryCal
     ) {
         boolean publishableCampaignStatus = campaign.getStatus() == FeedbackCampaignStatus.CLOSED
                 || campaign.getStatus() == FeedbackCampaignStatus.PUBLISHED;
+
         if (publishableCampaignStatus && submittedCount > 0 && !insufficientFeedback) {
             if (summary.getVisibilityStatus() == FeedbackSummaryVisibilityStatus.PUBLISHED) {
                 return;
@@ -206,36 +206,41 @@ public class FeedbackSummaryCalculationServiceImpl implements FeedbackSummaryCal
             long submittedCount,
             boolean insufficientFeedback
     ) {
-        String formula = "Scores use a 0-100 scale. Each question score is calculated as rating divided by the question max rating, multiplied by 100. For the current 1-5 scale, 1=20, 2=40, 3=60, 4=80, and 5=100. Relationship scores average submitted response scores, and the final score applies configured reviewer-group weights.";
         if (assignedCount == 0) {
-            return "No evaluator assignments exist for this target employee. " + formula;
+            return "No evaluator assignments exist for this employee. Scores use the submitted 1-5 ratings converted to a 0-100 scale.";
         }
         if (submittedCount == 0) {
-            return "No submitted feedback responses are available yet. " + formula;
+            return "No submitted feedback responses are available yet. Scores use the submitted 1-5 ratings converted to a 0-100 scale.";
         }
         if (insufficientFeedback) {
-            return "Feedback score uses submitted responses and configured evaluator relationship weights, but confidence is low because too few evaluators submitted. " + formula;
+            return "Too few evaluators submitted feedback. Scores use submitted 1-5 ratings converted to 0-100 and relationship weights.";
         }
         if (Boolean.FALSE.equals(campaign.getRedistributeMissingRelationshipWeight())) {
-            return "Feedback score applies configured evaluator relationship weights. Unavailable reviewer group weight is not redistributed. " + formula;
+            return "Scores use submitted 1-5 ratings converted to 0-100 and configured relationship weights. Missing reviewer group weight is not redistributed.";
         }
-        return "Feedback score applies configured evaluator relationship weights and redistributes unavailable reviewer group weight across available reviewer groups. " + formula;
+        return "Scores use submitted 1-5 ratings converted to 0-100 and configured relationship weights. Missing reviewer group weight is redistributed. Low-response groups are masked, not blocked.";
     }
 
-    private boolean isInsufficientFeedback(long assignedCount, long submittedCount, List<FeedbackResponse> responses) {
+    private boolean isInsufficientFeedback(long assignedCount, long submittedCount) {
         if (submittedCount == 0) {
             return true;
         }
-        if (assignedCount > 1 && submittedCount < 2) {
-            return true;
-        }
-        return hasSingleProtectedRelationshipResponse(responses, FeedbackRelationshipType.PEER)
-                || hasSingleProtectedRelationshipResponse(responses, FeedbackRelationshipType.SUBORDINATE);
-    }
 
-    private boolean hasSingleProtectedRelationshipResponse(List<FeedbackResponse> responses, FeedbackRelationshipType relationshipType) {
-        long count = countByRelationship(responses, relationshipType);
-        return count > 0 && !FeedbackPrivacyUtil.hasEnoughProtectedResponses(relationshipType, count);
+        /*
+         * The whole employee summary should not be blocked only because one protected
+         * reviewer group is below the privacy threshold.
+         *
+         * Example:
+         * - Self = 1
+         * - Manager = 1
+         * - Peer = 3
+         * - Subordinate = 2
+         *
+         * The overall result can still be publishable because total feedback exists.
+         * The low-response relationship group should be masked in the UI/reporting layer
+         * instead of blocking the whole summary.
+         */
+        return assignedCount > 1 && submittedCount < 2;
     }
 
     private String determineConfidenceLevel(long assignedCount, long submittedCount, double completionRate) {

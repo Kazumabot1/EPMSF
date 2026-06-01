@@ -77,7 +77,7 @@ const PositionPermissionRoute = ({
         replace
         state={{
           from: location.pathname,
-          permissionDeniedMessage: `Your position (${positionName}) has this feature disabled!`,
+          permissionDeniedMessage: `This function is disabled for your position (${positionName}). Please contact HR Admin if you need access.`,
         }}
       />
     );

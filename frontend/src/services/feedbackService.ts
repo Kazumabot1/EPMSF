@@ -53,7 +53,11 @@ export const feedbackService = {
 
   async closeCampaign(campaignId: number): Promise<FeedbackCampaign> {
     try {
-      const response = await api.post<ApiEnvelope<FeedbackCampaign>>(`${FEEDBACK_BASE}/campaigns/${campaignId}/close`);
+      const response = await api.post<ApiEnvelope<FeedbackCampaign>>(`${FEEDBACK_BASE}/campaigns/${campaignId}/close`, {
+        closeMode: 'WITH_WARNINGS',
+        acknowledgedWarnings: true,
+        reason: 'Closed from campaign setup action.',
+      });
       return response.data.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to close feedback campaign.'));

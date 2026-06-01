@@ -112,7 +112,8 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
     @Override
     @Transactional
     public List<FeedbackRequest> replaceTargets(Long campaignId, List<Long> targetEmployeeIds, Long requestedByUserId) {
-        FeedbackCampaign campaign = getCampaignById(campaignId);
+        FeedbackCampaign campaign = feedbackCampaignRepository.findByIdForUpdate(campaignId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback campaign not found."));
         ensureDraftCampaign(campaign, "Only DRAFT campaigns can be reconfigured.");
 
         Set<Long> uniqueTargetIds = normalizeTargetIds(targetEmployeeIds);
@@ -131,28 +132,47 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
                 .toList();
 
         List<FeedbackRequest> existingRequests = feedbackRequestRepository.findByCampaignIdOrderByTargetEmployeeIdAsc(campaignId);
-        if (!existingRequests.isEmpty()) {
-            // Draft target changes intentionally clear old generated assignments because assignment pools
-            // depend on target, department, manager, and team readiness snapshots.
+        Map<Long, FeedbackRequest> existingByTargetId = existingRequests.stream()
+                .filter(request -> request.getTargetEmployeeId() != null)
+                .collect(Collectors.toMap(FeedbackRequest::getTargetEmployeeId, request -> request, (left, right) -> left));
+        Set<Long> existingTargetIds = new LinkedHashSet<>(existingByTargetId.keySet());
+        boolean targetsChanged = !existingTargetIds.equals(uniqueTargetIds);
+
+        if (targetsChanged && !existingRequests.isEmpty()) {
+            // Draft target changes intentionally clear generated assignment/question snapshots because
+            // assignment pools depend on target, department, manager, and team readiness snapshots.
             assignmentRepository.deleteByFeedbackRequestCampaignId(campaignId);
             assignmentRepository.flush();
-            feedbackRequestRepository.deleteAllInBatch(existingRequests);
-            feedbackRequestRepository.flush();
             questionReviewService.clearCampaignQuestionSelection(campaignId);
         }
 
-        List<FeedbackRequest> newRequests = selectedContexts.stream()
-                .map(context -> buildRequest(campaign, context, requestedByUserId))
+        List<FeedbackRequest> removedRequests = existingRequests.stream()
+                .filter(request -> request.getTargetEmployeeId() == null || !uniqueTargetIds.contains(request.getTargetEmployeeId()))
                 .toList();
-        List<FeedbackRequest> saved = feedbackRequestRepository.saveAll(newRequests);
+        if (!removedRequests.isEmpty()) {
+            feedbackRequestRepository.deleteAllInBatch(removedRequests);
+            feedbackRequestRepository.flush();
+        }
+
+        List<FeedbackRequest> requestsToSave = selectedContexts.stream()
+                .map(context -> {
+                    FeedbackRequest request = existingByTargetId.get(context.employeeId);
+                    if (request == null) {
+                        request = new FeedbackRequest();
+                    }
+                    return applyTargetSnapshot(request, campaign, context, requestedByUserId);
+                })
+                .toList();
+
+        List<FeedbackRequest> saved = feedbackRequestRepository.saveAll(requestsToSave);
         feedbackOperationalService.audit(
                 requestedByUserId,
                 FeedbackOperationalService.TARGETS_UPDATED,
                 FeedbackOperationalService.ENTITY_CAMPAIGN,
                 campaignId,
-                null,
+                "previousTargetCount=" + existingTargetIds.size(),
                 "targetCount=" + saved.size(),
-                "Feedback campaign targets replaced"
+                targetsChanged ? "Feedback campaign targets replaced" : "Feedback campaign targets refreshed"
         );
         return saved;
     }
@@ -169,14 +189,19 @@ public class FeedbackCampaignTargetServiceImpl implements FeedbackCampaignTarget
     }
 
     private FeedbackRequest buildRequest(FeedbackCampaign campaign, TargetContext context, Long requestedByUserId) {
-        FeedbackRequest request = new FeedbackRequest();
+        return applyTargetSnapshot(new FeedbackRequest(), campaign, context, requestedByUserId);
+    }
+
+    private FeedbackRequest applyTargetSnapshot(FeedbackRequest request, FeedbackCampaign campaign, TargetContext context, Long requestedByUserId) {
         request.setCampaign(campaign);
         request.setTargetEmployeeId(context.employeeId);
         request.setForm(null);
         request.setRequestedByUserId(requestedByUserId);
         request.setDueAt(null);
         request.setIsAnonymousEnabled(false);
-        request.setStatus(FeedbackRequestStatus.PENDING);
+        if (request.getStatus() == null) {
+            request.setStatus(FeedbackRequestStatus.PENDING);
+        }
 
         request.setTargetUserId(context.userId);
         request.setTargetEmployeeCode(context.employeeCode);

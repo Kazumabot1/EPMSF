@@ -45,16 +45,36 @@ const campaignSchema = z
 type CampaignFormValues = z.input<typeof campaignSchema>;
 type WizardStepId = 'campaign' | 'targets' | 'evaluators' | 'review';
 
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+const toDateInputValue = (date: Date) =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+const toLocalDateTimeValue = (date: Date) =>
+  `${toDateInputValue(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:00`;
+
+const startAtForDate = (dateValue: string) => {
+  const today = toDateInputValue(new Date());
+  if (dateValue !== today) {
+    return `${dateValue}T09:00:00`;
+  }
+
+  const safeStart = new Date(Date.now() + 15 * 60 * 1000);
+  safeStart.setSeconds(0, 0);
+  return toLocalDateTimeValue(safeStart);
+};
+
 const defaultCampaignValues = (): CampaignFormValues => {
   const start = new Date();
+  start.setDate(start.getDate() + 1);
   const end = new Date(start.getTime() + 14 * 24 * 60 * 60 * 1000);
 
   return {
     name: '',
     description: '',
     instructions: '',
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
+    startDate: toDateInputValue(start),
+    endDate: toDateInputValue(end),
     managerFeedbackAnonymous: false,
     peerFeedbackAnonymous: true,
     subordinateFeedbackAnonymous: true,
@@ -70,7 +90,7 @@ const buildCampaignPayload = (values: CampaignFormValues): CreateFeedbackCampaig
   reviewYear: Number(values.startDate.slice(0, 4)),
   startDate: values.startDate,
   endDate: values.endDate,
-  startAt: `${values.startDate}T09:00:00`,
+  startAt: startAtForDate(values.startDate),
   endAt: `${values.endDate}T17:00:00`,
   formId: null,
   description: values.description?.trim() || undefined,
@@ -440,7 +460,7 @@ const CreateCampaignPage = () => {
                                 <span>02</span>
                                 <div>
                                   <strong>Window</strong>
-                                  <small>The precise time window is saved as 09:00 start and 17:00 close for now.</small>
+                                  <small>Default time is 09:00 start and 17:00 close. Same-day starts are saved safely after the current time.</small>
                                 </div>
                               </div>
                               <div className="feedback-setup-form-grid">
