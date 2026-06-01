@@ -181,7 +181,7 @@ const buildInvalidQuestionSummaries = (
                     question.sourceRuleName ||
                     (question.sourceRuleId
                         ? `Rule #${question.sourceRuleId}`
-                        : "Active Rule Set"),
+                        : "Active Form Setup"),
                 ]);
                 existing.competencies = unique([
                     ...existing.competencies,
@@ -284,11 +284,11 @@ export function QuestionReviewStep({
             <div className="hfdqs-head">
                 <div>
                     <span className="hfdq-kicker">Step 4</span>
-                    <h3>Question Snapshot</h3>
+                    <h3>Campaign Question Preview</h3>
                     <p>
                         Review unique question sets and scoring readiness before freezing
                         the campaign forms. Questions are controlled by Question Bank and
-                        Rule Sets.
+                        Form Setup.
                     </p>
                 </div>
                 <div className="hfdqs-head-actions">
@@ -304,7 +304,7 @@ export function QuestionReviewStep({
                         onClick={() => void resolveQuestionReview()}
                     >
                         <i className="bi bi-arrow-clockwise" />{" "}
-                        {resolvingQuestionReview ? "Refreshing..." : "Refresh Snapshot"}
+                        {resolvingQuestionReview ? "Refreshing..." : "Refresh Preview"}
                     </button>
                     <button
                         className="hfd-btn hfd-btn-primary"
@@ -317,7 +317,7 @@ export function QuestionReviewStep({
                         onClick={() => void saveQuestionReview()}
                     >
                         <i className="bi bi-save2" />{" "}
-                        {savingQuestionReview ? "Saving..." : "Save Snapshot"}
+                        {savingQuestionReview ? "Saving..." : "Save Campaign Questions"}
                     </button>
                 </div>
             </div>
@@ -327,7 +327,7 @@ export function QuestionReviewStep({
                     <i className="bi bi-save" />
                     <strong>Save campaign details first</strong>
                     <p>
-                        Question snapshot becomes available after the campaign setup is
+                        Campaign question preview becomes available after the campaign setup is
                         ready.
                     </p>
                 </div>
@@ -341,7 +341,7 @@ export function QuestionReviewStep({
                 </div>
             ) : loadingQuestionReview ? (
                 <div className="hfd-spinner">
-                    <i className="bi bi-arrow-repeat" /> Loading question snapshot...
+                    <i className="bi bi-arrow-repeat" /> Loading campaign question preview...
                 </div>
             ) : (
                 <div className="hfdqs-body">
@@ -386,15 +386,15 @@ export function QuestionReviewStep({
                                 <strong>
                                     {blockingGroups.length > 0 ||
                                     invalidQuestionSummaries.length > 0
-                                        ? "Snapshot needs attention before it can be saved."
+                                        ? "Campaign question preview needs attention before it can be saved."
                                         : snapshotStale
-                                            ? "Snapshot needs save."
-                                            : "Snapshot notice"}
+                                            ? "Campaign question preview needs save."
+                                            : "Campaign question preview notice"}
                                 </strong>
                                 {snapshotStale && (
                                     <p>
-                                        The evaluator assignments or active rules may have changed.
-                                        Save this snapshot before launch.
+                                        The evaluator assignments or Form Setup may have changed.
+                                        Save these campaign questions before launch.
                                     </p>
                                 )}
                                 {(questionReview.warnings ?? [])
@@ -415,7 +415,7 @@ export function QuestionReviewStep({
                                         {invalidQuestionSummaries.length === 1 ? "" : "s"} are used
                                         across {invalidVariantCount} form variant
                                         {invalidVariantCount === 1 ? "" : "s"}. Replace them in
-                                        Question Bank or Rule Sets, then refresh this snapshot.
+                                        Question Bank or Form Setup, then refresh this preview.
                                     </p>
                                 )}
                             </div>
@@ -455,9 +455,9 @@ export function QuestionReviewStep({
                     {!hasSnapshot ? (
                         <div className="hfd-empty-state hfdt-empty">
                             <i className="bi bi-ui-checks-grid" />
-                            <strong>No question snapshot yet</strong>
+                            <strong>No campaign question preview yet</strong>
                             <p>
-                                Refresh the snapshot to resolve forms from active Rule Sets.
+                                Refresh the preview to resolve questions from Form Setup.
                             </p>
                         </div>
                     ) : (
@@ -546,7 +546,7 @@ export function QuestionReviewStep({
                                                         <i className="bi bi-slash-circle" />
                                                         <strong>No questions matched</strong>
                                                         <p>
-                                                            Update active Rule Sets for this recipient and
+                                                            Update active Form Setup for this recipient and
                                                             relationship scope.
                                                         </p>
                                                     </div>
@@ -630,7 +630,7 @@ export function QuestionReviewStep({
                                         <span className="hfdq-kicker">Competency weights</span>
                                         <h4>Scoring importance</h4>
                                         <p>
-                                            Questions come from Rule Sets. This section only controls
+                                            Questions come from Form Setup. This section only controls
                                             how much each competency contributes to the final score.
                                         </p>
                                     </div>

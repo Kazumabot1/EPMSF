@@ -1261,3 +1261,48 @@
   line-height: 1.7;
   font-weight: 800;
 }
+
+/* Patch 24: employee page polish for demo consistency */
+.ess-page {
+  min-height: auto;
+  padding: 24px 18px 52px;
+}
+
+.ess-container {
+  width: min(1180px, 100%);
+}
+
+.ess-header {
+  padding: 24px 26px;
+  border-radius: 28px;
+  box-shadow: 0 22px 54px rgba(37, 99, 235, 0.22);
+}
+
+.ess-header h1 {
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.ess-tabbar {
+  margin-top: 2px;
+  margin-bottom: 20px;
+  border-color: #dbe7f6;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.ess-card,
+.ess-score-panel,
+.ess-past-card {
+  border-color: #dbe7f6;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.06);
+}
+
+.ess-info-grid div {
+  border-color: #dbe7f6;
+  background: #f8fbff;
+}
+
+@media (max-width: 980px) {
+  .ess-layout {
+    grid-template-columns: 1fr;
+  }
+}

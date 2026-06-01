@@ -116,7 +116,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
   const isHr =
       !isAdmin &&
       (normalizedRoles.includes('HR') ||
-      normalizedDashboard === 'HR_DASHBOARD');
+          normalizedDashboard === 'HR_DASHBOARD');
 
   const isDepartmentHead =
       normalizedRoles.includes('DEPARTMENT_HEAD') ||
@@ -237,16 +237,16 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           { to: '/admin/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
-    {
-      to: '/admin/approval/kpi',
-      label: 'Approvals',
-      icon: 'bi bi-bullseye',
-      children: [
-        { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
+      {
+        to: '/admin/approval/kpi',
+        label: 'Approvals',
+        icon: 'bi bi-bullseye',
+        children: [
+          { to: '/admin/approval/kpi', label: 'Employee KPI Approval', icon: 'bi bi-check2-circle', end: true },
 
-        { to: '/admin/approval/changes', label: 'Workforce Change Review', icon: 'bi bi-person-check' },
-      ],
-    },
+          { to: '/admin/approval/changes', label: 'Workforce Change Review', icon: 'bi bi-person-check' },
+        ],
+      },
       { to: '/notifications', label: 'Notifications', icon: 'bi bi-bell' },
       {
         to: '/position-permissions',
@@ -256,7 +256,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
           {
             to: '/position-permissions',
             label: 'Position Permissions',
-            icon: 'bi bi-sliders2-vertical',
+            icon: 'bi bi-ui-checks2-vertical',
           },
         ],
       },
@@ -277,31 +277,31 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
       },
     ]);
 
-const organizationChildren = compactItems([
-  allow(positionPermissions, 'departmentCrud') && {
-    to: '/hr/department',
-    label: 'Departments',
-    icon: 'bi bi-building',
-  },
-  allow(positionPermissions, 'departmentComparisonView') && {
-    to: '/hr/department-comparison',
-    label: 'Departments Comparison',
-    icon: 'bi bi-columns-gap',
-    end: true,
-  },
-  allow(positionPermissions, 'employeeCrud') && {
-    to: '/hr/employee',
-    label: 'Employee',
-    icon: 'bi bi-people',
-    end: true,
-  },
-  {
-    to: '/hr/workforce-changes',
-    label: 'Workforce Changes',
-    icon: 'bi bi-arrow-left-right',
-    end: true,
-  },
-]);
+    const organizationChildren = compactItems([
+      allow(positionPermissions, 'departmentCrud') && {
+        to: '/hr/department',
+        label: 'Departments',
+        icon: 'bi bi-building',
+      },
+      allow(positionPermissions, 'departmentComparisonView') && {
+        to: '/hr/department-comparison',
+        label: 'Departments Comparison',
+        icon: 'bi bi-columns-gap',
+        end: true,
+      },
+      allow(positionPermissions, 'employeeCrud') && {
+        to: '/hr/employee',
+        label: 'Employee',
+        icon: 'bi bi-people',
+        end: true,
+      },
+      {
+        to: '/hr/workforce-changes',
+        label: 'Workforce Changes',
+        icon: 'bi bi-arrow-left-right',
+        end: true,
+      },
+    ]);
 
     const hrNavItems: NavItem[] = compactItems([
       { to: '/dashboard', label: 'Dashboard', icon: 'bi bi-grid-1x2' },
@@ -434,7 +434,7 @@ const organizationChildren = compactItems([
             icon: 'bi bi-collection',
             end: true,
           },
-          { to: '/hr/feedback/question-rules', label: 'Question Rules', icon: 'bi bi-sliders' },
+          { to: '/hr/feedback/question-rules', label: 'Form Setup', icon: 'bi bi-ui-checks' },
           { to: '/hr/feedback/campaigns', label: 'Campaign Setup', icon: 'bi bi-megaphone' },
           { to: '/hr/feedback/monitoring', label: 'Monitoring', icon: 'bi bi-graph-up-arrow' },
           { to: '/hr/feedback/analytics', label: 'Analytics', icon: 'bi bi-bar-chart-line' },
@@ -495,6 +495,7 @@ const organizationChildren = compactItems([
           { to: '/hr/kpi-version-history', label: 'KPI Version History', icon: 'bi bi-clock-history' },
           { to: '/hr/kpi-template-cycle', label: 'KPI Template Cycle', icon: 'bi bi-arrow-repeat' },
           { to: '/hr/employee-kpis', label: 'Employee KPI', icon: 'bi bi-person-lines-fill' },
+          { to: '/hr/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
         ],
       },
 
@@ -507,6 +508,7 @@ const organizationChildren = compactItems([
       { to: '/profile', label: 'Profile', icon: 'bi bi-person' },
       hasMyTeams && { to: '/my-team', label: 'My Team', icon: 'bi bi-diagram-3' },
       { to: '/employee/kpis', label: 'My KPIs', icon: 'bi bi-bullseye' },
+      { to: '/employee/kpi/history', label: 'KPI History', icon: 'bi bi-clock-history' },
       { to: '/employee/appraisals', label: 'My Appraisals', icon: 'bi bi-clipboard-check' },
       { to: '/employee/self-assessment', label: 'Self-Assessment', icon: 'bi bi-pencil-square' },
       { to: '/employee/feedback', label: '360 Feedback', icon: 'bi bi-chat-dots' },

@@ -63,7 +63,7 @@ export function useCampaignSetupSteps({
         },
         {
             key: 'questions',
-            label: 'Question Snapshot',
+            label: 'Campaign Question Preview',
             note: 'Campaign question set',
             status: savedAssignmentCount > 0 ? (questionReviewReady ? `${includedQuestionCount} saved` : 'Ready to review') : 'Generate evaluators first',
             icon: 'bi-ui-checks-grid',

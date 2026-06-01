@@ -31,13 +31,17 @@ export const kpiWorkflowService = {
     }
   },
 
-  async managerHistory(): Promise<ManagerKpiAssignment[]> {
+  async roleScopedHistory(): Promise<ManagerKpiAssignment[]> {
     try {
-      const response = await api.get<ManagerKpiAssignment[]>(`${M_BASE}/history`);
+      const response = await api.get<ManagerKpiAssignment[]>('/kpi-history');
       return response.data;
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, 'Failed to load KPI history.'));
     }
+  },
+
+  async managerHistory(): Promise<ManagerKpiAssignment[]> {
+    return kpiWorkflowService.roleScopedHistory();
   },
 
   async updateScores(

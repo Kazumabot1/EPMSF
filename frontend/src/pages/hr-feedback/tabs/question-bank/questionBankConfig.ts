@@ -4,10 +4,19 @@ export const REQUIRED_RESPONSE_TYPE = 'RATING_WITH_COMMENT' as const;
 export const REQUIRED_SCORING_BEHAVIOR = 'SCORED' as const;
 export const MIN_COMMENT_LENGTH = 10;
 
+export type QuestionLifecycleStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'RETIRED' | 'ARCHIVED';
+
+export const normalizeQuestionStatus = (status?: string | null): QuestionLifecycleStatus => {
+    const value = (status ?? 'DRAFT').trim().toUpperCase().replaceAll('-', '_').replaceAll(' ', '_');
+    if (value === 'RETIRED' || value === 'INACTIVE') return 'INACTIVE';
+    if (value === 'ACTIVE' || value === 'DRAFT' || value === 'ARCHIVED') return value;
+    return 'DRAFT';
+};
+
 export const QUESTION_STATUS_OPTIONS = [
-    { value: 'DRAFT', label: 'Draft', description: 'Work in progress. Not available for new rules.' },
-    { value: 'ACTIVE', label: 'Active', description: 'Ready to use in question rules and campaigns.' },
-    { value: 'RETIRED', label: 'Retired', description: 'Hidden from new rules but retained for history.' },
+    { value: 'DRAFT', label: 'Draft', description: 'Work in progress. Not available for new forms.' },
+    { value: 'ACTIVE', label: 'Active', description: 'Ready to use in Form Setup and campaigns.' },
+    { value: 'INACTIVE', label: 'Inactive', description: 'Hidden from new forms but retained for history.' },
     { value: 'ARCHIVED', label: 'Archived', description: 'Audit/history only.' },
 ] as const;
 
@@ -19,7 +28,7 @@ export type QuestionEditorFormState = {
     competencyCode: string;
     questionText: string;
     helpText: string;
-    status: string;
+    status: QuestionLifecycleStatus;
 };
 
 export const emptyQuestionForm = (defaultCompetencyCode = ''): QuestionEditorFormState => ({
@@ -41,7 +50,7 @@ export const toQuestionPayload = (form: QuestionEditorFormState): QuestionBankPa
     weight: 1,
     required: true,
     helpText: form.helpText.trim() || null,
-    status: form.status || 'DRAFT',
+    status: normalizeQuestionStatus(form.status),
 });
 
 export const toQuestionForm = (question: QuestionBankItem): QuestionEditorFormState => ({
@@ -50,7 +59,7 @@ export const toQuestionForm = (question: QuestionBankItem): QuestionEditorFormSt
     competencyCode: question.competencyCode,
     questionText: question.questionText,
     helpText: question.helpText ?? '',
-    status: question.status === 'INACTIVE' ? 'RETIRED' : question.status,
+    status: normalizeQuestionStatus(question.status),
 });
 
 export const normalizeText = (value?: string | null) => (value ?? '').trim().toLowerCase();
@@ -67,4 +76,7 @@ export const getCompetencyName = (code: string | null | undefined, competencies:
     return competencies.find((competency) => competency.code === code)?.name ?? code.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
-export const getStatusLabel = (status: string) => QUESTION_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
+export const getStatusLabel = (status: string) => {
+    const normalized = normalizeQuestionStatus(status);
+    return QUESTION_STATUS_OPTIONS.find((option) => option.value === normalized)?.label ?? normalized;
+};

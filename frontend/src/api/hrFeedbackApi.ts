@@ -80,7 +80,7 @@ export interface RatingScaleOption {
 export type FeedbackRelationshipType = 'MANAGER' | 'PEER' | 'SUBORDINATE' | 'SELF';
 export type FeedbackQuestionRuleRole = 'MANAGER' | 'PEER' | 'SUBORDINATE' | 'SELF';
 
-export type FeedbackQuestionStatus = 'DRAFT' | 'ACTIVE' | 'RETIRED' | 'ARCHIVED' | string;
+export type FeedbackQuestionStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'RETIRED' | 'ARCHIVED' | string;
 
 export interface FeedbackCompetencyItem {
     id: number;
@@ -431,7 +431,7 @@ export const hrFeedbackApi = {
         }
     },
 
-    async updateQuestionBankStatus(questionId: number, status: 'DRAFT' | 'ACTIVE' | 'RETIRED' | 'ARCHIVED'): Promise<QuestionBankItem> {
+    async updateQuestionBankStatus(questionId: number, status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'RETIRED' | 'ARCHIVED'): Promise<QuestionBankItem> {
         try {
             const res = await api.patch<ApiEnvelope<QuestionBankItem>>(`${BASE}/question-bank/questions/${questionId}/status`, null, { params: { status } });
             return unwrap(res);

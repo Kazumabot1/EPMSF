@@ -216,6 +216,7 @@ function App() {
                 </Route>
                 <Route path="/employee/continuous-feedback" element={<ContinuousFeedbackPage />} />
                 <Route path="/employee/kpis" element={<EmployeeKpiResultsPage />} />
+                <Route path="/employee/kpi/history" element={<ManagerKpiHistoryPage />} />
                 <Route path="/employee/appraisals" element={<AppraisalHistoryListPage role="employee" />} />
                 <Route path="/employee/assessment-scores" element={<EmployeeAssessmentScoresPage />} />
                 <Route path="/employee/self-assessment" element={<EmployeeSelfAssessmentPage />} />
@@ -450,6 +451,7 @@ function App() {
                   <Route path="/hr/kpi-template-cycle/:id/edit" element={<KpiTemplateCycleEditorPage />} />
                   <Route path="/hr/kpi-template-cycle" element={<KpiTemplateCycleListPage />} />
                   <Route path="/hr/employee-kpis" element={<HrEmployeeKpiListPage />} />
+                  <Route path="/hr/kpi/history" element={<ManagerKpiHistoryPage />} />
                 </Route>
 
 

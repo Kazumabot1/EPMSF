@@ -45,6 +45,24 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             """)
     Optional<User> findActiveByEmployeeId(@Param("employeeId") Integer employeeId);
 
+    @EntityGraph(attributePaths = {"position"})
+    @Query("""
+            SELECT u
+            FROM User u
+            WHERE u.active IS NULL OR u.active = true
+            """)
+    List<User> findAllActiveWithPosition();
+
+    @Query("""
+            SELECT DISTINCT u.employeeId
+            FROM User u
+            JOIN Employee e ON e.id = u.employeeId
+            WHERE u.employeeId IN :employeeIds
+              AND (u.active IS NULL OR u.active = true)
+              AND (e.active IS NULL OR e.active = true)
+            """)
+    List<Integer> findActiveEmployeeIdsWithActiveUsers(@Param("employeeIds") Collection<Integer> employeeIds);
+
 
     @EntityGraph(attributePaths = {"position", "position.level"})
     @Query("""

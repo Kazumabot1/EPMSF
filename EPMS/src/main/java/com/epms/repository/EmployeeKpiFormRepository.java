@@ -46,6 +46,9 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
     @EntityGraph(attributePaths = {
             "employee",
             "employee.position",
+            "employee.employeeDepartments",
+            "employee.employeeDepartments.currentDepartment",
+            "employee.employeeDepartments.parentDepartment",
             "kpiForm",
             "kpiTemplateCycle",
             "cyclePeriod",
@@ -119,6 +122,9 @@ public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm
     @EntityGraph(attributePaths = {
             "employee",
             "employee.position",
+            "employee.employeeDepartments",
+            "employee.employeeDepartments.currentDepartment",
+            "employee.employeeDepartments.parentDepartment",
             "kpiForm",
             "kpiTemplateCycle",
             "cyclePeriod",

@@ -52,6 +52,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private static final List<String> HR_ROLE_NAMES = List.of("HR", "HUMAN_RESOURCE", "HUMAN_RESOURCES", "HR_MANAGER");
     private static final List<String> HR_ADMIN_ROLE_NAMES = List.of("ADMIN", "HRADMIN", "HR_ADMIN", "HR_ADMINISTRATOR");
     private static final List<String> EXECUTIVE_ROLE_NAMES = List.of("CEO", "EXECUTIVE");
+    private static final List<String> EMPLOYEE_ROLE_NAMES = List.of("EMPLOYEE", "STAFF", "TEAM_MEMBER");
 
     private static final List<String> MANAGER_DASHBOARD_NAMES = List.of("MANAGER_DASHBOARD");
     private static final List<String> DEPARTMENT_HEAD_DASHBOARD_NAMES = List.of(
@@ -60,6 +61,7 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     private static final List<String> HR_DASHBOARD_NAMES = List.of("HR_DASHBOARD");
     private static final List<String> HR_ADMIN_DASHBOARD_NAMES = List.of("ADMIN_DASHBOARD", "HRADMIN_DASHBOARD", "HR_ADMIN_DASHBOARD");
     private static final List<String> EXECUTIVE_DASHBOARD_NAMES = List.of("EXECUTIVE_DASHBOARD", "CEO_DASHBOARD");
+    private static final List<String> EMPLOYEE_DASHBOARD_NAMES = List.of("EMPLOYEE_DASHBOARD");
 
     private final KpiFormRepository kpiFormRepository;
     private final KpiTemplateCycleRepository kpiTemplateCycleRepository;
@@ -1165,7 +1167,28 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
     @Transactional(readOnly = true)
     public List<ManagerKpiAssignmentDto> listFinalizedHistoryForManagerDepartment() {
         List<Integer> employeeIds = currentEvaluatorScopedEmployeeIds();
-        if (employeeIds.isEmpty()) {
+        return finalizedHistoryRowsForEmployeeIds(employeeIds);
+    }
+
+    @Override
+    @Transactional
+    public List<ManagerKpiAssignmentDto> listFinalizedHistoryForCurrentUserScope() {
+        // History should reflect the same finalized state HR sees after period-end auto-finalization.
+        runAutoFinalizePastDueAssignments();
+
+        UserPrincipal principal = SecurityUtils.currentUser();
+        if (hasHrAdminScope(principal) || hasHrScope(principal)) {
+            return employeeKpiFormRepository.findAllByStatusWithDetail(EmployeeKpiStatus.FINALIZED).stream()
+                    .map(this::toManagerDto)
+                    .toList();
+        }
+
+        List<Integer> employeeIds = currentHistoryScopedEmployeeIds();
+        return finalizedHistoryRowsForEmployeeIds(employeeIds);
+    }
+
+    private List<ManagerKpiAssignmentDto> finalizedHistoryRowsForEmployeeIds(Collection<Integer> employeeIds) {
+        if (employeeIds == null || employeeIds.isEmpty()) {
             return List.of();
         }
         return employeeKpiFormRepository.findByEmployeeIdInAndStatusWithDetail(
@@ -1824,6 +1847,42 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
         );
     }
 
+    private List<Integer> currentHistoryScopedEmployeeIds() {
+        UserPrincipal principal = SecurityUtils.currentUser();
+        User currentUser = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found."));
+
+        if (hasDepartmentHeadScope(principal)) {
+            Integer deptId = requireManagerDepartmentId();
+            return departmentHistoryScopedEmployeeIds(deptId);
+        }
+
+        if (hasManagerScope(principal)) {
+            return currentEvaluatorScopedEmployeeIds();
+        }
+
+        if (hasEmployeeScope(principal)) {
+            return currentUser.getEmployeeId() == null ? List.of() : List.of(currentUser.getEmployeeId());
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Your account cannot view KPI history."
+        );
+    }
+
+    private List<Integer> departmentHistoryScopedEmployeeIds(Integer departmentId) {
+        if (departmentId == null) {
+            return List.of();
+        }
+        return employeeRepository.findCurrentByWorkingDepartmentId(departmentId, false).stream()
+                .filter(employee -> employee.getId() != null)
+                .filter(employee -> activeFlag(employee.getActive()))
+                .map(Employee::getId)
+                .distinct()
+                .toList();
+    }
+
     private Integer requireManagerDepartmentId() {
         Integer deptId = SecurityUtils.currentUser().getDepartmentId();
         if (deptId == null) {
@@ -2226,6 +2285,14 @@ public class EmployeeKpiWorkflowServiceImpl implements EmployeeKpiWorkflowServic
 
     private boolean hasHrAdminScope(UserPrincipal principal) {
         return hasAnyAuthority(principal, HR_ADMIN_ROLE_NAMES, HR_ADMIN_DASHBOARD_NAMES);
+    }
+
+    private boolean hasHrScope(UserPrincipal principal) {
+        return hasAnyAuthority(principal, HR_ROLE_NAMES, HR_DASHBOARD_NAMES);
+    }
+
+    private boolean hasEmployeeScope(UserPrincipal principal) {
+        return hasAnyAuthority(principal, EMPLOYEE_ROLE_NAMES, EMPLOYEE_DASHBOARD_NAMES);
     }
 
     private boolean hasExecutiveScope(UserPrincipal principal) {
