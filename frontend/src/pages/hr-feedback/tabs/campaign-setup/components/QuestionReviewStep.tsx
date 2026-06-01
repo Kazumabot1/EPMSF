@@ -39,13 +39,14 @@ type QuestionSet = {
     validQuestionCount: number;
     invalidQuestionCount: number;
     questionCount: number;
+    sourceFormNames: string[];
     ready: boolean;
 };
 
 type InvalidQuestionSummary = {
     questionCode: string;
     questionText: string;
-    sourceRules: string[];
+    sourceForms: string[];
     competencies: string[];
     variantLabels: string[];
 };
@@ -71,11 +72,27 @@ const variantLabel = (group: any) =>
     ]
         .filter(Boolean)
         .join(" · ") ||
-    "Form variant";
+    "Evaluator form";
 
 const unique = (values: Array<string | null | undefined>) =>
     Array.from(
         new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)),
+    );
+
+const evaluatorFormTitle = (relationshipLabels: string[], index: number) => {
+    if (relationshipLabels.length === 1) {
+        const clean = relationshipLabels[0].replace(/\s+reviewer$/i, "").trim();
+        return `${clean || "Evaluator"} Form`;
+    }
+    return `Shared Evaluator Form ${index + 1}`;
+};
+
+const sourceFormNamesForQuestions = (questions: FeedbackCampaignQuestionGroup["questions"] = []) =>
+    unique(
+        questions.map((question) =>
+            question.sourceRuleName ||
+            (question.sourceRuleId ? `Form #${question.sourceRuleId}` : "Form Setup"),
+        ),
     );
 
 const hashSignature = (value: string) => {
@@ -126,10 +143,8 @@ const buildQuestionSets = (
             const invalidQuestionCount = questions.filter(
                 (question) => !isRatingWithRequiredComment(question),
             ).length;
-            const title =
-                relationshipLabels.length === 1
-                    ? `${relationshipLabels[0]} Question Set`
-                    : `Shared Question Set ${index + 1}`;
+            const title = evaluatorFormTitle(relationshipLabels, index);
+            const sourceFormNames = sourceFormNamesForQuestions(questions);
             return {
                 setKey: hashSignature(signature),
                 title,
@@ -148,6 +163,7 @@ const buildQuestionSets = (
                 validQuestionCount,
                 invalidQuestionCount,
                 questionCount: questions.length,
+                sourceFormNames,
                 ready: validQuestionCount > 0 && invalidQuestionCount === 0,
             };
         })
@@ -172,16 +188,16 @@ const buildInvalidQuestionSummaries = (
                 const existing = byQuestion.get(questionCode) ?? {
                     questionCode,
                     questionText: String(question.questionText ?? ""),
-                    sourceRules: [],
+                    sourceForms: [],
                     competencies: [],
                     variantLabels: [],
                 };
-                existing.sourceRules = unique([
-                    ...existing.sourceRules,
+                existing.sourceForms = unique([
+                    ...existing.sourceForms,
                     question.sourceRuleName ||
                     (question.sourceRuleId
-                        ? `Rule #${question.sourceRuleId}`
-                        : "Active Form Setup"),
+                        ? `Form #${question.sourceRuleId}`
+                        : "Form Setup"),
                 ]);
                 existing.competencies = unique([
                     ...existing.competencies,
@@ -224,8 +240,8 @@ export function QuestionReviewStep({
                                        setSelectedQuestionGroupKey,
                                    }: QuestionReviewStepProps) {
     const [selectedQuestionSetKey, setSelectedQuestionSetKey] = useState("");
-    const hasSnapshot = questionGroups.length > 0;
-    const snapshotStale = hasSnapshot && !questionReview.saved;
+    const hasCampaignQuestionPreview = questionGroups.length > 0;
+    const previewNeedsSave = hasCampaignQuestionPreview && !questionReview.saved;
 
     const questionSets = useMemo(
         () => buildQuestionSets(questionGroups),
@@ -248,10 +264,6 @@ export function QuestionReviewStep({
         ) ??
         questionSets[0] ??
         null;
-    const invalidVariantCount = unique(
-        invalidQuestionSummaries.flatMap((item) => item.variantLabels),
-    ).length;
-
     useEffect(() => {
         if (questionSets.length === 0) {
             setSelectedQuestionSetKey("");
@@ -286,9 +298,9 @@ export function QuestionReviewStep({
                     <span className="hfdq-kicker">Step 4</span>
                     <h3>Campaign Question Preview</h3>
                     <p>
-                        Review unique question sets and scoring readiness before freezing
-                        the campaign forms. Questions are controlled by Question Bank and
-                        Form Setup.
+                        Review the final evaluator forms generated from Form Setup. Save
+                        the campaign questions before launch so each evaluator form stays
+                        consistent for this campaign.
                     </p>
                 </div>
                 <div className="hfdqs-head-actions">
@@ -348,11 +360,11 @@ export function QuestionReviewStep({
                     <div className="hfdqs-summary-grid hfdqs-summary-grid-wide">
                         <div>
                             <strong>{questionSets.length}</strong>
-                            <span>question sets</span>
+                            <span>evaluator forms</span>
                         </div>
                         <div>
                             <strong>{formVariantCount}</strong>
-                            <span>form variants</span>
+                            <span>target profiles</span>
                         </div>
                         <div>
                             <strong>{questionReview.targetCount ?? 0}</strong>
@@ -362,17 +374,9 @@ export function QuestionReviewStep({
                             <strong>{questionReview.assignmentCount ?? 0}</strong>
                             <span>assignments covered</span>
                         </div>
-                        <div
-                            className={
-                                invalidQuestionSummaries.length > 0 ? "danger" : "ready"
-                            }
-                        >
-                            <strong>{invalidQuestionSummaries.length}</strong>
-                            <span>invalid questions</span>
-                        </div>
                     </div>
 
-                    {(snapshotStale ||
+                    {(previewNeedsSave ||
                         (questionReview.warnings ?? []).length > 0 ||
                         blockingGroups.length > 0 ||
                         invalidQuestionSummaries.length > 0) && (
@@ -387,14 +391,14 @@ export function QuestionReviewStep({
                                     {blockingGroups.length > 0 ||
                                     invalidQuestionSummaries.length > 0
                                         ? "Campaign question preview needs attention before it can be saved."
-                                        : snapshotStale
-                                            ? "Campaign question preview needs save."
+                                        : previewNeedsSave
+                                            ? "Campaign questions need to be saved."
                                             : "Campaign question preview notice"}
                                 </strong>
-                                {snapshotStale && (
+                                {previewNeedsSave && (
                                     <p>
-                                        The evaluator assignments or Form Setup may have changed.
-                                        Save these campaign questions before launch.
+                                        Evaluator assignments or Form Setup may have changed.
+                                        Save campaign questions again before launch.
                                     </p>
                                 )}
                                 {(questionReview.warnings ?? [])
@@ -404,18 +408,16 @@ export function QuestionReviewStep({
                                     ))}
                                 {blockingGroups.length > 0 && (
                                     <p>
-                                        {blockingGroups.length} form variant
+                                        {blockingGroups.length} evaluator form
                                         {blockingGroups.length === 1 ? "" : "s"} have no rating
                                         question with required comment.
                                     </p>
                                 )}
                                 {invalidQuestionSummaries.length > 0 && (
                                     <p>
-                                        {invalidQuestionSummaries.length} invalid question
-                                        {invalidQuestionSummaries.length === 1 ? "" : "s"} are used
-                                        across {invalidVariantCount} form variant
-                                        {invalidVariantCount === 1 ? "" : "s"}. Replace them in
-                                        Question Bank or Form Setup, then refresh this preview.
+                                        Some questions in this preview are not valid for a 360
+                                        campaign. Update Question Bank or Form Setup, then refresh
+                                        the preview.
                                     </p>
                                 )}
                             </div>
@@ -435,9 +437,9 @@ export function QuestionReviewStep({
                                         <span>{item.questionText}</span>
                                         <small>
                                             {item.competencies.join(", ")} · Used in{" "}
-                                            {item.variantLabels.length} variant
+                                            {item.variantLabels.length} evaluator form
                                             {item.variantLabels.length === 1 ? "" : "s"} ·{" "}
-                                            {item.sourceRules.join(", ")}
+                                            {item.sourceForms.join(", ")}
                                         </small>
                                     </article>
                                 ))}
@@ -452,7 +454,7 @@ export function QuestionReviewStep({
                         </section>
                     )}
 
-                    {!hasSnapshot ? (
+                    {!hasCampaignQuestionPreview ? (
                         <div className="hfd-empty-state hfdt-empty">
                             <i className="bi bi-ui-checks-grid" />
                             <strong>No campaign question preview yet</strong>
@@ -465,7 +467,7 @@ export function QuestionReviewStep({
                             <div className="hfdqs-workbench hfdqs-workbench-grouped hfdqs-primary-workbench">
                                 <aside className="hfdqs-variants">
                                     <div className="hfdqs-panel-title">
-                                        <span className="hfdq-kicker">Question sets</span>
+                                        <span className="hfdq-kicker">Evaluator forms</span>
                                         <strong>{questionSets.length}</strong>
                                     </div>
                                     <div className="hfdqs-variant-list">
@@ -481,13 +483,13 @@ export function QuestionReviewStep({
                                                 >
                           <span>
                             {questionSet.relationshipLabels.length === 1
-                                ? questionSet.relationshipLabels[0]
-                                : "Shared form"}
+                                ? `${questionSet.relationshipLabels[0].replace(/\s+reviewer$/i, "")} form`
+                                : "Shared evaluator form"}
                           </span>
                                                     <strong>{questionSet.title}</strong>
                                                     <em>
-                                                        {questionSet.validQuestionCount} valid questions ·{" "}
-                                                        {questionSet.variants.length} variant
+                                                        {questionSet.validQuestionCount} questions ·{" "}
+                                                        {questionSet.variants.length} profile
                                                         {questionSet.variants.length === 1 ? "" : "s"}
                                                     </em>
                                                     <small>
@@ -511,10 +513,10 @@ export function QuestionReviewStep({
                                     {!selectedQuestionSet ? (
                                         <div className="hfd-empty-state hfdt-mini-empty">
                                             <i className="bi bi-ui-checks" />
-                                            <strong>Select a question set</strong>
+                                            <strong>Select an evaluator form</strong>
                                             <p>
-                                                Choose a question set to preview the evaluator form
-                                                once.
+                                                Choose an evaluator form to preview the saved campaign
+                                                questions.
                                             </p>
                                         </div>
                                     ) : (
@@ -526,11 +528,15 @@ export function QuestionReviewStep({
                           </span>
                                                     <h4>{selectedQuestionSet.title}</h4>
                                                     <p>
-                                                        {selectedQuestionSet.variants.length} variants ·{" "}
+                                                        {selectedQuestionSet.variants.length} target profiles ·{" "}
                                                         {selectedQuestionSet.targetCount} recipients ·{" "}
                                                         {selectedQuestionSet.assignmentCount} assignments ·{" "}
-                                                        {selectedQuestionSet.validQuestionCount} valid
-                                                        questions
+                                                        {selectedQuestionSet.validQuestionCount} questions
+                                                    </p>
+                                                    <p>
+                                                        Form used: {selectedQuestionSet.sourceFormNames.length > 0
+                                                        ? selectedQuestionSet.sourceFormNames.join(", ")
+                                                        : "Form Setup"}
                                                     </p>
                                                 </div>
                                                 <span
@@ -546,8 +552,8 @@ export function QuestionReviewStep({
                                                         <i className="bi bi-slash-circle" />
                                                         <strong>No questions matched</strong>
                                                         <p>
-                                                            Update active Form Setup for this recipient and
-                                                            relationship scope.
+                                                            Update Form Setup for this evaluator form, then
+                                                            refresh the preview.
                                                         </p>
                                                     </div>
                                                 ) : (
@@ -630,7 +636,7 @@ export function QuestionReviewStep({
                                         <span className="hfdq-kicker">Competency weights</span>
                                         <h4>Scoring importance</h4>
                                         <p>
-                                            Questions come from Form Setup. This section only controls
+                                            Questions are generated from Form Setup. This section only controls
                                             how much each competency contributes to the final score.
                                         </p>
                                     </div>
@@ -656,8 +662,7 @@ export function QuestionReviewStep({
                                         Equal weight
                                     </button>
                                     <span className="hfdqs-weight-mode-note">
-                    Edit any percentage to use custom competency weights. Weight
-                    by question count is not used.
+                    Edit any percentage to use custom competency weights.
                   </span>
                                 </div>
 
@@ -677,7 +682,7 @@ export function QuestionReviewStep({
                                     <div className="hfdqs-weight-table-head" role="row">
                                         <span>Competency</span>
                                         <span>Questions</span>
-                                        <span>Used in</span>
+                                        <span>Used by</span>
                                         <span>Weight</span>
                                     </div>
                                     {competencyWeights.map((weight: any) => {
@@ -696,7 +701,7 @@ export function QuestionReviewStep({
                         </span>
                                                 <span>{questionCountLabel}</span>
                                                 <span>
-                          {Number(weight.formCount ?? 0)} variant
+                          {Number(weight.formCount ?? 0)} form
                                                     {Number(weight.formCount ?? 0) === 1 ? "" : "s"}
                         </span>
                                                 <span className="hfdqs-weight-input-wrap">

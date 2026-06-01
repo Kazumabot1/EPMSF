@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type {
     FeedbackCampaign,
@@ -9,7 +9,6 @@ import type {
 } from '../../../../../types/feedbackCampaign';
 
 type LaunchStepTarget = 'foundation' | 'targets' | 'evaluators' | 'questions';
-type LaunchConfirmationMode = 'validate' | 'launch' | null;
 
 type LaunchReadinessSectionProps = {
     selectedCampaign: FeedbackCampaign | null;
@@ -106,7 +105,7 @@ const launchCheckMessage = (key?: string | null, status?: string | null, fallbac
     const normalizedStatus = String(status ?? '').toUpperCase();
     if (normalizedStatus === 'PASS') return fallback ?? 'Ready.';
     if (normalizedKey === 'LIFECYCLE' || normalizedKey === 'LIFECYCLE_STATE') return fallback ?? 'Validate and lock setup before launch.';
-    if (normalizedKey === 'QUESTION_SELECTION' || normalizedKey === 'QUESTION_SNAPSHOT') return fallback ?? 'Save the question snapshot before launch.';
+    if (normalizedKey === 'QUESTION_SELECTION' || normalizedKey === 'QUESTION_SNAPSHOT') return fallback ?? 'Save campaign questions before launch.';
     if (normalizedKey === 'RELATIONSHIP_WEIGHTS') return fallback ?? 'Evaluator relationship weights must total 100%.';
     if (normalizedKey === 'COMPETENCY_WEIGHTS') return fallback ?? 'Competency weights must total 100%.';
     if (normalizedKey === 'TARGETS') return fallback ?? 'Select and save at least one feedback recipient.';
@@ -123,7 +122,10 @@ const readinessStatusLabel = (status?: string | null) => {
     return 'Needs attention';
 };
 
-const buildRelationshipWeightLabel = (scoringConfig: FeedbackCampaignScoringConfig, formatPercent: (value?: number | null) => string) => {
+const buildRelationshipWeightLabel = (
+    scoringConfig: FeedbackCampaignScoringConfig,
+    formatPercent: (value?: number | null) => string,
+) => {
     const weights = scoringConfig.relationshipWeights ?? [];
     if (weights.length === 0) return 'Not saved yet';
     return weights
@@ -161,9 +163,6 @@ export function LaunchReadinessSection({
                                            onValidateSetup,
                                            onLaunchCampaign,
                                        }: LaunchReadinessSectionProps) {
-    const [confirmationMode, setConfirmationMode] = useState<LaunchConfirmationMode>(null);
-    const [launchConfirmationText, setLaunchConfirmationText] = useState('');
-
     const blockingCount = activationReadiness.blockingIssues.length;
     const warningCount = activationReadiness.warnings.length;
     const readyCheckCount = launchChecklist.filter(check => String(check.status ?? '').toUpperCase() === 'PASS').length;
@@ -173,25 +172,6 @@ export function LaunchReadinessSection({
         () => buildRelationshipWeightLabel(scoringConfig, formatPercent),
         [formatPercent, scoringConfig],
     );
-    const confirmationCampaignName = selectedCampaign?.name ?? 'this campaign';
-    const isLaunchConfirmation = confirmationMode === 'launch';
-    const confirmationAllowed = confirmationMode === 'validate'
-        || (isLaunchConfirmation && launchConfirmationText.trim().toUpperCase() === 'LAUNCH');
-
-    const closeConfirmation = () => {
-        setConfirmationMode(null);
-        setLaunchConfirmationText('');
-    };
-
-    const confirmAction = () => {
-        if (!confirmationAllowed) return;
-        if (confirmationMode === 'validate') {
-            onValidateSetup();
-        } else if (confirmationMode === 'launch') {
-            onLaunchCampaign();
-        }
-        closeConfirmation();
-    };
 
     return (
         <section className={`hfdq-table-card hfda-card ${!questionReviewReady && selectedCampaign?.status === 'DRAFT' ? 'disabled' : ''}`}>
@@ -199,13 +179,13 @@ export function LaunchReadinessSection({
                 <div>
                     <span className="hfdq-kicker">Step 5</span>
                     <h3>Review &amp; Launch</h3>
-                    <p>Review readiness, understand what will be locked, then launch safely.</p>
+                    <p>Review the saved setup and launch when everything is ready.</p>
                 </div>
                 <div className="hfdt-summary-pills">
                     <span><strong>{campaignLaunched && selectedCampaign ? statusLabels[selectedCampaign.status] : launchReady ? 'Ready' : 'Review'}</strong> status</span>
                     <span><strong>{launchTargetCount}</strong> recipients</span>
                     <span><strong>{launchAssignmentCount}</strong> assignments</span>
-                    <span><strong>{questionSetCount}</strong> question sets</span>
+                    <span><strong>{questionSetCount}</strong> question forms</span>
                 </div>
             </div>
 
@@ -217,15 +197,15 @@ export function LaunchReadinessSection({
                     <div>
                         <span className="hfdq-kicker">Campaign launched</span>
                         <h4>{selectedCampaign.status === 'ACTIVE' ? 'Feedback collection is active.' : `Campaign status: ${statusLabels[selectedCampaign.status] ?? selectedCampaign.status}`}</h4>
-                        <p>Created {launchTargetCount} recipient record{launchTargetCount === 1 ? '' : 's'}, {launchAssignmentCount} evaluator task{launchAssignmentCount === 1 ? '' : 's'}, and locked {questionSetCount} question set{questionSetCount === 1 ? '' : 's'} for this campaign.</p>
+                        <p>Created {launchTargetCount} recipient record{launchTargetCount === 1 ? '' : 's'}, {launchAssignmentCount} evaluator task{launchAssignmentCount === 1 ? '' : 's'}, and locked {questionSetCount} question form{questionSetCount === 1 ? '' : 's'} for this campaign.</p>
                     </div>
                     <Link className="hfd-btn hfd-btn-primary" to="/hr/feedback/monitoring"><i className="bi bi-graph-up-arrow" /> Open Monitoring</Link>
                 </div>
             ) : !questionReviewReady && selectedCampaign.status === 'DRAFT' ? (
                 <div className="hfd-empty-state hfdt-empty">
                     <i className="bi bi-ui-checks-grid" />
-                    <strong>Save question snapshot first</strong>
-                    <p>Launch requires saved recipients, evaluator assignments, question snapshot, and scoring weights.</p>
+                    <strong>Save campaign questions first</strong>
+                    <p>Launch requires saved recipients, evaluator assignments, campaign questions, and scoring weights.</p>
                     <button className="hfd-btn hfd-btn-secondary" type="button" onClick={() => onGoToStep('questions')}>
                         <i className="bi bi-arrow-left" /> Back to Campaign Question Preview
                     </button>
@@ -233,20 +213,21 @@ export function LaunchReadinessSection({
             ) : loadingActivation ? (
                 <div className="hfd-spinner"><i className="bi bi-arrow-repeat" /> Loading final launch check...</div>
             ) : (
-                <div className="hfda-launch-stack hfda-final-stack">
-                    <div className={`hfda-launch-banner ${launchReady ? 'ready' : 'blocked'}`}>
-                        <i className={`bi ${launchReady ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'}`} />
+                <div className="hfda-launch-stack hfda-final-stack hfda-final-compact">
+                    <div className={`hfda-compact-status ${launchReady ? 'ready' : blockingCount > 0 ? 'blocked' : 'warning'}`}>
+                        <i className={`bi ${launchReady ? 'bi-check-circle-fill' : blockingCount > 0 ? 'bi-x-circle-fill' : 'bi-info-circle-fill'}`} />
                         <div>
                             <strong>{launchBannerTitle}</strong>
-                            <p>{launchBannerMessage}</p>
+                            <span>{launchBannerMessage}</span>
                         </div>
+                        <em>{readinessPercent}% ready</em>
                     </div>
 
-                    <div className="hfda-final-summary-grid">
-                        <article className="hfda-final-summary-card primary">
-                            <span className="hfdq-kicker">Campaign</span>
-                            <h4>{selectedCampaign.name}</h4>
-                            <p>Review year {selectedCampaign.reviewYear} · {campaignWindowLabel}</p>
+                    <div className="hfda-final-summary-grid hfda-final-summary-grid-compact">
+                        <article className="hfda-final-summary-card">
+                            <span>Campaign</span>
+                            <strong>{selectedCampaign.name}</strong>
+                            <small>Review year {selectedCampaign.reviewYear} · {campaignWindowLabel}</small>
                         </article>
                         <article className="hfda-final-summary-card">
                             <span>Recipients</span>
@@ -259,7 +240,7 @@ export function LaunchReadinessSection({
                             <small>{roleAssignmentSummary.length > 0 ? roleAssignmentSummary.join(' · ') : 'Assignments required'}</small>
                         </article>
                         <article className="hfda-final-summary-card">
-                            <span>Question snapshot</span>
+                            <span>Campaign questions</span>
                             <strong>{questionSetCount}</strong>
                             <small>{activationReadiness.summary.questionSelectionCount || 0} saved questions</small>
                         </article>
@@ -268,14 +249,18 @@ export function LaunchReadinessSection({
                             <strong>{scoringConfig.relationshipWeightsReady && competencyWeightsReady ? '100%' : 'Review'}</strong>
                             <small>Relationship {formatPercent(scoringConfig.totalRelationshipWeight)}% · Competency {formatPercent(competencyWeightTotal)}%</small>
                         </article>
+                        <article className="hfda-final-summary-card">
+                            <span>Visibility</span>
+                            <strong>Grouped</strong>
+                            <small>{privacySummary}</small>
+                        </article>
                     </div>
 
-                    <div className="hfda-readiness-board">
+                    <div className="hfda-readiness-board hfda-readiness-board-compact">
                         <div className="hfda-readiness-title-row">
                             <div>
                                 <span className="hfdq-kicker">Launch readiness</span>
                                 <h4>{blockingCount > 0 ? `${blockingCount} item${blockingCount === 1 ? '' : 's'} must be fixed` : warningCount > 0 ? `${warningCount} warning${warningCount === 1 ? '' : 's'} to review` : 'All launch checks passed'}</h4>
-                                <p>Each check shows where HR should go if something needs attention.</p>
                             </div>
                             <div className="hfda-readiness-meter">
                                 <strong>{readinessPercent}%</strong>
@@ -285,17 +270,17 @@ export function LaunchReadinessSection({
 
                         {activationReadiness.blockingIssues.length > 0 && (
                             <div className="hfda-issue-strip blocked">
-                                {activationReadiness.blockingIssues.slice(0, 4).map(item => <span key={item}><i className="bi bi-x-circle" /> {item}</span>)}
+                                {activationReadiness.blockingIssues.slice(0, 3).map(item => <span key={item}><i className="bi bi-x-circle" /> {item}</span>)}
                             </div>
                         )}
 
                         {activationReadiness.warnings.length > 0 && (
                             <div className="hfda-issue-strip warning">
-                                {activationReadiness.warnings.slice(0, 4).map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
+                                {activationReadiness.warnings.slice(0, 3).map(item => <span key={item}><i className="bi bi-info-circle" /> {item}</span>)}
                             </div>
                         )}
 
-                        <div className="hfda-check-list hfda-check-list-v2">
+                        <div className="hfda-check-list hfda-check-list-v2 hfda-check-list-compact">
                             {launchChecklist.length === 0 ? (
                                 <div className="hfd-empty-state hfdt-mini-empty"><i className="bi bi-clipboard-check" /><strong>No validation result yet</strong><p>Refresh the final check after saving setup changes.</p></div>
                             ) : launchChecklist.map(check => {
@@ -321,31 +306,9 @@ export function LaunchReadinessSection({
                         </div>
                     </div>
 
-                    <div className="hfda-launch-impact-grid">
-                        <article className="hfda-impact-card">
-                            <span className="hfdq-kicker">Launch impact</span>
-                            <h4>What happens after launch</h4>
-                            <ul>
-                                <li>Campaign details, recipients, evaluator assignments, question snapshot, and scoring setup are locked.</li>
-                                <li>Evaluator feedback tasks become available according to the campaign window.</li>
-                                <li>Question text, competencies, rating scale, and required-comment rules are frozen for this campaign.</li>
-                                <li>HR can monitor progress, send reminders, and close the campaign after collection.</li>
-                            </ul>
-                        </article>
-                        <article className="hfda-impact-card subtle">
-                            <span className="hfdq-kicker">Scoring policy</span>
-                            <h4>Unavailable relationship handling</h4>
-                            <p>{scoringConfig.redistributeMissingRelationshipWeight
-                                ? 'If a recipient naturally has no weighted evaluator relationship, that unavailable relationship weight is redistributed across the recipient’s available evaluator groups.'
-                                : 'Every weighted evaluator relationship is required. Missing weighted relationships block launch until HR adjusts assignments or weights.'}</p>
-                            <p>{relationshipWeightLabel}</p>
-                        </article>
-                        <article className="hfda-impact-card subtle">
-                            <span className="hfdq-kicker">Feedback visibility</span>
-                            <h4>Recipient view</h4>
-                            <p>{privacySummary}</p>
-                            <p>HR/Admin can still audit evaluator identity for assignment management.</p>
-                        </article>
+                    <div className="hfda-compact-note">
+                        <span><i className="bi bi-sliders" /> Scoring policy</span>
+                        <p>{relationshipWeightLabel}</p>
                     </div>
 
                     <div className="hfda-launch-actions hfda-final-actions">
@@ -356,49 +319,15 @@ export function LaunchReadinessSection({
                             <i className="bi bi-ui-checks-grid" /> Back to Campaign Question Preview
                         </button>
                         {selectedCampaign.status === 'DRAFT' && (
-                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canValidateSetup || activatingCampaign} onClick={() => setConfirmationMode('validate')}>
+                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canValidateSetup || activatingCampaign} onClick={onValidateSetup}>
                                 <i className="bi bi-shield-check" /> {activatingCampaign ? 'Validating...' : 'Validate & Lock Setup'}
                             </button>
                         )}
                         {selectedCampaign.status === 'READY_TO_ACTIVATE' && (
-                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canActivate || activatingCampaign} onClick={() => setConfirmationMode('launch')}>
+                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!canActivate || activatingCampaign} onClick={onLaunchCampaign}>
                                 <i className="bi bi-rocket-takeoff" /> {activatingCampaign ? 'Launching...' : 'Launch Campaign'}
                             </button>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {confirmationMode && selectedCampaign && (
-                <div className="hfda-confirm-backdrop" role="presentation">
-                    <div className="hfda-confirm-modal" role="dialog" aria-modal="true" aria-label={isLaunchConfirmation ? 'Launch campaign confirmation' : 'Validate setup confirmation'}>
-                        <button className="hfda-confirm-close" type="button" onClick={closeConfirmation} aria-label="Close confirmation">
-                            <i className="bi bi-x-lg" />
-                        </button>
-                        <span className="hfda-confirm-icon"><i className={`bi ${isLaunchConfirmation ? 'bi-rocket-takeoff' : 'bi-shield-check'}`} /></span>
-                        <span className="hfdq-kicker">{isLaunchConfirmation ? 'Final launch confirmation' : 'Setup lock confirmation'}</span>
-                        <h3>{isLaunchConfirmation ? `Launch “${confirmationCampaignName}”?` : `Validate and lock “${confirmationCampaignName}”?`}</h3>
-                        <p>{isLaunchConfirmation
-                            ? 'This will open the campaign workflow, create active evaluator tasks, and keep the saved question snapshot locked for this campaign.'
-                            : 'This will lock the setup for final launch review. Launch becomes available after validation passes.'}</p>
-                        <div className="hfda-confirm-facts">
-                            <span><strong>{launchTargetCount}</strong> recipients</span>
-                            <span><strong>{launchAssignmentCount}</strong> evaluator tasks</span>
-                            <span><strong>{questionSetCount}</strong> question sets</span>
-                        </div>
-                        {isLaunchConfirmation && (
-                            <label className="hfda-confirm-type">
-                                Type <strong>LAUNCH</strong> to confirm.
-                                <input value={launchConfirmationText} onChange={(event) => setLaunchConfirmationText(event.target.value)} placeholder="LAUNCH" />
-                            </label>
-                        )}
-                        <div className="hfda-confirm-actions">
-                            <button className="hfd-btn hfd-btn-secondary" type="button" onClick={closeConfirmation}>Cancel</button>
-                            <button className="hfd-btn hfd-btn-primary" type="button" disabled={!confirmationAllowed || activatingCampaign} onClick={confirmAction}>
-                                <i className={`bi ${isLaunchConfirmation ? 'bi-rocket-takeoff' : 'bi-shield-check'}`} />
-                                {isLaunchConfirmation ? 'Launch Campaign' : 'Validate & Lock Setup'}
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
