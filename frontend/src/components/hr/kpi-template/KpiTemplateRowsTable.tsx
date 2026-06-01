@@ -3,7 +3,6 @@ import type { KpiCategory } from '../../../types/kpiCategory';
 import type { KpiItem } from '../../../types/kpiItem';
 import type { KpiTemplateRowDraft } from '../../../types/kpiTemplate';
 import type { KpiUnit } from '../../../types/kpiUnit';
-import './kpi-template.css';
 
 type Props = {
   rows: KpiTemplateRowDraft[];
@@ -17,7 +16,7 @@ type Props = {
 };
 
 const cellInput =
-  'kpi-tpl-input kpi-tpl-row-input min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
+  'min-h-10 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500';
 
 type KpiNumberInputProps = {
   value: number | null;
@@ -31,16 +30,12 @@ type KpiNumberInputProps = {
 const blockedNumberKeys = new Set(['-', '+', 'e', 'E']);
 
 function isNumericKpiNumberText(value: string) {
-  if (value === '') {
-    return true;
-  }
+  if (value === '') return true;
   return /^\d+(\.\d*)?$/.test(value) && Number.isFinite(Number(value));
 }
 
 function isInvalidKpiNumberValue(value: number | null, min?: number, max?: number) {
-  if (value === null) {
-    return false;
-  }
+  if (value === null) return false;
   return !Number.isFinite(value) || (min != null && value < min) || (max != null && value > max);
 }
 
@@ -48,45 +43,46 @@ function KpiNumberInput({ value, disabled, onChange, min, max, className = '' }:
   const invalid = isInvalidKpiNumberValue(value, min, max);
 
   return (
-    <div className={`kpi-tpl-number-box ${disabled ? 'is-disabled' : ''} ${invalid ? 'is-invalid' : ''}`}>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={value ?? ''}
-        disabled={disabled}
-        onKeyDown={(event) => {
-          if (blockedNumberKeys.has(event.key)) {
-            event.preventDefault();
-          }
-        }}
-        onPaste={(event) => {
-          const pasted = event.clipboardData.getData('text');
-          if (!isNumericKpiNumberText(pasted)) {
-            event.preventDefault();
-          }
-        }}
-        onChange={(event) => {
-          const nextValue = event.target.value;
-          if (!isNumericKpiNumberText(nextValue)) {
-            return;
-          }
-          onChange(nextValue === '' ? null : Number(nextValue));
-        }}
-        className={`kpi-tpl-number-input ${className}`}
-      />
-    </div>
+    <input
+      type="text"
+      inputMode="decimal"
+      value={value ?? ''}
+      disabled={disabled}
+      onKeyDown={(event) => {
+        if (blockedNumberKeys.has(event.key)) event.preventDefault();
+      }}
+      onPaste={(event) => {
+        const pasted = event.clipboardData.getData('text');
+        if (!isNumericKpiNumberText(pasted)) event.preventDefault();
+      }}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        if (!isNumericKpiNumberText(nextValue)) return;
+        onChange(nextValue === '' ? null : Number(nextValue));
+      }}
+      className={`${cellInput} text-right font-mono tabular-nums ${invalid ? 'border-red-400 ring-4 ring-red-100' : ''} ${className}`}
+    />
   );
 }
 
-const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemoveRow, onRowChange, readOnly = false }: Props) => {
+const KpiTemplateRowsTable = ({
+  rows,
+  categories,
+  units,
+  items,
+  onAddRow,
+  onRemoveRow,
+  onRowChange,
+  readOnly = false,
+}: Props) => {
   const totalWeight = rows.reduce((sum, row) => sum + (row.weight ?? 0), 0);
   const catalogDataMissing = categories.length === 0 || items.length === 0;
 
   return (
-    <div className="kpi-tpl-row-card overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-900/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       {catalogDataMissing && !readOnly && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-medium">Optional catalog data for KPI rows</p>
+          <p className="font-semibold">Optional catalog data for KPI rows</p>
           <p className="mt-1 text-amber-800/90">
             {categories.length === 0 && (
               <>
@@ -111,35 +107,41 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
       )}
 
       <div className="overflow-x-auto">
-        <table className="kpi-tpl-create-table min-w-[1120px] w-full border-collapse text-left text-sm">
-          <thead className="kpi-tpl-thead">
-            <tr className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-              <th className="w-[72px] px-3 py-3.5 text-center">No.</th>
-              <th className="min-w-[230px] px-3 py-3.5">KPI</th>
-              <th className="min-w-[190px] px-3 py-3.5">Category</th>
-              <th className="min-w-[108px] px-3 py-3.5 text-right">Target %</th>
-              <th className="min-w-[175px] px-3 py-3.5">Unit</th>
-              <th className="min-w-[100px] bg-blue-50 px-3 py-3.5 text-center text-blue-900">Actual %</th>
-              <th className="min-w-[108px] px-3 py-3.5 text-right">Weight %</th>
-              <th className="min-w-[100px] bg-blue-50 px-3 py-3.5 text-center text-blue-900">Score %</th>
-              <th className="min-w-[112px] bg-blue-50 px-3 py-3.5 text-center text-blue-900">Weight Score</th>
-              <th className="w-14 px-2 py-3.5 text-center" aria-label="Actions" />
+        <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+          <thead className="bg-slate-100 text-xs font-bold uppercase tracking-wide text-slate-600">
+            <tr>
+              <th className="w-[72px] px-3 py-3 text-center">No.</th>
+              <th className="min-w-[230px] px-3 py-3">KPI</th>
+              <th className="min-w-[190px] px-3 py-3">Category</th>
+              <th className="min-w-[108px] px-3 py-3 text-right">Target %</th>
+              <th className="min-w-[175px] px-3 py-3">Unit</th>
+              <th className="min-w-[100px] bg-blue-50 px-3 py-3 text-center text-blue-800">Actual %</th>
+              <th className="min-w-[108px] px-3 py-3 text-right">Weight %</th>
+              <th className="min-w-[100px] bg-blue-50 px-3 py-3 text-center text-blue-800">Score %</th>
+              <th className="min-w-[112px] bg-blue-50 px-3 py-3 text-center text-blue-800">Weight Score</th>
+              <th className="w-14 px-2 py-3 text-center" aria-label="Actions" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-slate-100 bg-white">
             {rows.map((row, rowIndex) => (
               <tr
                 key={row.rowId}
-                className={`align-top odd:bg-gray-50/40 transition-colors hover:bg-blue-50/30 ${
-                  row.id == null && row.changeReason ? 'kpi-tpl-row-added' : ''
-                }`}
+                className={`align-top transition-colors hover:bg-blue-50/40 ${
+                  rowIndex % 2 === 1 ? 'bg-slate-50/50' : ''
+                } ${row.id == null && row.changeReason ? 'bg-emerald-50/40' : ''}`}
               >
                 <td className="px-3 py-3 text-center">
-                  <span className="kpi-tpl-seq-badge">{rowIndex + 1}</span>
-                  {row.id == null && row.changeReason && <span className="kpi-tpl-change-pill added mt-2">Added</span>}
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-700">
+                    {rowIndex + 1}
+                  </span>
+                  {row.id == null && row.changeReason && (
+                    <span className="mt-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800">
+                      Added
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-3">
-                  <div className="kpi-tpl-field-stack">
+                  <div className="flex flex-col gap-2">
                     <select
                       value={row.kpiItemId ?? ''}
                       disabled={readOnly}
@@ -169,12 +171,12 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                       disabled={readOnly || row.kpiItemId !== null}
                       onChange={(event) => onRowChange(row.rowId, { kpiLabel: event.target.value })}
                       placeholder="Or custom KPI name"
-                      className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
+                      className={cellInput}
                     />
                   </div>
                 </td>
                 <td className="px-3 py-3">
-                  <div className="kpi-tpl-field-stack">
+                  <div className="flex flex-col gap-2">
                     <select
                       value={row.kpiCategoryId ?? ''}
                       disabled={readOnly}
@@ -202,24 +204,21 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                       disabled={readOnly || row.kpiCategoryId !== null}
                       onChange={(event) => onRowChange(row.rowId, { kpiCategoryLabel: event.target.value })}
                       placeholder="Or custom category"
-                      className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
+                      className={cellInput}
                     />
                   </div>
                 </td>
                 <td className="px-3 py-3">
-                  <div className="kpi-tpl-single-field">
-                    <KpiNumberInput
-                      min={1}
-                      max={100}
-                      value={row.target}
-                      disabled={readOnly}
-                      onChange={(target) => onRowChange(row.rowId, { target })}
-                      className="text-right tabular-nums"
-                    />
-                  </div>
+                  <KpiNumberInput
+                    min={1}
+                    max={100}
+                    value={row.target}
+                    disabled={readOnly}
+                    onChange={(target) => onRowChange(row.rowId, { target })}
+                  />
                 </td>
                 <td className="px-3 py-3">
-                  <div className="kpi-tpl-field-stack">
+                  <div className="flex flex-col gap-2">
                     <select
                       value={row.kpiUnitId ?? ''}
                       disabled={readOnly}
@@ -247,37 +246,35 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                       disabled={readOnly || row.kpiUnitId !== null}
                       onChange={(event) => onRowChange(row.rowId, { kpiUnitLabel: event.target.value })}
                       placeholder="Or custom unit"
-                      className={`${cellInput} disabled:bg-gray-100 disabled:text-gray-500`}
+                      className={cellInput}
                     />
                   </div>
                 </td>
                 <td className="bg-blue-50/60 px-3 py-3">
-                  <div className="kpi-tpl-locked-cell">
-                    <i className="bi bi-lock text-blue-400" aria-hidden />
+                  <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-center text-xs font-semibold text-blue-700">
+                    <i className="bi bi-lock text-blue-500" aria-hidden />
                     <span>Manager</span>
                   </div>
                 </td>
                 <td className="px-3 py-3">
-                  <div className="kpi-tpl-single-field">
-                    <KpiNumberInput
-                      min={1}
-                      max={100}
-                      value={row.weight}
-                      disabled={readOnly}
-                      onChange={(weight) => onRowChange(row.rowId, { weight })}
-                      className="text-right font-semibold tabular-nums"
-                    />
-                  </div>
+                  <KpiNumberInput
+                    min={1}
+                    max={100}
+                    value={row.weight}
+                    disabled={readOnly}
+                    onChange={(weight) => onRowChange(row.rowId, { weight })}
+                    className="font-semibold"
+                  />
                 </td>
                 <td className="bg-blue-50/60 px-3 py-3">
-                  <div className="kpi-tpl-locked-cell">
-                    <i className="bi bi-graph-up-arrow text-blue-400" aria-hidden />
+                  <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-center text-xs font-semibold text-blue-700">
+                    <i className="bi bi-graph-up-arrow text-blue-500" aria-hidden />
                     <span>PM</span>
                   </div>
                 </td>
                 <td className="bg-blue-50/60 px-3 py-3 text-center">
-                  <div className="kpi-tpl-locked-cell">
-                    <span className="text-lg leading-none text-gray-400">—</span>
+                  <div className="flex items-center justify-center rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-lg text-slate-400">
+                    —
                   </div>
                 </td>
                 <td className="px-2 py-3 text-center">
@@ -286,7 +283,7 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
                       type="button"
                       onClick={() => onRemoveRow(row.rowId)}
                       disabled={rows.length <= 1}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                       title="Remove row"
                       aria-label="Remove row"
                     >
@@ -298,19 +295,22 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-              <td colSpan={6} className="px-3 py-3 text-right text-xs uppercase tracking-wide text-gray-600">
+            <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+              <td colSpan={6} className="px-3 py-3 text-right text-xs uppercase tracking-wide text-slate-600">
                 Total weight
               </td>
               <td
-                className={`px-3 py-3 text-right tabular-nums ${
-                  totalWeight !== 100 ? 'text-amber-700' : 'text-gray-900'
+                className={`px-3 py-3 text-right font-mono tabular-nums ${
+                  totalWeight !== 100 ? 'text-amber-700' : 'text-slate-950'
                 }`}
               >
                 {totalWeight}%
               </td>
-              <td colSpan={2} className="bg-blue-50/60 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-blue-700/85">
-                Total score (PM)
+              <td
+                colSpan={2}
+                className="bg-blue-50/60 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-blue-700"
+              >
+                Total score (Manager)
               </td>
               <td className="w-14" />
             </tr>
@@ -318,16 +318,20 @@ const KpiTemplateRowsTable = ({ rows, categories, units, items, onAddRow, onRemo
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-gray-200 bg-gradient-to-r from-gray-50 via-blue-50/30 to-gray-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         {!readOnly && (
-          <button type="button" onClick={onAddRow} className="kpi-tpl-btn-primary w-full justify-center sm:w-auto">
+          <button
+            type="button"
+            onClick={onAddRow}
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_100%)] px-4 text-sm font-bold text-blue-700 shadow-sm transition hover:border-blue-300 hover:from-blue-50 hover:to-blue-100 sm:w-auto"
+          >
             <i className="bi bi-plus-lg text-lg" aria-hidden />
             Add KPI row
           </button>
         )}
-        <p className="max-w-md text-xs leading-relaxed text-gray-600">
-          <span className="font-semibold text-gray-800">Weighted score</span> (PM phase):{' '}
-          <code className="rounded-md bg-white px-2 py-0.5 font-mono text-[11px] text-gray-800 shadow-sm ring-1 ring-gray-200">
+        <p className="max-w-md text-xs leading-relaxed text-slate-600">
+          <span className="font-semibold text-slate-800">Weighted score</span> (Manager phase):{' '}
+          <code className="rounded-md bg-white px-2 py-0.5 font-mono text-[11px] text-slate-800 shadow-sm ring-1 ring-slate-200">
             (score × weight) ÷ 100
           </code>
         </p>

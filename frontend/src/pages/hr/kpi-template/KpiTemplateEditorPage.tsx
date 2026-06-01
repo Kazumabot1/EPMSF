@@ -1,10 +1,11 @@
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import ConfirmModal from '../../../components/ConfirmModal';
+import KpiAlertModal from '../../../components/hr/kpi-template/KpiAlertModal';
 import KpiPositionExistingAlert from '../../../components/hr/kpi-template/KpiPositionExistingAlert';
 import KpiRowReasonModal from '../../../components/hr/kpi-template/KpiRowReasonModal';
 import KpiTemplateRowsTable from '../../../components/hr/kpi-template/KpiTemplateRowsTable';
-import '../../../components/hr/kpi-template/kpi-template.css';
 import { handleKpiTemplateSaveError } from '../../../components/hr/kpi-template/kpiTemplateConflict';
 import {
   buildKpiPositionDropdownOptions,
@@ -30,10 +31,16 @@ import type { KpiUnit } from '../../../types/kpiUnit';
 import type { PositionResponse } from '../../../types/position';
 
 const fieldClass =
-  'kpi-tpl-input min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400';
+  'min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100';
+
+const btnSecondary =
+  'inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 no-underline shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50';
+
+const btnPrimary =
+  'inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-200 bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_100%)] px-4 text-sm font-bold text-blue-700 shadow-sm transition hover:border-blue-300 hover:from-blue-50 hover:to-blue-100 disabled:cursor-not-allowed disabled:opacity-50';
 
 const FieldLabel = ({ children }: { children: ReactNode }) => (
-  <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{children}</span>
+  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{children}</span>
 );
 
 const KpiTemplateEditorPage = () => {
@@ -46,7 +53,9 @@ const KpiTemplateEditorPage = () => {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<KpiFormStatus>('DRAFT');
   const [positionId, setPositionId] = useState<number | null>(null);
-  const [positionDurationMonths, setPositionDurationMonths] = useState<KpiTemplateDurationMonths>(DEFAULT_KPI_TEMPLATE_DURATION_MONTHS);
+  const [positionDurationMonths, setPositionDurationMonths] = useState<KpiTemplateDurationMonths>(
+    DEFAULT_KPI_TEMPLATE_DURATION_MONTHS,
+  );
   const [positions, setPositions] = useState<PositionResponse[]>([]);
   const [assignedPositionIds, setAssignedPositionIds] = useState<number[]>([]);
   const [existingTemplate, setExistingTemplate] = useState<ExistingKpiForPosition | null>(null);
@@ -65,6 +74,8 @@ const KpiTemplateEditorPage = () => {
   const [loading, setLoading] = useState(false);
   const [savingAction, setSavingAction] = useState<'draft' | 'use-in-cycle' | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
+  const [successAlert, setSuccessAlert] = useState<{ title: string; message: string } | null>(null);
 
   const applyLookups = useCallback((lookups: Awaited<ReturnType<typeof loadKpiTemplateEditorLookups>>) => {
     setCategories(lookups.categories);
@@ -225,20 +236,38 @@ const KpiTemplateEditorPage = () => {
     toast.error(message);
   };
 
-  const saveTemplate = async (action: 'draft' | 'use-in-cycle'): Promise<number | null> => {
+  const showSuccessAlert = (action: 'draft' | 'use-in-cycle') => {
+    if (action === 'use-in-cycle') {
+      setSuccessAlert({
+        title: 'Success',
+        message: isEdit
+          ? 'KPI template was saved and activated successfully.'
+          : 'KPI template was created and activated successfully.',
+      });
+      return;
+    }
+    setSuccessAlert({
+      title: 'Draft saved',
+      message: isEdit
+        ? 'Your KPI template draft was saved successfully.'
+        : 'Your KPI template draft was created successfully.',
+    });
+  };
+
+  const saveTemplate = async (action: 'draft' | 'use-in-cycle'): Promise<boolean> => {
     if (saveInFlightRef.current || savingAction !== null) {
-      return null;
+      return false;
     }
 
     const submitStatus: KpiFormStatus = action === 'use-in-cycle' ? 'ACTIVE' : 'DRAFT';
     const message = validate(submitStatus);
     if (message) {
       showSaveError(message);
-      return null;
+      return false;
     }
     if (positionId == null) {
       showSaveError('Select a position.');
-      return null;
+      return false;
     }
 
     const payload = buildPayload(submitStatus);
@@ -262,20 +291,13 @@ const KpiTemplateEditorPage = () => {
         }
       }
 
-      if (action === 'use-in-cycle') {
-        toast.success(isEdit ? 'KPI template activated.' : 'KPI template created and activated.');
-        navigate('/hr/kpi-template');
-        return null;
-      } else {
-        toast.success(isEdit ? 'KPI template draft saved.' : 'KPI template draft created.');
-        navigate('/hr/kpi-template');
-        return null;
-      }
+      showSuccessAlert(action);
+      return true;
     } catch (err) {
       const apiError = toApiRequestError(err, 'Could not save the KPI template.');
       if (isEdit && apiError.status === 409) {
         showSaveError(apiError.message);
-        return null;
+        return false;
       }
       if (
         !(await handleKpiTemplateSaveError(err, navigate, positionId, isEdit ? templateId : undefined, {
@@ -284,11 +306,21 @@ const KpiTemplateEditorPage = () => {
       ) {
         showSaveError(apiError.message);
       }
-      return null;
+      return false;
     } finally {
       saveInFlightRef.current = false;
       setSavingAction(null);
     }
+  };
+
+  const handleSuccessAlertClose = () => {
+    setSuccessAlert(null);
+    navigate('/hr/kpi-template');
+  };
+
+  const confirmSaveDraft = () => {
+    setDraftConfirmOpen(false);
+    void saveTemplate('draft');
   };
 
   const handleUseFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -304,51 +336,51 @@ const KpiTemplateEditorPage = () => {
         ? 'All positions already have a KPI template'
         : 'Select position...';
 
+  const saveDisabled =
+    loading || savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0);
+
   if (loading && isEdit) {
     return (
-      <div className="kpi-tpl-page">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-center px-4 py-28">
-          <div className="kpi-tpl-shimmer mb-5 h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-300 to-gray-200" />
-          <p className="text-sm font-medium text-gray-600">Loading editor…</p>
+      <div
+        className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-slate-50 text-slate-600"
+        style={{ fontFamily: '"Times New Roman", Times, serif' }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <span className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" aria-hidden />
+          <p className="text-sm font-medium">Loading editor…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="kpi-tpl-page">
-      <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
-        <div className="kpi-tpl-editor-hero flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 text-2xl text-white shadow-lg shadow-blue-900/20 ring-4 ring-blue-500/10">
-              <i className="bi bi-sliders" aria-hidden />
-            </div>
+    <div
+      className="min-h-[calc(100vh-4rem)] bg-slate-50 text-slate-700"
+      style={{ fontFamily: '"Times New Roman", Times, serif' }}
+    >
+      <div className="mx-auto max-w-6xl px-4 py-6 pb-16">
+        <header className="rounded-xl border border-slate-200 bg-[radial-gradient(circle_at_92%_16%,rgba(37,99,235,0.1),transparent_14rem),linear-gradient(135deg,#ffffff_0%,#eff6ff_100%)] px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-700">
+              <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.05em] text-blue-700">
+                <i className="bi bi-sliders text-sm" aria-hidden />
                 {isEdit ? 'Edit template' : 'Create template'}
-              </p>
-              <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+              </span>
+              <h1 className="text-2xl font-bold leading-tight text-slate-950">
                 {isEdit ? 'Update KPI structure' : 'New KPI template'}
               </h1>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600">
+              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
                 Align HR-defined KPI rows with positions. PM scoring columns stay read-only here.
               </p>
             </div>
+            <Link to="/hr/kpi-template" className={`${btnSecondary} shrink-0 self-start`}>
+              <i className="bi bi-arrow-left text-base" aria-hidden />
+              Back to list
+            </Link>
           </div>
-          <Link
-            to="/hr/kpi-template"
-            className="kpi-tpl-btn-secondary inline-flex shrink-0 self-start no-underline"
-          >
-            <i className="bi bi-arrow-left text-base" aria-hidden />
-            Back to list
-          </Link>
-        </div>
+        </header>
 
-        <form
-          noValidate
-          className="space-y-8"
-          onSubmit={handleUseFormSubmit}
-        >
+        <form noValidate className="mt-4 space-y-4" onSubmit={handleUseFormSubmit}>
           {validationMessage && (
             <div
               className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm"
@@ -359,37 +391,39 @@ const KpiTemplateEditorPage = () => {
             </div>
           )}
 
-          <section className="kpi-tpl-card overflow-hidden p-0">
-            <div className="p-6 sm:p-8">
-              <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-gray-100 pb-6">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                  <i className="bi bi-info-circle text-xl" aria-hidden />
-                </span>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Basics</h2>
-                  <p className="mt-0.5 text-sm text-gray-500">Template title and position assignment</p>
-                </div>
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+              <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-lg text-blue-700">
+                <i className="bi bi-info-circle" aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Basics</h2>
+                <p className="text-sm text-slate-500">Template title and position assignment</p>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
-                <label className="flex flex-col gap-2">
-                  <FieldLabel>Title</FieldLabel>
-                  <input
-                    required
-                    value={title}
-                    onChange={(event) => {
-                      setTitle(event.target.value);
-                      setValidationMessage(null);
-                    }}
-                    placeholder="e.g. Sales Manager KPIs"
-                    className={fieldClass}
-                  />
-                </label>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <FieldLabel>Title</FieldLabel>
+                <input
+                  required
+                  value={title}
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    setValidationMessage(null);
+                  }}
+                  placeholder="e.g. Sales Manager KPIs"
+                  className={fieldClass}
+                />
+              </label>
 
               <label className="flex flex-col gap-2">
                 <FieldLabel>Position</FieldLabel>
                 <div className="relative">
-                  <i className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
+                  <i
+                    className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-slate-400"
+                    aria-hidden
+                  />
                   <select
                     required
                     value={positionId ?? ''}
@@ -418,7 +452,7 @@ const KpiTemplateEditorPage = () => {
                   </select>
                 </div>
                 {!loading && positions.length > 0 && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-slate-500">
                     {!isEdit
                       ? `${availablePositionCount} of ${positions.length} position${positions.length === 1 ? '' : 's'} available for a new KPI template.`
                       : `${positions.length} position${positions.length === 1 ? '' : 's'} in the organization.`}
@@ -441,10 +475,14 @@ const KpiTemplateEditorPage = () => {
                   />
                 )}
               </label>
-              <label className="flex flex-col gap-2">
+
+              <label className="flex flex-col gap-2 md:col-span-2 lg:col-span-1">
                 <FieldLabel>Position duration</FieldLabel>
                 <div className="relative">
-                  <i className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
+                  <i
+                    className="bi bi-chevron-down pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-slate-400"
+                    aria-hidden
+                  />
                   <select
                     required
                     value={positionDurationMonths}
@@ -464,34 +502,37 @@ const KpiTemplateEditorPage = () => {
                   </select>
                 </div>
               </label>
-              </div>
             </div>
+          </section>
 
-            <div className="flex flex-wrap items-end justify-between gap-4 border-y border-gray-100 bg-gradient-to-r from-gray-50 to-white px-6 py-6 sm:px-8">
-              <div className="flex items-start gap-4">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                  <i className="bi bi-table text-xl" aria-hidden />
+          <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-lg text-blue-700">
+                  <i className="bi bi-table" aria-hidden />
                 </span>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">KPI rows</h2>
-                  <p className="mt-1 max-w-xl text-sm text-gray-500">
-                    Violet-tinted columns are filled later by PM (actual, score, weighted score).
+                  <h2 className="text-lg font-bold text-slate-950">KPI rows</h2>
+                  <p className="mt-0.5 max-w-xl text-sm text-slate-500">
+                    Blue columns are filled later by managers (actual, score, weighted score).
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Total weight</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total weight</p>
                 <p
                   className={`text-3xl font-bold tabular-nums tracking-tight ${
-                    (status === 'ACTIVE' || status === 'FINALIZED') && totalWeight !== 100 ? 'text-red-600' : 'text-gray-900'
+                    (status === 'ACTIVE' || status === 'FINALIZED') && totalWeight !== 100
+                      ? 'text-red-600'
+                      : 'text-slate-950'
                   }`}
                 >
                   {totalWeight}
-                  <span className="text-xl font-semibold text-gray-400">%</span>
+                  <span className="text-xl font-semibold text-slate-400">%</span>
                 </p>
               </div>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-5">
               <KpiTemplateRowsTable
                 rows={rows}
                 categories={categories}
@@ -518,36 +559,26 @@ const KpiTemplateEditorPage = () => {
             </div>
           </section>
 
-          <div className="flex flex-wrap justify-end gap-3 pt-2">
-            <Link to="/hr/kpi-template" className="kpi-tpl-btn-secondary no-underline">
+          <div className="flex flex-wrap justify-end gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <Link to="/hr/kpi-template" className={btnSecondary}>
               Cancel
             </Link>
             <button
               type="button"
-              onClick={() => void saveTemplate('draft')}
-              disabled={loading || savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
-              className="kpi-tpl-btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setDraftConfirmOpen(true)}
+              disabled={saveDisabled}
+              className={btnSecondary}
             >
-              {savingAction === 'draft' ? (
-                <>
-                  <span className="kpi-tpl-shimmer inline-block h-4 w-4 rounded-full bg-white/90" />
-                  Saving draft…
-                </>
-              ) : (
-                'Save Draft'
-              )}
+              {savingAction === 'draft' ? 'Saving draft…' : 'Save Draft'}
             </button>
             <button
               type="submit"
-              disabled={loading || savingAction !== null || positions.length === 0 || (!isEdit && availablePositionCount === 0)}
-              className="kpi-tpl-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={saveDisabled}
+              className={btnPrimary}
               title="Save this form and return to the KPI template list"
             >
               {savingAction === 'use-in-cycle' ? (
-                <>
-                  <span className="kpi-tpl-shimmer inline-block h-4 w-4 rounded-full bg-white/90" />
-                  Saving…
-                </>
+                'Saving…'
               ) : (
                 <>
                   Use Form
@@ -558,6 +589,7 @@ const KpiTemplateEditorPage = () => {
           </div>
         </form>
       </div>
+
       <KpiRowReasonModal
         open={reasonAction !== null}
         title={reasonAction?.type === 'remove' ? 'Remove KPI row' : 'Add KPI row'}
@@ -565,6 +597,27 @@ const KpiTemplateEditorPage = () => {
         confirmText={reasonAction?.type === 'remove' ? 'Remove row' : 'Add row'}
         onConfirm={handleReasonConfirm}
         onCancel={() => setReasonAction(null)}
+      />
+
+      <ConfirmModal
+        open={draftConfirmOpen}
+        title="Save as draft"
+        message="Save this KPI template as a draft? You can activate it later using Use Form."
+        confirmText="Save draft"
+        cancelText="Cancel"
+        loading={savingAction === 'draft'}
+        onConfirm={confirmSaveDraft}
+        onCancel={() => {
+          if (savingAction !== 'draft') setDraftConfirmOpen(false);
+        }}
+      />
+
+      <KpiAlertModal
+        open={successAlert != null}
+        title={successAlert?.title ?? 'Success'}
+        message={successAlert?.message ?? ''}
+        variant="success"
+        onClose={handleSuccessAlertClose}
       />
     </div>
   );

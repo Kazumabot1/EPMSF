@@ -219,7 +219,7 @@ const KpiTemplateDetailPage = () => {
                       </td>
                       <td className="px-4 py-3.5 text-right tabular-nums text-gray-900">{totalWeight}%</td>
                       <td colSpan={2} className="bg-blue-50/50 px-4 py-3.5 text-right text-xs tabular-nums text-blue-700/80">
-                        Total score — PM phase
+                        Total score — Manager phase
                       </td>
                     </tr>
                   </tfoot>
@@ -228,7 +228,7 @@ const KpiTemplateDetailPage = () => {
             </div>
             <p className="border-t border-gray-100 bg-gray-50/80 px-6 py-3.5 text-xs leading-relaxed text-gray-600">
               <i className="bi bi-info-circle mr-1.5 inline text-blue-600" aria-hidden />
-              Actual values and scores are captured when PM assigns and evaluates employee KPI forms.
+              Actual values and scores are captured when managers assign and evaluate employee KPI forms.
             </p>
           </div>
         </section>
