@@ -391,3 +391,88 @@
     transform: translateY(0) scale(1);
   }
 }
+
+/* HR KPI Management consistency patch */
+.kpi-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 16px 56px;
+  color: #0f172a;
+}
+
+.kpi-hero {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 22px;
+  padding: 24px 26px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 92% 6%, rgba(255, 255, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 8% 0%, rgba(56, 189, 248, 0.24), transparent 34%),
+    linear-gradient(135deg, #2563eb 0%, #1d4ed8 54%, #1e40af 100%);
+  box-shadow: 0 20px 52px rgba(30, 64, 175, 0.22);
+}
+
+.kpi-hero h1 {
+  font-size: clamp(1.55rem, 2.3vw, 2.25rem);
+  font-weight: 850;
+  letter-spacing: -0.035em;
+}
+
+.kpi-hero p {
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 500;
+}
+
+.kpi-hero .kpi-btn-primary {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.kpi-hero .kpi-btn-primary:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.kpi-surface {
+  border-color: #dbe7f6;
+  border-radius: 20px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.065);
+}
+
+.kpi-table-wrap {
+  border-color: #dbe7f6;
+  border-radius: 16px;
+}
+
+.kpi-table thead th {
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kpi-table tbody tr:hover td {
+  background: #f8fbff;
+}
+
+.kpi-table tbody td:first-child {
+  width: 84px;
+  color: #1d4ed8;
+  font-weight: 850;
+}
+
+.kpi-icon-btn:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.kpi-icon-btn.danger:hover {
+  border-color: #fecaca;
+  color: #dc2626;
+  background: #fef2f2;
+}

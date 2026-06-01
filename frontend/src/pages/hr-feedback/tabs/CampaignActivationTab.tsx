@@ -343,7 +343,7 @@ export default function CampaignMonitoringTab({ activeCampaign }: Props) {
 
   const closeCampaign = async () => {
     if (!selectedId) return;
-    const confirmed = window.confirm('Close this campaign now? Evaluators will no longer be able to submit feedback, and analytics will become available.');
+    const confirmed = window.confirm('Close this campaign now? Pending feedback will be locked. If only warning-level items remain, the campaign will close with warning acknowledgement.');
     if (!confirmed) return;
     setActionLoading(true);
     setError('');

@@ -318,7 +318,7 @@ const KpiTemplateEditorPage = () => {
   return (
     <div className="kpi-tpl-page">
       <div className="mx-auto max-w-6xl px-4 py-8 pb-20">
-        <div className="mb-10 flex flex-col gap-6 border-b border-gray-200/90 pb-8 sm:flex-row sm:items-start sm:justify-between">
+        <div className="kpi-tpl-editor-hero flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 text-2xl text-white shadow-lg shadow-blue-900/20 ring-4 ring-blue-500/10">
               <i className="bi bi-sliders" aria-hidden />

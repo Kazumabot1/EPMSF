@@ -294,7 +294,6 @@ const FeedbackFormPage = () => {
       comments: assignment.comments ?? '',
       responses: flatQuestions.map((question) => ({
         assignmentQuestionId: question.assignmentQuestionId ?? question.id,
-        questionId: question.sourceQuestionId ?? question.id,
         ratingValue: question.existingRatingValue != null ? String(question.existingRatingValue) : '',
         comment: question.existingComment ?? '',
       })),
@@ -317,7 +316,6 @@ const FeedbackFormPage = () => {
         const rawValue = response.ratingValue.trim();
         return {
           assignmentQuestionId: response.assignmentQuestionId || question?.assignmentQuestionId || question?.id,
-          questionId: response.questionId || question?.sourceQuestionId || question?.id,
           ratingValue: rawValue ? Number(rawValue) : null,
           comment: response.comment.trim() || undefined,
         };
@@ -409,8 +407,7 @@ const FeedbackFormPage = () => {
           }
 
           return {
-            assignmentQuestionId: response.assignmentQuestionId,
-            questionId: response.questionId,
+            assignmentQuestionId: response.assignmentQuestionId || question.assignmentQuestionId || question.id,
             ratingValue: numericValue,
             comment: response.comment.trim(),
           };
