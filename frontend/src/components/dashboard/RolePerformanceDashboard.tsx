@@ -7,6 +7,7 @@ import { feedbackService } from '../../services/feedbackService';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
 import { notificationService } from '../../services/notificationService';
 import { profileService } from '../../services/profileService';
+import { emptyPositionPermission, positionPermissionService } from '../../services/positionPermissionService';
 import {
   emptyReportingDashboard,
   reportingService,
@@ -19,6 +20,7 @@ import type { FeedbackDashboard } from '../../types/feedback';
 import type { EmployeeKpiResult } from '../../types/kpiWorkflow';
 import type { NotificationDto } from '../../services/notificationService';
 import type { UserProfile } from '../../services/profileService';
+import type { PositionPermission } from '../../types/positionPermission';
 import {
   buildScoreBands,
   toDashboardNumber,
@@ -248,18 +250,20 @@ type QuickAction = {
   title: string;
   description: string;
   to: string;
+  permissionField?: keyof PositionPermission;
+  anyPermissions?: Array<keyof PositionPermission>;
 };
 
 const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
   if (view === 'hr') {
     return [
-      { icon: 'bi-people', title: 'Employees', description: 'Manage employee records', to: '/hr/employee' },
-      { icon: 'bi-building', title: 'Departments', description: 'Department setup', to: '/hr/department' },
-      { icon: 'bi-grid', title: 'Department Comparison', description: 'Department performance', to: '/hr/department-comparison' },
+      { icon: 'bi-people', title: 'Employees', description: 'Manage employee records', to: '/hr/employee', permissionField: 'employeeCrud' },
+      { icon: 'bi-building', title: 'Departments', description: 'Department setup', to: '/hr/department', permissionField: 'departmentCrud' },
+      { icon: 'bi-grid', title: 'Department Comparison', description: 'Department performance', to: '/hr/department-comparison', permissionField: 'departmentComparisonView' },
       { icon: 'bi-diagram-3', title: 'View Teams', description: 'Company team structure', to: '/hr/team' },
-      { icon: 'bi-clipboard-data', title: 'Appraisals', description: 'Review workflow', to: '/hr/appraisal' },
-      { icon: 'bi-bullseye', title: 'KPI Templates', description: 'KPI setup', to: '/hr/kpi-template' },
-      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Feedback setup', to: '/hr/feedback/questions' },
+      { icon: 'bi-clipboard-data', title: 'Appraisals', description: 'Review workflow', to: '/hr/appraisal', permissionField: 'appraisalPermission' },
+      { icon: 'bi-bullseye', title: 'KPI Templates', description: 'KPI setup', to: '/hr/kpi-template', permissionField: 'kpiPermission' },
+      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Feedback setup', to: '/hr/feedback/questions', permissionField: 'feedback360Permission' },
       { icon: 'bi-graph-up', title: 'Reports', description: 'Performance reports', to: '/hr/reports/performance' },
       { icon: 'bi-stars', title: 'Recommendations', description: 'Promotion insights', to: '/hr/reports/recommendations' },
     ];
@@ -287,10 +291,10 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
 
   if (view === 'departmentHead') {
     return [
-      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams' },
-      { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review' },
-      { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review' },
-      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary' },
+      { icon: 'bi-diagram-3', title: 'View Teams', description: 'Department team list', to: '/department-head/teams', permissionField: 'teamView' },
+      { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Review scores', to: '/department-head/assessment-review', permissionField: 'selfAssessmentView' },
+      { icon: 'bi-list-check', title: 'Appraisals', description: 'Department review queue', to: '/department-head/appraisals/review', permissionField: 'appraisalPermission' },
+      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Department feedback', to: '/department-head/feedback/summary', permissionField: 'feedback360Permission' },
       { icon: 'bi-bullseye', title: 'Department KPIs', description: 'Department KPI results', to: '/department-head/department-kpis' },
       { icon: 'bi-graph-up', title: 'Reports', description: 'Scoped reports', to: '/department-head/reports/performance' },
     ];
@@ -298,13 +302,13 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
 
   if (view === 'manager') {
     return [
-      { icon: 'bi-people', title: 'My Team', description: 'Direct reports', to: '/manager/my-team' },
-      { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Manager reviews', to: '/manager/assessment-review' },
-      { icon: 'bi-list-check', title: 'Appraisals', description: 'Review history', to: '/manager/appraisals' },
-      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Team feedback summary', to: '/manager/feedback/summary' },
-      { icon: 'bi-bullseye', title: 'KPI Scoring', description: 'Score KPIs', to: '/manager/kpi-scoring' },
+      { icon: 'bi-people', title: 'My Team', description: 'Direct reports', to: '/manager/my-team', permissionField: 'teamView' },
+      { icon: 'bi-clipboard-check', title: 'Assessment Review', description: 'Manager reviews', to: '/manager/assessment-review', permissionField: 'selfAssessmentSign' },
+      { icon: 'bi-list-check', title: 'Appraisals', description: 'Review history', to: '/manager/appraisals', permissionField: 'appraisalPermission' },
+      { icon: 'bi-chat-square-text', title: '360 Feedback', description: 'Team feedback summary', to: '/manager/feedback/summary', permissionField: 'feedback360Permission' },
+      { icon: 'bi-bullseye', title: 'KPI Scoring', description: 'Score KPIs', to: '/manager/kpi-scoring', anyPermissions: ['kpiInput', 'kpiScore', 'kpiView'] },
       { icon: 'bi-graph-up', title: 'Reports', description: 'Manager reports', to: '/manager/reports/performance' },
-      { icon: 'bi-exclamation-triangle', title: 'Create PIP', description: 'Improvement plan', to: '/pip/create' },
+      { icon: 'bi-exclamation-triangle', title: 'Create PIP', description: 'Improvement plan', to: '/pip/create', permissionField: 'pipCreate' },
     ];
   }
 
@@ -554,6 +558,31 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
   const [error, setError] = useState('');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [positionPermissions, setPositionPermissions] = useState<PositionPermission>(emptyPositionPermission());
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (view === 'admin' || view === 'employee' || view === 'ceo') {
+      setPositionPermissions(emptyPositionPermission());
+      return () => {
+        mounted = false;
+      };
+    }
+
+    positionPermissionService
+      .getMyPermissions()
+      .then((data) => {
+        if (mounted) setPositionPermissions({ ...emptyPositionPermission(), ...data });
+      })
+      .catch(() => {
+        if (mounted) setPositionPermissions(emptyPositionPermission());
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [view]);
 
   useEffect(() => {
     let mounted = true;
@@ -705,7 +734,18 @@ const RolePerformanceDashboard = ({ view }: RolePerformanceDashboardProps) => {
 
   const metrics = isEmployeeView(view) ? employeeMetrics : orgMetrics;
   const totalDistribution = distributionData.reduce((sum, item) => sum + toDashboardNumber(item.value), 0);
-  const quickActions = getQuickActions(view);
+  const quickActions = useMemo(() => {
+    const canUseAction = (action: QuickAction) => {
+      if (view === 'admin' || view === 'employee' || view === 'ceo') return true;
+      if (action.anyPermissions?.length) {
+        return action.anyPermissions.some((field) => Boolean(positionPermissions[field]));
+      }
+      if (action.permissionField) return Boolean(positionPermissions[action.permissionField]);
+      return true;
+    };
+
+    return getQuickActions(view).filter(canUseAction);
+  }, [positionPermissions, view]);
 
   return (
     <DashboardShell
