@@ -231,9 +231,33 @@ const normalizeDashboard = (raw: any): ReportingDashboard => {
   };
 };
 
+let dashboardInFlight: Promise<ReportingDashboard> | null = null;
+let dashboardCache: { data: ReportingDashboard; loadedAt: number } | null = null;
+const DASHBOARD_CACHE_MS = 5000;
+
 export const reportingService = {
-  async getDashboard(): Promise<ReportingDashboard> {
-    const response = await api.get('/reports/dashboard');
-    return normalizeDashboard(unwrap<any>(response, emptyReportingDashboard));
+  async getDashboard(forceRefresh = false): Promise<ReportingDashboard> {
+    const now = Date.now();
+
+    if (!forceRefresh && dashboardCache && now - dashboardCache.loadedAt < DASHBOARD_CACHE_MS) {
+      return dashboardCache.data;
+    }
+
+    if (!forceRefresh && dashboardInFlight) {
+      return dashboardInFlight;
+    }
+
+    dashboardInFlight = api
+      .get('/reports/dashboard')
+      .then((response) => {
+        const data = normalizeDashboard(unwrap<any>(response, emptyReportingDashboard));
+        dashboardCache = { data, loadedAt: Date.now() };
+        return data;
+      })
+      .finally(() => {
+        dashboardInFlight = null;
+      });
+
+    return dashboardInFlight;
   },
 };
