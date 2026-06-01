@@ -436,13 +436,17 @@ const FeedbackMyResultPage = () => {
                     </p>
                 </div>
                 <div className="feedback-privacy-grid">
-                    {(selectedResult.relationshipPrivacy ?? []).map((item) => (
-                        <article key={item.relationshipType} className={item.visibleOutsideHr ? 'visible' : 'hidden'}>
-                            <strong>{item.label || item.relationshipType}</strong>
-                            <span>{item.responseCount} / {item.minimumVisibleResponses} minimum</span>
-                            <small>{item.visibleOutsideHr ? 'Visible in employee result' : item.hiddenReason || 'Hidden for confidentiality'}</small>
-                        </article>
-                    ))}
+                    {(selectedResult.relationshipPrivacy ?? []).map((item) => {
+                        const notApplicable = item.applicable === false;
+                        const badge = notApplicable ? 'Not applicable' : item.thresholdRequired ? `${item.responseCount} / ${item.minimumVisibleResponses} minimum` : `${item.responseCount} responses`;
+                        return (
+                            <article key={item.relationshipType} className={item.visibleOutsideHr ? 'visible' : 'hidden'}>
+                                <strong>{item.label || item.relationshipType}</strong>
+                                <span>{badge}</span>
+                                <small>{notApplicable ? 'Not applicable for this result' : item.visibleOutsideHr ? 'Visible in employee result' : item.hiddenReason || 'Hidden for confidentiality'}</small>
+                            </article>
+                        );
+                    })}
                 </div>
             </section>
         </main>

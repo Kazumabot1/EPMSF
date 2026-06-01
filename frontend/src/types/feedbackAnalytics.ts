@@ -10,10 +10,12 @@ export interface FeedbackRelationshipPrivacy {
   relationshipType: string;
   label?: string | null;
   responseCount: number;
+  assignedCount?: number;
   minimumVisibleResponses: number;
   thresholdRequired: boolean;
   thresholdMet: boolean;
   visibleOutsideHr: boolean;
+  applicable?: boolean;
   hiddenReason?: string | null;
 }
 

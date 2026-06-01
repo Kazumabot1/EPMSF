@@ -13,6 +13,7 @@
     <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/db/migration/V20260518_09__feedback_question_rule_set_identity.sql" dialect="MySQL" />
     <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/db/migration/V20260518_10__feedback_question_rule_set_governance_fields.sql" dialect="MySQL" />
     <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/db/migration/V20260518_11__feedback_question_rule_set_status_governance.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/db/migration/V20260601_02__force_fix_feedback_question_selection_unique_key.sql" dialect="MySQL" />
     <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/manual-fixes/20260506_feedback_module_boundary.sql" dialect="MariaDB" />
     <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/manual-fixes/20260506_feedback_summary_publish_rules.sql" dialect="MariaDB" />
     <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/manual-fixes/20260507_feedback_early_close_approval.sql" dialect="GenericSQL" />

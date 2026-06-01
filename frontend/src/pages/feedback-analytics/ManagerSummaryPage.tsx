@@ -137,7 +137,7 @@ const reviewerGroupRows = (item: ManagedFeedbackResultItem): ReviewerGroupRow[] 
     const privacy = relationshipPrivacyFor(item, group.key);
     const score = toNumber(item[group.scoreKey] as number | null | undefined);
     const count = countOf(item[group.countKey] as number | null | undefined);
-    const visible = privacy?.visibleOutsideHr ?? score != null;
+    const visible = privacy?.applicable === false ? false : (privacy?.visibleOutsideHr ?? score != null);
     return {
         key: group.key,
         label: privacy?.label || group.label,
@@ -149,7 +149,7 @@ const reviewerGroupRows = (item: ManagedFeedbackResultItem): ReviewerGroupRow[] 
 });
 
 const hasPrivacyProtectedGroup = (item: ManagedFeedbackResultItem) =>
-    asArray(item.relationshipPrivacy).some((entry) => entry.visibleOutsideHr === false || entry.thresholdMet === false)
+    asArray(item.relationshipPrivacy).some((entry) => entry.applicable !== false && (entry.visibleOutsideHr === false || entry.thresholdMet === false))
     || reviewerGroupRows(item).some((entry) => entry.count > 0 && !entry.visible);
 
 const confidenceLabel = (item: ManagedFeedbackResultItem) => {

@@ -34,6 +34,7 @@ import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.DepartmentRepository;
 import com.epms.repository.EmployeeRepository;
 import com.epms.repository.FeedbackCampaignRepository;
+import com.epms.repository.FeedbackEvaluatorAssignmentRepository;
 import com.epms.repository.FeedbackResponseRepository;
 import com.epms.repository.FeedbackSummaryRepository;
 import com.epms.repository.TeamRepository;
@@ -66,6 +67,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
     private final FeedbackCampaignRepository feedbackCampaignRepository;
     private final FeedbackResponseRepository feedbackResponseRepository;
+    private final FeedbackEvaluatorAssignmentRepository feedbackEvaluatorAssignmentRepository;
     private final FeedbackSummaryRepository feedbackSummaryRepository;
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
@@ -920,6 +922,44 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
         return responsesBySummaryKey;
     }
 
+    private Map<String, Map<FeedbackRelationshipType, Long>> loadAssignedCountsBySummaryKey(List<FeedbackSummary> summaries) {
+        if (summaries == null || summaries.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<String> summaryKeys = summaries.stream()
+                .map(this::summaryKey)
+                .collect(Collectors.toSet());
+        List<Long> campaignIds = summaries.stream()
+                .map(FeedbackSummary::getCampaign)
+                .filter(Objects::nonNull)
+                .map(FeedbackCampaign::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<String, Map<FeedbackRelationshipType, Long>> assignedCountsBySummaryKey = new LinkedHashMap<>();
+        for (Long campaignId : campaignIds) {
+            List<FeedbackEvaluatorAssignment> assignments = feedbackEvaluatorAssignmentRepository.findByCampaignIdWithRequest(campaignId);
+            for (FeedbackEvaluatorAssignment assignment : assignments) {
+                FeedbackRequest request = assignment == null ? null : assignment.getFeedbackRequest();
+                Long targetEmployeeId = request == null ? null : request.getTargetEmployeeId();
+                FeedbackRelationshipType relationshipType = assignment == null ? null : assignment.getRelationshipType();
+                if (targetEmployeeId == null || relationshipType == null) {
+                    continue;
+                }
+                String key = summaryKey(campaignId, targetEmployeeId);
+                if (!summaryKeys.contains(key)) {
+                    continue;
+                }
+                assignedCountsBySummaryKey
+                        .computeIfAbsent(key, ignored -> new EnumMap<>(FeedbackRelationshipType.class))
+                        .merge(relationshipType, 1L, Long::sum);
+            }
+        }
+        return assignedCountsBySummaryKey;
+    }
+
     private String summaryKey(FeedbackSummary summary) {
         Long campaignId = summary == null || summary.getCampaign() == null ? null : summary.getCampaign().getId();
         Long targetEmployeeId = summary == null ? null : summary.getTargetEmployeeId();
@@ -932,35 +972,49 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
     private List<FeedbackRelationshipPrivacyResponse> buildRelationshipPrivacy(
             FeedbackSummary summary,
-            boolean protectRelationshipBreakdown
+            boolean protectRelationshipBreakdown,
+            Map<FeedbackRelationshipType, Long> assignedCountsByRelationship
     ) {
         return List.of(
-                relationshipPrivacy(summary, FeedbackRelationshipType.SELF, protectRelationshipBreakdown),
-                relationshipPrivacy(summary, FeedbackRelationshipType.MANAGER, protectRelationshipBreakdown),
-                relationshipPrivacy(summary, FeedbackRelationshipType.PEER, protectRelationshipBreakdown),
-                relationshipPrivacy(summary, FeedbackRelationshipType.SUBORDINATE, protectRelationshipBreakdown)
+                relationshipPrivacy(summary, FeedbackRelationshipType.SELF, protectRelationshipBreakdown, assignedCountsByRelationship),
+                relationshipPrivacy(summary, FeedbackRelationshipType.MANAGER, protectRelationshipBreakdown, assignedCountsByRelationship),
+                relationshipPrivacy(summary, FeedbackRelationshipType.PEER, protectRelationshipBreakdown, assignedCountsByRelationship),
+                relationshipPrivacy(summary, FeedbackRelationshipType.SUBORDINATE, protectRelationshipBreakdown, assignedCountsByRelationship)
         );
     }
 
     private FeedbackRelationshipPrivacyResponse relationshipPrivacy(
             FeedbackSummary summary,
             FeedbackRelationshipType relationshipType,
-            boolean protectRelationshipBreakdown
+            boolean protectRelationshipBreakdown,
+            Map<FeedbackRelationshipType, Long> assignedCountsByRelationship
     ) {
         long responseCount = relationshipResponseCount(summary, relationshipType);
-        boolean thresholdRequired = FeedbackPrivacyUtil.requiresGroupThreshold(relationshipType);
+        long assignedCount = assignedCountsByRelationship == null
+                ? 0L
+                : assignedCountsByRelationship.getOrDefault(relationshipType, 0L);
+        boolean protectedRelationship = FeedbackPrivacyUtil.requiresGroupThreshold(relationshipType);
+        boolean applicable = !protectedRelationship || assignedCount > 0 || responseCount > 0;
+        boolean thresholdRequired = protectedRelationship && applicable;
         int minimumVisibleResponses = thresholdRequired ? FeedbackPrivacyUtil.MIN_PROTECTED_RELATIONSHIP_RESPONSES : 1;
-        boolean thresholdMet = FeedbackPrivacyUtil.hasEnoughProtectedResponses(relationshipType, responseCount);
-        boolean visibleOutsideHr = !protectRelationshipBreakdown || thresholdMet;
-        String hiddenReason = visibleOutsideHr ? null : FeedbackPrivacyUtil.protectedRelationshipThresholdMessage(relationshipType);
+        boolean thresholdMet = !thresholdRequired || FeedbackPrivacyUtil.hasEnoughProtectedResponses(relationshipType, responseCount);
+        boolean visibleOutsideHr = applicable && (!protectRelationshipBreakdown || thresholdMet);
+        String hiddenReason = null;
+        if (!applicable) {
+            hiddenReason = relationshipDisplayLabel(relationshipType) + " is not applicable for this employee.";
+        } else if (!visibleOutsideHr) {
+            hiddenReason = FeedbackPrivacyUtil.protectedRelationshipThresholdMessage(relationshipType);
+        }
         return FeedbackRelationshipPrivacyResponse.builder()
                 .relationshipType(relationshipType.name())
                 .label(relationshipDisplayLabel(relationshipType))
                 .responseCount(responseCount)
+                .assignedCount(assignedCount)
                 .minimumVisibleResponses(minimumVisibleResponses)
                 .thresholdRequired(thresholdRequired)
                 .thresholdMet(thresholdMet)
                 .visibleOutsideHr(visibleOutsideHr)
+                .applicable(applicable)
                 .hiddenReason(hiddenReason)
                 .build();
     }
@@ -1137,6 +1191,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
 
     private List<FeedbackResultItemResponse> mapResults(List<FeedbackSummary> summaries, Map<Long, String> employeeNames, boolean protectRelationshipBreakdown) {
         Map<String, List<FeedbackResponse>> submittedResponsesBySummaryKey = loadSubmittedResponsesBySummaryKey(summaries);
+        Map<String, Map<FeedbackRelationshipType, Long>> assignedCountsBySummaryKey = loadAssignedCountsBySummaryKey(summaries);
         return summaries.stream()
                 .map(summary -> {
                     boolean showOverallScore = !protectRelationshipBreakdown || includeOverallScore(summary);
@@ -1145,7 +1200,9 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                     boolean showCompetencyBreakdown = !protectRelationshipBreakdown || includeCompetencyBreakdown(summary);
                     boolean showComments = !protectRelationshipBreakdown || includeComments(summary);
 
-                    List<FeedbackResponse> submittedResponses = submittedResponsesBySummaryKey.getOrDefault(summaryKey(summary), List.of());
+                    String summaryKey = summaryKey(summary);
+                    List<FeedbackResponse> submittedResponses = submittedResponsesBySummaryKey.getOrDefault(summaryKey, List.of());
+                    Map<FeedbackRelationshipType, Long> assignedCounts = assignedCountsBySummaryKey.getOrDefault(summaryKey, Map.of());
                     Double visibleAverageScore = showOverallScore ? summary.getAverageScore() : null;
                     return FeedbackResultItemResponse.builder()
                             .campaignId(summary.getCampaign().getId())
@@ -1184,7 +1241,7 @@ public class FeedbackSummaryServiceImpl implements FeedbackSummaryService {
                             .includeSelfVsOthers(includeSelfVsOthers(summary))
                             .includeComments(includeComments(summary))
                             .includeScoreExplanation(includeScoreExplanation(summary))
-                            .relationshipPrivacy(buildRelationshipPrivacy(summary, protectRelationshipBreakdown))
+                            .relationshipPrivacy(buildRelationshipPrivacy(summary, protectRelationshipBreakdown, assignedCounts))
                             .competencyBreakdown(showCompetencyBreakdown
                                     ? buildEmployeeCompetencyBreakdown(summary, submittedResponses, protectRelationshipBreakdown)
                                     : List.of())

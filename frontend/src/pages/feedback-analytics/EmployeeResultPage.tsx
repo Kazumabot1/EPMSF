@@ -89,7 +89,7 @@ const reviewerGroupRows = (item: FeedbackResultItem): ReviewerGroupRow[] => REVI
     const privacy = privacyFor(item.relationshipPrivacy, group.key);
     const score = toNumber(item[group.scoreKey] as number | null | undefined);
     const count = countOf(item[group.countKey] as number | null | undefined);
-    const visible = privacy?.visibleOutsideHr ?? score != null;
+    const visible = privacy?.applicable === false ? false : (privacy?.visibleOutsideHr ?? score != null);
     return {
         key: group.key,
         label: privacy?.label || group.label,
@@ -101,7 +101,7 @@ const reviewerGroupRows = (item: FeedbackResultItem): ReviewerGroupRow[] => REVI
 });
 
 const hasPrivacyProtectedGroup = (item: FeedbackResultItem) =>
-    (item.relationshipPrivacy ?? []).some((entry) => entry.visibleOutsideHr === false || entry.thresholdMet === false)
+    (item.relationshipPrivacy ?? []).some((entry) => entry.applicable !== false && (entry.visibleOutsideHr === false || entry.thresholdMet === false))
     || reviewerGroupRows(item).some((row) => row.count > 0 && !row.visible);
 
 const groupedComments = (comments: FeedbackPublishedComment[]) => comments.reduce<Record<string, FeedbackPublishedComment[]>>((groups, comment) => {
@@ -138,7 +138,7 @@ const ReviewerGroupBreakdown = ({ item }: { item: FeedbackResultItem }) => {
 
     return (
         <div className="feedback-result-relationship-grid">
-            {reviewerGroupRows(item).map((row) => {
+            {reviewerGroupRows(item).filter((row) => row.count > 0 || row.key === 'SELF' || row.key === 'MANAGER').map((row) => {
                 const canShowScore = row.visible && row.score != null;
                 return (
                     <article className={`feedback-result-relationship-card ${row.visible ? '' : 'is-masked'}`} key={row.key}>

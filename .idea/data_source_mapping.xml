@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/EPMS/src/main/resources/db/migration/V20260601_02__force_fix_feedback_question_selection_unique_key.sql" value="8a0b76a0-1c75-493e-9abe-f23e5875ea5e" />
+  </component>
+</project>

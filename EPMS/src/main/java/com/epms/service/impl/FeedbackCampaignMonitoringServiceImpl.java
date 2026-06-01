@@ -53,7 +53,7 @@ public class FeedbackCampaignMonitoringServiceImpl implements FeedbackCampaignMo
 
     private static final List<String> RELATIONSHIP_ORDER = List.of("MANAGER", "PEER", "SUBORDINATE", "SELF");
     private static final Set<String> PROTECTED_RELATIONSHIPS = Set.of("PEER", "SUBORDINATE");
-    private static final int MIN_PROTECTED_RESPONSES = 2;
+    private static final int MIN_PROTECTED_RESPONSES = 3;
     private static final int DAYS_REMAINING_RISK_THRESHOLD = 2;
     private static final int HEAVY_PENDING_THRESHOLD = 8;
     private static final int OVERLOADED_PENDING_THRESHOLD = 12;

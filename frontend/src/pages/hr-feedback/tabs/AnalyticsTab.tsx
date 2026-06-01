@@ -63,6 +63,7 @@ const numberValue = (value?: number | null) => Number(value ?? 0);
 const countValue = (value?: number | null) => Number(value ?? 0);
 const formatCount = (value?: number | null) => Number(value ?? 0).toLocaleString();
 const hasNumericScore = (value?: number | null) => value != null && !Number.isNaN(Number(value));
+const PROTECTED_RELATIONSHIP_THRESHOLD = 3;
 
 const formatScore = (value?: number | null, digits = 1) => {
   if (value == null || Number.isNaN(Number(value))) return '—';
@@ -108,40 +109,52 @@ const fallbackRelationshipPrivacy = (item: FeedbackResultItem): FeedbackRelation
     relationshipType: 'MANAGER',
     label: 'Manager',
     responseCount: countValue(item.managerResponses),
+    assignedCount: countValue(item.managerResponses),
     minimumVisibleResponses: 1,
     thresholdRequired: false,
     thresholdMet: countValue(item.managerResponses) >= 1,
     visibleOutsideHr: countValue(item.managerResponses) >= 1,
+    applicable: true,
     hiddenReason: countValue(item.managerResponses) >= 1 ? null : 'Not submitted yet.',
   },
   {
     relationshipType: 'PEER',
     label: 'Peers',
     responseCount: countValue(item.peerResponses),
-    minimumVisibleResponses: 2,
-    thresholdRequired: true,
-    thresholdMet: countValue(item.peerResponses) >= 2,
-    visibleOutsideHr: countValue(item.peerResponses) >= 2,
-    hiddenReason: countValue(item.peerResponses) >= 2 ? null : 'Hidden until the minimum peer response count is met.',
+    assignedCount: countValue(item.peerResponses),
+    minimumVisibleResponses: PROTECTED_RELATIONSHIP_THRESHOLD,
+    thresholdRequired: countValue(item.peerResponses) > 0,
+    thresholdMet: countValue(item.peerResponses) >= PROTECTED_RELATIONSHIP_THRESHOLD,
+    visibleOutsideHr: countValue(item.peerResponses) >= PROTECTED_RELATIONSHIP_THRESHOLD,
+    applicable: countValue(item.peerResponses) > 0,
+    hiddenReason: countValue(item.peerResponses) > 0
+        ? 'Hidden until the peer confidentiality threshold is met.'
+        : 'Peer reviewers are not applicable for this employee.',
   },
   {
     relationshipType: 'SUBORDINATE',
     label: 'Subordinates',
     responseCount: countValue(item.subordinateResponses),
-    minimumVisibleResponses: 2,
-    thresholdRequired: true,
-    thresholdMet: countValue(item.subordinateResponses) >= 2,
-    visibleOutsideHr: countValue(item.subordinateResponses) >= 2,
-    hiddenReason: countValue(item.subordinateResponses) >= 2 ? null : 'Hidden until the minimum subordinate response count is met.',
+    assignedCount: countValue(item.subordinateResponses),
+    minimumVisibleResponses: PROTECTED_RELATIONSHIP_THRESHOLD,
+    thresholdRequired: countValue(item.subordinateResponses) > 0,
+    thresholdMet: countValue(item.subordinateResponses) >= PROTECTED_RELATIONSHIP_THRESHOLD,
+    visibleOutsideHr: countValue(item.subordinateResponses) >= PROTECTED_RELATIONSHIP_THRESHOLD,
+    applicable: countValue(item.subordinateResponses) > 0,
+    hiddenReason: countValue(item.subordinateResponses) > 0
+        ? 'Hidden until the subordinate confidentiality threshold is met.'
+        : 'Subordinate reviewers are not applicable for this employee.',
   },
   {
     relationshipType: 'SELF',
     label: 'Self',
     responseCount: countValue(item.selfResponses),
+    assignedCount: countValue(item.selfResponses),
     minimumVisibleResponses: 1,
     thresholdRequired: false,
     thresholdMet: countValue(item.selfResponses) >= 1,
     visibleOutsideHr: countValue(item.selfResponses) >= 1,
+    applicable: true,
     hiddenReason: countValue(item.selfResponses) >= 1 ? null : 'Not submitted yet.',
   },
 ];
@@ -152,7 +165,9 @@ const privacyRowsFor = (item: FeedbackResultItem) => {
     ...row,
     label: row.label || relationshipDisplayName(row.relationshipType),
     responseCount: countValue(row.responseCount),
+    assignedCount: countValue(row.assignedCount),
     minimumVisibleResponses: Number(row.minimumVisibleResponses ?? 1),
+    applicable: row.applicable !== false,
     thresholdRequired: Boolean(row.thresholdRequired),
     thresholdMet: row.thresholdMet !== false,
     visibleOutsideHr: row.visibleOutsideHr !== false,
@@ -402,22 +417,22 @@ function ScoringCard({ scoringConfig, scoringLoading, className }: { summary: Fe
   }));
 
   return (
-      <CompactCard className={cx('h-full', className)}>
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <CompactCard className={cx('flex h-full min-h-[210px] flex-col', className)}>
+        <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold text-slate-950">Reviewer weights</h4>
             <p className="mt-0.5 text-xs text-slate-500">Campaign scoring mix</p>
           </div>
           <span className={badgeClass(scoringConfig?.relationshipWeightsReady ? 'green' : 'amber')}>{scoringLoading ? 'Loading' : scoringConfig?.relationshipWeightsReady ? 'Ready' : 'Review'}</span>
         </div>
-        <div className="space-y-3">
+        <div className="flex-1 content-center">
           <BarList rows={configuredRows} maxValue={100} emptyText="No weights configured." />
         </div>
       </CompactCard>
   );
 }
 
-function AnalyticsGrid({ summary }: { summary: FeedbackCampaignSummary }) {
+function AnalyticsPatternsCard({ summary }: { summary: FeedbackCampaignSummary }) {
   const hasResponses = countValue(summary.totalResponses) > 0;
   const rows = distributionRows(summary.scoreDistribution, summary.items ?? []);
   const relationshipRows = (summary.relationshipAverages ?? []).map(row => ({
@@ -435,41 +450,36 @@ function AnalyticsGrid({ summary }: { summary: FeedbackCampaignSummary }) {
       .slice(0, 4)
       .map(row => ({ label: row.competencyName || row.competencyCode, value: numberValue(row.averageScore), meta: formatScore(row.averageScore) }));
 
-  if (!hasResponses && competencies.length === 0) {
-    return (
-        <CompactCard>
-          <SectionHeader eyebrow="Analytics" title="Patterns" helper="Patterns appear when submitted feedback is available." />
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500">No feedback was submitted before this campaign closed.</div>
-        </CompactCard>
-    );
-  }
-
   return (
-      <div className="space-y-3">
-        <SectionHeader eyebrow="Analytics" title="Patterns" helper="Focus on score bands, reviewer groups, and competency trends." />
-        <div className="grid gap-3 lg:grid-cols-2">
-          <CompactCard>
-            <h4 className="mb-1 text-sm font-semibold text-slate-950">Score distribution</h4>
-            <p className="mb-3 text-xs text-slate-500">Employees by score band</p>
-            <BarList rows={rows} maxValue={Math.max(1, ...rows.map(row => row.value))} />
-          </CompactCard>
-          <CompactCard>
-            <h4 className="mb-1 text-sm font-semibold text-slate-950">Reviewer groups</h4>
-            <p className="mb-3 text-xs text-slate-500">Submitted reviewer averages</p>
-            <BarList rows={relationshipRows} maxValue={100} emptyText="No reviewer averages yet." />
-          </CompactCard>
-          <CompactCard>
-            <h4 className="mb-1 text-sm font-semibold text-slate-950">Strongest competencies</h4>
-            <p className="mb-3 text-xs text-slate-500">Highest scoring areas</p>
-            <BarList rows={topCompetencies} maxValue={100} emptyText="No competency scores yet." />
-          </CompactCard>
-          <CompactCard>
-            <h4 className="mb-1 text-sm font-semibold text-slate-950">Development focus</h4>
-            <p className="mb-3 text-xs text-slate-500">Lowest scoring areas</p>
-            <BarList rows={focusCompetencies} maxValue={100} emptyText="No competency scores yet." />
-          </CompactCard>
-        </div>
-      </div>
+      <CompactCard className="h-full">
+        <SectionHeader eyebrow="Analytics" title="Patterns" helper={hasResponses ? 'Score bands, reviewer groups, and competencies.' : 'Patterns appear when feedback exists.'} />
+        {!hasResponses && competencies.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500">No feedback was submitted before this campaign closed.</div>
+        ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                <h4 className="mb-1 text-sm font-semibold text-slate-950">Score distribution</h4>
+                <p className="mb-3 text-xs text-slate-500">Employees by score band</p>
+                <BarList rows={rows} maxValue={Math.max(1, ...rows.map(row => row.value))} />
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                <h4 className="mb-1 text-sm font-semibold text-slate-950">Reviewer groups</h4>
+                <p className="mb-3 text-xs text-slate-500">Submitted reviewer averages</p>
+                <BarList rows={relationshipRows} maxValue={100} emptyText="No reviewer averages yet." />
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                <h4 className="mb-1 text-sm font-semibold text-slate-950">Strongest competencies</h4>
+                <p className="mb-3 text-xs text-slate-500">Highest scoring areas</p>
+                <BarList rows={topCompetencies} maxValue={100} emptyText="No competency scores yet." />
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                <h4 className="mb-1 text-sm font-semibold text-slate-950">Development focus</h4>
+                <p className="mb-3 text-xs text-slate-500">Lowest scoring areas</p>
+                <BarList rows={focusCompetencies} maxValue={100} emptyText="No competency scores yet." />
+              </div>
+            </div>
+        )}
+      </CompactCard>
   );
 }
 
@@ -505,24 +515,26 @@ function ConfidenceCompact({ rows, className }: { rows: FeedbackConfidenceBreakd
   ] as FeedbackConfidenceBreakdown[];
 
   return (
-      <CompactCard className={cx('h-full', className)}>
-        <div className="mb-4">
+      <CompactCard className={cx('flex h-full min-h-[210px] flex-col', className)}>
+        <div className="mb-3">
           <h4 className="text-sm font-semibold text-slate-950">Confidence</h4>
           <p className="mt-0.5 text-xs text-slate-500">Result quality by employee</p>
         </div>
-        <div className="grid h-full gap-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center">
-          <ConfidenceDonut rows={safeRows} />
-          <div className="space-y-2">
+        <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex shrink-0 justify-center sm:w-[118px]">
+            <ConfidenceDonut rows={safeRows} />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
             {safeRows.map((row, index) => {
               const level = String(row.level ?? '').toUpperCase();
               const tone: Tone = level.includes('HIGH') ? 'green' : level.includes('MEDIUM') ? 'amber' : level.includes('LOW') ? 'amber' : 'red';
               return (
                   <div key={`${row.level}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
-                <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                  <i className={cx('h-1.5 w-1.5 rounded-full not-italic', tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-rose-500')} />
-                  {row.label || row.level}
+                <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-700">
+                  <i className={cx('h-1.5 w-1.5 shrink-0 rounded-full not-italic', tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-rose-500')} />
+                  <span className="truncate">{row.label || row.level}</span>
                 </span>
-                    <strong className="text-xs text-slate-950">{formatCount(row.count)}</strong>
+                    <strong className="shrink-0 text-xs text-slate-950">{formatCount(row.count)}</strong>
                   </div>
               );
             })}
@@ -543,7 +555,7 @@ function PublishReadinessPanel({ summary, readyItems, blockedItems, publishedCou
 }) {
   const items = summary.items ?? [];
   const allPrivacyRows = items.flatMap(privacyRowsFor);
-  const maskedRows = allPrivacyRows.filter(row => row.thresholdRequired && !row.thresholdMet && row.responseCount > 0);
+  const maskedRows = allPrivacyRows.filter(row => row.applicable !== false && row.thresholdRequired && !row.thresholdMet && row.responseCount > 0);
   const noResponseCount = blockedItems.filter(item => countValue(item.totalResponses) === 0).length;
   const insufficientCount = blockedItems.filter(item => item.insufficientFeedback && countValue(item.totalResponses) > 0).length;
   const nextAction = readyItems.length > 0
@@ -589,7 +601,7 @@ function PublishReadinessPanel({ summary, readyItems, blockedItems, publishedCou
           ))}
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-slate-500">Peer threshold</span>
-            <strong className="text-slate-900">{allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? 2}+</strong>
+            <strong className="text-slate-900">{allPrivacyRows.find(row => row.relationshipType === 'PEER')?.minimumVisibleResponses ?? PROTECTED_RELATIONSHIP_THRESHOLD}+</strong>
           </div>
         </div>
       </CompactCard>
@@ -599,7 +611,7 @@ function PublishReadinessPanel({ summary, readyItems, blockedItems, publishedCou
 function RelationshipChips({ item }: { item: FeedbackResultItem }) {
   return (
       <div className="flex flex-wrap gap-1.5">
-        {privacyRowsFor(item).map(row => (
+        {privacyRowsFor(item).filter(row => row.applicable !== false).map(row => (
             <span key={row.relationshipType} className={cx('rounded-full px-2 py-1 text-xs font-semibold', row.responseCount > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500')}>
           {relationshipDisplayName(row.relationshipType)} {row.responseCount}
         </span>
@@ -750,12 +762,26 @@ function ResultDrawer({ item, onClose }: { item: FeedbackResultItem | null; onCl
             <CompactCard>
               <h4 className="mb-3 text-base font-semibold text-slate-950">Privacy checks</h4>
               <div className="space-y-2">
-                {privacyRows.map(row => (
-                    <div key={row.relationshipType} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3">
-                      <span><strong className="block text-sm text-slate-800">{row.label}</strong><small className="text-slate-500">{row.visibleOutsideHr ? 'Can be shown if this section is published.' : row.hiddenReason || 'Hidden outside HR.'}</small></span>
-                      <span className={badgeClass(row.thresholdMet ? 'green' : 'amber')}>{row.responseCount}/{row.minimumVisibleResponses}</span>
-                    </div>
-                ))}
+                {privacyRows.map(row => {
+                  const notApplicable = row.applicable === false;
+                  const protectedRow = row.thresholdRequired;
+                  const helperText = notApplicable
+                      ? 'Not applicable for this employee.'
+                      : protectedRow
+                          ? row.thresholdMet
+                              ? 'Confidentiality threshold met.'
+                              : `Hidden from employee results until ${row.minimumVisibleResponses} submitted responses are available.`
+                          : row.visibleOutsideHr
+                              ? 'Can be shown if this section is published.'
+                              : row.hiddenReason || 'Hidden outside HR.';
+                  const badgeText = notApplicable ? 'N/A' : protectedRow ? `${row.responseCount}/${row.minimumVisibleResponses}` : `${row.responseCount}`;
+                  return (
+                      <div key={row.relationshipType} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3">
+                        <span><strong className="block text-sm text-slate-800">{row.label}</strong><small className="text-slate-500">{helperText}</small></span>
+                        <span className={badgeClass(notApplicable ? 'slate' : row.thresholdMet ? 'green' : 'amber')}>{badgeText}</span>
+                      </div>
+                  );
+                })}
               </div>
             </CompactCard>
 
@@ -1123,7 +1149,7 @@ export default function AnalyticsTab() {
   };
 
   return (
-      <div className="mx-auto w-full max-w-[1180px] space-y-4 overflow-x-hidden px-4 pb-8 text-slate-900">
+      <div className="f360-analytics-page mx-auto w-full max-w-[1180px] space-y-4 overflow-x-hidden px-4 pb-8 text-slate-900">
         {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{notice}</div> : null}
         {error ? <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div> : null}
         {closedCampaigns.length === 0 && !loading ? <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm font-medium text-slate-500">Analytics appears after a 360 campaign is closed.</div> : null}
@@ -1133,6 +1159,24 @@ export default function AnalyticsTab() {
         {summary && !loading ? (
             <>
               <CampaignSummaryStrip summary={summary} campaign={selectedCampaign} cards={metricCards} selectedId={selectedId} closedCampaigns={closedCampaigns} setSelectedId={setSelectedId} onRefresh={refreshSummary} loading={loading} />
+
+              <div className="grid w-full min-w-0 items-stretch gap-4 lg:grid-cols-2">
+                <ConfidenceCompact rows={summary.confidenceBreakdown ?? []} />
+                <ScoringCard summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
+              </div>
+
+              <div className="grid w-full min-w-0 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <AnalyticsPatternsCard summary={summary} />
+                <PublishReadinessPanel
+                    summary={summary}
+                    readyItems={readyItems}
+                    blockedItems={blockedItems}
+                    publishedCount={publishedCount}
+                    actionLoading={actionLoading}
+                    onPublish={openPublishModal}
+                    onUnpublish={() => setUnpublishOpen(true)}
+                />
+              </div>
 
               <EmployeeResultsList
                   items={filteredItems}
@@ -1147,24 +1191,6 @@ export default function AnalyticsTab() {
                   onOpen={setSelectedResult}
                   onExport={exportCsv}
               />
-
-              <div className="grid w-full min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <AnalyticsGrid summary={summary} />
-                <PublishReadinessPanel
-                    summary={summary}
-                    readyItems={readyItems}
-                    blockedItems={blockedItems}
-                    publishedCount={publishedCount}
-                    actionLoading={actionLoading}
-                    onPublish={openPublishModal}
-                    onUnpublish={() => setUnpublishOpen(true)}
-                />
-              </div>
-
-              <div className="grid w-full min-w-0 items-stretch gap-4 lg:grid-cols-2">
-                <ConfidenceCompact rows={summary.confidenceBreakdown ?? []} />
-                <ScoringCard summary={summary} scoringConfig={scoringConfig} scoringLoading={scoringLoading} />
-              </div>
 
               <ResultDrawer item={selectedResult} onClose={() => setSelectedResult(null)} />
               <PublishModal
