@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { kpiWorkflowService } from '../../services/kpiWorkflowService';
 import type { ManagerKpiAssignment, ManagerKpiTemplateSummary } from '../../types/kpiWorkflow';
@@ -23,6 +23,25 @@ const sortTemplateSummaries = (rows: ManagerKpiTemplateSummary[]) =>
 
 const summaryKey = (summary: Pick<ManagerKpiTemplateSummary, 'kpiFormId' | 'cyclePeriodId'>) =>
   `${summary.kpiFormId}:${summary.cyclePeriodId ?? 'legacy'}`;
+
+const parseSummaryKey = (key: string) => {
+  if (key === '') return null;
+  const colon = key.indexOf(':');
+  if (colon <= 0) return null;
+
+  const kpiFormId = Number(key.slice(0, colon));
+  const cyclePart = key.slice(colon + 1);
+  if (!Number.isFinite(kpiFormId)) return null;
+
+  if (cyclePart === 'legacy') {
+    return { kpiFormId, cyclePeriodId: null as number | null };
+  }
+
+  const cyclePeriodId = Number(cyclePart);
+  if (!Number.isFinite(cyclePeriodId)) return null;
+
+  return { kpiFormId, cyclePeriodId };
+};
 
 function lineEffectivelyScored(
   line: ManagerKpiAssignment['lines'][number],
@@ -49,6 +68,7 @@ const ManagerKpiScoringPage = () => {
   const [finalizeTarget, setFinalizeTarget] = useState<ManagerKpiAssignment | null>(null);
   const [finalizeReason, setFinalizeReason] = useState('');
   const [savingFormId, setSavingFormId] = useState<number | null>(null);
+  const assignmentsRequestRef = useRef(0);
 
   const loadSummaries = useCallback(async () => {
     try {
@@ -70,10 +90,21 @@ const ManagerKpiScoringPage = () => {
     void loadSummaries();
   }, [loadSummaries]);
 
-  const loadAssignments = useCallback(async (summary: ManagerKpiTemplateSummary) => {
+  const loadAssignmentsForKey = useCallback(async (key: string) => {
+    const parsed = parseSummaryKey(key);
+    if (!parsed) {
+      setAssignments([]);
+      setDrafts({});
+      return;
+    }
+
+    const requestId = ++assignmentsRequestRef.current;
+
     try {
       setLoadingAssignments(true);
-      const data = await kpiWorkflowService.listAssignments(summary.kpiFormId, summary.cyclePeriodId);
+      const data = await kpiWorkflowService.listAssignments(parsed.kpiFormId, parsed.cyclePeriodId);
+      if (requestId !== assignmentsRequestRef.current) return;
+
       setAssignments(data);
       const nextDrafts: DraftScores = {};
       for (const row of data) {
@@ -85,17 +116,23 @@ const ManagerKpiScoringPage = () => {
       }
       setDrafts(nextDrafts);
     } catch (err) {
+      if (requestId !== assignmentsRequestRef.current) return;
       toast.error(err instanceof Error ? err.message : 'Failed to load assignments.');
     } finally {
-      setLoadingAssignments(false);
+      if (requestId === assignmentsRequestRef.current) {
+        setLoadingAssignments(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    const summary = summaries.find((s) => summaryKey(s) === selectedSummaryKey);
-    if (!summary) return;
-    void loadAssignments(summary);
-  }, [selectedSummaryKey, summaries, loadAssignments]);
+    if (selectedSummaryKey === '') {
+      setAssignments([]);
+      setDrafts({});
+      return;
+    }
+    void loadAssignmentsForKey(selectedSummaryKey);
+  }, [selectedSummaryKey, loadAssignmentsForKey]);
 
   const selectedSummary = useMemo(
     () => summaries.find((s) => summaryKey(s) === selectedSummaryKey),
@@ -167,7 +204,8 @@ const ManagerKpiScoringPage = () => {
       setModalAssignment((prev) =>
         prev?.employeeKpiFormId === updated.employeeKpiFormId ? updated : prev,
       );
-      void loadSummaries();
+      await loadSummaries();
+      await loadAssignmentsForKey(selectedSummaryKey);
       if (closeModalAfter) setModalAssignment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed.');
@@ -195,7 +233,7 @@ const ManagerKpiScoringPage = () => {
       const result = await kpiWorkflowService.finalizeDepartment(selectedSummary.kpiFormId, selectedSummary.cyclePeriodId);
       toast.success(`Finalized ${result.assignmentsCreated} employee record(s).`);
       await loadSummaries();
-      await loadAssignments(selectedSummary);
+      await loadAssignmentsForKey(selectedSummaryKey);
       setModalAssignment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Finalize failed.');
@@ -242,7 +280,8 @@ const ManagerKpiScoringPage = () => {
       );
       setFinalizeTarget(null);
       setFinalizeReason('');
-      void loadSummaries();
+      await loadSummaries();
+      await loadAssignmentsForKey(selectedSummaryKey);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Finalize failed.');
     } finally {

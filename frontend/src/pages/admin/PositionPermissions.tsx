@@ -13,7 +13,6 @@ import type {
 import '../position/position-ui.css';
 
 type PermissionField = keyof PositionPermission;
-type TeamAssignmentMode = 'none' | 'teamAssignAsLeader' | 'teamAssignAsMember';
 type PermissionItem = {
   key: PermissionField;
   label: string;
@@ -110,7 +109,6 @@ const allGroups: PermissionGroup[] = [
   },
 ];
 
-
 const allowedByRole: Record<string, PermissionField[]> = {
   HR: [
     'oneOnOneCreate', 'oneOnOneDeptSelection',
@@ -135,19 +133,15 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'kpiInput', 'kpiScore',
     'selfAssessmentSign', 'continuousFeedbackGive', 'feedbackSend',
   ],
-
-  /**
-   * Employee positions use position permission only for team assignment eligibility.
-   * They should not expose normal feature toggles here.
-   */
   EMPLOYEE: [
-    'teamAssignAsLeader',
-    'teamAssignAsMember',
+    'teamView', 'teamAssignAsLeader', 'teamAssignAsMember',
+    'oneOnOneCreate', 'appraisalView', 'kpiView',
+    'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentSign',
+    'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
   ],
-
   ADMIN: [
     'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
-    'teamView', 'teamCreate', 'teamEdit', 'teamHistory',
+    'teamView', 'teamCreate', 'teamEdit', 'teamHistory', 'teamAssignAsLeader', 'teamAssignAsPm', 'teamAssignAsMember',
     'pipViewAll', 'pipCreate', 'pipEdit',
     'appraisalView', 'appraisalReview', 'appraisalApprove', 'appraisalScoreInput', 'appraisalSign',
     'kpiView', 'kpiCreate', 'kpiEdit', 'kpiInput', 'kpiScore',
@@ -157,7 +151,17 @@ const allowedByRole: Record<string, PermissionField[]> = {
   ],
   HRADMIN: [
     'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
-    'teamView', 'teamCreate', 'teamEdit', 'teamHistory',
+    'teamView', 'teamCreate', 'teamEdit', 'teamHistory', 'teamAssignAsLeader', 'teamAssignAsPm', 'teamAssignAsMember',
+    'pipViewAll', 'pipCreate', 'pipEdit',
+    'appraisalView', 'appraisalReview', 'appraisalApprove', 'appraisalScoreInput', 'appraisalSign',
+    'kpiView', 'kpiCreate', 'kpiEdit', 'kpiInput', 'kpiScore',
+    'selfAssessmentView', 'selfAssessmentInput', 'selfAssessmentLock', 'selfAssessmentSign',
+    'feedbackFormCreate', 'continuousFeedbackView', 'continuousFeedbackGive', 'feedbackSend',
+    'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
+  ],
+  HR_ADMIN: [
+    'oneOnOneCreate', 'oneOnOneDeptSelection', 'oneOnOneTeamSelection',
+    'teamView', 'teamCreate', 'teamEdit', 'teamHistory', 'teamAssignAsLeader', 'teamAssignAsPm', 'teamAssignAsMember',
     'pipViewAll', 'pipCreate', 'pipEdit',
     'appraisalView', 'appraisalReview', 'appraisalApprove', 'appraisalScoreInput', 'appraisalSign',
     'kpiView', 'kpiCreate', 'kpiEdit', 'kpiInput', 'kpiScore',
@@ -166,29 +170,6 @@ const allowedByRole: Record<string, PermissionField[]> = {
     'departmentCrud', 'departmentComparisonView', 'positionCrud', 'employeeCrud', 'employeeExcelImport',
   ],
 };
-
-
-const teamAssignmentOptions: Array<{
-  value: TeamAssignmentMode;
-  label: string;
-  helper: string;
-}> = [
-  {
-    value: 'none',
-    label: 'No team assignment eligibility',
-    helper: 'Employees with this position will not appear in Team Leader or Member selection.',
-  },
-  {
-    value: 'teamAssignAsLeader',
-    label: 'Can be Team Leader',
-    helper: 'Employees with this position can be selected only as Team Leader.',
-  },
-  {
-    value: 'teamAssignAsMember',
-    label: 'Can be Team Member',
-    helper: 'Employees with this position can be selected only as normal Team Members.',
-  },
-];
 
 const normalizeRoleName = (role?: string | null) =>
   String(role ?? '')
@@ -199,16 +180,22 @@ const normalizeRoleName = (role?: string | null) =>
     .toUpperCase()
     .replace('DEPARTMENT_HEAD', 'DEPARTMENTHEAD');
 
+const isExecutivePosition = (position: PositionResponse) => {
+  const role = normalizeRoleName(position.roleName);
+  const title = normalizeRoleName(position.positionTitle);
+  return (
+    role === 'CEO' ||
+    role === 'EXECUTIVE' ||
+    title.includes('CEO') ||
+    title.includes('CHAIRMAN') ||
+    title.includes('EXECUTIVE')
+  );
+};
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return '-';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
-};
-
-const isPermissionManagedPosition = (position: PositionResponse) => {
-  const role = normalizeRoleName(position.roleName);
-
-  return role !== 'CEO' && role !== 'EXECUTIVE';
 };
 
 const normalizeColumnName = (value?: string | null) =>
@@ -224,21 +211,6 @@ const valueBadge = (value?: string | null) => {
   return '-';
 };
 
-const getTeamAssignmentMode = (permission: PositionPermission): TeamAssignmentMode => {
-  if (permission.teamAssignAsLeader) return 'teamAssignAsLeader';
-  if (permission.teamAssignAsMember) return 'teamAssignAsMember';
-  return 'none';
-};
-
-const buildTeamAssignmentPermission = (
-  previous: PositionPermission,
-  mode: TeamAssignmentMode,
-): PositionPermission => ({
-  ...previous,
-  teamAssignAsLeader: mode === 'teamAssignAsLeader',
-  teamAssignAsMember: mode === 'teamAssignAsMember',
-});
-
 const resetUnavailableFields = (permission: PositionPermission, allowedFields: Set<PermissionField>) => {
   const next = { ...permission };
   (Object.keys(next) as PermissionField[]).forEach((key) => {
@@ -246,7 +218,24 @@ const resetUnavailableFields = (permission: PositionPermission, allowedFields: S
       (next as Record<PermissionField, boolean>)[key] = false;
     }
   });
+
+  if (!next.oneOnOneCreate) {
+    next.oneOnOneDeptSelection = false;
+    next.oneOnOneTeamSelection = false;
+    next.oneOnOnePermission = false;
+  } else {
+    next.oneOnOnePermission = true;
+  }
+
   return next;
+};
+
+const isPermissionLocked = (key: PermissionField, permissions: PositionPermission) => {
+  if (key === 'oneOnOneDeptSelection' || key === 'oneOnOneTeamSelection') {
+    return !permissions.oneOnOneCreate;
+  }
+
+  return false;
 };
 
 const PositionPermissions = () => {
@@ -272,7 +261,6 @@ const PositionPermissions = () => {
     [roleKey],
   );
 
-
   const visibleGroups = useMemo(
     () => allGroups
       .map((group) => ({ ...group, items: group.items.filter((item) => allowedFields.has(item.key)) }))
@@ -290,34 +278,31 @@ const PositionPermissions = () => {
     );
   }, [positions, query]);
 
-  const teamAssignmentMode = useMemo(() => getTeamAssignmentMode(permissions), [permissions]);
   const hasChanges = useMemo(
     () => JSON.stringify(permissions) !== JSON.stringify(originalPermissions),
     [permissions, originalPermissions],
   );
 
-const loadPositions = async () => {
-  setLoading(true);
-  setMessage('');
-  setIsError(false);
-
-  try {
-    const data = await positionService.getPositions();
-    const managedPositions = data.filter(isPermissionManagedPosition);
-
-    setPositions(managedPositions);
-    setSelectedPositionId((prev) =>
-      prev && managedPositions.some((item) => item.id === prev)
-        ? prev
-        : managedPositions[0]?.id ?? null,
-    );
-  } catch (error) {
-    setIsError(true);
-    setMessage(error instanceof Error ? error.message : 'Failed to load positions.');
-  } finally {
-    setLoading(false);
-  }
-};
+  const loadPositions = async () => {
+    setLoading(true);
+    setMessage('');
+    setIsError(false);
+    try {
+      const data = await positionService.getPositions();
+      const visiblePositions = data.filter((position) => !isExecutivePosition(position));
+      setPositions(visiblePositions);
+      setSelectedPositionId((prev) => (
+        prev && visiblePositions.some((item) => item.id === prev)
+          ? prev
+          : visiblePositions[0]?.id ?? null
+      ));
+    } catch (error) {
+      setIsError(true);
+      setMessage(error instanceof Error ? error.message : 'Failed to load positions.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadPositionAccess = async (positionId: number) => {
     setMessage('');
@@ -327,7 +312,7 @@ const loadPositions = async () => {
         positionPermissionService.getByPositionId(positionId),
         positionPermissionService.getAudit(positionId),
       ]);
-      const normalized = buildTeamAssignmentPermission(permissionData, getTeamAssignmentMode(permissionData));
+      const normalized = resetUnavailableFields(permissionData, allowedFields);
       setPermissions(normalized);
       setOriginalPermissions(normalized);
       setAuditRows(auditData);
@@ -355,14 +340,21 @@ const loadPositions = async () => {
   }, [selectedPosition?.id, roleKey]);
 
   const togglePermission = (key: PermissionField) => {
-    setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
+    setPermissions((prev) => {
+      if (isPermissionLocked(key, prev)) {
+        return prev;
+      }
+
+      const next = { ...prev, [key]: !prev[key] };
+      if (key === 'oneOnOneCreate' && !next.oneOnOneCreate) {
+        next.oneOnOneDeptSelection = false;
+        next.oneOnOneTeamSelection = false;
+      }
+
+      return resetUnavailableFields(next, allowedFields);
+    });
     setMessage('');
     setIsError(false);
-  };
-
-  const changeTeamAssignment = (mode: TeamAssignmentMode) => {
-    if (mode !== 'none' && !allowedFields.has(mode)) return;
-    setPermissions((prev) => buildTeamAssignmentPermission(prev, mode));
   };
 
   const handleSave = async () => {
@@ -371,12 +363,9 @@ const loadPositions = async () => {
     setMessage('');
     setIsError(false);
     try {
-      const safePayload = resetUnavailableFields(
-        buildTeamAssignmentPermission(permissions, getTeamAssignmentMode(permissions)),
-        allowedFields,
-      );
+      const safePayload = resetUnavailableFields(permissions, allowedFields);
       const saved = await positionPermissionService.save(selectedPositionId, safePayload);
-      const normalizedSaved = buildTeamAssignmentPermission(saved, getTeamAssignmentMode(saved));
+      const normalizedSaved = resetUnavailableFields(saved, allowedFields);
       setPermissions(normalizedSaved);
       setOriginalPermissions(normalizedSaved);
       setMessage('Position permissions saved successfully.');
@@ -473,40 +462,6 @@ const loadPositions = async () => {
                   </div>
                 </div>
 
-{allowedFields.has('teamAssignAsLeader') || allowedFields.has('teamAssignAsMember') ? (
-                  <div className="position-surface" style={{ margin: '0 0 18px' }}>
-                    <div className="position-surface-inner">
-                      <div className="position-detail-section-title" style={{ marginBottom: 16 }}>
-                        <div><h3>Team Assignment Eligibility</h3><p>Only valid options for this position role can be selected.</p></div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
-                        {teamAssignmentOptions
-                          .filter((option) => option.value === 'none' || allowedFields.has(option.value))
-                          .map((option) => {
-                            const active = teamAssignmentMode === option.value;
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => changeTeamAssignment(option.value)}
-                                style={{
-                                  padding: 18,
-                                  borderRadius: 20,
-                                  border: active ? '1px solid rgba(37, 99, 235, 0.55)' : '1px solid rgba(148, 163, 184, 0.32)',
-                                  background: active ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(14, 165, 233, 0.12))' : 'rgba(248, 250, 252, 0.9)',
-                                  textAlign: 'left',
-                                }}
-                              >
-                                <strong>{option.label}</strong>
-                                <p className="position-mini-text" style={{ margin: '8px 0 0' }}>{option.helper}</p>
-                              </button>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
                 <div style={{ display: 'grid', gap: 18 }}>
                   {visibleGroups.map((group) => (
                     <div key={group.title} className="position-surface" style={{ margin: 0 }}>
@@ -516,12 +471,14 @@ const loadPositions = async () => {
                         </div>
                         <div style={{ display: 'grid', gap: 12 }}>
                           {group.items.map((item) => {
-                            const enabled = Boolean(permissions[item.key]);
+                            const locked = isPermissionLocked(item.key, permissions);
+                            const enabled = !locked && Boolean(permissions[item.key]);
                             return (
                               <button
                                 key={item.key}
                                 type="button"
                                 onClick={() => togglePermission(item.key)}
+                                disabled={locked}
                                 style={{
                                   display: 'grid',
                                   gridTemplateColumns: '1fr auto',
@@ -532,9 +489,16 @@ const loadPositions = async () => {
                                   border: enabled ? '1px solid rgba(22, 163, 74, 0.35)' : '1px solid rgba(148, 163, 184, 0.3)',
                                   background: enabled ? 'rgba(22, 163, 74, 0.08)' : 'rgba(248, 250, 252, 0.85)',
                                   textAlign: 'left',
+                                  cursor: locked ? 'not-allowed' : 'pointer',
+                                  opacity: locked ? 0.62 : 1,
                                 }}
                               >
-                                <div><strong>{item.label}</strong><div className="position-mini-text" style={{ marginTop: 6 }}>{item.helper}</div></div>
+                                <div>
+                                  <strong>{item.label}</strong>
+                                  <div className="position-mini-text" style={{ marginTop: 6 }}>
+                                    {locked ? 'Enable Create 1:1 Meeting first.' : item.helper}
+                                  </div>
+                                </div>
                                 <span className={`position-pill ${enabled ? 'active' : 'inactive'}`} style={{ minWidth: 88, textAlign: 'center' }}>{enabled ? 'Enabled' : 'Disabled'}</span>
                               </button>
                             );

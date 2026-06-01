@@ -82,8 +82,10 @@ public class SecurityConfig {
             "DEPARTMENTHEAD",
             "DEPT_HEAD",
             "HEAD_OF_DEPARTMENT",
-            "CEO",
-            "EXECUTIVE"
+            "ADMIN",
+            "HRADMIN",
+            "HR_ADMIN",
+            "HR_ADMINISTRATOR"
     );
 
     private static final Set<String> SCORE_TABLE_ROLES = Set.of(
@@ -148,8 +150,9 @@ public class SecurityConfig {
             "DEPARTMENT_HEAD_DASHBOARD",
             "DEPARTMENTHEAD_DASHBOARD",
             "DEPT_HEAD_DASHBOARD",
-            "EXECUTIVE_DASHBOARD",
-            "CEO_DASHBOARD"
+            "ADMIN_DASHBOARD",
+            "HRADMIN_DASHBOARD",
+            "HR_ADMIN_DASHBOARD"
     );
 
     private static final Set<String> SCORE_TABLE_DASHBOARDS = Set.of(

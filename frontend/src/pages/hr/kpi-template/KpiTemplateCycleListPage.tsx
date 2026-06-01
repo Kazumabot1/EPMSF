@@ -27,6 +27,7 @@ const formatDate = (value: string | null | undefined) => {
 const statusLabel = (cycle: KpiTemplateCycleResponse) => {
   if (cycle.status === 'PENDING_APPROVAL') return 'Pending approval';
   if (cycle.status === 'CLOSING') return 'Closing';
+  if (cycle.status === 'CLOSED') return 'Closed';
   if (cycle.status === 'ACTIVE') return 'Active';
   if (cycle.status === 'DEACTIVATED') return 'Inactive';
   return 'Draft';
@@ -280,7 +281,7 @@ const KpiTemplateCycleListPage = () => {
                                   type="checkbox"
                                   className="peer sr-only"
                                   checked={cycle.status === 'ACTIVE' || cycle.status === 'CLOSING' || cycle.status === 'PENDING_APPROVAL'}
-                                  disabled={togglingId === cycle.id || cycle.status === 'CLOSING' || cycle.status === 'PENDING_APPROVAL'}
+                                  disabled={togglingId === cycle.id || cycle.status === 'CLOSING' || cycle.status === 'PENDING_APPROVAL' || cycle.status === 'CLOSED'}
                                   onChange={() => void handleToggleActive(cycle)}
                                 />
                                 <span className="absolute inset-0 rounded-full bg-gray-200 transition peer-checked:bg-emerald-500 peer-disabled:opacity-50" />

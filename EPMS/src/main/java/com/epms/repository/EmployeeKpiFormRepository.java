@@ -15,6 +15,9 @@ import java.util.Optional;
 
 public interface EmployeeKpiFormRepository extends JpaRepository<EmployeeKpiForm, Integer> {
 
+    @Query("SELECT DISTINCT ekf.employee.id FROM EmployeeKpiForm ekf WHERE ekf.employee.id IS NOT NULL")
+    List<Integer> findDistinctEmployeeIdsWithAssignments();
+
     long countByKpiForm_Id(Integer kpiFormId);
 
     Optional<EmployeeKpiForm> findByEmployee_IdAndKpiForm_Id(Integer employeeId, Integer kpiFormId);

@@ -36,6 +36,7 @@ import com.epms.repository.UserRepository;
 import com.epms.security.UserPrincipal;
 import com.epms.service.NotificationService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -46,10 +47,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,6 +61,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -105,8 +110,17 @@ class EmployeeKpiWorkflowServiceImplTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private EmployeeKpiWorkflowServiceImpl service;
+
+    @BeforeEach
+    void setUpClock() {
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2025-12-31T00:00:00Z"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Rangoon"));
+    }
 
     @AfterEach
     void clearSecurityContext() {

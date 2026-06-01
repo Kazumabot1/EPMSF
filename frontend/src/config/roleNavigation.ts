@@ -92,6 +92,14 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
         { label: 'KPI History', path: '/admin/kpi/history', icon: 'bi-clock-history' },
       ],
     },
+    {
+      label: 'KPI Approvals',
+      path: '/admin/approval/kpi',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+      ],
+    },
 {
   label: 'Approvals',
   path: '/admin/approval/kpi',
@@ -419,6 +427,7 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
   Executive: [
     { label: 'Executive Dashboard', path: '/executive/dashboard', icon: 'bi-building', end: true },
     { label: 'Profile', path: '/profile', icon: 'bi-person' },
+    { label: 'People Change Review', path: '/executive/approval/changes', icon: 'bi-person-check' },
     {
       label: 'Reports',
       path: '/executive/reports',

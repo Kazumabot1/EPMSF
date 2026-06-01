@@ -23,8 +23,9 @@ export const POSITION_PERMISSION_FIELDS: Array<keyof PositionPermission> = [
   'teamEdit',
   'teamHistory',
   'teamView',
-'teamAssignAsLeader',
-'teamAssignAsMember',
+  'teamAssignAsLeader',
+  'teamAssignAsPm',
+  'teamAssignAsMember',
 
   'pipCreate',
   'pipEdit',
@@ -104,7 +105,7 @@ export const emptyPositionPermission = (): PositionPermission => ({
   oneOnOnePermission: false,
   positionPermission: false,
   kpiPermission: false,
-
+  departmentKpiPermission: false,
   assessmentScoresView: false,
   assessmentFormCreate: false,
 
@@ -116,9 +117,9 @@ export const emptyPositionPermission = (): PositionPermission => ({
   teamEdit: false,
   teamHistory: false,
   teamView: false,
-
-teamAssignAsLeader: false,
-teamAssignAsMember: false,
+  teamAssignAsLeader: false,
+  teamAssignAsPm: false,
+  teamAssignAsMember: false,
 
   pipCreate: false,
   pipEdit: false,
@@ -161,14 +162,16 @@ export const sanitizePositionPermission = (payload: unknown): PositionPermission
     clean[field] = Boolean(source[field]);
   });
 
-
-clean.teamPermission = Boolean(
-  source.teamPermission ||
-    clean.teamView ||
-    clean.teamCreate ||
-    clean.teamEdit ||
-    clean.teamHistory,
-);
+  clean.teamPermission = Boolean(
+    source.teamPermission ||
+      clean.teamView ||
+      clean.teamCreate ||
+      clean.teamEdit ||
+      clean.teamHistory ||
+      clean.teamAssignAsLeader ||
+      clean.teamAssignAsPm ||
+      clean.teamAssignAsMember,
+  );
 
   clean.organizationPermission = Boolean(
     source.organizationPermission ||
@@ -204,11 +207,13 @@ clean.teamPermission = Boolean(
   clean.kpiPermission = Boolean(
     source.kpiPermission || clean.kpiCreate || clean.kpiEdit || clean.kpiScore || clean.kpiView || clean.kpiInput,
   );
+  clean.departmentKpiPermission = Boolean(source.departmentKpiPermission);
 
-
-  clean.oneOnOnePermission = Boolean(
-    source.oneOnOnePermission || clean.oneOnOneCreate || clean.oneOnOneDeptSelection || clean.oneOnOneTeamSelection,
-  );
+  if (!clean.oneOnOneCreate) {
+    clean.oneOnOneDeptSelection = false;
+    clean.oneOnOneTeamSelection = false;
+  }
+  clean.oneOnOnePermission = Boolean(clean.oneOnOneCreate);
   clean.feedback360Permission = Boolean(source.feedback360Permission || clean.feedbackFormCreate || clean.feedbackSend);
   clean.positionPermission = Boolean(source.positionPermission || clean.positionCrud);
 

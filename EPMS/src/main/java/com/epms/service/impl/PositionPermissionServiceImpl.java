@@ -74,6 +74,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     return created;
                 });
 
+        normalizeOneOnOnePermissions(dto);
         normalizeTeamAssignmentPermissions(dto);
 
         List<PositionPermissionAudit> auditRows = buildAuditRows(
@@ -211,7 +212,10 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
             case "teamPermission" -> safe(pp.getTeamView())
                     || safe(pp.getTeamCreate())
                     || safe(pp.getTeamEdit())
-                    || safe(pp.getTeamHistory());
+                    || safe(pp.getTeamHistory())
+                    || safe(pp.getTeamAssignAsLeader())
+                    || safe(pp.getTeamAssignAsPm())
+                    || safe(pp.getTeamAssignAsMember());
             case "organizationPermission" -> safe(pp.getDepartmentCrud())
                     || safe(pp.getDepartmentComparisonView())
                     || safe(pp.getEmployeeCrud())
@@ -234,11 +238,11 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                     || safe(pp.getKpiScore())
                     || safe(pp.getKpiView())
                     || safe(pp.getKpiInput());
-
-
-            case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate())
-                    || safe(pp.getOneOnOneDeptSelection())
-                    || safe(pp.getOneOnOneTeamSelection());
+            case "departmentKpiPermission" -> safe(pp.getKpiCreate())
+                    || safe(pp.getKpiEdit())
+                    || safe(pp.getKpiScore())
+                    || safe(pp.getKpiView());
+            case "oneOnOnePermission" -> safe(pp.getOneOnOneCreate());
             case "feedback360Permission" -> safe(pp.getFeedbackFormCreate())
                     || safe(pp.getFeedbackSend());
             case "positionPermission" -> safe(pp.getPositionCrud());
@@ -252,7 +256,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
             case "teamHistory" -> safe(pp.getTeamHistory());
             case "teamView" -> safe(pp.getTeamView());
             case "teamAssignAsLeader" -> safe(pp.getTeamAssignAsLeader());
-            case "teamAssignAsPm" -> false;
+            case "teamAssignAsPm" -> safe(pp.getTeamAssignAsPm());
             case "teamAssignAsMember" -> safe(pp.getTeamAssignAsMember());
 
             case "pipCreate" -> safe(pp.getPipCreate());
@@ -307,7 +311,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .oneOnOnePermission(hasPermission(pp, "oneOnOnePermission"))
                 .positionPermission(hasPermission(pp, "positionPermission"))
                 .kpiPermission(hasPermission(pp, "kpiPermission"))
-
+                .departmentKpiPermission(hasPermission(pp, "departmentKpiPermission"))
                 .assessmentScoresView(hasPermission(pp, "assessmentScoresView"))
                 .assessmentFormCreate(hasPermission(pp, "assessmentFormCreate"))
 
@@ -320,7 +324,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .teamHistory(safe(pp.getTeamHistory()))
                 .teamView(safe(pp.getTeamView()))
                 .teamAssignAsLeader(safe(pp.getTeamAssignAsLeader()))
-                .teamAssignAsPm(false)
+                .teamAssignAsPm(safe(pp.getTeamAssignAsPm()))
                 .teamAssignAsMember(safe(pp.getTeamAssignAsMember()))
 
                 .pipCreate(safe(pp.getPipCreate()))
@@ -369,7 +373,7 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
         pp.setTeamHistory(safe(safeDto.getTeamHistory()));
         pp.setTeamView(safe(safeDto.getTeamView()));
         pp.setTeamAssignAsLeader(safe(safeDto.getTeamAssignAsLeader()));
-        pp.setTeamAssignAsPm(false);
+        pp.setTeamAssignAsPm(safe(safeDto.getTeamAssignAsPm()));
         pp.setTeamAssignAsMember(safe(safeDto.getTeamAssignAsMember()));
 
         pp.setPipCreate(safe(safeDto.getPipCreate()));
@@ -501,23 +505,41 @@ public class PositionPermissionServiceImpl implements PositionPermissionService 
                 .build();
     }
 
+    private void normalizeOneOnOnePermissions(PositionPermissionDto dto) {
+        if (dto == null) {
+            return;
+        }
+
+        if (!safe(dto.getOneOnOneCreate())) {
+            dto.setOneOnOneDeptSelection(false);
+            dto.setOneOnOneTeamSelection(false);
+        }
+    }
+
     private void normalizeTeamAssignmentPermissions(PositionPermissionDto dto) {
         if (dto == null) {
             return;
         }
 
         boolean leader = safe(dto.getTeamAssignAsLeader());
+        boolean pm = safe(dto.getTeamAssignAsPm());
         boolean member = safe(dto.getTeamAssignAsMember());
 
-        dto.setTeamAssignAsPm(false);
-
         if (leader) {
+            dto.setTeamAssignAsPm(false);
+            dto.setTeamAssignAsMember(false);
+            return;
+        }
+
+        if (pm) {
+            dto.setTeamAssignAsLeader(false);
             dto.setTeamAssignAsMember(false);
             return;
         }
 
         if (member) {
             dto.setTeamAssignAsLeader(false);
+            dto.setTeamAssignAsPm(false);
         }
     }
 

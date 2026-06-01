@@ -1,4 +1,4 @@
-export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'PENDING_APPROVAL' | 'CLOSING' | 'DEACTIVATED';
+export type KpiTemplateCycleStatus = 'DRAFT' | 'ACTIVE' | 'PENDING_APPROVAL' | 'CLOSING' | 'DEACTIVATED' | 'CLOSED';
 export type KpiTemplateCyclePeriodStatus = 'SCHEDULED' | 'OPEN' | 'CLOSING' | 'CLOSED';
 export type KpiGraceExtension = 'ONE_WEEK' | 'TWO_WEEKS' | 'THREE_WEEKS' | 'ONE_MONTH';
 export type KpiEarlyCloseReviewDecision = 'APPROVED' | 'REJECTED';

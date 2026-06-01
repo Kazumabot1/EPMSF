@@ -1,24 +1,38 @@
-import { useEffect, useState } from 'react';
+/*Z*/import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { dashboardPathByRole, resolveUserRole } from '../config/roleNavigation';
 import { authStorage } from '../services/authStorage';
 import { emptyPositionPermission, positionPermissionService } from '../services/positionPermissionService';
 import type { PositionPermission } from '../types/positionPermission';
 
 type PositionPermissionRouteProps = {
-  permission: keyof PositionPermission;
+  permission?: keyof PositionPermission;
+  anyPermissions?: Array<keyof PositionPermission>;
   fallbackPath?: string;
 };
 
 const PositionPermissionRoute = ({
   permission,
-  fallbackPath = '/notifications',
+  anyPermissions,
+  fallbackPath,
 }: PositionPermissionRouteProps) => {
   const location = useLocation();
   const user = authStorage.getUser();
+  const role = resolveUserRole(user);
   const [permissions, setPermissions] = useState<PositionPermission>(emptyPositionPermission());
   const [loading, setLoading] = useState(true);
 
+  const requiredPermissions = useMemo(() => {
+    if (anyPermissions?.length) return anyPermissions;
+    return permission ? [permission] : [];
+  }, [anyPermissions, permission]);
+
   useEffect(() => {
+    if (role === 'Admin') {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     setLoading(true);
@@ -37,7 +51,11 @@ const PositionPermissionRoute = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [role]);
+
+  if (role === 'Admin' || requiredPermissions.length === 0) {
+    return <Outlet />;
+  }
 
   if (loading) {
     return (
@@ -47,11 +65,15 @@ const PositionPermissionRoute = ({
     );
   }
 
-  if (!permissions[permission]) {
+  const allowed = requiredPermissions.some((field) => Boolean(permissions[field]));
+
+  if (!allowed) {
     const positionName = user?.position || 'your position';
+    const destination = fallbackPath ?? dashboardPathByRole[role] ?? '/notifications';
+
     return (
       <Navigate
-        to={fallbackPath}
+        to={destination}
         replace
         state={{
           from: location.pathname,
