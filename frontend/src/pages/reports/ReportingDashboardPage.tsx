@@ -116,6 +116,22 @@ const formatDateTime = (value?: string | null) => {
 
 const cleanStatus = (value?: string | null) => normalizeDashboardStatus(value || 'UNKNOWN');
 
+const cleanText = (value?: string | number | null, fallback = '—') => {
+    const text = String(value ?? '').trim();
+    return text || fallback;
+};
+
+const exportScore = (value?: number | null) => Number(value ?? 0);
+
+const exportScopeLabel = (dashboard: ReportingDashboard) => {
+    const scope = cleanText(dashboard.access?.scopeLabel, 'Current permitted scope');
+    const role = cleanStatus(dashboard.access?.role || '');
+
+    if (!dashboard.access?.role) return scope;
+
+    return `${scope} • ${role}`;
+};
+
 const scoreClass = (score?: number | null) => {
     const value = Number(score ?? 0);
 
@@ -444,119 +460,136 @@ const ReportingDashboardPage = ({ reportType = 'employees' }: ReportingDashboard
     const reportMetrics = useMemo(() => buildReportMetricCards(activeReportType, dashboard, analytics), [activeReportType, dashboard, analytics]);
     const reportInsights = useMemo(() => buildReportInsightCards(activeReportType, dashboard, analytics), [activeReportType, dashboard, analytics]);
 
-    const exportActiveReport = () => {
+    const exportOptions = {
+        title: activeCopy.title,
+        subtitle: activeCopy.description,
+        sheetName: activeCopy.title,
+        scopeLabel: exportScopeLabel(dashboard),
+        emptyMessage: 'No report rows are available for this scope yet.',
+    };
+
+    const exportActiveReport = async () => {
         if (activeReportType === 'employees') {
-            exportToExcel<EmployeePerformanceRow & Record<string, unknown>>(
+            await exportToExcel<EmployeePerformanceRow & Record<string, unknown>>(
                 filteredEmployees as (EmployeePerformanceRow & Record<string, unknown>)[],
                 [
-                    { header: 'Employee', key: 'employeeName' },
-                    { header: 'Code', key: 'employeeCode' },
-                    { header: 'Department', key: 'departmentName' },
-                    { header: 'Position', key: 'position' },
-                    { header: 'Manager', key: 'managerName' },
-                    { header: 'Form', key: 'formName' },
-                    { header: 'Period', key: 'period' },
-                    { header: 'Status', key: 'status' },
-                    { header: 'Score %', key: 'scorePercent' },
-                    { header: 'Label', key: 'performanceLabel' },
-                    { header: 'Submitted At', key: 'submittedAt' },
+                    { header: 'Employee Name', value: (row) => cleanText(row.employeeName) },
+                    { header: 'Employee Code', value: (row) => cleanText(row.employeeCode) },
+                    { header: 'Department', value: (row) => cleanText(row.departmentName) },
+                    { header: 'Position', value: (row) => cleanText(row.position) },
+                    { header: 'Manager', value: (row) => cleanText(row.managerName) },
+                    { header: 'Assessment Form', value: (row) => cleanText(row.formName) },
+                    { header: 'Review Period', value: (row) => cleanText(row.period) },
+                    { header: 'Review Status', value: (row) => cleanStatus(row.status) },
+                    { header: 'Assessment Score (%)', value: (row) => exportScore(row.scorePercent), numFmt: '0.00' },
+                    { header: 'Performance Label', value: (row) => cleanText(row.performanceLabel, 'Not scored') },
+                    { header: 'Submitted Date', value: (row) => formatDateTime(row.submittedAt) },
+                    { header: 'Approved Date', value: (row) => formatDateTime(row.approvedAt) },
                 ],
                 activeCopy.exportLabel,
+                exportOptions,
             );
             return;
         }
 
         if (activeReportType === 'kpi') {
-            exportToExcel<KpiPerformanceRow & Record<string, unknown>>(
+            await exportToExcel<KpiPerformanceRow & Record<string, unknown>>(
                 filteredKpis as (KpiPerformanceRow & Record<string, unknown>)[],
                 [
-                    { header: 'Employee', key: 'employeeName' },
-                    { header: 'Code', key: 'employeeCode' },
-                    { header: 'Department', key: 'departmentName' },
-                    { header: 'Position', key: 'position' },
-                    { header: 'KPI Title', key: 'kpiTitle' },
-                    { header: 'Status', key: 'status' },
-                    { header: 'Total Score', key: 'totalScore' },
-                    { header: 'Weighted Score', key: 'totalWeightedScore' },
-                    { header: 'Label', key: 'performanceLabel' },
-                    { header: 'Period Start', key: 'periodStartDate' },
-                    { header: 'Period End', key: 'periodEndDate' },
-                    { header: 'Finalized At', key: 'finalizedAt' },
+                    { header: 'Employee Name', value: (row) => cleanText(row.employeeName) },
+                    { header: 'Employee Code', value: (row) => cleanText(row.employeeCode) },
+                    { header: 'Department', value: (row) => cleanText(row.departmentName) },
+                    { header: 'Position', value: (row) => cleanText(row.position) },
+                    { header: 'KPI Template', value: (row) => cleanText(row.kpiTitle) },
+                    { header: 'KPI Status', value: (row) => cleanStatus(row.status) },
+                    { header: 'Raw KPI Score', value: (row) => exportScore(row.totalScore), numFmt: '0.00' },
+                    { header: 'Weighted KPI Score (%)', value: (row) => exportScore(row.totalWeightedScore), numFmt: '0.00' },
+                    { header: 'Performance Label', value: (row) => cleanText(row.performanceLabel, 'Not scored') },
+                    { header: 'Period Start', value: (row) => formatDate(row.periodStartDate) },
+                    { header: 'Period End', value: (row) => formatDate(row.periodEndDate) },
+                    { header: 'Finalized Date', value: (row) => formatDateTime(row.finalizedAt) },
                 ],
                 activeCopy.exportLabel,
+                exportOptions,
             );
             return;
         }
 
         if (activeReportType === 'departments') {
-            exportToExcel<DepartmentPerformanceRow & Record<string, unknown>>(
+            await exportToExcel<DepartmentPerformanceRow & Record<string, unknown>>(
                 filteredDepartments as (DepartmentPerformanceRow & Record<string, unknown>)[],
                 [
-                    { header: 'Department', key: 'departmentName' },
-                    { header: 'Employees', key: 'employeeCount' },
-                    { header: 'Assessments', key: 'assessmentCount' },
-                    { header: 'Approved', key: 'approvedCount' },
-                    { header: 'Pending', key: 'pendingCount' },
-                    { header: 'Active PIPs', key: 'activePipCount' },
-                    { header: 'Appraisal Avg', key: 'averageScore' },
-                    { header: 'KPI Records', key: 'kpiRecordCount' },
-                    { header: 'KPI Avg', key: 'averageKpiScore' },
-                    { header: 'Overall Score', key: 'overallScore' },
-                    { header: 'Label', key: 'performanceLabel' },
+                    { header: 'Department', value: (row) => cleanText(row.departmentName) },
+                    { header: 'Employees in Scope', value: (row) => Number(row.employeeCount ?? 0), numFmt: '0' },
+                    { header: 'Submitted Assessments', value: (row) => Number(row.assessmentCount ?? 0), numFmt: '0' },
+                    { header: 'Approved Assessments', value: (row) => Number(row.approvedCount ?? 0), numFmt: '0' },
+                    { header: 'Pending Assessments', value: (row) => Number(row.pendingCount ?? 0), numFmt: '0' },
+                    { header: 'Active PIPs', value: (row) => Number(row.activePipCount ?? 0), numFmt: '0' },
+                    { header: 'Appraisal Average (%)', value: (row) => exportScore(row.averageScore), numFmt: '0.00' },
+                    { header: 'Finalized KPI Records', value: (row) => Number(row.kpiRecordCount ?? 0), numFmt: '0' },
+                    { header: 'KPI Average (%)', value: (row) => exportScore(row.averageKpiScore), numFmt: '0.00' },
+                    { header: 'Overall Performance (%)', value: (row) => exportScore(row.overallScore), numFmt: '0.00' },
+                    { header: 'Performance Label', value: (row) => cleanText(row.performanceLabel, 'Not scored') },
                 ],
                 activeCopy.exportLabel,
+                exportOptions,
             );
             return;
         }
 
         if (activeReportType === 'pip') {
-            exportToExcel<PipReportRow & Record<string, unknown>>(
+            await exportToExcel<PipReportRow & Record<string, unknown>>(
                 filteredPips as (PipReportRow & Record<string, unknown>)[],
                 [
-                    { header: 'Employee', key: 'employeeName' },
-                    { header: 'Code', key: 'employeeCode' },
-                    { header: 'Department', key: 'departmentName' },
-                    { header: 'Goal', key: 'goal' },
-                    { header: 'Active', key: 'active' },
-                    { header: 'Start Date', key: 'startDate' },
-                    { header: 'End Date', key: 'endDate' },
-                    { header: 'Created By', key: 'createdByName' },
+                    { header: 'Employee Name', value: (row) => cleanText(row.employeeName) },
+                    { header: 'Employee Code', value: (row) => cleanText(row.employeeCode) },
+                    { header: 'Department', value: (row) => cleanText(row.departmentName) },
+                    { header: 'Improvement Goal', value: (row) => cleanText(row.goal) },
+                    { header: 'Plan Status', value: (row) => row.active ? 'Active' : 'Completed' },
+                    { header: 'Start Date', value: (row) => formatDate(row.startDate) },
+                    { header: 'End Date', value: (row) => formatDate(row.endDate) },
+                    { header: 'Created By', value: (row) => cleanText(row.createdByName) },
+                    { header: 'Created Date', value: (row) => formatDateTime(row.createdAt) },
+                    { header: 'Finished Date', value: (row) => formatDateTime(row.finishedAt) },
                 ],
                 activeCopy.exportLabel,
+                exportOptions,
             );
             return;
         }
 
         if (activeReportType === 'feedback') {
-            exportToExcel<FeedbackParticipationRow & Record<string, unknown>>(
+            await exportToExcel<FeedbackParticipationRow & Record<string, unknown>>(
                 filteredFeedback as (FeedbackParticipationRow & Record<string, unknown>)[],
                 [
-                    { header: 'Campaign', key: 'campaignName' },
-                    { header: 'Status', key: 'status' },
-                    { header: 'Start Date', key: 'startDate' },
-                    { header: 'End Date', key: 'endDate' },
-                    { header: 'Assigned', key: 'assignedCount' },
-                    { header: 'Submitted', key: 'submittedCount' },
-                    { header: 'Pending', key: 'pendingCount' },
-                    { header: 'Completion %', key: 'completionRate' },
+                    { header: 'Campaign Name', value: (row) => cleanText(row.campaignName) },
+                    { header: 'Campaign Status', value: (row) => cleanStatus(row.status) },
+                    { header: 'Start Date', value: (row) => formatDate(row.startDate) },
+                    { header: 'End Date', value: (row) => formatDate(row.endDate) },
+                    { header: 'Assigned Evaluations', value: (row) => Number(row.assignedCount ?? 0), numFmt: '0' },
+                    { header: 'Submitted Evaluations', value: (row) => Number(row.submittedCount ?? 0), numFmt: '0' },
+                    { header: 'Pending Evaluations', value: (row) => Number(row.pendingCount ?? 0), numFmt: '0' },
+                    { header: 'Completion Rate (%)', value: (row) => exportScore(row.completionRate), numFmt: '0.00' },
                 ],
                 activeCopy.exportLabel,
+                exportOptions,
             );
             return;
         }
 
-        exportToExcel<RecommendationRow & Record<string, unknown>>(
+        await exportToExcel<RecommendationRow & Record<string, unknown>>(
             filteredRecommendations as (RecommendationRow & Record<string, unknown>)[],
             [
-                { header: 'Employee', key: 'employeeName' },
-                { header: 'Code', key: 'employeeCode' },
-                { header: 'Department', key: 'departmentName' },
-                { header: 'Recommendation', key: 'recommendationType' },
-                { header: 'Score %', key: 'scorePercent' },
-                { header: 'Label', key: 'performanceLabel' },
-                { header: 'Reason', key: 'reason' },
+                { header: 'Employee Name', value: (row) => cleanText(row.employeeName) },
+                { header: 'Employee Code', value: (row) => cleanText(row.employeeCode) },
+                { header: 'Department', value: (row) => cleanText(row.departmentName) },
+                { header: 'Recommendation Type', value: (row) => cleanStatus(row.recommendationType) },
+                { header: 'Score (%)', value: (row) => exportScore(row.scorePercent), numFmt: '0.00' },
+                { header: 'Performance Label', value: (row) => cleanText(row.performanceLabel, 'Not scored') },
+                { header: 'Reason', value: (row) => cleanText(row.reason) },
             ],
             activeCopy.exportLabel,
+            exportOptions,
         );
     };
 

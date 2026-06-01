@@ -284,14 +284,11 @@ function App() {
                   element={<RedirectWithMessage to="/executive/dashboard" message="Department KPI approvals are handled by HR Admin." />}
               />
               <Route path="/ceo/approval/department-kpi" element={<Navigate to="/executive/dashboard" replace />} />
-              <Route path="/executive/approval/changes" element={<EmployeeChangeApprovalPage />} />
-              <Route path="/ceo/approval/changes" element={<Navigate to="/executive/approval/changes" replace />} />
-
-       <Route
-           path="/executive/approval/changes"
-           element={<RedirectWithMessage to="/executive/dashboard" message="Workforce change approvals are handled by HR Admin." />}
-       />
-       <Route path="/ceo/approval/changes" element={<Navigate to="/executive/dashboard" replace />} />
+              <Route
+                  path="/executive/approval/changes"
+                  element={<RedirectWithMessage to="/executive/dashboard" message="Workforce change approvals are handled by HR Admin." />}
+              />
+              <Route path="/ceo/approval/changes" element={<Navigate to="/executive/dashboard" replace />} />
               <Route
                   path="/executive/kpis"
                   element={<RedirectWithMessage to="/executive/dashboard" message="KPI management is handled by HR Admin and managers." />}
@@ -314,6 +311,12 @@ function App() {
               <Route path="/executive/reports/feedback-completion" element={<ReportingDashboardPage reportType="feedback" />} />
               <Route path="/executive/reports/recommendations" element={<ReportingDashboardPage reportType="recommendations" />} />
               <Route path="/ceo/reports" element={<Navigate to="/executive/reports/performance" replace />} />
+              <Route path="/ceo/reports/performance" element={<Navigate to="/executive/reports/performance" replace />} />
+              <Route path="/ceo/reports/kpi" element={<Navigate to="/executive/reports/kpi" replace />} />
+              <Route path="/ceo/reports/department-performance" element={<Navigate to="/executive/reports/department-performance" replace />} />
+              <Route path="/ceo/reports/pip-status" element={<Navigate to="/executive/reports/pip-status" replace />} />
+              <Route path="/ceo/reports/feedback-completion" element={<Navigate to="/executive/reports/feedback-completion" replace />} />
+              <Route path="/ceo/reports/recommendations" element={<Navigate to="/executive/reports/recommendations" replace />} />
             </Route>
           </Route>
 
@@ -462,7 +465,7 @@ function App() {
                   <Route path="/hr/kpi-template-cycle/:id/edit" element={<KpiTemplateCycleEditorPage />} />
                   <Route path="/hr/kpi-template-cycle" element={<KpiTemplateCycleListPage />} />
                   <Route path="/hr/employee-kpis" element={<HrEmployeeKpiListPage />} />
-                  <Route path="/hr/kpi/history" element={<ManagerKpiHistoryPage />} />
+                  <Route path="/hr/kpi/history" element={<Navigate to="/hr/reports/kpi" replace />} />
                 </Route>
 
 
