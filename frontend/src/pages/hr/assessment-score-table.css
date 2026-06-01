@@ -1,15 +1,4 @@
-/* ===== Assessment Score Table (HR / Dept Head view) ===== *Z/
 
-.ast-page {
-  padding: 24px 20px 48px;
-  font-family: 'Inter', system-ui, sans-serif;
-  animation: astFadeIn 0.3s ease-out;
-}
-@keyframes astFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-
-.ast-container { max-width: 1320px; margin: 0 auto; }
-
-/* Hero */
 .ast-hero {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
@@ -170,11 +159,46 @@
 }
 @keyframes astPopIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
 .ast-modal-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 16px; padding: 22px 24px; border-bottom: 1px solid #e2e8f0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 22px 96px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: center;
 }
-.ast-modal-header h2 { margin: 0 0 4px; font-size: 18px; color: #0f172a; }
-.ast-modal-header p { margin: 0; font-size: 13px; color: #64748b; }
+
+.ast-modal-header > div {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ast-modal-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+}
+
+.ast-modal-header p {
+  max-width: 560px;
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.ast-modal-header .ast-btn-light {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+}
+
 .ast-modal-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
 
 /* Self-assessment table inside modal */
@@ -841,4 +865,29 @@
   .assessment-record-signature-grid {
     grid-template-columns: 1fr;
   }
+}
+/* Center assessment form title inside HR self-assessment detail modal */
+.ast-modal .appraisal-template-banner {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.ast-modal .appraisal-template-banner h2 {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.ast-modal .appraisal-template-banner p {
+  width: 100%;
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
 }
