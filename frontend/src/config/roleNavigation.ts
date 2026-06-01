@@ -95,6 +95,15 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     },
     { label: 'Notifications', path: '/notifications', icon: 'bi-bell' },
     {
+      label: 'KPI Approvals',
+      path: '/admin/approval/kpi',
+      icon: 'bi-bullseye',
+      children: [
+        { label: 'Employee KPI Approval', path: '/admin/approval/kpi', icon: 'bi-check2-circle', end: true },
+        { label: 'Department KPI Approval', path: '/admin/approval/department-kpi', icon: 'bi-building-check' },
+      ],
+    },
+    {
       label: 'Access Control',
       path: '/position-permissions',
       icon: 'bi-shield-lock',

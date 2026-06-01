@@ -6,6 +6,7 @@ import com.epms.service.KpiTemplateCycleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,6 +14,11 @@ import java.util.List;
 @RestController
 @RequestMapping({"/api/hradmin/kpi-approvals", "/api/executive/kpi-approvals"})
 @RequiredArgsConstructor
+@PreAuthorize(
+        "hasRole('ADMIN') "
+                + "or hasAuthority('ROLE_ADMIN') "
+                + "or authentication.principal.dashboard == 'ADMIN_DASHBOARD'"
+)
 public class KpiApprovalController {
 
     private final KpiTemplateCycleService cycleService;

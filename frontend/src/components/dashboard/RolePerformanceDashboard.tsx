@@ -267,10 +267,12 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
 
   if (view === 'admin') {
     return [
-      { icon: 'bi-speedometer2', title: 'Dashboard', description: 'Admin performance view', to: '/admin/dashboard' },
+      { icon: 'bi-speedometer2', title: 'Dashboard', description: 'HR Admin performance view', to: '/admin/dashboard' },
       { icon: 'bi-person-gear', title: 'Users', description: 'User accounts', to: '/admin/users' },
       { icon: 'bi-upload', title: 'Import Employees', description: 'Bulk employee import', to: '/admin/employee/import' },
       { icon: 'bi-shield-check', title: 'Permissions', description: 'Position permissions', to: '/position-permissions' },
+      { icon: 'bi-bullseye', title: 'KPI Approval', description: 'Approve KPI cycles', to: '/admin/approval/kpi' },
+      { icon: 'bi-building-check', title: 'Department KPI Approval', description: 'Approve department KPI', to: '/admin/approval/department-kpi' },
       { icon: 'bi-journal-text', title: 'Audit Logs', description: 'System activity', to: '/admin/audit-logs' },
     ];
   }
@@ -279,9 +281,7 @@ const getQuickActions = (view: RoleDashboardView): QuickAction[] => {
     return [
       { icon: 'bi-bar-chart', title: 'Performance Report', description: 'Organization results', to: '/executive/reports/performance' },
       { icon: 'bi-building-check', title: 'Department Performance', description: 'Department comparison', to: '/executive/reports/department-performance' },
-      { icon: 'bi-check2-square', title: 'KPI Approval', description: 'Approve KPI workflow', to: '/executive/approval/kpi' },
-      { icon: 'bi-diagram-3', title: 'Department KPI Approval', description: 'Approve department KPI', to: '/executive/approval/department-kpi' },
-      { icon: 'bi-bullseye', title: 'KPI Results', description: 'KPI performance', to: '/executive/kpis' },
+      { icon: 'bi-person-check', title: 'People Change Review', description: 'Approve workforce changes', to: '/executive/approval/changes' },
       { icon: 'bi-stars', title: 'Recommendations', description: 'Promotion insights', to: '/executive/reports/recommendations' },
     ];
   }
@@ -377,10 +377,10 @@ const getRoleCopy = (view: RoleDashboardView, userName?: string | null) => {
 
   if (view === 'admin') {
     return {
-      eyebrow: 'Admin Performance',
+      eyebrow: 'HR Admin Performance',
       title: `Good morning, ${firstName}!`,
       description: 'Monitor organization performance health using the same secured reporting data used by HR.',
-      scope: 'Admin view',
+      scope: 'HR Admin view',
       chartTitle: 'Overall Results by Department',
       chartSubtitle: 'Organization performance compared across departments.',
       distributionTitle: 'Results Distribution',
