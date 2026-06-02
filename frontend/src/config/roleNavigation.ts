@@ -286,11 +286,6 @@ export const roleNavigation: Record<UserRole, NavItem[]> = {
     { label: 'Department Employee Lists', path: '/department-head/employee-lists', icon: 'bi-people' },
     { label: 'My KPIs', path: '/department-head/kpis', icon: 'bi-bullseye' },
     {
-      label: 'View Self-assessment Form',
-      path: '/department-head/self-assessment-forms',
-      icon: 'bi bi-eye',
-    },
-    {
       label: 'Continuous Feedback',
       path: '/continuous-feedback',
       icon: 'bi-chat-dots',
