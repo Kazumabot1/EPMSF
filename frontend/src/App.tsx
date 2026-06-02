@@ -194,7 +194,7 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
               <Route element={<AppLayout />}>
                 <Route path="/admin/dashboard" element={<RolePerformanceDashboard view="admin" />} />
-                <Route path="/admin/users" element={<AdminDashboard />} />
+                <Route path="/admin/users" element={<EmployeeManagement />} />
                 <Route path="/admin/employee/import" element={<HrEmployeeAccountImport />} />
                 <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
                 <Route path="/admin/kpi-scoring" element={<ManagerKpiScoringPage />} />

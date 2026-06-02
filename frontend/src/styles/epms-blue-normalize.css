@@ -786,3 +786,548 @@ body > .fixed.inset-0.z-50 > :where(div, section, article),
 .manager-kpi-blue-scope * {
   --tw-ring-color: rgba(37, 99, 235, 0.16);
 }
+
+/* ==========================================================================
+   Final compact Times New Roman app cleanup
+   Purpose: make the full frontend feel like one blue/white business app.
+   ========================================================================== */
+:root {
+  --epms-font-serif: "Times New Roman", Times, serif;
+  --epms-final-blue: #2563eb;
+  --epms-final-blue-dark: #1d4ed8;
+  --epms-final-blue-soft: #eff6ff;
+  --epms-final-page: #f8fafc;
+  --epms-final-card: #ffffff;
+  --epms-final-border: #dbe7f3;
+  --epms-final-text: #0f172a;
+  --epms-final-muted: #64748b;
+  --epms-final-shadow: 0 10px 24px rgba(15, 23, 42, 0.055);
+  --epms-final-radius: 14px;
+  --epms-final-radius-sm: 10px;
+}
+
+html,
+body,
+#root,
+button,
+input,
+select,
+textarea,
+table,
+.hr-shell,
+.app-shell,
+.hr-sidebar,
+.employee-sidebar,
+.hr-content,
+.app-main,
+.app-content-employee,
+.hr-content-inner {
+  font-family: var(--epms-font-serif) !important;
+}
+
+html,
+body,
+#root,
+.hr-shell,
+.app-shell,
+.hr-content,
+.app-main,
+.app-content-employee,
+.hr-content-inner {
+  background: var(--epms-final-page) !important;
+  color: var(--epms-final-text) !important;
+}
+
+.hr-content-inner,
+.app-content-employee {
+  padding: 18px 22px !important;
+}
+
+@media (min-width: 1536px) {
+  .hr-content-inner,
+  .app-content-employee {
+    padding: 20px 26px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .hr-content-inner,
+  .app-content-employee {
+    padding: 14px !important;
+  }
+}
+
+/* Typography: compact, readable, no oversized display treatment. */
+:where(h1, h2, h3, h4) {
+  color: var(--epms-final-text) !important;
+  font-family: var(--epms-font-serif) !important;
+  letter-spacing: 0 !important;
+}
+
+:where(h1) {
+  font-size: clamp(1.75rem, 2.4vw, 2.35rem) !important;
+  line-height: 1.12 !important;
+  font-weight: 800 !important;
+}
+
+:where(h2) {
+  font-size: clamp(1.25rem, 1.8vw, 1.55rem) !important;
+  line-height: 1.18 !important;
+  font-weight: 800 !important;
+}
+
+:where(p, small, span, label, td, th, input, select, textarea, button) {
+  font-family: var(--epms-font-serif) !important;
+}
+
+/* Global blue/white surfaces. */
+:where(
+  .card,
+  .panel,
+  .section-card,
+  .content-card,
+  .settings-card,
+  .table-card,
+  .form-card,
+  .summary-card,
+  .stat-card,
+  .metric-card,
+  .info-card,
+  .detail-card,
+  .team-card,
+  .department-card,
+  .employee-card,
+  .position-card,
+  .pip-card,
+  .appraisal-card,
+  .report-card,
+  .notification-card,
+  .audit-card,
+  .adm-stat-card,
+  .adm-form-card,
+  .adm-table-wrap,
+  .position-surface,
+  .epms-emp-stat,
+  .epms-emp-table-wrap,
+  .epms-emp-card,
+  .oom-card,
+  .kpi-tpl-card
+):not(.dashboard-metric-card):not(.dashboard-chart-card) {
+  border: 1px solid var(--epms-final-border) !important;
+  border-radius: var(--epms-final-radius) !important;
+  background: var(--epms-final-card) !important;
+  box-shadow: var(--epms-final-shadow) !important;
+  padding: 14px !important;
+}
+
+/* Hero/header cards: remove heavy gradients and huge empty space. */
+:where(
+  .adm-hero,
+  .team-hero,
+  .position-hero,
+  .department-hero,
+  .employee-hero,
+  .oom-header,
+  .continuous-feedback-hero,
+  .pip-hero,
+  .pip-page-header,
+  .reporting-hero,
+  .admin-dashboard-hero,
+  .appraisal-dashboard-hero,
+  .appraisal-history-hero,
+  .appraisal-template-hero,
+  .kpi-tpl-hero,
+  .hfd-hero,
+  .hr-assessment-hero,
+  .department-compare-hero,
+  .epms-emp-hero
+) {
+  overflow: hidden !important;
+  border: 1px solid var(--epms-final-border) !important;
+  border-radius: var(--epms-final-radius) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f6f9ff 100%) !important;
+  color: var(--epms-final-text) !important;
+  box-shadow: var(--epms-final-shadow) !important;
+  padding: 18px 20px !important;
+  margin-bottom: 14px !important;
+}
+
+:where(
+  .adm-hero,
+  .team-hero,
+  .position-hero,
+  .department-hero,
+  .employee-hero,
+  .oom-header,
+  .continuous-feedback-hero,
+  .pip-hero,
+  .pip-page-header,
+  .reporting-hero,
+  .admin-dashboard-hero,
+  .appraisal-dashboard-hero,
+  .appraisal-history-hero,
+  .appraisal-template-hero,
+  .kpi-tpl-hero,
+  .hfd-hero,
+  .hr-assessment-hero,
+  .department-compare-hero,
+  .epms-emp-hero
+)::before,
+:where(
+  .adm-hero,
+  .team-hero,
+  .position-hero,
+  .department-hero,
+  .employee-hero,
+  .oom-header,
+  .continuous-feedback-hero,
+  .pip-hero,
+  .pip-page-header,
+  .reporting-hero,
+  .admin-dashboard-hero,
+  .appraisal-dashboard-hero,
+  .appraisal-history-hero,
+  .appraisal-template-hero,
+  .kpi-tpl-hero,
+  .hfd-hero,
+  .hr-assessment-hero,
+  .department-compare-hero,
+  .epms-emp-hero
+)::after {
+  display: none !important;
+}
+
+:where(
+  .adm-hero,
+  .team-hero,
+  .position-hero,
+  .department-hero,
+  .employee-hero,
+  .oom-header,
+  .continuous-feedback-hero,
+  .pip-hero,
+  .pip-page-header,
+  .reporting-hero,
+  .admin-dashboard-hero,
+  .appraisal-dashboard-hero,
+  .appraisal-history-hero,
+  .appraisal-template-hero,
+  .kpi-tpl-hero,
+  .hfd-hero,
+  .hr-assessment-hero,
+  .department-compare-hero,
+  .epms-emp-hero
+) :where(h1, h2, h3, p, span, small) {
+  color: inherit !important;
+}
+
+:where(
+  .adm-hero-badge,
+  .team-hero-badge,
+  .position-hero-badge,
+  .employee-layout-badge,
+  .oom-eyebrow,
+  .appraisal-eyebrow,
+  .reporting-eyebrow,
+  .kpi-tpl-eyebrow,
+  .hfd-eyebrow,
+  .epms-emp-eyebrow,
+  .appraisal-dashboard-kicker,
+  .pip-eyebrow,
+  .department-compare-kicker,
+  .position-kicker
+) {
+  border: 1px solid #bfdbfe !important;
+  border-radius: 999px !important;
+  background: var(--epms-final-blue-soft) !important;
+  color: var(--epms-final-blue-dark) !important;
+  box-shadow: none !important;
+  padding: 4px 10px !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* Neutralize decorative utility gradients without breaking status colors. */
+:where(.bg-gradient-to-r, .bg-gradient-to-l, .bg-gradient-to-br, .bg-gradient-to-bl, .bg-gradient-to-tr, .bg-gradient-to-tl) {
+  background-image: linear-gradient(135deg, #ffffff, #f6f9ff) !important;
+}
+
+:where([class*="from-purple-"], [class*="from-violet-"], [class*="from-indigo-"], [class*="from-sky-"], [class*="from-cyan-"]),
+:where([class*="via-purple-"], [class*="via-violet-"], [class*="via-indigo-"], [class*="via-sky-"], [class*="via-cyan-"]),
+:where([class*="to-purple-"], [class*="to-violet-"], [class*="to-indigo-"], [class*="to-sky-"], [class*="to-cyan-"]) {
+  --tw-gradient-from: #ffffff var(--tw-gradient-from-position) !important;
+  --tw-gradient-via: #f6f9ff var(--tw-gradient-via-position) !important;
+  --tw-gradient-to: #f6f9ff var(--tw-gradient-to-position) !important;
+}
+
+/* Compact controls and buttons. */
+:where(button, .btn, .button, [class*="-btn"], a[class*="btn"]) {
+  border-radius: var(--epms-final-radius-sm) !important;
+  font-family: var(--epms-font-serif) !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+:where(button, .btn, .button, [class*="-btn"], a[class*="btn"]):not(:disabled):hover {
+  transform: none !important;
+}
+
+:where(button[class*="px-5"], button[class*="px-6"], a[class*="px-5"], a[class*="px-6"]) {
+  padding-left: 0.9rem !important;
+  padding-right: 0.9rem !important;
+}
+
+:where(.btn-primary, .primary, .primary-button, .submit-button, .save-button, .create-button, button[type='submit']) {
+  background: var(--epms-final-blue) !important;
+  border-color: var(--epms-final-blue) !important;
+  color: #ffffff !important;
+}
+
+:where(.btn-primary, .primary, .primary-button, .submit-button, .save-button, .create-button, button[type='submit']):not(:disabled):hover {
+  background: var(--epms-final-blue-dark) !important;
+  border-color: var(--epms-final-blue-dark) !important;
+}
+
+:where(.btn-secondary, .secondary, .secondary-button, .cancel-button, .ghost-button, .outline-button) {
+  background: #ffffff !important;
+  border: 1px solid var(--epms-final-border) !important;
+  color: #334155 !important;
+}
+
+/* Inputs and tables. */
+:where(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+  min-height: 38px;
+  border: 1px solid var(--epms-final-border) !important;
+  border-radius: var(--epms-final-radius-sm) !important;
+  background: #ffffff !important;
+  color: var(--epms-final-text) !important;
+  box-shadow: none !important;
+}
+
+:where(input, select, textarea):not([type='checkbox']):not([type='radio']):focus {
+  border-color: #93c5fd !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+:where(table) {
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+:where(table) th {
+  background: #f8fafc !important;
+  color: #334155 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+  padding: 10px 12px !important;
+}
+
+:where(table) td {
+  color: #334155 !important;
+  padding: 10px 12px !important;
+}
+
+/* Shared sidebars and top bars. */
+.hr-sidebar,
+.employee-sidebar,
+.employee-header,
+.hr-header {
+  background: #ffffff !important;
+  box-shadow: 4px 0 18px rgba(15, 23, 42, 0.04) !important;
+}
+
+.hr-nav-link,
+.employee-nav-link,
+.hr-submenu-link,
+.employee-submenu-link {
+  border-radius: 10px !important;
+  min-height: 38px !important;
+  margin-bottom: 3px !important;
+  color: #475569 !important;
+  font-weight: 800 !important;
+}
+
+.hr-nav-link.active,
+.employee-nav-link.active,
+.hr-submenu-link.active,
+.employee-submenu-link.active {
+  background: var(--epms-final-blue-soft) !important;
+  border-color: #bfdbfe !important;
+  color: var(--epms-final-blue-dark) !important;
+  box-shadow: none !important;
+}
+
+.hr-sidebar-collapse,
+.employee-sidebar-collapse {
+  height: 40px !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  border-color: #bfdbfe !important;
+  color: var(--epms-final-blue-dark) !important;
+  box-shadow: none !important;
+}
+
+/* Modals: smaller, centered, scrollable, clean headers. */
+:where(
+  .modal-content,
+  .dialog,
+  .dialog-content,
+  .popup,
+  .popover-panel,
+  .appraisal-modal-box,
+  .appraisal-form-view-modal,
+  .assessment-record-modal,
+  .ast-modal,
+  .team-modal-content,
+  .team-modal,
+  .department-modal,
+  .dept-compare-modal,
+  .employee-profile-modal,
+  .epms-emp-modal,
+  .ess-modal,
+  .f360-rules-modal-shell,
+  .f360-rules-clean-modal-shell,
+  .forgot-modal,
+  .hfa-modal,
+  .hfd-modal,
+  .hfd-publish-modal,
+  .hfda-confirm-modal,
+  .hfde-manual-modal,
+  .hfdqb-modal,
+  .hfdqb-clean-modal-shell,
+  .kpi-modal,
+  .kpi-tpl-modal,
+  .kpi-tpl-reason-modal,
+  .nt-modal,
+  .oom-modal,
+  .pip-modal,
+  .position-modal,
+  .position-detail-modal,
+  .sat-edit-modal
+) {
+  width: min(var(--modal-width, 900px), calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 32px) !important;
+  overflow: hidden !important;
+  border: 1px solid var(--epms-final-border) !important;
+  border-radius: var(--epms-final-radius) !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18) !important;
+}
+
+:where(
+  .appraisal-modal-box-xl,
+  .appraisal-full-form-modal,
+  .team-modal-wide,
+  .epms-emp-modal--wide,
+  .hfdqb-competency-modal,
+  .hfdqb-clean-competency-modal,
+  .hfdqb-clean-question-modal,
+  .f360-rules-rule-builder-modal,
+  .f360-rules-clean-rule-builder-modal
+) {
+  --modal-width: 1080px;
+}
+
+:where(
+  .appraisal-modal-header,
+  .team-modal-header,
+  .department-modal-header,
+  .dept-compare-modal-head,
+  .employee-profile-modal-head,
+  .epms-emp-modal__head,
+  .f360-rules-modal-head,
+  .f360-rules-clean-modal-head,
+  .hfa-modal-header,
+  .hfd-modal-header,
+  .hfd-publish-modal-head,
+  .hfdqb-clean-modal-head,
+  .kpi-tpl-modal-header,
+  .nt-modal-head,
+  .oom-modal-header,
+  .pip-modal-header,
+  .position-modal-header,
+  .assessment-record-modal-header,
+  .ast-modal-header
+) {
+  min-height: 0 !important;
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--epms-final-border) !important;
+  background: #ffffff !important;
+  color: var(--epms-final-text) !important;
+}
+
+:where(
+  .appraisal-modal-header,
+  .team-modal-header,
+  .department-modal-header,
+  .dept-compare-modal-head,
+  .employee-profile-modal-head,
+  .epms-emp-modal__head,
+  .f360-rules-modal-head,
+  .f360-rules-clean-modal-head,
+  .hfa-modal-header,
+  .hfd-modal-header,
+  .hfd-publish-modal-head,
+  .hfdqb-clean-modal-head,
+  .kpi-tpl-modal-header,
+  .nt-modal-head,
+  .oom-modal-header,
+  .pip-modal-header,
+  .position-modal-header,
+  .assessment-record-modal-header,
+  .ast-modal-header
+) :where(h1, h2, h3, p) {
+  margin-top: 0 !important;
+  color: var(--epms-final-text) !important;
+}
+
+:where(
+  .appraisal-modal-body,
+  .appraisal-form-view-modal-body,
+  .assessment-record-modal-body,
+  .ast-modal-body,
+  .team-modal-body,
+  .department-modal-body,
+  .dept-compare-modal-body,
+  .ess-modal,
+  .hfa-modal-body,
+  .kpi-tpl-modal-body,
+  .oom-modal-body,
+  .template-form-modal-body,
+  .epms-emp-form-body
+) {
+  max-height: calc(100vh - 150px) !important;
+  overflow-y: auto !important;
+  padding: 14px 18px !important;
+}
+
+:where(
+  .appraisal-modal-footer,
+  .team-modal-footer,
+  .dept-compare-modal-footer,
+  .hfa-modal-footer,
+  .kpi-tpl-modal-footer,
+  .oom-modal-footer,
+  .modal-actions,
+  .position-modal-actions,
+  .ess-modal-actions,
+  .f360-rules-modal-actions,
+  .f360-rules-clean-modal-actions,
+  .hfd-publish-modal-actions,
+  .hfdqb-clean-modal-actions,
+  .epms-emp-form-footer
+) {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid var(--epms-final-border) !important;
+  background: #ffffff !important;
+  padding: 12px 18px !important;
+}
+
+body > .fixed.inset-0.z-50 > :where(div, section, article) {
+  max-width: min(900px, calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 32px) !important;
+  border-radius: var(--epms-final-radius) !important;
+}
