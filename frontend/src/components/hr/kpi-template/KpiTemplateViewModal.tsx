@@ -248,15 +248,12 @@ const KpiTemplateViewModal = ({ open, templateId, onClose }: Props) => {
                       </td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums text-slate-950">{totalWeight}%</td>
                       <td colSpan={2} className="bg-blue-50/60 px-4 py-3 text-right text-xs text-blue-800">
-                        Total score — Manager phase
+                        Total score
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-              <p className="border-t border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                Actual values and scores are captured when managers assign and evaluate employee KPI forms.
-              </p>
             </section>
           </div>
         )}

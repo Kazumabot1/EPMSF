@@ -30,9 +30,11 @@ public class EmployeeController {
 
     @GetMapping
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<List<EmployeeResponseDto>>> getAllEmployees(
             @RequestParam(defaultValue = "false") boolean includeInactive
@@ -43,9 +45,11 @@ public class EmployeeController {
 
     @GetMapping("/{id}")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> getEmployeeById(@PathVariable Integer id) {
         EmployeeResponseDto dto = employeeService.getEmployeeById(id);
@@ -54,9 +58,11 @@ public class EmployeeController {
 
     @GetMapping("/{id}/department-transfer-preview")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeDepartmentTransferPreviewDto>> previewDepartmentTransfer(
             @PathVariable Integer id,
@@ -114,9 +120,11 @@ public class EmployeeController {
 
     @PostMapping
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> createEmployee(
             @Valid @RequestBody EmployeeRequestDto request
@@ -128,9 +136,11 @@ public class EmployeeController {
 
     @PutMapping("/{id}")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> updateEmployee(
             @PathVariable Integer id,
@@ -142,9 +152,11 @@ public class EmployeeController {
 
     @PatchMapping("/{id}/deactivate")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> deactivateEmployee(@PathVariable Integer id) {
         EmployeeResponseDto dto = employeeService.deactivateEmployee(id);
@@ -153,9 +165,11 @@ public class EmployeeController {
 
     @PatchMapping("/{id}/activate")
     @PreAuthorize(
-            "hasAnyRole('HR', 'ADMIN') "
+            "hasAnyRole('HR', 'ADMIN', 'HRADMIN', 'HR_ADMIN', 'HR_ADMINISTRATOR') "
                     + "or principal.dashboard == 'HR_DASHBOARD' "
-                    + "or principal.dashboard == 'ADMIN_DASHBOARD'"
+                    + "or principal.dashboard == 'ADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HRADMIN_DASHBOARD' "
+                    + "or principal.dashboard == 'HR_ADMIN_DASHBOARD'"
     )
     public ResponseEntity<GenericApiResponse<EmployeeResponseDto>> activateEmployee(@PathVariable Integer id) {
         EmployeeResponseDto dto = employeeService.activateEmployee(id);

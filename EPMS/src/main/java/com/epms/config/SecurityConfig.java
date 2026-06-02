@@ -365,7 +365,7 @@ public class SecurityConfig {
                                 "/api/hr/employee-accounts",
                                 "/api/hr/employee-accounts/**"
                         ).access((authentication, context) ->
-                                hasHrPermissionOrNonHrRole(authentication.get(), "employeeCrud")
+                                hasEmployeeCrudAccess(authentication.get())
                         )
 
                         .requestMatchers(
@@ -986,6 +986,22 @@ public class SecurityConfig {
         return new AuthorizationDecision(
                 positionPermissionService.currentUserHasPermission(permissionField)
         );
+    }
+
+    private AuthorizationDecision hasEmployeeCrudAccess(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationAdmin(authentication))) {
+            return new AuthorizationDecision(true);
+        }
+
+        if (Boolean.TRUE.equals(isCurrentAuthenticationHr(authentication))) {
+            return hasRoleDashboardOrPosition(authentication, HR_ROLES, HR_DASHBOARDS);
+        }
+
+        return new AuthorizationDecision(true);
     }
 
     private AuthorizationDecision hasHrDashboardOrNonHrRole(Authentication authentication) {

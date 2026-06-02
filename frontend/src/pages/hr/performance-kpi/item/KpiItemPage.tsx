@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import ConfirmModal from '../../../../components/ConfirmModal';
 import KpiItemForm from '../../../../components/hr/performance-kpi/KpiItemForm';
 import { kpiCategoryService } from '../../../../services/kpiCategoryService';
 import { kpiItemService } from '../../../../services/kpiItemService';
@@ -29,8 +28,6 @@ const KpiItemPage = () => {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<KpiItem | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const loadData = async () => {
     try {
@@ -139,20 +136,6 @@ const KpiItemPage = () => {
       setFormError(saveError instanceof Error ? saveError.message : 'Failed to save KPI item.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!itemToDelete) return;
-    try {
-      setDeleting(true);
-      await kpiItemService.remove(itemToDelete.id);
-      setItemToDelete(null);
-      await loadData();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete KPI item.');
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -332,15 +315,6 @@ const KpiItemPage = () => {
                             >
                               <i className="bi bi-pencil-square text-base" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setItemToDelete(item)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                              title="Delete"
-                              aria-label="Delete"
-                            >
-                              <i className="bi bi-trash text-base" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -418,18 +392,6 @@ const KpiItemPage = () => {
         </div>
       )}
 
-      <ConfirmModal
-        open={itemToDelete !== null}
-        title="Delete KPI item"
-        message={`Delete "${itemToDelete?.name ?? ''}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        loading={deleting}
-        onConfirm={() => void handleDeleteConfirm()}
-        onCancel={() => {
-          if (!deleting) setItemToDelete(null);
-        }}
-      />
     </div>
   );
 };

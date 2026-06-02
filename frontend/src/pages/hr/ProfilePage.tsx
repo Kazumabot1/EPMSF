@@ -702,7 +702,7 @@ const ProfilePage = () => {
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="rounded-3xl border border-blue-100 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 p-6 text-white shadow-xl shadow-blue-100">
           <h1 className="text-2xl font-black">My Profile</h1>
-          <p className="mt-2 text-sm text-blue-50">
+          <p className="mt-2 text-sm text-black">
             Update your profile picture, Gmail/email, phone number, and password.
           </p>
         </div>
