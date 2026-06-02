@@ -22,7 +22,6 @@ import {
   Feedback360Field,
   Feedback360GuidanceGrid,
   Feedback360HelpTip,
-  Feedback360Hero,
   Feedback360InfoGrid,
   Feedback360InfoItem,
   Feedback360Panel,
@@ -69,14 +68,6 @@ const DEFAULT_RATING_OPTIONS: FeedbackRatingOption[] = [
   { value: 3, label: 'Meets requirement' },
   { value: 4, label: 'Good' },
   { value: 5, label: 'Outstanding' },
-];
-
-const SCORE_EXPLANATION = [
-  { range: '86–100', label: 'Outstanding', description: 'Consistently exceeds expectations and demonstrates strong positive impact.' },
-  { range: '71–85', label: 'Good', description: 'Performs well and meets most expectations with reliable results.' },
-  { range: '60–70', label: 'Meets requirement', description: 'Meets the expected standard for the role.' },
-  { range: '40–59', label: 'Needs improvement', description: 'Needs clearer progress, consistency, or support in this area.' },
-  { range: '0–39', label: 'Unsatisfactory', description: 'Falls below the expected standard and requires focused improvement.' },
 ];
 
 const getQuestionRatingOptions = (question?: FeedbackAssignmentQuestionDetail | null): FeedbackRatingOption[] => {
@@ -242,8 +233,6 @@ const FeedbackFormPage = () => {
     },
   });
 
-  const watchedAssessmentDate = watch('assessmentDateText');
-  const watchedEffectiveDate = watch('effectiveDateText');
   const watchedComments = watch('comments');
   const watchedResponses = watch('responses');
 
@@ -294,6 +283,7 @@ const FeedbackFormPage = () => {
       comments: assignment.comments ?? '',
       responses: flatQuestions.map((question) => ({
         assignmentQuestionId: question.assignmentQuestionId ?? question.id,
+        questionId: question.sourceQuestionId ?? question.id,
         ratingValue: question.existingRatingValue != null ? String(question.existingRatingValue) : '',
         comment: question.existingComment ?? '',
       })),
@@ -316,6 +306,7 @@ const FeedbackFormPage = () => {
         const rawValue = response.ratingValue.trim();
         return {
           assignmentQuestionId: response.assignmentQuestionId || question?.assignmentQuestionId || question?.id,
+          questionId: response.questionId || question?.sourceQuestionId || question?.id,
           ratingValue: rawValue ? Number(rawValue) : null,
           comment: response.comment.trim() || undefined,
         };
@@ -354,7 +345,7 @@ const FeedbackFormPage = () => {
     }, 3500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [assignment?.canSubmit, isDirty, watchedAssessmentDate, watchedEffectiveDate, watchedComments, watchedResponses, submitMutation.isPending, saveDraftMutation.isPending]);
+  }, [assignment?.canSubmit, isDirty, watchedComments, watchedResponses, submitMutation.isPending, saveDraftMutation.isPending]);
 
   useEffect(() => {
     if (!isDirty || !assignment?.canSubmit) return undefined;
@@ -407,7 +398,8 @@ const FeedbackFormPage = () => {
           }
 
           return {
-            assignmentQuestionId: response.assignmentQuestionId || question.assignmentQuestionId || question.id,
+            assignmentQuestionId: response.assignmentQuestionId,
+            questionId: response.questionId,
             ratingValue: numericValue,
             comment: response.comment.trim(),
           };
@@ -450,8 +442,6 @@ const FeedbackFormPage = () => {
     }
     if (normalizedLength(values.comments) > MAX_ADDITIONAL_COMMENT_LENGTH) return;
 
-    const confirmed = window.confirm('Submit final feedback? After final submission, you will not be able to edit this response.');
-    if (!confirmed) return;
 
     try {
       await submitMutation.mutateAsync({
@@ -495,19 +485,16 @@ const FeedbackFormPage = () => {
 
   return (
       <Feedback360Shell>
-        <Feedback360Hero
-            eyebrow="Rating 1–5 + required comment"
-            title="360° Feedback Form"
-            description={`${assignment.campaignName} · ${roleLabel}`}
-            action={<Feedback360ButtonLink to={feedbackHomePath} variant="secondary">Back to feedback</Feedback360ButtonLink>}
-            aside={(
-                <>
-                  <span>Required progress</span>
-                  <strong>{answeredRequiredCount}/{requiredCount} questions completed</strong>
-                  <p>{attentionQuestionCount > 0 ? `${attentionQuestionCount} question${attentionQuestionCount === 1 ? '' : 's'} still need attention.` : 'Ready for final submission when you are.'}</p>
-                </>
-            )}
-        />
+        <div className="f360-form-topbar">
+          <Feedback360ButtonLink to={feedbackHomePath} variant="secondary">
+            Back to feedback
+          </Feedback360ButtonLink>
+
+          <div className="f360-form-topbar-summary" aria-label="Required progress">
+            <span>Required progress</span>
+            <strong>{answeredRequiredCount}/{requiredCount} questions completed</strong>
+          </div>
+        </div>
 
         <section className="f360-status-strip">
           <Feedback360InfoItem label="Deadline" value={formatDateTime(assignment.dueAt)} />
@@ -535,25 +522,6 @@ const FeedbackFormPage = () => {
             ]}
         />
 
-        {attentionItems.length > 0 && assignment.canSubmit ? (
-            <Feedback360Panel>
-              <Feedback360PanelHeader
-                  compact
-                  eyebrow="Needs attention"
-                  title={`${attentionQuestionCount} question${attentionQuestionCount === 1 ? '' : 's'} still need attention before submitting`}
-                  description={`Every question needs a rating and a supporting comment of ${MIN_REQUIRED_COMMENT_LENGTH}–${MAX_REQUIRED_COMMENT_LENGTH} characters. Select an item to jump to it.`}
-              />
-              <div className="f360-attention-list">
-                {attentionItems.slice(0, 8).map((item, itemIndex) => (
-                    <button type="button" key={`${item.index}-${item.message}-${itemIndex}`} onClick={() => scrollToQuestion(item.index)}>
-                      <span>{item.label}</span>
-                      <em>{item.message}</em>
-                    </button>
-                ))}
-                {attentionItems.length > 8 ? <small>+{attentionItems.length - 8} more items</small> : null}
-              </div>
-            </Feedback360Panel>
-        ) : null}
         {additionalCommentsTooLong ? <Feedback360Banner tone="warning">Additional comments must be {MAX_ADDITIONAL_COMMENT_LENGTH} characters or fewer.</Feedback360Banner> : null}
         {saveDraftMutation.error instanceof Error ? <Feedback360Banner tone="danger">{saveDraftMutation.error.message}</Feedback360Banner> : null}
         {submitMutation.error instanceof Error ? <Feedback360Banner tone="danger">{submitMutation.error.message}</Feedback360Banner> : null}
@@ -563,22 +531,6 @@ const FeedbackFormPage = () => {
             <EmployeeInfoPanel title="Employee receiving feedback" person={assignment.target} fallbackName={assignment.targetEmployeeName} />
             {isSelfFeedback ? null : <EmployeeInfoPanel title="Evaluator" person={assignment.evaluator} roleLabel={roleLabel} />}
           </div>
-
-          <Feedback360Panel>
-            <Feedback360PanelHeader
-                compact
-                title="Assessment details"
-                description="Assessment Date and Effective Date are kept as text until the business rule is finalized."
-            />
-            <Feedback360InfoGrid columns={2}>
-              <Feedback360Field label="Assessment Date">
-                <input disabled={!assignment.canSubmit || submitting} placeholder="Enter assessment date" {...register('assessmentDateText')} />
-              </Feedback360Field>
-              <Feedback360Field label="Effective Date">
-                <input disabled={!assignment.canSubmit || submitting} placeholder="Enter effective date" {...register('effectiveDateText')} />
-              </Feedback360Field>
-            </Feedback360InfoGrid>
-          </Feedback360Panel>
 
           <Feedback360Panel>
             <Feedback360PanelHeader
@@ -693,23 +645,6 @@ const FeedbackFormPage = () => {
             />
               <Feedback360CharacterCount current={additionalCommentsLength} max={MAX_ADDITIONAL_COMMENT_LENGTH} optional invalid={additionalCommentsTooLong} />
             </Feedback360Field>
-          </Feedback360Panel>
-
-          <Feedback360Panel>
-            <Feedback360PanelHeader
-                compact
-                title="Score explanation"
-                description="Scores are summarized after submission using the campaign scoring settings. The formula is intentionally not shown on the evaluator form."
-            />
-            <div className="f360-score-grid">
-              {SCORE_EXPLANATION.map((item) => (
-                  <div className="f360-score-cell" key={item.range}>
-                    <span>{item.range}</span>
-                    <strong>{item.label}</strong>
-                    <small>{item.description}</small>
-                  </div>
-              ))}
-            </div>
           </Feedback360Panel>
 
           <div className="f360-sticky-actions">

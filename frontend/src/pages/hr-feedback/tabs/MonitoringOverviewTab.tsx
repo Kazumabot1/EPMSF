@@ -1531,92 +1531,110 @@ function CloseCampaignConfirmDialog({
 
     const readiness = monitoring.closeReadiness;
     const withWarnings = Boolean(readiness?.requiresAcknowledgement || readiness?.canCloseWithWarnings);
-    const warningItems = (readiness?.checklist ?? []).filter((item) => String(item.status).toUpperCase() === 'WARNING').slice(0, 5);
+    const warningItems = (readiness?.checklist ?? []).filter((item) => String(item.status).toUpperCase() === 'WARNING').slice(0, 4);
     const confirmDisabled = closing || (withWarnings && !acknowledged);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true">
-            <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
-                <div className="flex items-start gap-3">
-                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${withWarnings ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'} ring-1`}>
-                        <i className={`bi ${withWarnings ? 'bi-exclamation-triangle-fill' : 'bi-check2-circle'}`} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-black text-slate-950">
-                            {withWarnings ? 'Close campaign with warnings?' : 'Close campaign?'}
-                        </h3>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                            Closing will lock feedback collection for this campaign. Evaluators will no longer be able to submit pending feedback after the campaign is closed. This does not publish results.
-                        </p>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                            <CloseReadinessMetric label="Pending" value={readiness?.pendingAssignments ?? 0} tone={(readiness?.pendingAssignments ?? 0) > 0 ? 'amber' : 'emerald'} />
-                            <CloseReadinessMetric label="Overdue" value={readiness?.overdueAssignments ?? 0} tone={(readiness?.overdueAssignments ?? 0) > 0 ? 'red' : 'emerald'} />
-                            <CloseReadinessMetric label="Privacy risks" value={readiness?.privacyRiskTargets ?? 0} tone={(readiness?.privacyRiskTargets ?? 0) > 0 ? 'amber' : 'emerald'} />
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 px-3 py-4 sm:px-4" role="dialog" aria-modal="true">
+            <div className="mx-auto flex min-h-full w-full max-w-2xl items-center justify-center">
+                <div className="flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+                        <div className="flex items-start gap-3">
+                            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${withWarnings ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'} ring-1`}>
+                                <i className={`bi ${withWarnings ? 'bi-exclamation-triangle-fill' : 'bi-check2-circle'}`} />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <h3 className="text-lg font-black text-slate-950">
+                                            {withWarnings ? 'Close campaign with warnings?' : 'Close campaign?'}
+                                        </h3>
+                                        <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">
+                                            Closing locks feedback collection. Pending evaluators cannot submit after the campaign is closed. Results are not published.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={onCancel}
+                                        disabled={closing}
+                                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50"
+                                        aria-label="Close dialog"
+                                    >
+                                        <i className="bi bi-x-lg" />
+                                    </button>
+                                </div>
+                                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                    <CloseReadinessMetric label="Pending" value={readiness?.pendingAssignments ?? 0} tone={(readiness?.pendingAssignments ?? 0) > 0 ? 'amber' : 'emerald'} />
+                                    <CloseReadinessMetric label="Overdue" value={readiness?.overdueAssignments ?? 0} tone={(readiness?.overdueAssignments ?? 0) > 0 ? 'red' : 'emerald'} />
+                                    <CloseReadinessMetric label="Privacy risks" value={readiness?.privacyRiskTargets ?? 0} tone={(readiness?.privacyRiskTargets ?? 0) > 0 ? 'amber' : 'emerald'} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {warningItems.length > 0 && (
+                            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                                <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Warnings to acknowledge</p>
+                                <ul className="mt-2 grid gap-1.5">
+                                    {warningItems.map((item) => (
+                                        <li key={item.key || item.title} className="flex gap-2 text-xs font-bold leading-5 text-amber-800">
+                                            <i className="bi bi-dot shrink-0" />
+                                            <span>{item.message}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        <label className="mt-4 block">
+                            <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Close note optional</span>
+                            <textarea
+                                value={reason}
+                                onChange={(event) => onReasonChange(event.target.value)}
+                                rows={2}
+                                maxLength={1000}
+                                placeholder="Example: HR reviewed remaining pending assignments before closing."
+                                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                            />
+                        </label>
+
+                        {withWarnings && (
+                            <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold leading-5 text-slate-600">
+                                <input
+                                    type="checkbox"
+                                    checked={acknowledged}
+                                    onChange={(event) => onAcknowledgedChange(event.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span>I understand that pending evaluators can no longer submit feedback after this campaign is closed.</span>
+                            </label>
+                        )}
+                    </div>
+
+                    <div className="shrink-0 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-12px_24px_rgba(15,23,42,0.06)] sm:p-4">
+                        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                disabled={closing}
+                                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onConfirm}
+                                disabled={confirmDisabled}
+                                className={`rounded-2xl px-4 py-2.5 text-sm font-black text-white transition disabled:bg-slate-300 ${withWarnings ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-950 hover:bg-slate-800'}`}
+                            >
+                                {closing ? 'Closing...' : withWarnings ? 'Close with warnings' : 'Close campaign'}
+                            </button>
                         </div>
                     </div>
-                </div>
-
-                {warningItems.length > 0 && (
-                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">Warnings to acknowledge</p>
-                        <ul className="mt-2 grid gap-1.5">
-                            {warningItems.map((item) => (
-                                <li key={item.key || item.title} className="flex gap-2 text-xs font-bold leading-5 text-amber-800">
-                                    <i className="bi bi-dot shrink-0" />
-                                    <span>{item.message}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-
-                <label className="mt-4 block">
-                    <span className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Close note optional</span>
-                    <textarea
-                        value={reason}
-                        onChange={(event) => onReasonChange(event.target.value)}
-                        rows={3}
-                        maxLength={1000}
-                        placeholder="Example: Campaign deadline has passed and HR reviewed remaining pending assignments."
-                        className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                    />
-                </label>
-
-                {withWarnings && (
-                    <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold leading-6 text-slate-600">
-                        <input
-                            type="checkbox"
-                            checked={acknowledged}
-                            onChange={(event) => onAcknowledgedChange(event.target.checked)}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span>I understand that pending evaluators can no longer submit feedback after this campaign is closed.</span>
-                    </label>
-                )}
-
-                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        disabled={closing}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onConfirm}
-                        disabled={confirmDisabled}
-                        className={`rounded-2xl px-4 py-2.5 text-sm font-black text-white transition disabled:bg-slate-300 ${withWarnings ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-950 hover:bg-slate-800'}`}
-                    >
-                        {closing ? 'Closing...' : withWarnings ? 'Close with warnings' : 'Close campaign'}
-                    </button>
                 </div>
             </div>
         </div>
     );
 }
-
 
 function ActivityTimelineExportSection({
                                            activity,

@@ -72,21 +72,6 @@ const relationshipLabel = (type: FeedbackRelationshipType | string | null | unde
     }
 };
 
-const relationshipTone = (type: FeedbackRelationshipType | string | null | undefined) => {
-    switch (type) {
-        case 'MANAGER':
-            return 'brand' as const;
-        case 'PEER':
-            return 'purple' as const;
-        case 'SUBORDINATE':
-            return 'info' as const;
-        case 'SELF':
-            return 'success' as const;
-        default:
-            return 'neutral' as const;
-    }
-};
-
 const formatDate = (value?: string | null) => {
     if (!value) return 'Not published yet';
     const date = new Date(value);
@@ -365,7 +350,7 @@ const EmployeeFeedbackDashboardPage = () => {
         return (
             <Feedback360VisuallyGrouped className={cx('f360-task-card', isOverdue(task) && 'f360-overdue')} key={task.assignmentId}>
                 <Feedback360Avatar name={task.targetEmployeeName} />
-                <div className="f360-task-main">
+                <div>
                     <Feedback360InlineList>
                         <Feedback360StatusPill tone="brand">{relationshipLabel(task.relationshipType)}</Feedback360StatusPill>
                         <Feedback360StatusPill tone={statusTone(task)}>{statusLabel(task)}</Feedback360StatusPill>
@@ -385,7 +370,7 @@ const EmployeeFeedbackDashboardPage = () => {
     };
 
     const renderTaskBucket = (bucket: TaskBucket) => (
-        <Feedback360Panel className="f360-task-bucket-panel" key={bucket.key}>
+        <Feedback360Panel key={bucket.key}>
             <Feedback360PanelHeader
                 compact
                 eyebrow={`${bucket.tasks.length} assignment${bucket.tasks.length === 1 ? '' : 's'}`}
@@ -401,7 +386,7 @@ const EmployeeFeedbackDashboardPage = () => {
     );
 
     const renderOverallScore = (result: FeedbackResultItem) => (
-        <section className="f360-overall-score f360-premium-score-card">
+        <section className="f360-overall-score">
             <span>Overall result</span>
             <strong>{scoreText(result.averageScore)}</strong>
             <em>{bandText(result.averageScore, result.scoreCategory)}</em>
@@ -484,28 +469,21 @@ const EmployeeFeedbackDashboardPage = () => {
     const renderWrittenComments = (result: FeedbackResultItem) => {
         const groups = groupedPublishedComments(result.comments);
         return (
-            <Feedback360Panel className="f360-written-comments-panel">
+            <Feedback360Panel>
                 <Feedback360PanelHeader compact title="Written comments" description="Only comments approved for publication and safe to show are displayed. Evaluator names are never shown." />
                 {groups.length === 0 ? (
                     <Feedback360EmptyState title="No written comments are available." description="HR may have hidden comments or the confidentiality threshold may not be met." />
                 ) : (
-                    <div className="f360-comment-group-list">
+                    <div className="f360-section-grid">
                         {groups.map((group) => (
-                            <article className="f360-comment-group-card" key={group.key}>
-                                <header className="f360-comment-group-head">
-                                    <span>Feedback area</span>
-                                    <strong>{group.title}</strong>
-                                </header>
-                                <div className="f360-comment-list">
+                            <article className="f360-question-comment-card" key={group.key}>
+                                <span>{group.title}</span>
+                                <div>
                                     {group.items.map((comment, index) => (
-                                        <section className="f360-comment-entry" key={`${group.key}-${comment.relationshipType}-${index}`}>
-                                            <div className="f360-comment-entry-head">
-                                                <Feedback360StatusPill tone={relationshipTone(comment.relationshipType)}>
-                                                    {comment.label ?? `${relationshipLabel(comment.relationshipType)} feedback`}
-                                                </Feedback360StatusPill>
-                                                {comment.questionText ? <small>{comment.questionText}</small> : null}
-                                            </div>
-                                            <blockquote>{comment.comment}</blockquote>
+                                        <section key={`${group.key}-${comment.relationshipType}-${index}`}>
+                                            <b>{comment.label ?? relationshipLabel(comment.relationshipType)} feedback</b>
+                                            {comment.questionText ? <small>{comment.questionText}</small> : null}
+                                            <ul><li>{comment.comment}</li></ul>
                                         </section>
                                     ))}
                                 </div>
@@ -548,12 +526,12 @@ const EmployeeFeedbackDashboardPage = () => {
         const key = `${result.campaignId}-${result.targetEmployeeId}-${result.publishedAt ?? result.summarizedAt}`;
         const expanded = Boolean(expandedCampaigns[key]);
         return (
-            <Feedback360VisuallyGrouped className="f360-result-group" key={key}>
+            <Feedback360VisuallyGrouped key={key}>
                 <button type="button" className="f360-result-head" onClick={() => toggleCampaign(key)} aria-expanded={expanded}>
                     <span className="f360-result-icon"><Feedback360Icon type="spark" /></span>
                     <div>
                         <h3>{result.campaignName}</h3>
-                        <p>Published {formatDate(result.publishedAt)} · {result.totalResponses} response{result.totalResponses === 1 ? '' : 's'}</p>
+                        <p>Published 360 feedback result</p>
                     </div>
                     <strong className="f360-result-score">{sectionAllowed(result.includeOverallScore) ? scoreText(result.averageScore) : 'Published'}</strong>
                     <Feedback360StatusPill tone={expanded ? 'brand' : 'neutral'}>{expanded ? 'Hide' : 'View'}</Feedback360StatusPill>
@@ -561,7 +539,7 @@ const EmployeeFeedbackDashboardPage = () => {
                 {expanded ? (
                     <div className="f360-result-body">
                         <section className="f360-document-header">
-                            <p>ACE Data Systems Ltd.</p>
+                            <p>ACE Data Systems Ltd.,</p>
                             <h2>360° Feedback Result</h2>
                             <div>
                                 <span>Campaign: {result.campaignName}</span>
@@ -584,7 +562,7 @@ const EmployeeFeedbackDashboardPage = () => {
     const openAssignmentCount = taskStats.toComplete + taskStats.inProgress;
 
     return (
-        <Feedback360Shell className="f360-employee-workspace">
+        <Feedback360Shell>
             <Feedback360Hero
                 eyebrow="360 feedback workspace"
                 title={workspace.title}
@@ -602,40 +580,59 @@ const EmployeeFeedbackDashboardPage = () => {
             />
 
             <Feedback360MetricGrid>
-                <Feedback360MetricCard value={taskStats.toComplete} label="To complete" description="Waiting for your response" tone="info" onClick={() => setTaskStatusFilter('PENDING')} />
-                <Feedback360MetricCard value={taskStats.inProgress} label="In progress" description="Drafts you can continue" tone="purple" onClick={() => setTaskStatusFilter('IN_PROGRESS')} />
-                <Feedback360MetricCard value={taskStats.submitted} label="Submitted" description="Locked final feedback" tone="success" onClick={() => setTaskStatusFilter('SUBMITTED')} />
-                <Feedback360MetricCard value={taskStats.publishedResults} label="Published results" description="Available for review" tone="brand" onClick={() => setTaskStatusFilter('ALL')} />
+                <Feedback360MetricCard value={taskStats.toComplete} label="To complete" tone="info" onClick={() => setTaskStatusFilter('PENDING')} />
+                <Feedback360MetricCard value={taskStats.inProgress} label="In progress" tone="purple" onClick={() => setTaskStatusFilter('IN_PROGRESS')} />
+                <Feedback360MetricCard value={taskStats.submitted} label="Submitted" tone="success" onClick={() => setTaskStatusFilter('SUBMITTED')} />
+                <Feedback360MetricCard value={taskStats.publishedResults} label="Published result available" tone="brand" onClick={() => setTaskStatusFilter('ALL')} />
             </Feedback360MetricGrid>
 
-            <Feedback360Panel className="f360-assignments-panel">
+            <Feedback360Panel>
                 <Feedback360PanelHeader
                     eyebrow="My assignments"
                     title="Feedback to complete"
                     description="These are only the 360 feedback assignments personally assigned to you. Every question uses rating 1–5 with a required supporting comment."
-                    actions={(
-                        <Feedback360Toolbar>
-                            <Feedback360Input type="search" placeholder="Search employee or campaign" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} />
-                            <Feedback360Select value={taskCampaignFilter} onChange={(event) => setTaskCampaignFilter(event.target.value)}>
-                                <option value="ALL">All campaigns</option>
-                                {taskCampaignOptions.map((campaign) => <option key={`task-campaign-${campaign.id}`} value={String(campaign.id)}>{campaign.name}</option>)}
-                            </Feedback360Select>
-                            <Feedback360Select value={taskRelationshipFilter} onChange={(event) => setTaskRelationshipFilter(event.target.value as RelationshipFilter)}>
-                                <option value="ALL">All relationships</option>
-                                <option value="MANAGER">Manager</option>
-                                <option value="PEER">Peer</option>
-                                <option value="SUBORDINATE">Subordinate reviewer</option>
-                                <option value="SELF">Self</option>
-                            </Feedback360Select>
-                            <Feedback360Select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)}>
-                                <option value="ALL">All statuses</option>
-                                <option value="PENDING">Not started</option>
-                                <option value="IN_PROGRESS">Draft saved</option>
-                                <option value="SUBMITTED">Completed</option>
-                            </Feedback360Select>
-                        </Feedback360Toolbar>
-                    )}
                 />
+
+                <div className="f360-assignment-toolbar-row">
+                    <Feedback360Toolbar>
+                        <Feedback360Input
+                            className="f360-assignment-search"
+                            type="search"
+                            placeholder="Search employee or campaign"
+                            value={taskSearch}
+                            onChange={(event) => setTaskSearch(event.target.value)}
+                        />
+                        <Feedback360Select
+                            className="f360-assignment-filter"
+                            value={taskCampaignFilter}
+                            onChange={(event) => setTaskCampaignFilter(event.target.value)}
+                        >
+                            <option value="ALL">All campaigns</option>
+                            {taskCampaignOptions.map((campaign) => <option key={`task-campaign-${campaign.id}`} value={String(campaign.id)}>{campaign.name}</option>)}
+                        </Feedback360Select>
+                        <Feedback360Select
+                            className="f360-assignment-filter"
+                            value={taskRelationshipFilter}
+                            onChange={(event) => setTaskRelationshipFilter(event.target.value as RelationshipFilter)}
+                        >
+                            <option value="ALL">All relationships</option>
+                            <option value="MANAGER">Manager</option>
+                            <option value="PEER">Peer</option>
+                            <option value="SUBORDINATE">Subordinate reviewer</option>
+                            <option value="SELF">Self</option>
+                        </Feedback360Select>
+                        <Feedback360Select
+                            className="f360-assignment-filter"
+                            value={taskStatusFilter}
+                            onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)}
+                        >
+                            <option value="ALL">All statuses</option>
+                            <option value="PENDING">Not started</option>
+                            <option value="IN_PROGRESS">Draft saved</option>
+                            <option value="SUBMITTED">Completed</option>
+                        </Feedback360Select>
+                    </Feedback360Toolbar>
+                </div>
 
                 {tasksQuery.isLoading ? <Feedback360EmptyState title="Loading assigned feedback..." /> : null}
                 {tasksQuery.error instanceof Error ? <Feedback360Banner tone="danger">{tasksQuery.error.message}</Feedback360Banner> : null}
@@ -649,7 +646,7 @@ const EmployeeFeedbackDashboardPage = () => {
             ) : null}
 
             {workspace.canSeeAboutMe ? (
-                <Feedback360Panel className="f360-published-results-panel">
+                <Feedback360Panel>
                     <Feedback360PanelHeader
                         compact
                         eyebrow="Published result available"
