@@ -21,6 +21,7 @@ import com.epms.entity.TeamMember;
 import com.epms.entity.User;
 import com.epms.entity.enums.AssessmentStatus;
 import com.epms.exception.BadRequestException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.exception.UnauthorizedActionException;
 import com.epms.repository.AssessmentFormDefinitionRepository;
@@ -101,6 +102,7 @@ public class EmployeeAssessmentService {
     private final EmployeeDepartmentRepository employeeDepartmentRepository;
     private final PositionPermissionService positionPermissionService;
     private final SelfAssessmentScoreBandService selfAssessmentScoreBandService;
+    private final NotificationService notificationService;
     private final TeamMemberRepository teamMemberRepository;
 
     @Transactional(readOnly = true)
@@ -166,15 +168,19 @@ public class EmployeeAssessmentService {
 
         ensureFormOpenForSubmission(form);
         validateRequestFormMatchesAssignedForm(request, form);
-        ensureNoNonEditableAssessment(user.getId(), form.getId());
 
-        EmployeeAssessment assessment = assessmentRepository
+        Optional<EmployeeAssessment> existingDraft = assessmentRepository
                 .findFirstByUserIdAndAssessmentFormIdAndStatusOrderByUpdatedAtDesc(
                         user.getId(),
                         form.getId(),
                         AssessmentStatus.DRAFT
-                )
-                .orElseGet(() -> createNewAssessment(user, form));
+                );
+
+        if (existingDraft.isEmpty()) {
+            ensureNoNonEditableAssessment(user.getId(), form.getId());
+        }
+
+        EmployeeAssessment assessment = existingDraft.orElseGet(() -> createNewAssessment(user, form));
 
         applyRequest(assessment, request, AssessmentStatus.DRAFT, form);
         calculateScores(assessment, form);
@@ -225,8 +231,12 @@ public class EmployeeAssessmentService {
         assessment.setSubmittedAt(LocalDateTime.now());
         assessment.setApprovedAt(null);
         assessment.setDeclinedAt(null);
+        clearRejectionAudit(assessment);
 
-        return toResponse(assessmentRepository.save(assessment));
+        EmployeeAssessment saved = assessmentRepository.save(assessment);
+        notifyManagersAssessmentSubmitted(saved);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -234,9 +244,7 @@ public class EmployeeAssessmentService {
         EmployeeAssessment assessment = findAssessment(id);
         UserPrincipal principal = SecurityUtils.currentUser();
 
-        if (!isEligibleManagerReviewer(assessment, principal)) {
-            throw new UnauthorizedActionException("Only an eligible manager can sign this self-assessment.");
-        }
+        assertManagerCanReviewSelfAssessment(assessment, principal, "sign");
 
         if (!AssessmentStatus.PENDING_MANAGER.equals(assessment.getStatus())
                 && !AssessmentStatus.SUBMITTED.equals(assessment.getStatus())) {
@@ -258,7 +266,11 @@ public class EmployeeAssessmentService {
         assessment.setManagerSignedAt(LocalDateTime.now());
         assessment.setStatus(AssessmentStatus.PENDING_HR);
 
-        return toResponse(assessmentRepository.save(assessment));
+        EmployeeAssessment saved = assessmentRepository.save(assessment);
+        notifyEmployeeManagerApproved(saved);
+        notifyHrAssessmentWaiting(saved);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -271,9 +283,7 @@ public class EmployeeAssessmentService {
         EmployeeAssessment assessment = findAssessment(id);
         UserPrincipal principal = SecurityUtils.currentUser();
 
-        if (!isEligibleManagerReviewer(assessment, principal)) {
-            throw new UnauthorizedActionException("Only an eligible manager can reject this self-assessment.");
-        }
+        assertManagerCanReviewSelfAssessment(assessment, principal, "reject");
 
         if (!AssessmentStatus.PENDING_MANAGER.equals(assessment.getStatus())
                 && !AssessmentStatus.SUBMITTED.equals(assessment.getStatus())) {
@@ -283,13 +293,12 @@ public class EmployeeAssessmentService {
         String reason = requiredReason(request, "Manager rejection reason is required.");
         String comment = clean(request == null ? null : request.getComment());
 
-        if (canEmployeeReviseAfterRejection(assessment)) {
-            reopenRejectedAssessmentForEmployeeRevision(assessment, reason, comment, false);
-        } else {
-            closeRejectedAssessment(assessment, reason, comment, false);
-        }
+        rejectAssessment(assessment, reason, comment, false);
 
-        return toResponse(assessmentRepository.save(assessment));
+        EmployeeAssessment saved = assessmentRepository.save(assessment);
+        notifyEmployeeRejected(saved);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -326,8 +335,12 @@ public class EmployeeAssessmentService {
         assessment.setStatus(AssessmentStatus.APPROVED);
         assessment.setApprovedAt(LocalDateTime.now());
         assessment.setDeclinedAt(null);
+        clearRejectionAudit(assessment);
 
-        return toResponse(assessmentRepository.save(assessment));
+        EmployeeAssessment saved = assessmentRepository.save(assessment);
+        notifyEmployeeHrApproved(saved);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -348,20 +361,59 @@ public class EmployeeAssessmentService {
             throw new BadRequestException("Approved assessments cannot be rejected.");
         }
 
-        if (AssessmentStatus.CLOSED_REJECTED.equals(assessment.getStatus())) {
-            throw new BadRequestException("This assessment is already closed as rejected.");
+        if (isRejectedStatus(assessment.getStatus())) {
+            throw new BadRequestException("This assessment is already rejected.");
         }
 
         String reason = requiredReason(request, "HR rejection reason is required.");
         String comment = clean(request == null ? null : request.getComment());
 
-        if (canEmployeeReviseAfterRejection(assessment)) {
-            reopenRejectedAssessmentForEmployeeRevision(assessment, reason, comment, true);
-        } else {
-            closeRejectedAssessment(assessment, reason, comment, true);
+        rejectAssessment(assessment, reason, comment, true);
+
+        EmployeeAssessment saved = assessmentRepository.save(assessment);
+        notifyEmployeeRejected(saved);
+        notifyManagerHrRejected(saved);
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public AssessmentResponse allowResubmit(Long id, ReviewActionRequest request) {
+        EmployeeAssessment rejectedAssessment = findAssessment(id);
+        UserPrincipal principal = SecurityUtils.currentUser();
+        Set<String> roles = currentUserTargetRoles(principal);
+
+        if (!roles.contains("HR") && !roles.contains("HRADMIN")) {
+            throw new UnauthorizedActionException("Only HR can allow self-assessment resubmission.");
         }
 
-        return toResponse(assessmentRepository.save(assessment));
+        if (!isRejectedStatus(rejectedAssessment.getStatus())) {
+            throw new BadRequestException("Only rejected self-assessments can be opened for resubmission.");
+        }
+
+        AssessmentFormDefinition form = formRepository
+                .findById(rejectedAssessment.getAssessmentFormId())
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment form not found."));
+
+        ensureFormOpenForSubmission(form);
+
+        assessmentRepository
+                .findFirstByUserIdAndAssessmentFormIdAndStatusInOrderByUpdatedAtDesc(
+                        rejectedAssessment.getUserId(),
+                        rejectedAssessment.getAssessmentFormId(),
+                        List.of(AssessmentStatus.DRAFT, AssessmentStatus.PENDING_MANAGER, AssessmentStatus.PENDING_HR)
+                )
+                .ifPresent(existing -> {
+                    throw new BadRequestException("This employee already has an active resubmission for this form.");
+                });
+
+        User approver = currentUserEntity();
+        EmployeeAssessment draft = createResubmissionDraft(rejectedAssessment, form, approver, clean(request == null ? null : request.getReason()));
+        EmployeeAssessment saved = assessmentRepository.save(draft);
+
+        notifyEmployeeResubmitAllowed(saved);
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -470,6 +522,7 @@ public class EmployeeAssessmentService {
                 .maxScore(0.0)
                 .scorePercent(0.0)
                 .performanceLabel("Not scored")
+                .attemptNo(1)
                 .answers(new ArrayList<>())
                 .build();
     }
@@ -635,6 +688,8 @@ public class EmployeeAssessmentService {
                 .departmentHeadComment(null)
                 .hrComment(null)
                 .declineReason(null)
+                .attemptNo(1)
+                .canAllowResubmit(false)
                 .sections(templateSectionsFromForm(form))
                 .scoreBands(selfAssessmentScoreBandService.getActiveBandsForAssessment())
                 .build();
@@ -684,6 +739,17 @@ public class EmployeeAssessmentService {
                 .hrComment(assessment.getHrComment())
                 .departmentHeadComment(assessment.getDepartmentHeadComment())
                 .declineReason(assessment.getDeclineReason())
+                .rejectedByRole(assessment.getRejectedByRole())
+                .rejectedByUserId(assessment.getRejectedByUserId())
+                .rejectedByName(assessment.getRejectedByName())
+                .rejectedAt(assessment.getRejectedAt())
+                .attemptNo(assessment.getAttemptNo() == null ? 1 : assessment.getAttemptNo())
+                .resubmittedFromAssessmentId(assessment.getResubmittedFromAssessmentId())
+                .resubmitAllowedByUserId(assessment.getResubmitAllowedByUserId())
+                .resubmitAllowedByName(assessment.getResubmitAllowedByName())
+                .resubmitAllowedAt(assessment.getResubmitAllowedAt())
+                .resubmitReason(assessment.getResubmitReason())
+                .canAllowResubmit(canHrAllowResubmit(assessment))
                 .employeeSignatureId(assessment.getEmployeeSignatureId())
                 .employeeSignatureName(assessment.getEmployeeSignatureName())
                 .employeeSignatureImageData(assessment.getEmployeeSignatureImageData())
@@ -738,8 +804,18 @@ public class EmployeeAssessmentService {
                 .declinedAt(assessment.getDeclinedAt())
                 .employeeSigned(assessment.getEmployeeSignatureId() != null)
                 .managerSigned(assessment.getManagerSignatureId() != null)
-                .departmentHeadSigned(assessment.getDepartmentHeadSignatureId() != null)
+                .departmentHeadSigned(false)
                 .hrSigned(assessment.getHrSignatureId() != null)
+                .declineReason(assessment.getDeclineReason())
+                .rejectedByRole(assessment.getRejectedByRole())
+                .rejectedByUserId(assessment.getRejectedByUserId())
+                .rejectedByName(assessment.getRejectedByName())
+                .rejectedAt(assessment.getRejectedAt())
+                .attemptNo(assessment.getAttemptNo() == null ? 1 : assessment.getAttemptNo())
+                .resubmittedFromAssessmentId(assessment.getResubmittedFromAssessmentId())
+                .resubmitAllowedAt(assessment.getResubmitAllowedAt())
+                .resubmitReason(assessment.getResubmitReason())
+                .canAllowResubmit(canHrAllowResubmit(assessment))
                 .build();
     }
 
@@ -915,7 +991,6 @@ public class EmployeeAssessmentService {
 
         if (role.equals("PROJECT_MANAGER")
                 || role.equals("TEAM_MANAGER")
-                || role.equals("TEAM_LEADER")
                 || role.equals("PM")
                 || role.contains("MANAGER")) {
             roles.add("MANAGER");
@@ -1331,7 +1406,8 @@ public class EmployeeAssessmentService {
         /*
          * Case 1:
          * Employee is inside one or more active teams.
-         * The form goes to that team Project Manager / Team Leader.
+         * The form goes to the team Project Manager only.
+         * Team Leader is a team-leading position, not the self-assessment approver.
          */
         if (!activeMemberships.isEmpty()) {
             for (TeamMember membership : activeMemberships) {
@@ -1342,7 +1418,6 @@ public class EmployeeAssessmentService {
                 }
 
                 addIfManager(managers, team.getProjectManager());
-                addIfManager(managers, team.getTeamLeader());
             }
 
             if (!managers.isEmpty()) {
@@ -1482,90 +1557,248 @@ public class EmployeeAssessmentService {
         return roles.contains("MANAGER");
     }
 
-    private boolean canEmployeeReviseAfterRejection(EmployeeAssessment assessment) {
-        if (assessment == null || assessment.getAssessmentFormId() == null) {
-            return false;
-        }
-
-        AssessmentFormDefinition form = formRepository
-                .findById(assessment.getAssessmentFormId())
-                .orElse(null);
-
-        if (form == null) {
-            return false;
-        }
-
+    private void rejectAssessment(
+            EmployeeAssessment assessment,
+            String reason,
+            String reviewerComment,
+            boolean rejectedByHr
+    ) {
+        User reviewer = currentUserEntity();
+        String reviewerName = displayName(reviewer);
         LocalDateTime now = LocalDateTime.now();
 
-        return form.getEndDate() == null || !now.isAfter(form.getEndDate());
-    }
-
-    private void reopenRejectedAssessmentForEmployeeRevision(
-            EmployeeAssessment assessment,
-            String reason,
-            String reviewerComment,
-            boolean rejectedByHr
-    ) {
-        assessment.setStatus(AssessmentStatus.DRAFT);
+        assessment.setStatus(AssessmentStatus.REJECTED);
         assessment.setDeclineReason(reason);
-        assessment.setDeclinedAt(LocalDateTime.now());
-        assessment.setApprovedAt(null);
-        assessment.setSubmittedAt(null);
-
-        if (rejectedByHr) {
-            assessment.setHrComment(reviewerComment);
-        } else {
-            assessment.setManagerComment(reviewerComment);
-        }
-
-        clearEmployeeSubmissionAndReviewSignatures(assessment);
-    }
-
-    private void closeRejectedAssessment(
-            EmployeeAssessment assessment,
-            String reason,
-            String reviewerComment,
-            boolean rejectedByHr
-    ) {
-        assessment.setStatus(AssessmentStatus.CLOSED_REJECTED);
-        assessment.setDeclineReason(reason);
-        assessment.setDeclinedAt(LocalDateTime.now());
+        assessment.setDeclinedAt(now);
+        assessment.setRejectedByRole(rejectedByHr ? "HR" : "MANAGER");
+        assessment.setRejectedByUserId(reviewer.getId());
+        assessment.setRejectedByName(reviewerName);
+        assessment.setRejectedAt(now);
         assessment.setApprovedAt(null);
 
         if (rejectedByHr) {
             assessment.setHrComment(reviewerComment);
         } else {
+            assessment.setManagerUserId(reviewer.getId());
+            assessment.setManagerName(reviewerName);
             assessment.setManagerComment(reviewerComment);
         }
     }
 
-    private void clearEmployeeSubmissionAndReviewSignatures(EmployeeAssessment assessment) {
-        assessment.setEmployeeSignatureId(null);
-        assessment.setEmployeeSignatureName(null);
-        assessment.setEmployeeSignatureImageData(null);
-        assessment.setEmployeeSignatureImageType(null);
-        assessment.setEmployeeSignedAt(null);
+    private EmployeeAssessment createResubmissionDraft(
+            EmployeeAssessment rejectedAssessment,
+            AssessmentFormDefinition form,
+            User approver,
+            String resubmitReason
+    ) {
+        EmployeeAssessment draft = EmployeeAssessment.builder()
+                .userId(rejectedAssessment.getUserId())
+                .employeeId(rejectedAssessment.getEmployeeId())
+                .employeeName(rejectedAssessment.getEmployeeName())
+                .employeeCode(rejectedAssessment.getEmployeeCode())
+                .currentPosition(rejectedAssessment.getCurrentPosition())
+                .departmentId(rejectedAssessment.getDepartmentId())
+                .departmentName(rejectedAssessment.getDepartmentName())
+                .managerUserId(rejectedAssessment.getManagerUserId())
+                .managerName(rejectedAssessment.getManagerName())
+                .departmentHeadUserId(null)
+                .departmentHeadName(null)
+                .assessmentFormId(rejectedAssessment.getAssessmentFormId())
+                .formName(rejectedAssessment.getFormName())
+                .companyName(rejectedAssessment.getCompanyName())
+                .assessmentDate(LocalDate.now())
+                .period(rejectedAssessment.getPeriod())
+                .status(AssessmentStatus.DRAFT)
+                .totalScore(rejectedAssessment.getTotalScore())
+                .maxScore(rejectedAssessment.getMaxScore())
+                .scorePercent(rejectedAssessment.getScorePercent())
+                .performanceLabel(rejectedAssessment.getPerformanceLabel())
+                .remarks(rejectedAssessment.getRemarks())
+                .attemptNo((rejectedAssessment.getAttemptNo() == null ? 1 : rejectedAssessment.getAttemptNo()) + 1)
+                .resubmittedFromAssessmentId(rejectedAssessment.getId())
+                .resubmitAllowedByUserId(approver.getId())
+                .resubmitAllowedByName(displayName(approver))
+                .resubmitAllowedAt(LocalDateTime.now())
+                .resubmitReason(resubmitReason)
+                .answers(new ArrayList<>())
+                .build();
 
-        assessment.setManagerSignatureId(null);
-        assessment.setManagerSignatureName(null);
-        assessment.setManagerSignatureImageData(null);
-        assessment.setManagerSignatureImageType(null);
-        assessment.setManagerSignedAt(null);
+        copyAnswers(rejectedAssessment, draft);
+        calculateScores(draft, form);
+        return draft;
+    }
 
-        assessment.setDepartmentHeadSignatureId(null);
-        assessment.setDepartmentHeadSignatureName(null);
-        assessment.setDepartmentHeadSignatureImageData(null);
-        assessment.setDepartmentHeadSignatureImageType(null);
-        assessment.setDepartmentHeadSignedAt(null);
+    private void copyAnswers(EmployeeAssessment source, EmployeeAssessment target) {
+        if (source.getAnswers() == null) {
+            return;
+        }
 
-        assessment.setHrSignatureId(null);
-        assessment.setHrSignatureName(null);
-        assessment.setHrSignatureImageData(null);
-        assessment.setHrSignatureImageType(null);
-        assessment.setHrSignedAt(null);
+        source.getAnswers()
+                .stream()
+                .sorted(Comparator.comparing(
+                        EmployeeAssessmentAnswer::getItemOrder,
+                        Comparator.nullsLast(Integer::compareTo)
+                ))
+                .forEach(answer -> target.addAnswer(EmployeeAssessmentAnswer.builder()
+                        .questionId(answer.getQuestionId())
+                        .sectionTitle(answer.getSectionTitle())
+                        .questionText(answer.getQuestionText())
+                        .itemOrder(answer.getItemOrder())
+                        .responseType(RESPONSE_TYPE_YES_NO_RATING)
+                        .required(answer.getRequired())
+                        .weight(1.0)
+                        .rating(answer.getRating())
+                        .maxRating(answer.getMaxRating())
+                        .comment("")
+                        .yesNoAnswer(answer.getYesNoAnswer())
+                        .build()));
+    }
 
-        assessment.setDepartmentHeadUserId(null);
-        assessment.setDepartmentHeadName(null);
+    private boolean canHrAllowResubmit(EmployeeAssessment assessment) {
+        if (assessment == null || !isRejectedStatus(assessment.getStatus())) {
+            return false;
+        }
+
+        if (assessment.getAssessmentFormId() == null) {
+            return false;
+        }
+
+        return formRepository
+                .findById(assessment.getAssessmentFormId())
+                .map(form -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    return Boolean.TRUE.equals(form.getActive())
+                            && (form.getStartDate() == null || !now.isBefore(form.getStartDate()))
+                            && (form.getEndDate() == null || !now.isAfter(form.getEndDate()));
+                })
+                .orElse(false);
+    }
+
+    private boolean isRejectedStatus(AssessmentStatus status) {
+        return AssessmentStatus.REJECTED.equals(status)
+                || AssessmentStatus.DECLINED.equals(status)
+                || AssessmentStatus.CLOSED_REJECTED.equals(status);
+    }
+
+    private void clearRejectionAudit(EmployeeAssessment assessment) {
+        assessment.setDeclineReason(null);
+        assessment.setRejectedByRole(null);
+        assessment.setRejectedByUserId(null);
+        assessment.setRejectedByName(null);
+        assessment.setRejectedAt(null);
+    }
+
+    private void assertManagerCanReviewSelfAssessment(EmployeeAssessment assessment, UserPrincipal principal, String action) {
+        if (!isEligibleManagerReviewer(assessment, principal)) {
+            throw new UnauthorizedActionException("Only an eligible manager can " + action + " this self-assessment.");
+        }
+
+        if (!positionPermissionService.currentUserHasPermission("selfAssessmentSign")) {
+            throw new UnauthorizedActionException("Your position does not have permission to review self-assessments.");
+        }
+    }
+
+    private String displayName(User user) {
+        if (user == null) {
+            return "Unknown user";
+        }
+
+        String fullName = normalizeOptional(user.getFullName());
+        if (fullName != null) {
+            return fullName;
+        }
+
+        return user.getEmail() == null ? "User #" + user.getId() : user.getEmail();
+    }
+
+    private void notifyManagersAssessmentSubmitted(EmployeeAssessment assessment) {
+        for (User manager : eligibleManagersForAssessment(assessment)) {
+            notificationService.sendEvent(
+                    manager.getId(),
+                    NotificationEventKey.SELF_ASSESSMENT_SUBMITTED,
+                    "Self-assessment waiting for review",
+                    assessment.getEmployeeName() + " submitted a self-assessment form for your review.",
+                    "GENERAL",
+                    assessment.getId() == null ? null : assessment.getId().intValue()
+            );
+        }
+    }
+
+    private void notifyEmployeeManagerApproved(EmployeeAssessment assessment) {
+        notificationService.sendEvent(
+                assessment.getUserId(),
+                NotificationEventKey.SELF_ASSESSMENT_MANAGER_APPROVED,
+                "Self-assessment approved by Manager",
+                "Your self-assessment was approved by Manager and sent to HR for final review.",
+                "GENERAL",
+                assessment.getId() == null ? null : assessment.getId().intValue()
+        );
+    }
+
+    private void notifyHrAssessmentWaiting(EmployeeAssessment assessment) {
+        for (User hrUser : userRepository.findActiveUsersByNormalizedRoleNames(List.of("HR", "HRADMIN"))) {
+            notificationService.sendEvent(
+                    hrUser.getId(),
+                    NotificationEventKey.SELF_ASSESSMENT_WAITING_HR,
+                    "Self-assessment waiting for HR review",
+                    assessment.getEmployeeName() + " is waiting for HR self-assessment approval.",
+                    "GENERAL",
+                    assessment.getId() == null ? null : assessment.getId().intValue()
+            );
+        }
+    }
+
+    private void notifyEmployeeHrApproved(EmployeeAssessment assessment) {
+        notificationService.sendEvent(
+                assessment.getUserId(),
+                NotificationEventKey.SELF_ASSESSMENT_HR_APPROVED,
+                "Self-assessment approved",
+                "Your self-assessment was approved by HR.",
+                "GENERAL",
+                assessment.getId() == null ? null : assessment.getId().intValue()
+        );
+    }
+
+    private void notifyEmployeeRejected(EmployeeAssessment assessment) {
+        String role = assessment.getRejectedByRole() == null ? "Reviewer" : assessment.getRejectedByRole();
+        String reason = assessment.getDeclineReason() == null ? "Please check the rejected form for details." : assessment.getDeclineReason();
+
+        notificationService.sendEvent(
+                assessment.getUserId(),
+                NotificationEventKey.SELF_ASSESSMENT_REJECTED,
+                "Self-assessment rejected by " + role,
+                "Your self-assessment was rejected by " + role + ". Reason: " + reason,
+                "GENERAL",
+                assessment.getId() == null ? null : assessment.getId().intValue()
+        );
+    }
+
+    private void notifyManagerHrRejected(EmployeeAssessment assessment) {
+        if (assessment.getManagerUserId() == null) {
+            return;
+        }
+
+        notificationService.sendEvent(
+                assessment.getManagerUserId(),
+                NotificationEventKey.SELF_ASSESSMENT_REJECTED,
+                "Self-assessment rejected by HR",
+                assessment.getEmployeeName() + "'s self-assessment was rejected by HR after Manager approval.",
+                "GENERAL",
+                assessment.getId() == null ? null : assessment.getId().intValue()
+        );
+    }
+
+    private void notifyEmployeeResubmitAllowed(EmployeeAssessment assessment) {
+        String reason = assessment.getResubmitReason() == null ? "Please review and resubmit before the form closes." : assessment.getResubmitReason();
+
+        notificationService.sendEvent(
+                assessment.getUserId(),
+                NotificationEventKey.SELF_ASSESSMENT_RESUBMIT_ALLOWED,
+                "Self-assessment resubmission opened",
+                "HR reopened your self-assessment for resubmission. " + reason,
+                "GENERAL",
+                assessment.getId() == null ? null : assessment.getId().intValue()
+        );
     }
 
     private String requiredReason(ReviewActionRequest request, String message) {

@@ -177,6 +177,17 @@ const normalizeAssessment = (payload: any): EmployeeAssessment | null => {
     hrComment: payload.hrComment ?? null,
     departmentHeadComment: payload.departmentHeadComment ?? null,
     declineReason: payload.declineReason ?? null,
+    rejectedByRole: payload.rejectedByRole ?? null,
+    rejectedByUserId: payload.rejectedByUserId ?? null,
+    rejectedByName: payload.rejectedByName ?? null,
+    rejectedAt: payload.rejectedAt ?? null,
+    attemptNo: payload.attemptNo ?? 1,
+    resubmittedFromAssessmentId: payload.resubmittedFromAssessmentId ?? null,
+    resubmitAllowedByUserId: payload.resubmitAllowedByUserId ?? null,
+    resubmitAllowedByName: payload.resubmitAllowedByName ?? null,
+    resubmitAllowedAt: payload.resubmitAllowedAt ?? null,
+    resubmitReason: payload.resubmitReason ?? null,
+    canAllowResubmit: Boolean(payload.canAllowResubmit ?? false),
 
     // Employee signature
     employeeSignatureId: payload.employeeSignatureId ?? null,
@@ -252,10 +263,18 @@ const normalizeScoreRow = (row: any): AssessmentScoreRow => ({
   declinedAt: row.declinedAt ?? null,
   employeeSigned: Boolean(row.employeeSigned ?? row.employeeSignatureId ?? row.employeeSignedAt),
   managerSigned: Boolean(row.managerSigned ?? row.managerSignatureId ?? row.managerSignedAt),
-  departmentHeadSigned: Boolean(
-    row.departmentHeadSigned ?? row.departmentHeadSignatureId ?? row.departmentHeadSignedAt,
-  ),
+  departmentHeadSigned: false,
   hrSigned: Boolean(row.hrSigned ?? row.hrSignatureId ?? row.hrSignedAt),
+  declineReason: row.declineReason ?? null,
+  rejectedByRole: row.rejectedByRole ?? null,
+  rejectedByUserId: row.rejectedByUserId ?? null,
+  rejectedByName: row.rejectedByName ?? null,
+  rejectedAt: row.rejectedAt ?? null,
+  attemptNo: row.attemptNo ?? 1,
+  resubmittedFromAssessmentId: row.resubmittedFromAssessmentId ?? null,
+  resubmitAllowedAt: row.resubmitAllowedAt ?? null,
+  resubmitReason: row.resubmitReason ?? null,
+  canAllowResubmit: Boolean(row.canAllowResubmit ?? false),
 });
 
 const normalizeList = <T,>(payload: any, fallback: T[]): T[] => {
@@ -456,6 +475,14 @@ async hrDecline(id: number, reason: string, comment?: string): Promise<EmployeeA
   const response = await api.post(`/employee-assessments/${id}/hr-decline`, {
     reason,
     comment: comment ?? null,
+  });
+
+  return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;
+},
+
+async allowResubmit(id: number, reason?: string): Promise<EmployeeAssessment> {
+  const response = await api.post(`/employee-assessments/${id}/allow-resubmit`, {
+    reason: reason ?? null,
   });
 
   return normalizeAssessment(unwrap<any>(response, null)) as EmployeeAssessment;

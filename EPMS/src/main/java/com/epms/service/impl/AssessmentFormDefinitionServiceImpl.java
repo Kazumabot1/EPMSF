@@ -13,19 +13,28 @@ import com.epms.entity.AssessmentFormDefinition;
 import com.epms.entity.AssessmentFormQuestionDefinition;
 import com.epms.entity.AssessmentFormScoreBandDefinition;
 import com.epms.entity.AssessmentFormSectionDefinition;
+import com.epms.entity.User;
 import com.epms.exception.BadRequestException;
+import com.epms.notification.NotificationEventKey;
 import com.epms.exception.ResourceNotFoundException;
 import com.epms.repository.AssessmentFormDefinitionRepository;
+import com.epms.repository.UserRepository;
 import com.epms.service.AssessmentFormDefinitionService;
+import com.epms.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -37,11 +46,13 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     private static final String TARGET_ROLE_EMPLOYEE = "Employee";
 
     private final AssessmentFormDefinitionRepository repository;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
     public List<AssessmentFormResponse> getAll() {
-        expireEndedActiveForms();
+        processAssessmentFormNotificationsAndExpiry();
 
         return repository.findAllByOrderByCreatedAtDesc()
                 .stream()
@@ -52,7 +63,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
     @Override
     @Transactional
     public AssessmentFormResponse getById(Integer id) {
-        expireEndedActiveForms();
+        processAssessmentFormNotificationsAndExpiry();
 
         return toResponse(getEntity(id));
     }
@@ -80,7 +91,7 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
     @Override
     public AssessmentFormResponse updateActivation(Integer id, AssessmentFormActivationPayload payload) {
-        expireEndedActiveForms();
+        processAssessmentFormNotificationsAndExpiry();
 
         if (payload == null || payload.getActive() == null) {
             throw new BadRequestException("Activation status is required.");
@@ -104,7 +115,13 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         repository.save(form);
     }
 
-    private void expireEndedActiveForms() {
+    @Scheduled(fixedDelay = 60000, initialDelay = 60000)
+    @Transactional
+    public void scheduledAssessmentFormNotificationCheck() {
+        processAssessmentFormNotificationsAndExpiry();
+    }
+
+    private void processAssessmentFormNotificationsAndExpiry() {
         LocalDateTime now = LocalDateTime.now();
 
         List<AssessmentFormDefinition> forms = repository.findAllByOrderByCreatedAtDesc();
@@ -112,8 +129,21 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
 
         for (AssessmentFormDefinition form : forms) {
             if (Boolean.TRUE.equals(form.getActive())
+                    && form.getStartDate() != null
+                    && !form.getStartDate().isAfter(now)
+                    && form.getStartNotificationSentAt() == null) {
+                notifyActiveEmployeesFormOpened(form);
+                form.setStartNotificationSentAt(now);
+                changed = true;
+            }
+
+            if (Boolean.TRUE.equals(form.getActive())
                     && form.getEndDate() != null
                     && !form.getEndDate().isAfter(now)) {
+                if (form.getCloseNotificationSentAt() == null) {
+                    notifyActiveEmployeesFormClosed(form);
+                    form.setCloseNotificationSentAt(now);
+                }
                 form.setActive(false);
                 changed = true;
             }
@@ -122,6 +152,129 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         if (changed) {
             repository.saveAll(forms);
         }
+    }
+
+    private void notifyActiveEmployeesFormOpened(AssessmentFormDefinition form) {
+        for (User employee : activeEmployeeUsers()) {
+            notificationService.sendEventOnce(
+                    employee.getId(),
+                    NotificationEventKey.SELF_ASSESSMENT_FORM_OPENED,
+                    "Self-assessment form is open",
+                    (form.getFormName() == null ? "Self-assessment form" : form.getFormName()) + " is now open. Please submit it before the end date.",
+                    "GENERAL",
+                    form.getId()
+            );
+        }
+    }
+
+    private void notifyActiveEmployeesFormClosed(AssessmentFormDefinition form) {
+        for (User employee : activeEmployeeUsers()) {
+            notificationService.sendEventOnce(
+                    employee.getId(),
+                    NotificationEventKey.SELF_ASSESSMENT_FORM_CLOSED,
+                    "Self-assessment form is closed",
+                    (form.getFormName() == null ? "Self-assessment form" : form.getFormName()) + " is now closed.",
+                    "GENERAL",
+                    form.getId()
+            );
+        }
+    }
+
+    private List<User> activeEmployeeUsers() {
+        return userRepository.findAll()
+                .stream()
+                .filter(user -> !Boolean.FALSE.equals(user.getActive()))
+                .filter(this::isEmployeeOnlyUser)
+                .toList();
+    }
+
+    private boolean isEmployeeOnlyUser(User user) {
+        if (user == null || user.getId() == null) {
+            return false;
+        }
+
+        Set<String> roles = normalizedUserRoles(user);
+        return roles.contains("EMPLOYEE")
+                && !roles.contains("MANAGER")
+                && !roles.contains("PROJECT_MANAGER")
+                && !roles.contains("TEAM_MANAGER")
+                && !roles.contains("DEPARTMENT_HEAD")
+                && !roles.contains("DEPARTMENTHEAD")
+                && !roles.contains("HR")
+                && !roles.contains("HRADMIN")
+                && !roles.contains("CEO")
+                && !roles.contains("EXECUTIVE");
+    }
+
+    private Set<String> normalizedUserRoles(User user) {
+        Set<String> roles = new LinkedHashSet<>();
+
+        addNormalizedRole(roles, roleFromDashboard(user.getDashboard()));
+
+        if (user.getPosition() != null) {
+            addNormalizedRole(roles, user.getPosition().getPositionTitle());
+            if (user.getPosition().getRole() != null) {
+                addNormalizedRole(roles, user.getPosition().getRole().getName());
+            }
+        }
+
+        addNormalizedRoles(roles, userRepository.findNormalizedRoleNamesByUserId(user.getId()));
+
+        return roles;
+    }
+
+    private void addNormalizedRoles(Set<String> roles, Collection<String> values) {
+        if (values == null) {
+            return;
+        }
+        values.forEach(value -> addNormalizedRole(roles, value));
+    }
+
+    private void addNormalizedRole(Set<String> roles, String value) {
+        String role = normalizeRole(value);
+        if (role == null || role.isBlank()) {
+            return;
+        }
+
+        roles.add(role);
+
+        if (role.equals("PROJECT_MANAGER") || role.equals("TEAM_MANAGER") || role.contains("MANAGER")) {
+            roles.add("MANAGER");
+        }
+
+        if (role.equals("DEPARTMENT_HEAD") || role.equals("DEPARTMENTHEAD") || role.equals("DEPT_HEAD") || role.equals("HEAD_OF_DEPARTMENT")) {
+            roles.add("DEPARTMENT_HEAD");
+        }
+    }
+
+    private String roleFromDashboard(String dashboard) {
+        if (dashboard == null || dashboard.isBlank()) {
+            return null;
+        }
+
+        return switch (dashboard) {
+            case "EMPLOYEE_DASHBOARD" -> "EMPLOYEE";
+            case "MANAGER_DASHBOARD" -> "MANAGER";
+            case "DEPARTMENT_HEAD_DASHBOARD", "DEPARTMENTHEAD_DASHBOARD", "DEPT_HEAD_DASHBOARD" -> "DEPARTMENT_HEAD";
+            case "HR_DASHBOARD" -> "HR";
+            case "HRADMIN_DASHBOARD", "ADMIN_DASHBOARD" -> "HRADMIN";
+            case "EXECUTIVE_DASHBOARD", "CEO_DASHBOARD" -> "CEO";
+            default -> null;
+        };
+    }
+
+    private String normalizeRole(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        return value
+                .replaceFirst("(?i)^ROLE_", "")
+                .trim()
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("[^A-Za-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase(Locale.ROOT);
     }
 
     private AssessmentFormDefinition getEntity(Integer id) {
@@ -163,6 +316,8 @@ public class AssessmentFormDefinitionServiceImpl implements AssessmentFormDefini
         form.setStartDate(payload.getStartDate());
         form.setEndDate(payload.getEndDate());
         form.setActive(true);
+        form.setStartNotificationSentAt(null);
+        form.setCloseNotificationSentAt(null);
 
         if (form.getTargetRoles() == null) {
             form.setTargetRoles(new ArrayList<>());

@@ -545,12 +545,7 @@ const Sidebar = ({ collapsed, onToggle, variant }: SidebarProps) => {
         label: 'My Team',
         icon: 'bi bi-diagram-3',
       },
-      {
-        to: '/manager/self-assessment',
-        label: 'My Self-Assessment',
-        icon: 'bi bi-pencil-square',
-      },
-      {
+      allow(positionPermissions, 'selfAssessmentSign') && {
         to: '/manager/assessment-review',
         label: 'Assessment Review',
         icon: 'bi bi-clipboard-check',

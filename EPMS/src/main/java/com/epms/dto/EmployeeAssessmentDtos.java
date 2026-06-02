@@ -130,6 +130,17 @@ public final class EmployeeAssessmentDtos {
         private String hrComment;
         private String departmentHeadComment;
         private String declineReason;
+        private String rejectedByRole;
+        private Integer rejectedByUserId;
+        private String rejectedByName;
+        private LocalDateTime rejectedAt;
+        private Integer attemptNo;
+        private Long resubmittedFromAssessmentId;
+        private Integer resubmitAllowedByUserId;
+        private String resubmitAllowedByName;
+        private LocalDateTime resubmitAllowedAt;
+        private String resubmitReason;
+        private Boolean canAllowResubmit;
 
         private Long employeeSignatureId;
         private String employeeSignatureName;
@@ -198,5 +209,16 @@ public final class EmployeeAssessmentDtos {
         private Boolean managerSigned;
         private Boolean departmentHeadSigned;
         private Boolean hrSigned;
+
+        private String declineReason;
+        private String rejectedByRole;
+        private Integer rejectedByUserId;
+        private String rejectedByName;
+        private LocalDateTime rejectedAt;
+        private Integer attemptNo;
+        private Long resubmittedFromAssessmentId;
+        private LocalDateTime resubmitAllowedAt;
+        private String resubmitReason;
+        private Boolean canAllowResubmit;
     }
 }

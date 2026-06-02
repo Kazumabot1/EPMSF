@@ -227,15 +227,7 @@ const handleManagerDecline = async () => {
       comment.trim() || undefined,
     );
 
-    if (updated.status === 'DRAFT') {
-      setActionMessage(
-        'Assessment returned to the employee for correction. The employee can edit and resubmit before the assessment period ends.',
-      );
-    } else {
-      setActionMessage(
-        'Assessment closed as rejected because the assessment period has ended.',
-      );
-    }
+    setActionMessage('Assessment rejected and saved as an audit record. HR can allow resubmission while the form period is still open.');
 
     onSaved(updated);
   } catch (err) {
@@ -251,7 +243,7 @@ const handleManagerDecline = async () => {
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Manager Assessment Review</h2>
-            <p className="text-sm text-slate-500">Read-only review. Manager remarks are optional and do not require a signature.</p>
+            <p className="text-sm text-slate-500">Review the employee submission, then approve or reject with clear notes.</p>
           </div>
 
           <button
@@ -374,7 +366,7 @@ const handleManagerDecline = async () => {
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <h4 className="mb-2 text-base font-bold text-slate-900">Manager Remarks</h4>
               <p className="mb-4 text-sm text-slate-500">
-                Manager signature is no longer required. Add remarks only. Department Head can sign and forward to HR.
+                Approve to send the form to HR, or reject it with a clear reason. Rejected forms stay saved as audit records.
               </p>
 
               <textarea
@@ -458,6 +450,7 @@ const ManagerAssessmentReviewPage = () => {
   const [selectedAssessment, setSelectedAssessment] = useState<EmployeeAssessment | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'TO_APPROVE' | 'APPROVED' | 'REJECTED'>('TO_APPROVE');
 
   const loadRows = async () => {
     try {
@@ -476,22 +469,33 @@ const ManagerAssessmentReviewPage = () => {
     void loadRows();
   }, []);
 
-  const remarkableRows = useMemo(
+  const toApproveRows = useMemo(
     () => rows.filter((row) => ['PENDING_MANAGER', 'SUBMITTED'].includes(row.status)),
     [rows],
   );
 
-  const forwardedRows = useMemo(
-    () => rows.filter((row) => ['PENDING_HR', 'APPROVED', 'DECLINED', 'REJECTED'].includes(row.status)),
+  const approvedRows = useMemo(
+    () => rows.filter((row) => Boolean(row.managerSigned) && row.rejectedByRole !== 'MANAGER'),
     [rows],
   );
+
+  const rejectedRows = useMemo(
+    () => rows.filter((row) => row.status === 'REJECTED' && row.rejectedByRole === 'MANAGER'),
+    [rows],
+  );
+
+  const tabRows = useMemo(() => {
+    if (activeTab === 'APPROVED') return approvedRows;
+    if (activeTab === 'REJECTED') return rejectedRows;
+    return toApproveRows;
+  }, [activeTab, approvedRows, rejectedRows, toApproveRows]);
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    if (!normalizedSearch) return rows;
+    if (!normalizedSearch) return tabRows;
 
-    return rows.filter((row) =>
+    return tabRows.filter((row) =>
       row.employeeName?.toLowerCase().includes(normalizedSearch) ||
       row.employeeCode?.toLowerCase().includes(normalizedSearch) ||
       row.departmentName?.toLowerCase().includes(normalizedSearch) ||
@@ -500,7 +504,7 @@ const ManagerAssessmentReviewPage = () => {
       row.performanceLabel?.toLowerCase().includes(normalizedSearch) ||
       row.formName?.toLowerCase().includes(normalizedSearch),
     );
-  }, [rows, search]);
+  }, [search, tabRows]);
 
   const openDetails = async (row: AssessmentScoreRow) => {
     try {
@@ -542,7 +546,7 @@ const ManagerAssessmentReviewPage = () => {
               <h1 className="text-3xl font-bold text-white">Assessment Review</h1>
 
               <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
-                Review self-assessments assigned to you. Manager signature is removed; you may add optional remarks only.
+                Review employee self-assessments assigned to you. Approve items move to HR; rejected items stay visible as audit records.
               </p>
             </div>
 
@@ -564,14 +568,36 @@ const ManagerAssessmentReviewPage = () => {
           </div>
 
           <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Can Add Remarks</p>
-            <p className="mt-2 text-3xl font-bold text-emerald-600">{remarkableRows.length}</p>
+            <p className="text-sm font-medium text-slate-500">To Approve</p>
+            <p className="mt-2 text-3xl font-bold text-emerald-600">{toApproveRows.length}</p>
           </div>
 
           <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Forwarded / Final</p>
-            <p className="mt-2 text-3xl font-bold text-teal-600">{forwardedRows.length}</p>
+            <p className="text-sm font-medium text-slate-500">Approved by Manager</p>
+            <p className="mt-2 text-3xl font-bold text-teal-600">{approvedRows.length}</p>
           </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 rounded-3xl border border-white bg-white/90 p-4 shadow-sm backdrop-blur">
+          {[
+            { key: 'TO_APPROVE' as const, label: 'TO APPROVE', count: toApproveRows.length },
+            { key: 'APPROVED' as const, label: 'APPROVED', count: approvedRows.length },
+            { key: 'REJECTED' as const, label: 'REJECTED', count: rejectedRows.length },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+                activeTab === tab.key
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {tab.label}
+              <span className="ml-2 rounded-full bg-white/25 px-2 py-0.5 text-xs">{tab.count}</span>
+            </button>
+          ))}
         </div>
 
         <div className="rounded-3xl border border-white bg-white/90 p-5 shadow-sm backdrop-blur">
@@ -597,12 +623,12 @@ const ManagerAssessmentReviewPage = () => {
           <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Assigned Self-Assessments</h2>
-              <p className="text-sm text-slate-500">Open a record to review answers and add optional manager remarks.</p>
+              <p className="text-sm text-slate-500">Use TO APPROVE, APPROVED, and REJECTED to track your manager review audit.</p>
             </div>
 
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Manager view · read-only
+              Manager review
             </span>
           </div>
 

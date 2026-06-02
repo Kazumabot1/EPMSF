@@ -15,7 +15,7 @@ import './employee-self-assessment.css';
 
 const EDITABLE_STATUSES: AssessmentStatus[] = ['DRAFT'];
 
-const FINAL_SCORE_VISIBLE_STATUSES: AssessmentStatus[] = ['APPROVED', 'CLOSED_REJECTED'];
+const FINAL_SCORE_VISIBLE_STATUSES: AssessmentStatus[] = ['APPROVED', 'REJECTED', 'DECLINED', 'CLOSED_REJECTED'];
 
 const RATINGS = [1, 2, 3, 4, 5];
 
@@ -65,7 +65,7 @@ type Toast = {
   msg: string;
 };
 
-type TabKey = 'ongoing' | 'past';
+type TabKey = 'ongoing' | 'pending' | 'rejected' | 'past';
 
 let toastSeq = 0;
 
@@ -294,14 +294,23 @@ const EmployeeSelfAssessmentPage = () => {
             declinedAt: latest.declinedAt ?? null,
             employeeSigned: Boolean(latest.employeeSignatureId),
             managerSigned: Boolean(latest.managerSignatureId),
-            departmentHeadSigned: Boolean(latest.departmentHeadSignatureId),
+            departmentHeadSigned: false,
             hrSigned: Boolean(latest.hrSignatureId),
           });
         }
       }
 
       setPastRows(rows);
-      setActiveTab(isLatestEditable ? 'ongoing' : 'past');
+
+      if (isLatestEditable) {
+        setActiveTab('ongoing');
+      } else if (rows.some((row) => ['SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(row.status))) {
+        setActiveTab('pending');
+      } else if (rows.some((row) => ['REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(row.status))) {
+        setActiveTab('rejected');
+      } else {
+        setActiveTab('past');
+      }
     } catch (error) {
       toast('error', errMsg(error, 'Unable to load self-assessment.'));
     } finally {
@@ -326,6 +335,28 @@ const EmployeeSelfAssessmentPage = () => {
   }, []);
 
   const progress = useMemo(() => answerProgress(ongoingAssessment), [ongoingAssessment]);
+
+  const pendingRows = useMemo(
+    () => pastRows.filter((row) => ['SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(row.status)),
+    [pastRows],
+  );
+
+  const rejectedRows = useMemo(
+    () => pastRows.filter((row) => ['REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(row.status)),
+    [pastRows],
+  );
+
+  const approvedRows = useMemo(
+    () => pastRows.filter((row) => row.status === 'APPROVED'),
+    [pastRows],
+  );
+
+  const currentListRows = useMemo(() => {
+    if (activeTab === 'pending') return pendingRows;
+    if (activeTab === 'rejected') return rejectedRows;
+    if (activeTab === 'past') return approvedRows;
+    return [];
+  }, [activeTab, approvedRows, pendingRows, rejectedRows]);
 
   const doSave = async (draft: EmployeeAssessment) => {
     if (!isEditableAssessment(draft)) return draft;
@@ -538,47 +569,49 @@ const EmployeeSelfAssessmentPage = () => {
     }
   };
 
-  const renderSignatureGrid = (assessment: EmployeeAssessment, editable: boolean) => (
-    <div className="ess-sig-grid">
-      <div className="ess-sig-slot">
-        {assessment.employeeSignatureImageData ? (
-          <>
-            <span className="ess-sig-label">Employee Signature</span>
-            <img
-              className="ess-sig-img"
-              src={sigSrc(
-                assessment.employeeSignatureImageData,
-                assessment.employeeSignatureImageType,
-              )}
-              alt="Employee signature"
+  const renderSignatureGrid = (assessment: EmployeeAssessment, editable: boolean) => {
+    const showManager = !editable && Boolean(assessment.managerSignatureImageData);
+    const showHr = !editable && Boolean(assessment.hrSignatureImageData);
+
+    return (
+      <div className="ess-sig-grid">
+        <div className="ess-sig-slot">
+          {assessment.employeeSignatureImageData ? (
+            <>
+              <span className="ess-sig-label">Employee Signature</span>
+              <img
+                className="ess-sig-img"
+                src={sigSrc(
+                  assessment.employeeSignatureImageData,
+                  assessment.employeeSignatureImageType,
+                )}
+                alt="Employee signature"
+              />
+              <p className="ess-sig-date">
+                Date: {fmtDate(assessment.employeeSignedAt || assessment.submittedAt)}
+              </p>
+              <small className="ess-sig-name">
+                {assessment.employeeSignatureName || assessment.employeeName}
+              </small>
+            </>
+          ) : editable ? (
+            <FormSignaturePicker
+              label="Employee Signature"
+              value={employeeSignature}
+              onChange={setEmployeeSignature}
+              disabled={submitting || saving}
             />
-            <p className="ess-sig-date">
-              Date: {fmtDate(assessment.employeeSignedAt || assessment.submittedAt)}
-            </p>
-            <small className="ess-sig-name">
-              {assessment.employeeSignatureName || assessment.employeeName}
-            </small>
-          </>
-        ) : editable ? (
-          <FormSignaturePicker
-            label="Employee Signature"
-            value={employeeSignature}
-            onChange={setEmployeeSignature}
-            disabled={submitting || saving}
-          />
-        ) : (
-          <>
-            <span className="ess-sig-label">Employee Signature</span>
-            <span className="ess-sig-pending">Pending</span>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <span className="ess-sig-label">Employee Signature</span>
+              <span className="ess-sig-pending">Not signed</span>
+            </>
+          )}
+        </div>
 
-      <div className="ess-sig-slot">
-        <span className="ess-sig-label">Manager Signature</span>
-
-        {assessment.managerSignatureImageData ? (
-          <>
+        {showManager && (
+          <div className="ess-sig-slot">
+            <span className="ess-sig-label">Manager Signature</span>
             <img
               className="ess-sig-img"
               src={sigSrc(
@@ -589,38 +622,12 @@ const EmployeeSelfAssessmentPage = () => {
             />
             <p className="ess-sig-date">Date: {fmtDate(assessment.managerSignedAt)}</p>
             <small className="ess-sig-name">{assessment.managerSignatureName}</small>
-          </>
-        ) : (
-          <span className="ess-sig-pending">Pending</span>
+          </div>
         )}
-      </div>
 
-      <div className="ess-sig-slot">
-        <span className="ess-sig-label">Department Head Signature</span>
-
-        {assessment.departmentHeadSignatureImageData ? (
-          <>
-            <img
-              className="ess-sig-img"
-              src={sigSrc(
-                assessment.departmentHeadSignatureImageData,
-                assessment.departmentHeadSignatureImageType,
-              )}
-              alt="Department head signature"
-            />
-            <p className="ess-sig-date">Date: {fmtDate(assessment.departmentHeadSignedAt)}</p>
-            <small className="ess-sig-name">{assessment.departmentHeadSignatureName}</small>
-          </>
-        ) : (
-          <span className="ess-sig-pending">Pending</span>
-        )}
-      </div>
-
-      <div className="ess-sig-slot">
-        <span className="ess-sig-label">HR Signature</span>
-
-        {assessment.hrSignatureImageData ? (
-          <>
+        {showHr && (
+          <div className="ess-sig-slot">
+            <span className="ess-sig-label">HR Signature</span>
             <img
               className="ess-sig-img"
               src={sigSrc(
@@ -631,13 +638,11 @@ const EmployeeSelfAssessmentPage = () => {
             />
             <p className="ess-sig-date">Date: {fmtDate(assessment.hrSignedAt)}</p>
             <small className="ess-sig-name">{assessment.hrSignatureName}</small>
-          </>
-        ) : (
-          <span className="ess-sig-pending">Pending</span>
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderInfoGrid = (assessment: EmployeeAssessment, editable: boolean) => (
     <div className="ess-card">
@@ -800,7 +805,6 @@ const EmployeeSelfAssessmentPage = () => {
   const renderComments = (assessment: EmployeeAssessment) => {
     if (
       !assessment.managerComment &&
-      !assessment.departmentHeadComment &&
       !assessment.hrComment &&
       !assessment.declineReason
     ) {
@@ -818,13 +822,6 @@ const EmployeeSelfAssessmentPage = () => {
           </div>
         )}
 
-        {assessment.departmentHeadComment && (
-          <div className="ess-comment-block">
-            <h4>Department Head Remarks</h4>
-            <p>{assessment.departmentHeadComment}</p>
-          </div>
-        )}
-
         {assessment.hrComment && (
           <div className="ess-comment-block">
             <h4>HR Remarks</h4>
@@ -834,8 +831,9 @@ const EmployeeSelfAssessmentPage = () => {
 
         {assessment.declineReason && (
           <div className="ess-comment-block danger">
-            <h4>Rejection Reason</h4>
+            <h4>Rejected by {assessment.rejectedByRole || 'Reviewer'}</h4>
             <p>{assessment.declineReason}</p>
+            {assessment.rejectedByName && <small>{assessment.rejectedByName}</small>}
           </div>
         )}
       </div>
@@ -1023,15 +1021,15 @@ const EmployeeSelfAssessmentPage = () => {
   };
 
   const renderPastRows = () => {
-    if (pastRows.length === 0) {
+    if (currentListRows.length === 0) {
       return (
         <div className="ess-card">
           <div className="ess-state">
             <div className="ess-state-icon">
               <i className="bi bi-clock-history" />
             </div>
-            <h3>No Past Self-Assessments</h3>
-            <p>Your submitted, approved, and closed rejected forms will appear here.</p>
+            <h3>No {activeTab === 'pending' ? 'Pending' : activeTab === 'rejected' ? 'Rejected' : 'Past'} Self-Assessments</h3>
+            <p>{activeTab === 'pending' ? 'Submitted forms waiting for Manager or HR review will appear here.' : activeTab === 'rejected' ? 'Rejected audit records will appear here.' : 'Approved forms will appear here.'}</p>
           </div>
         </div>
       );
@@ -1039,7 +1037,7 @@ const EmployeeSelfAssessmentPage = () => {
 
     return (
       <div className="ess-past-grid">
-        {pastRows.map((row) => {
+        {currentListRows.map((row) => {
           const scoreVisible = FINAL_SCORE_VISIBLE_STATUSES.includes(row.status);
 
           return (
@@ -1061,9 +1059,15 @@ const EmployeeSelfAssessmentPage = () => {
                   <span>{fmtDateTime(row.submittedAt)}</span>
                 </div>
                 <div>
-                  <label>Final Date</label>
-                  <span>{fmtDateTime(row.approvedAt ?? row.declinedAt)}</span>
+                  <label>{row.status === 'REJECTED' ? 'Rejected Date' : 'Final Date'}</label>
+                  <span>{fmtDateTime(row.approvedAt ?? row.declinedAt ?? row.rejectedAt)}</span>
                 </div>
+                {row.rejectedByRole && (
+                  <div>
+                    <label>Rejected By</label>
+                    <span>{row.rejectedByRole}</span>
+                  </div>
+                )}
               </div>
 
               {scoreVisible ? (
@@ -1178,7 +1182,7 @@ const EmployeeSelfAssessmentPage = () => {
             </div>
             <h3>Submit Assessment?</h3>
             <p>
-              Once submitted, this form will move to Past and cannot be edited unless a reviewer returns it before the assessment period ends.
+              Once submitted, this form will move to Pending for Manager and HR review. If it is rejected, HR can allow resubmission while the form period is still open.
             </p>
 
             <div className="ess-modal-actions">
@@ -1210,7 +1214,7 @@ const EmployeeSelfAssessmentPage = () => {
           <div>
             <p className="ess-kicker">Self-Assessment</p>
             <h1>Employee Self-Assessment</h1>
-            <p>Complete your current form and review past submitted assessments.</p>
+            <p>Complete your current form and track pending, rejected, and approved self-assessment records.</p>
           </div>
 
           <button type="button" className="ess-refresh-btn" onClick={() => void loadPage()}>
@@ -1232,12 +1236,32 @@ const EmployeeSelfAssessmentPage = () => {
 
           <button
             type="button"
+            className={activeTab === 'pending' ? 'active' : ''}
+            onClick={() => setActiveTab('pending')}
+          >
+            <i className="bi bi-hourglass-split" />
+            Pending
+            <span>{pendingRows.length}</span>
+          </button>
+
+          <button
+            type="button"
+            className={activeTab === 'rejected' ? 'active' : ''}
+            onClick={() => setActiveTab('rejected')}
+          >
+            <i className="bi bi-x-circle" />
+            Rejected
+            <span>{rejectedRows.length}</span>
+          </button>
+
+          <button
+            type="button"
             className={activeTab === 'past' ? 'active' : ''}
             onClick={() => setActiveTab('past')}
           >
             <i className="bi bi-clock-history" />
             Past
-            <span>{pastRows.length}</span>
+            <span>{approvedRows.length}</span>
           </button>
         </div>
 

@@ -70,6 +70,15 @@ public class NotificationPolicyRegistry {
 
         registerRequired(policies, NotificationEventKey.POSITION_DEPARTMENT_CHANGED, NotificationCategory.WORKFORCE_CHANGE);
 
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_FORM_OPENED, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_FORM_CLOSED, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_SUBMITTED, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_MANAGER_APPROVED, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_WAITING_HR, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_HR_APPROVED, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_REJECTED, NotificationCategory.GENERAL);
+        registerRequired(policies, NotificationEventKey.SELF_ASSESSMENT_RESUBMIT_ALLOWED, NotificationCategory.GENERAL);
+
         registerOptional(policies, NotificationEventKey.HR_ANNOUNCEMENT_NORMAL, NotificationCategory.HR_ANNOUNCEMENT);
         registerRequired(policies, NotificationEventKey.HR_ANNOUNCEMENT_IMPORTANT, NotificationCategory.HR_ANNOUNCEMENT);
 

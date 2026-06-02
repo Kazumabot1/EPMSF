@@ -55,6 +55,12 @@ public class AssessmentFormDefinition {
     @Column(name = "is_active", nullable = false)
     private Boolean active = false;
 
+    @Column(name = "start_notification_sent_at")
+    private LocalDateTime startNotificationSentAt;
+
+    @Column(name = "close_notification_sent_at")
+    private LocalDateTime closeNotificationSentAt;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "assessment_form_target_roles",

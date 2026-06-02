@@ -40,10 +40,10 @@ const statusLabel = (status?: string | null) => {
   switch (status) {
     case 'PENDING_HR': return 'Pending HR Approval';
     case 'PENDING_MANAGER': return 'Pending Manager Review';
-    case 'PENDING_DEPARTMENT_HEAD': return 'Pending Dept Head Review';
     case 'APPROVED': return 'Approved';
-    case 'DECLINED': return 'Declined';
-    case 'CLOSED_REJECTED': return 'Closed Rejected';
+    case 'DECLINED':
+    case 'REJECTED':
+    case 'CLOSED_REJECTED': return 'Rejected';
     default: return status?.replaceAll('_', ' ') || '-';
   }
 };
@@ -67,7 +67,11 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
   const [viewLoading, setViewLoading] = useState(false);
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [approving, setApproving] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [allowingResubmit, setAllowingResubmit] = useState(false);
   const [hrComment, setHrComment] = useState('');
+  const [declineReason, setDeclineReason] = useState('');
+  const [resubmitReason, setResubmitReason] = useState('');
   const [hrSignature, setHrSignature] = useState<FormSignatureValue>({
     signatureId: 0,
     imageData: null,
@@ -121,18 +125,24 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
   );
 
   const approvedRecords = useMemo(
-    () => filteredRecords.filter((record) => record.status === 'APPROVED'),
+    () => filteredRecords.filter((record) => ['APPROVED', 'REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(record.status)),
     [filteredRecords],
+  );
+
+  const rejectedRecords = useMemo(
+    () => records.filter((record) => ['REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(record.status)).length,
+    [records],
   );
 
   const summary = useMemo(() => {
     const approved = records.filter((record) => record.status === 'APPROVED').length;
+    const rejected = records.filter((record) => ['REJECTED', 'DECLINED', 'CLOSED_REJECTED'].includes(record.status)).length;
     const pendingHr = records.filter((record) => record.status === 'PENDING_HR').length;
     const scored = records.filter((record) => record.status === 'APPROVED' && Number.isFinite(record.scorePercent));
     const average = scored.length
       ? scored.reduce((sum, record) => sum + Number(record.scorePercent || 0), 0) / scored.length
       : 0;
-    return { approved, pendingHr, average };
+    return { approved, rejected, pendingHr, average };
   }, [records]);
 
   const heroCopy = pageMode === 'review'
@@ -144,9 +154,9 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
       }
     : {
         title: 'Self-Assessment Form Records',
-        description: 'Approved self-assessment forms are kept here as final records for viewing and PDF export.',
-        metricLabel: 'Approved Records',
-        metricValue: summary.approved,
+        description: 'Approved and rejected self-assessment forms are kept here as audit records for viewing. Approved forms can be exported as PDF.',
+        metricLabel: 'Approved / Rejected Records',
+        metricValue: summary.approved + summary.rejected,
       };
 
 
@@ -158,6 +168,8 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
       const assessment = await employeeAssessmentService.getById(id);
       setSelectedAssessment(assessment);
       setHrComment(assessment.hrComment ?? '');
+      setDeclineReason(assessment.declineReason ?? '');
+      setResubmitReason(assessment.resubmitReason ?? '');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Self-assessment form could not be opened.');
     } finally {
@@ -168,6 +180,8 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
   const closeRecord = () => {
     setSelectedAssessment(null);
     setHrComment('');
+    setDeclineReason('');
+    setResubmitReason('');
     setRecordMode('view');
   };
 
@@ -227,6 +241,55 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
     }
   };
 
+  const declineSelectedAssessment = async () => {
+    if (!selectedAssessment?.id) return;
+    if (!declineReason.trim()) {
+      setMessage('Please enter a rejection reason.');
+      return;
+    }
+
+    setDeclining(true);
+    setMessage('');
+    try {
+      const rejected = await employeeAssessmentService.hrDecline(
+        selectedAssessment.id,
+        declineReason.trim(),
+        hrComment.trim() || undefined,
+      );
+      setSelectedAssessment(rejected);
+      setRecordMode('view');
+      setHrComment(rejected.hrComment ?? '');
+      setMessage('Self-assessment form rejected and saved as an audit record.');
+      await loadRecords();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'HR rejection could not be completed.');
+    } finally {
+      setDeclining(false);
+    }
+  };
+
+  const allowSelectedAssessmentResubmit = async () => {
+    if (!selectedAssessment?.id) return;
+    if (!resubmitReason.trim()) {
+      setMessage('Please enter a resubmit reason.');
+      return;
+    }
+
+    setAllowingResubmit(true);
+    setMessage('');
+    try {
+      const draft = await employeeAssessmentService.allowResubmit(selectedAssessment.id, resubmitReason.trim());
+      setSelectedAssessment(draft);
+      setRecordMode('view');
+      setMessage('Resubmission opened for the employee. Previous answers were copied into a new draft.');
+      await loadRecords();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Resubmission could not be opened.');
+    } finally {
+      setAllowingResubmit(false);
+    }
+  };
+
   const scoreBands = selectedAssessment?.scoreBands?.length
     ? [...selectedAssessment.scoreBands].sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
     : defaultScoreBands();
@@ -251,6 +314,7 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
         <div><span>Total Records</span><strong>{records.length}</strong></div>
         <div><span>Pending HR Approval</span><strong>{summary.pendingHr}</strong></div>
         <div><span>Approved</span><strong>{summary.approved}</strong></div>
+        <div><span>Rejected</span><strong>{rejectedRecords}</strong></div>
         <div><span>Average Score</span><strong>{formatPercent(summary.average)}</strong></div>
       </section>
 
@@ -289,7 +353,7 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
           <div className="assessment-score-toolbar">
             <div>
               <h2>Form Records</h2>
-              <p>Only HR-approved self-assessment forms can be viewed as final records or exported as PDF.</p>
+              <p>Approved and rejected self-assessment forms are shown here as audit records. Rejected records can be reopened by HR while the form period is active.</p>
             </div>
             <input
               type="search"
@@ -301,7 +365,7 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
 
           <SelfAssessmentRecordTable
             records={approvedRecords}
-            emptyText={status === 'loading' ? 'Loading records...' : 'No approved self-assessment form records found.'}
+            emptyText={status === 'loading' ? 'Loading records...' : 'No approved or rejected self-assessment form records found.'}
             viewLoading={viewLoading}
             exportingId={exportingId}
             showExport
@@ -379,6 +443,7 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
                 <p><strong>Employee:</strong> {selectedAssessment.remarks || '-'}</p>
                 <p><strong>Manager:</strong> {selectedAssessment.managerComment || '-'}</p>
                 <p><strong>HR:</strong> {recordMode === 'approve' ? 'Add HR final comment below.' : selectedAssessment.hrComment || '-'}</p>
+                <p><strong>Rejection:</strong> {selectedAssessment.declineReason ? `${selectedAssessment.rejectedByRole || 'Reviewer'} - ${selectedAssessment.declineReason}` : '-'}</p>
               </div>
 
               <h3>Signatures</h3>
@@ -413,7 +478,7 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
                       rows={4}
                       value={hrComment}
                       onChange={(event) => setHrComment(event.target.value)}
-                      placeholder="Enter HR final comment before approval."
+                      placeholder="Enter HR final comment before approval or rejection."
                     />
                   </label>
                   <div className="assessment-hr-field">
@@ -424,15 +489,56 @@ const SelfAssessmentFormRecordsPage = ({ pageMode = 'records' }: SelfAssessmentF
                       disabled={approving}
                     />
                   </div>
+                  <label className="assessment-hr-field">
+                    <span>Rejection Reason</span>
+                    <textarea
+                      rows={3}
+                      value={declineReason}
+                      onChange={(event) => setDeclineReason(event.target.value)}
+                      placeholder="Required only when rejecting this form."
+                    />
+                  </label>
                   <div className="assessment-score-actions assessment-hr-actions">
                     <button
                       type="button"
                       onClick={approveSelectedAssessment}
-                      disabled={approving || !hrSignature.signatureId}
+                      disabled={approving || declining || !hrSignature.signatureId}
                     >
                       {approving ? 'Approving...' : 'Approve Form'}
                     </button>
+                    <button
+                      type="button"
+                      onClick={declineSelectedAssessment}
+                      disabled={approving || declining || !declineReason.trim()}
+                    >
+                      {declining ? 'Rejecting...' : 'Reject Form'}
+                    </button>
                     <button type="button" onClick={closeRecord}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {selectedAssessment.status === 'REJECTED' && selectedAssessment.canAllowResubmit && (
+                <div className="assessment-hr-approval-panel">
+                  <h3>Allow Employee Resubmission</h3>
+                  <p>This keeps the rejected form as audit and creates a new draft with previous answers copied.</p>
+                  <label className="assessment-hr-field">
+                    <span>Resubmit Reason</span>
+                    <textarea
+                      rows={3}
+                      value={resubmitReason}
+                      onChange={(event) => setResubmitReason(event.target.value)}
+                      placeholder="Explain why HR is allowing resubmission."
+                    />
+                  </label>
+                  <div className="assessment-score-actions assessment-hr-actions">
+                    <button
+                      type="button"
+                      onClick={allowSelectedAssessmentResubmit}
+                      disabled={allowingResubmit || !resubmitReason.trim()}
+                    >
+                      {allowingResubmit ? 'Opening...' : 'Allow Resubmit'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -490,7 +596,7 @@ const SelfAssessmentRecordTable = ({
             <td>
               <div className="assessment-score-actions">
                 <button type="button" onClick={() => onView(record)} disabled={viewLoading}>{viewLabel}</button>
-                {showExport && (
+                {showExport && record.status === 'APPROVED' && (
                   <button type="button" onClick={() => onExport(record)} disabled={exportingId === record.id}>
                     {exportingId === record.id ? 'Exporting...' : 'Export PDF'}
                   </button>

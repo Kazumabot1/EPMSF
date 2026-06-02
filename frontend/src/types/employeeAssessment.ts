@@ -77,6 +77,17 @@ export interface EmployeeAssessment {
   hrComment?: string | null;
   departmentHeadComment?: string | null;
   declineReason?: string | null;
+  rejectedByRole?: string | null;
+  rejectedByUserId?: number | null;
+  rejectedByName?: string | null;
+  rejectedAt?: string | null;
+  attemptNo?: number | null;
+  resubmittedFromAssessmentId?: number | null;
+  resubmitAllowedByUserId?: number | null;
+  resubmitAllowedByName?: string | null;
+  resubmitAllowedAt?: string | null;
+  resubmitReason?: string | null;
+  canAllowResubmit?: boolean;
 
   employeeSignatureId?: number | null;
   employeeSignatureName?: string | null;
@@ -161,4 +172,15 @@ export interface AssessmentScoreRow {
   managerSigned?: boolean;
   departmentHeadSigned?: boolean;
   hrSigned?: boolean;
+
+  declineReason?: string | null;
+  rejectedByRole?: string | null;
+  rejectedByUserId?: number | null;
+  rejectedByName?: string | null;
+  rejectedAt?: string | null;
+  attemptNo?: number | null;
+  resubmittedFromAssessmentId?: number | null;
+  resubmitAllowedAt?: string | null;
+  resubmitReason?: string | null;
+  canAllowResubmit?: boolean;
 }

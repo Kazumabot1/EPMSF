@@ -116,6 +116,36 @@ public class EmployeeAssessment {
     @Column(name = "decline_reason", columnDefinition = "TEXT")
     private String declineReason;
 
+    @Column(name = "rejected_by_role", length = 40)
+    private String rejectedByRole;
+
+    @Column(name = "rejected_by_user_id")
+    private Integer rejectedByUserId;
+
+    @Column(name = "rejected_by_name")
+    private String rejectedByName;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
+
+    @Column(name = "attempt_no")
+    private Integer attemptNo;
+
+    @Column(name = "resubmitted_from_assessment_id")
+    private Long resubmittedFromAssessmentId;
+
+    @Column(name = "resubmit_allowed_by_user_id")
+    private Integer resubmitAllowedByUserId;
+
+    @Column(name = "resubmit_allowed_by_name")
+    private String resubmitAllowedByName;
+
+    @Column(name = "resubmit_allowed_at")
+    private LocalDateTime resubmitAllowedAt;
+
+    @Column(name = "resubmit_reason", columnDefinition = "TEXT")
+    private String resubmitReason;
+
     @Column(name = "employee_signature_id")
     private Long employeeSignatureId;
 
@@ -240,6 +270,10 @@ public class EmployeeAssessment {
 
         if (performanceLabel == null || performanceLabel.isBlank()) {
             performanceLabel = "Not scored";
+        }
+
+        if (attemptNo == null || attemptNo < 1) {
+            attemptNo = 1;
         }
     }
 

@@ -182,6 +182,20 @@ public class EmployeeAssessmentController {
         );
     }
 
+
+    @PostMapping("/{id}/allow-resubmit")
+    public ResponseEntity<GenericApiResponse<AssessmentResponse>> allowResubmit(
+            @PathVariable Long id,
+            @RequestBody(required = false) ReviewActionRequest request
+    ) {
+        return ResponseEntity.ok(
+                GenericApiResponse.success(
+                        "Employee can resubmit this self-assessment",
+                        assessmentService.allowResubmit(id, request)
+                )
+        );
+    }
+
     @PostMapping("/{id}/hr-decline")
     public ResponseEntity<GenericApiResponse<AssessmentResponse>> hrDecline(
             @PathVariable Long id,
