@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import ConfirmModal from '../../../../components/ConfirmModal';
 import KpiCategoryForm from '../../../../components/hr/performance-kpi/KpiCategoryForm';
 import { kpiCategoryService } from '../../../../services/kpiCategoryService';
 import type { KpiCategory } from '../../../../types/kpiCategory';
@@ -24,8 +23,6 @@ const KpiCategoryPage = () => {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<KpiCategory | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -116,20 +113,6 @@ const KpiCategoryPage = () => {
       setFormError(saveError instanceof Error ? saveError.message : 'Failed to save KPI category.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!categoryToDelete) return;
-    try {
-      setDeleting(true);
-      await kpiCategoryService.remove(categoryToDelete.id);
-      setCategoryToDelete(null);
-      await loadCategories();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete KPI category.');
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -294,15 +277,6 @@ const KpiCategoryPage = () => {
                             >
                               <i className="bi bi-pencil-square text-base" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setCategoryToDelete(category)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-red-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                              title="Delete"
-                              aria-label="Delete"
-                            >
-                              <i className="bi bi-trash text-base" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -377,18 +351,6 @@ const KpiCategoryPage = () => {
         </div>
       )}
 
-      <ConfirmModal
-        open={categoryToDelete !== null}
-        title="Delete KPI category"
-        message={`Delete "${categoryToDelete?.name ?? ''}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        loading={deleting}
-        onConfirm={() => void handleDeleteConfirm()}
-        onCancel={() => {
-          if (!deleting) setCategoryToDelete(null);
-        }}
-      />
     </div>
   );
 };

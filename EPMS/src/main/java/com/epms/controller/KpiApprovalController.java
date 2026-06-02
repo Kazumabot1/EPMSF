@@ -30,6 +30,11 @@ public class KpiApprovalController {
         return ResponseEntity.ok(cycleService.listPendingEarlyCloseRequests());
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<List<KpiTemplateCycleResponseDTO>> listHistory() {
+        return ResponseEntity.ok(cycleService.listEarlyCloseReviewHistory());
+    }
+
     @PostMapping("/{id}/approve")
     public ResponseEntity<KpiTemplateCycleResponseDTO> approve(
             @PathVariable Integer id,

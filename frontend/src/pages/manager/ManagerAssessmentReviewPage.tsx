@@ -529,7 +529,7 @@ const ManagerAssessmentReviewPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/60 to-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       {selectedAssessment && (
         <ReviewModal
           assessment={selectedAssessment}
@@ -538,18 +538,19 @@ const ManagerAssessmentReviewPage = () => {
         />
       )}
 
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-blue-700 to-sky-700 p-6 shadow-xl">
-          <div className="relative flex flex-col justify-between gap-5 md:flex-row md:items-center">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <section className="overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-gradient-to-br from-white via-blue-50/60 to-slate-50 px-5 py-6 sm:px-7">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
             <div>
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-blue-700 shadow-sm">
                 <i className="bi bi-person-check" />
                 Manager Review Queue
               </p>
 
-              <h1 className="text-3xl font-bold text-white">Assessment Review</h1>
+              <h1 className="text-3xl font-black tracking-normal text-slate-950 sm:text-4xl">Assessment Review</h1>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-50">
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
                 Review self-assessments assigned to you. Manager signature is removed; you may add optional remarks only.
               </p>
             </div>
@@ -557,38 +558,48 @@ const ManagerAssessmentReviewPage = () => {
             <button
               type="button"
               onClick={() => void loadRows()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-blue-700 shadow-lg shadow-blue-950/20 transition hover:-translate-y-0.5 hover:bg-blue-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
             >
               <i className={`bi bi-arrow-repeat ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
           </div>
-        </div>
+          </div>
+        </section>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Assigned Records</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{rows.length}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-500">Assigned Records</p>
+              <i className="bi bi-folder-check text-blue-700" aria-hidden />
+            </div>
+            <p className="mt-3 text-3xl font-black text-slate-950">{rows.length}</p>
           </div>
 
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Can Add Remarks</p>
-            <p className="mt-2 text-3xl font-bold text-blue-600">{remarkableRows.length}</p>
+          <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-500">Can Add Remarks</p>
+              <i className="bi bi-pencil-square text-blue-700" aria-hidden />
+            </div>
+            <p className="mt-3 text-3xl font-black text-blue-700">{remarkableRows.length}</p>
           </div>
 
-          <div className="rounded-3xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
-            <p className="text-sm font-medium text-slate-500">Forwarded / Final</p>
-            <p className="mt-2 text-3xl font-bold text-teal-600">{forwardedRows.length}</p>
+          <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-500">Forwarded / Final</p>
+              <i className="bi bi-check2-circle text-emerald-700" aria-hidden />
+            </div>
+            <p className="mt-3 text-3xl font-black text-emerald-700">{forwardedRows.length}</p>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white bg-white/90 p-5 shadow-sm backdrop-blur">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="relative">
             <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
               placeholder="Search employee, code, department, form, period, status, label..."
             />
           </div>
@@ -601,7 +612,7 @@ const ManagerAssessmentReviewPage = () => {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-3xl border border-white bg-white/90 shadow-sm backdrop-blur">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Assigned Self-Assessments</h2>

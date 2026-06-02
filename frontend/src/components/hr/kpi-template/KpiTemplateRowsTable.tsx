@@ -251,9 +251,8 @@ const KpiTemplateRowsTable = ({
                   </div>
                 </td>
                 <td className="bg-blue-50/60 px-3 py-3">
-                  <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-center text-xs font-semibold text-blue-700">
+                  <div className="flex items-center justify-center rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-center text-xs font-semibold text-blue-700">
                     <i className="bi bi-lock text-blue-500" aria-hidden />
-                    <span>Manager</span>
                   </div>
                 </td>
                 <td className="px-3 py-3">
@@ -267,9 +266,8 @@ const KpiTemplateRowsTable = ({
                   />
                 </td>
                 <td className="bg-blue-50/60 px-3 py-3">
-                  <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-center text-xs font-semibold text-blue-700">
+                  <div className="flex items-center justify-center rounded-lg border border-dashed border-blue-200 bg-blue-50/80 px-2 py-3 text-center text-xs font-semibold text-blue-700">
                     <i className="bi bi-graph-up-arrow text-blue-500" aria-hidden />
-                    <span>PM</span>
                   </div>
                 </td>
                 <td className="bg-blue-50/60 px-3 py-3 text-center">
@@ -310,7 +308,7 @@ const KpiTemplateRowsTable = ({
                 colSpan={2}
                 className="bg-blue-50/60 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-blue-700"
               >
-                Total score (Manager)
+                Total score
               </td>
               <td className="w-14" />
             </tr>
@@ -330,7 +328,7 @@ const KpiTemplateRowsTable = ({
           </button>
         )}
         <p className="max-w-md text-xs leading-relaxed text-slate-600">
-          <span className="font-semibold text-slate-800">Weighted score</span> (Manager phase):{' '}
+          <span className="font-semibold text-slate-800">Weighted score</span>:{' '}
           <code className="rounded-md bg-white px-2 py-0.5 font-mono text-[11px] text-slate-800 shadow-sm ring-1 ring-slate-200">
             (score × weight) ÷ 100
           </code>
