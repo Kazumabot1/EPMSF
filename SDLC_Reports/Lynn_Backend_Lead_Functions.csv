@@ -24,16 +24,14 @@ No.,Name,Features,Function/Method,Description,Commit Date,Status
 23,Lynn,Dashboard,getOverallKPI,Get overall KPI summary,2026-05-30,Complete
 24,Lynn,Self Assessment,buildSelfAssessment,Build self-assessment form,2026-05-31,Complete
 25,Lynn,Self Assessment,submitSelfAssessment,Submit self-assessment data,2026-05-31,Complete
-26,Lynn,One-on-One,createOneOnOne,Create one-on-one evaluations,2026-05-31,Complete
-27,Lynn,One-on-One,getOneOnOneDetails,Retrieve one-on-one data,2026-05-31,Complete
-28,Lynn,Feedback360,initiateFeedback360,Initialize 360-degree feedback,2026-05-31,Complete
-29,Lynn,Feedback360,collectFeedback,Collect feedback responses,2026-05-31,Complete
-30,Lynn,Permission,setPositionPermission,Configure position permissions,2026-05-31,Complete
-31,Lynn,Excel Import,importEmployeeData,Import employee data from Excel,2026-06-01,Complete
-32,Lynn,Database,fixSQLQueries,SQL query optimization,2026-06-01,Complete
-33,Lynn,KPI Delivery,refineCycleDelivery,Refine KPI delivery cycle,2026-05-31,Complete
-34,Lynn,KPI Flow,KPIFlowChange,Modify KPI workflow logic,2026-05-31,Complete
-35,Lynn,Overall System,OverallFixed,System-wide bug fixes,2026-06-01,Complete
-36,Lynn,Dashboard Integration,overallDashboardKPI,Dashboard KPI integration,2026-05-30,Complete
-37,Lynn,Routes,RoutesFixed,Backend routes configuration,2026-05-31,Complete
-38,Lynn,Department KPI,RemoveDepartmentKPIApproval,Remove approval navigation,2026-05-31,Complete
+26,Lynn,Feedback360,initiateFeedback360,Initialize 360-degree feedback,2026-05-31,Complete
+27,Lynn,Feedback360,collectFeedback,Collect feedback responses,2026-05-31,Complete
+28,Lynn,Permission,setPositionPermission,Configure position permissions,2026-05-31,Complete
+29,Lynn,Excel Import,importEmployeeData,Import employee data from Excel,2026-06-01,Complete
+30,Lynn,Database,fixSQLQueries,SQL query optimization,2026-06-01,Complete
+31,Lynn,KPI Delivery,refineCycleDelivery,Refine KPI delivery cycle,2026-05-31,Complete
+32,Lynn,KPI Flow,KPIFlowChange,Modify KPI workflow logic,2026-05-31,Complete
+33,Lynn,Overall System,OverallFixed,System-wide bug fixes,2026-06-01,Complete
+34,Lynn,Dashboard Integration,overallDashboardKPI,Dashboard KPI integration,2026-05-30,Complete
+35,Lynn,Routes,RoutesFixed,Backend routes configuration,2026-05-31,Complete
+36,Lynn,Department KPI,RemoveDepartmentKPIApproval,Remove approval navigation,2026-05-31,Complete
