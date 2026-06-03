@@ -1,0 +1,13 @@
+No.,Name,Features,Function/Method,Description,Commit Date,Status
+1,juggerkaung,Workforce Scoring,createWorkforceScoreTable,Create workforce scoring table,2026-06-01,Complete
+2,juggerkaung,Workforce Scoring,workforceScoreMechanism,Workforce score calculation,2026-06-01,Complete
+3,juggerkaung,SA Scoring,createSAScoreTable,Create self-assessment scoring table,2026-05-31,Complete
+4,juggerkaung,SA Scoring,SAScoreMechanism,Self-assessment scoring algorithm,2026-05-31,Complete
+5,juggerkaung,Scoring Logic,calculateWorkforceScore,Calculate workforce score values,2026-06-01,Complete
+6,juggerkaung,Scoring Logic,calculateSAScore,Calculate self-assessment scores,2026-05-31,Complete
+7,juggerkaung,Branch Integration,mergeBranchKHN4,Merge KHN4 branch,2026-06-01,Complete
+8,juggerkaung,Branch Integration,mergeIntoKHN4,Integrate changes into KHN4,2026-05-31,Complete
+9,juggerkaung,Branch Integration,updateToKHN4,Update to KHN4 specifications,2026-05-31,Complete
+10,juggerkaung,Branch Integration,mainKHN4Merge,Main and KHN4 merge,2026-06-01,Complete
+11,juggerkaung,Feature Implementation,depKpiRemoveCEONotInPP,Department KPI CEO feature,2026-05-31,Complete
+12,juggerkaung,Feature Implementation,clickViewTeamDetails,Team details view feature,2026-05-31,Complete

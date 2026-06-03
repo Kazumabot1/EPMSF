@@ -1,0 +1,15 @@
+No.,Name,Features,Function/Method,Description,Commit Date,Status
+1,aungmoemyint0963-hash,KPI UI,fixKpiUI,Fix KPI interface issues,2026-06-01,Complete
+2,aungmoemyint0963-hash,KPI UI,KpiUI,KPI user interface updates,2026-06-01,Complete
+3,aungmoemyint0963-hash,Department Employees,getDepartmentEmployeeList,Get employee list by department,2026-05-31,Complete
+4,aungmoemyint0963-hash,Department Employees,displayDepartmentEmployees,Display department employees,2026-05-31,Complete
+5,aungmoemyint0963-hash,Department Employees,DepartmentEmployeeLists,Employee listing functionality,2026-05-31,Complete
+6,aungmoemyint0963-hash,Button Components,fixButtonComponent,Fix button component issues,2026-06-01,Complete
+7,aungmoemyint0963-hash,Button Components,BottonFix,Button component fixes,2026-06-01,Complete
+8,aungmoemyint0963-hash,System Integration,mergeMainBranch,Merge with main branch,2026-05-31,Complete
+9,aungmoemyint0963-hash,System Integration,mergeAMM2Branch,Merge AMM2 branch integration,2026-05-31,Complete
+10,aungmoemyint0963-hash,System Integration,mergeLynnBranch,Merge Lynn branch changes,2026-05-31,Complete
+11,aungmoemyint0963-hash,Branch Integration,mergeMainIntoAMM2,Integrate main into AMM2,2026-05-31,Complete
+12,aungmoemyint0963-hash,UI Fixes,UIComponentFixes,Overall UI component repairs,2026-06-01,Complete
+13,aungmoemyint0963-hash,Development Management,NothingMarker,Code milestone marker,2026-05-31,Complete
+14,aungmoemyint0963-hash,Development Management,NothingAtAllMarker,Development tracking marker,2026-05-31,Complete

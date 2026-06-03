@@ -1,0 +1,39 @@
+No.,Name,Features,Function/Method,Description,Commit Date,Status
+1,Lynn,KPI Category,createKpiCategory,Create KPI categories for system,2026-05-31,Complete
+2,Lynn,KPI Category,getAllKpiCategories,Retrieve all KPI categories,2026-05-31,Complete
+3,Lynn,KPI Category,getKpiCategoryById,Fetch specific KPI category,2026-05-31,Complete
+4,Lynn,KPI Category,updateKpiCategory,Update KPI category details,2026-05-31,Complete
+5,Lynn,KPI Category,deleteKpiCategory,Remove KPI category,2026-05-31,Complete
+6,Lynn,KPI Item,createKpiItem,Create KPI items,2026-05-31,Complete
+7,Lynn,KPI Item,getAllKpiItems,Fetch all KPI items,2026-05-31,Complete
+8,Lynn,KPI Item,getKpiItemById,Get specific KPI item,2026-05-31,Complete
+9,Lynn,KPI Item,updateKpiItem,Update KPI item data,2026-05-31,Complete
+10,Lynn,KPI Item,deleteKpiItem,Delete KPI item,2026-05-31,Complete
+11,Lynn,Position,createPosition,Create position records,2026-05-31,Complete
+12,Lynn,Position,getAllPosition,Retrieve all positions,2026-05-31,Complete
+13,Lynn,Position,getPositionById,Fetch specific position,2026-05-31,Complete
+14,Lynn,Position,updatePosition,Update position information,2026-05-31,Complete
+15,Lynn,Position Level,createPositionLevel,Create position level mappings,2026-05-31,Complete
+16,Lynn,Position Level,getAllPositionLevel,Get all position levels,2026-05-31,Complete
+17,Lynn,Position Level,getPositionLevelById,Fetch position level by ID,2026-05-31,Complete
+18,Lynn,Position Level,updatePositionLevel,Update position level,2026-05-31,Complete
+19,Lynn,Position Level,deletePositionLevel,Delete position level,2026-05-31,Complete
+20,Lynn,KPI Unit,createKpiUnit,Create KPI units,2026-05-30,Complete
+21,Lynn,KPI Unit,getAllKpiUnit,Retrieve all KPI units,2026-05-30,Complete
+22,Lynn,Dashboard,getDashboardMetrics,Calculate dashboard metrics,2026-05-30,Complete
+23,Lynn,Dashboard,getOverallKPI,Get overall KPI summary,2026-05-30,Complete
+24,Lynn,Self Assessment,buildSelfAssessment,Build self-assessment form,2026-05-31,Complete
+25,Lynn,Self Assessment,submitSelfAssessment,Submit self-assessment data,2026-05-31,Complete
+26,Lynn,One-on-One,createOneOnOne,Create one-on-one evaluations,2026-05-31,Complete
+27,Lynn,One-on-One,getOneOnOneDetails,Retrieve one-on-one data,2026-05-31,Complete
+28,Lynn,Feedback360,initiateFeedback360,Initialize 360-degree feedback,2026-05-31,Complete
+29,Lynn,Feedback360,collectFeedback,Collect feedback responses,2026-05-31,Complete
+30,Lynn,Permission,setPositionPermission,Configure position permissions,2026-05-31,Complete
+31,Lynn,Excel Import,importEmployeeData,Import employee data from Excel,2026-06-01,Complete
+32,Lynn,Database,fixSQLQueries,SQL query optimization,2026-06-01,Complete
+33,Lynn,KPI Delivery,refineCycleDelivery,Refine KPI delivery cycle,2026-05-31,Complete
+34,Lynn,KPI Flow,KPIFlowChange,Modify KPI workflow logic,2026-05-31,Complete
+35,Lynn,Overall System,OverallFixed,System-wide bug fixes,2026-06-01,Complete
+36,Lynn,Dashboard Integration,overallDashboardKPI,Dashboard KPI integration,2026-05-30,Complete
+37,Lynn,Routes,RoutesFixed,Backend routes configuration,2026-05-31,Complete
+38,Lynn,Department KPI,RemoveDepartmentKPIApproval,Remove approval navigation,2026-05-31,Complete
