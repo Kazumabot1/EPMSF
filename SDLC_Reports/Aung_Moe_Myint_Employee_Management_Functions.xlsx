@@ -1,0 +1,15 @@
+No.,Name,Features,Function/Method,Description,Commit Date,Status
+1,Aung Moe Myint,KPI UI,fixKpiUI,Fix KPI interface issues,2026-06-01,Complete
+2,Aung Moe Myint,KPI UI,KpiUI,KPI user interface updates,2026-06-01,Complete
+3,Aung Moe Myint,Department Employees,getDepartmentEmployeeList,Get employee list by department,2026-05-31,Complete
+4,Aung Moe Myint,Department Employees,displayDepartmentEmployees,Display department employees,2026-05-31,Complete
+5,Aung Moe Myint,Department Employees,DepartmentEmployeeLists,Employee listing functionality,2026-05-31,Complete
+6,Aung Moe Myint,Button Components,fixButtonComponent,Fix button component issues,2026-06-01,Complete
+7,Aung Moe Myint,Button Components,BottonFix,Button component fixes,2026-06-01,Complete
+8,Aung Moe Myint,System Integration,mergeMainBranch,Merge with main branch,2026-05-31,Complete
+9,Aung Moe Myint,System Integration,mergeAMM2Branch,Merge AMM2 branch integration,2026-05-31,Complete
+10,Aung Moe Myint,System Integration,mergeLynnBranch,Merge Lynn branch changes,2026-05-31,Complete
+11,Aung Moe Myint,Branch Integration,mergeMainIntoAMM2,Integrate main into AMM2,2026-05-31,Complete
+12,Aung Moe Myint,UI Fixes,UIComponentFixes,Overall UI component repairs,2026-06-01,Complete
+13,Aung Moe Myint,Development Management,NothingMarker,Code milestone marker,2026-05-31,Complete
+14,Aung Moe Myint,Development Management,NothingAtAllMarker,Development tracking marker,2026-05-31,Complete

@@ -1,0 +1,43 @@
+Project Summary,EPMS - Employee Performance Management System
+Repository,Kazumabot1/EPMSF
+Project Duration,47 days
+Total Commits,100+
+Active Contributors,5
+
+Language Composition,
+TypeScript,47.5%
+Java,39.1%
+CSS,13%
+Other,0.4%
+
+Team Breakdown,
+Zin Lin Oo,Backend Lead - 36 functions
+Yu Waddy Myint,Frontend Developer - 28 functions
+Ye Yint Paing,Analytics & Feedback Lead - 24 functions
+Aung Moe Myint,Employee Management Dev - 14 functions
+Kaung Htet Naing,Scoring & Evaluation Developer - 14 functions
+
+Key Modules Completed,
+✓ KPI Management System (100%)
+✓ Dashboard Integration (100%)
+✓ Analytics Module (100%)
+✓ 360-Degree Feedback (100%)
+✓ Self-Assessment Module (100%)
+✓ Position Management (100%)
+✓ Department Management (100%)
+✓ Role-Based Access Control (100%)
+✓ Employee Scoring System (100%)
+✓ One-on-One Evaluations (100%)
+✓ Excel Import Functionality (100%)
+✓ Form Setup & Campaign Management (100%)
+
+Project Status,Final Project - Completed
+Last Commit,2026-06-03
+Repository URL,https://github.com/Kazumabot1/EPMSF
+
+Function Count by Member,
+Zin Lin Oo,36 functions
+Yu Waddy Myint,28 functions
+Ye Yint Paing,24 functions
+Aung Moe Myint,14 functions
+Kaung Htet Naing,14 functions

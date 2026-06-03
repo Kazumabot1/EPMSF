@@ -1,0 +1,37 @@
+No.,Name,Features,Function/Method,Description,Commit Date,Status
+1,Zin Lin Oo,KPI Category,createKpiCategory,Create KPI categories for system,2026-05-31,Complete
+2,Zin Lin Oo,KPI Category,getAllKpiCategories,Retrieve all KPI categories,2026-05-31,Complete
+3,Zin Lin Oo,KPI Category,getKpiCategoryById,Fetch specific KPI category,2026-05-31,Complete
+4,Zin Lin Oo,KPI Category,updateKpiCategory,Update KPI category details,2026-05-31,Complete
+5,Zin Lin Oo,KPI Category,deleteKpiCategory,Remove KPI category,2026-05-31,Complete
+6,Zin Lin Oo,KPI Item,createKpiItem,Create KPI items,2026-05-31,Complete
+7,Zin Lin Oo,KPI Item,getAllKpiItems,Fetch all KPI items,2026-05-31,Complete
+8,Zin Lin Oo,KPI Item,getKpiItemById,Get specific KPI item,2026-05-31,Complete
+9,Zin Lin Oo,KPI Item,updateKpiItem,Update KPI item data,2026-05-31,Complete
+10,Zin Lin Oo,KPI Item,deleteKpiItem,Delete KPI item,2026-05-31,Complete
+11,Zin Lin Oo,Position,createPosition,Create position records,2026-05-31,Complete
+12,Zin Lin Oo,Position,getAllPosition,Retrieve all positions,2026-05-31,Complete
+13,Zin Lin Oo,Position,getPositionById,Fetch specific position,2026-05-31,Complete
+14,Zin Lin Oo,Position,updatePosition,Update position information,2026-05-31,Complete
+15,Zin Lin Oo,Position Level,createPositionLevel,Create position level mappings,2026-05-31,Complete
+16,Zin Lin Oo,Position Level,getAllPositionLevel,Get all position levels,2026-05-31,Complete
+17,Zin Lin Oo,Position Level,getPositionLevelById,Fetch position level by ID,2026-05-31,Complete
+18,Zin Lin Oo,Position Level,updatePositionLevel,Update position level,2026-05-31,Complete
+19,Zin Lin Oo,Position Level,deletePositionLevel,Delete position level,2026-05-31,Complete
+20,Zin Lin Oo,KPI Unit,createKpiUnit,Create KPI units,2026-05-30,Complete
+21,Zin Lin Oo,KPI Unit,getAllKpiUnit,Retrieve all KPI units,2026-05-30,Complete
+22,Zin Lin Oo,Dashboard,getDashboardMetrics,Calculate dashboard metrics,2026-05-30,Complete
+23,Zin Lin Oo,Dashboard,getOverallKPI,Get overall KPI summary,2026-05-30,Complete
+24,Zin Lin Oo,Self Assessment,buildSelfAssessment,Build self-assessment form,2026-05-31,Complete
+25,Zin Lin Oo,Self Assessment,submitSelfAssessment,Submit self-assessment data,2026-05-31,Complete
+26,Zin Lin Oo,Feedback360,initiateFeedback360,Initialize 360-degree feedback,2026-05-31,Complete
+27,Zin Lin Oo,Feedback360,collectFeedback,Collect feedback responses,2026-05-31,Complete
+28,Zin Lin Oo,Permission,setPositionPermission,Configure position permissions,2026-05-31,Complete
+29,Zin Lin Oo,Excel Import,importEmployeeData,Import employee data from Excel,2026-06-01,Complete
+30,Zin Lin Oo,Database,fixSQLQueries,SQL query optimization,2026-06-01,Complete
+31,Zin Lin Oo,KPI Delivery,refineCycleDelivery,Refine KPI delivery cycle,2026-05-31,Complete
+32,Zin Lin Oo,KPI Flow,KPIFlowChange,Modify KPI workflow logic,2026-05-31,Complete
+33,Zin Lin Oo,Overall System,OverallFixed,System-wide bug fixes,2026-06-01,Complete
+34,Zin Lin Oo,Dashboard Integration,overallDashboardKPI,Dashboard KPI integration,2026-05-30,Complete
+35,Zin Lin Oo,Routes,RoutesFixed,Backend routes configuration,2026-05-31,Complete
+36,Zin Lin Oo,Department KPI,RemoveDepartmentKPIApproval,Remove approval navigation,2026-05-31,Complete
