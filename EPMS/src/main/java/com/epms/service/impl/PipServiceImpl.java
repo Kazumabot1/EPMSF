@@ -116,10 +116,7 @@ public class PipServiceImpl implements PipService {
             }
 
             candidates = employeeDepartmentRepository
-                    .findActiveUsersByWorkingDepartmentId(currentUser.getDepartmentId())
-                    .stream()
-                    .filter(user -> !isActiveMemberOfAnyTeam(user))
-                    .toList();
+                    .findActiveUsersByWorkingDepartmentId(currentUser.getDepartmentId());
         } else {
             candidates = getManagedTeamUsers(currentUser.getId());
         }
@@ -242,7 +239,6 @@ public class PipServiceImpl implements PipService {
     @Transactional
     public PipDetailResponseDto updatePhase(Integer pipId, Integer phaseId, PipPhaseUpdateRequestDto requestDto) {
         User currentUser = getCurrentUser();
-        positionPermissionService.assertCurrentUserHasPermission("pipEdit");
         Pip pip = getPip(pipId);
 
         if (!Boolean.TRUE.equals(pip.getStatus())) {
@@ -327,7 +323,6 @@ public class PipServiceImpl implements PipService {
     @Transactional
     public PipDetailResponseDto finishPip(Integer id, PipFinishRequestDto requestDto) {
         User currentUser = getCurrentUser();
-        positionPermissionService.assertCurrentUserHasPermission("pipEdit");
         Pip pip = getPip(id);
 
         if (!Boolean.TRUE.equals(pip.getStatus())) {
@@ -473,10 +468,6 @@ public class PipServiceImpl implements PipService {
                 throw new BusinessValidationException("Department Head can create PIP only for employees in their own department.");
             }
 
-            if (isActiveMemberOfAnyTeam(employee)) {
-                throw new BusinessValidationException("Department Head can create PIP only for employees who do not have an active team.");
-            }
-
             return;
         }
 
@@ -493,7 +484,7 @@ public class PipServiceImpl implements PipService {
 
     private boolean canView(User currentUser, Pip pip) {
         if (isHr(currentUser)) {
-            return positionPermissionService.currentUserHasPermission("pipViewAll");
+            return currentUserHasPermission("pipViewAll");
         }
 
         if (Objects.equals(currentUser.getId(), pip.getEmployeeUserId())) {
@@ -502,6 +493,11 @@ public class PipServiceImpl implements PipService {
 
         if (Objects.equals(currentUser.getId(), pip.getCreatedByUserId())) {
             return true;
+        }
+
+        if (currentUserHasPermission("pipViewAll")) {
+            User employee = getUser(pip.getEmployeeUserId(), "Employee user not found.");
+            return isPipScopeUser(currentUser, employee);
         }
 
         return canEdit(currentUser, pip);
@@ -516,20 +512,52 @@ public class PipServiceImpl implements PipService {
             return false;
         }
 
-        if (!positionPermissionService.currentUserHasPermission("pipEdit")) {
+        boolean isCreator = Objects.equals(currentUser.getId(), pip.getCreatedByUserId());
+        boolean hasEditPermission = currentUserHasPermission("pipEdit");
+        boolean hasCreatePermission = currentUserHasPermission("pipCreate");
+
+        /*
+         * Creator workflow fix:
+         * A user who is allowed to create a PIP must be able to maintain the PIP
+         * they created. Otherwise the plan is created successfully but the creator
+         * only sees a read-only details modal and cannot update phases.
+         */
+        if (isCreator && (hasEditPermission || hasCreatePermission)) {
+            return true;
+        }
+
+        if (!hasEditPermission) {
             return false;
         }
 
-        if (Objects.equals(currentUser.getId(), pip.getCreatedByUserId())) {
+        User employee = getUser(pip.getEmployeeUserId(), "Employee user not found.");
+        return isPipScopeUser(currentUser, employee);
+    }
+
+    private boolean isPipScopeUser(User viewer, User employee) {
+        if (viewer == null || employee == null) {
+            return false;
+        }
+
+        if (isHr(viewer)) {
             return true;
         }
 
-        User employee = getUser(pip.getEmployeeUserId(), "Employee user not found.");
+        if (isDepartmentHead(viewer)) {
+            return viewer.getDepartmentId() != null
+                    && employeeDepartmentRepository.existsActiveUserInWorkingDepartment(
+                    employee.getId(),
+                    viewer.getDepartmentId()
+            );
+        }
 
+        return canManageByTeam(viewer, employee);
+    }
+
+    private boolean currentUserHasPermission(String permissionKey) {
         try {
-            assertCanManageEmployee(currentUser, employee);
-            return true;
-        } catch (RuntimeException ex) {
+            return positionPermissionService.currentUserHasPermission(permissionKey);
+        } catch (RuntimeException ignored) {
             return false;
         }
     }
@@ -546,9 +574,9 @@ public class PipServiceImpl implements PipService {
         List<PipPhaseResponseDto> phaseDtos = pip.getPhases() == null
                 ? List.of()
                 : pip.getPhases().stream()
-                  .sorted(Comparator.comparing(PipPhase::getPhaseNumber))
-                  .map(this::toPhaseDto)
-                  .toList();
+                .sorted(Comparator.comparing(PipPhase::getPhaseNumber))
+                .map(this::toPhaseDto)
+                .toList();
 
         List<PipUpdateHistoryDto> updateDtos = pipUpdateRepository.findByPipIdOrderByUpdatedAtDesc(pip.getId())
                 .stream()
