@@ -42,6 +42,15 @@ function formatDateTime(value?: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+function todayText(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function hasDateArrived(value?: string | null): boolean {
+  if (!value) return true;
+  return value <= todayText();
+}
+
 function phaseStatusLabel(status: PipPhaseStatus): string {
   return STATUS_OPTIONS.find((option) => option.value === status)?.label || status;
 }
@@ -91,6 +100,17 @@ export default function PipPastPlansPage() {
       };
     });
     setPhaseDrafts(drafts);
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [selected]);
 
   const list = useMemo(() => {
@@ -340,6 +360,11 @@ export default function PipPastPlansPage() {
 
             {modalError && <div className="pip-alert pip-alert-error">{modalError}</div>}
             {message && <div className="pip-alert pip-alert-success">{message}</div>}
+            {!selected.canEdit && selected.status && (
+              <div className="pip-alert pip-alert-warning">
+                This PIP is view-only for your current position. To update phases or finish the PIP, enable Edit PIP for this position or open a PIP that you created with Create PIP permission.
+              </div>
+            )}
 
             <div className="pip-detail-grid">
               <div>
@@ -384,7 +409,7 @@ export default function PipPastPlansPage() {
                     status: phase.status,
                     reasonNote: phase.reasonNote || "",
                   };
-                  const phaseHasStarted = !phase.startDate || new Date(phase.startDate) <= new Date();
+                  const phaseHasStarted = hasDateArrived(phase.startDate);
 
                   return (
                     <div className="pip-phase-detail-card" key={phase.id}>
